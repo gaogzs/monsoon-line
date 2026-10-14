@@ -358,28 +358,46 @@ var Game = (function () {
     document.getElementById('acName').textContent = ac.name + '  「' + ac.cn + '」';
     document.getElementById('acRole').textContent = ac.role + '  ·  ' + ac.maker;
 
+    /* 先算挂载重量 —— 六维条要拿它算"挂载之后"的实际值 */
+    var list = resolveLoadout(ac, lo);
+    var mass = loadoutMass(ac, lo);
+    var mtow = ac.maxLoad || 5000;
+    var loadK = Math.min(1, mass / mtow);
+    var lp = loadoutPenalty(loadK);
+    var gun = WEAPONS[ac.gun];
+
+    /* 六维条显示的是**挂载之后**的实际值，不是机型的固有值 ——
+       否则玩家看着一架飞机的数据、开的却是另一架。
+       只有受挂载影响的维度会缩水，被吃掉的那一段用暗红标出来，
+       右边再把净损失放在括号里。 */
     var stats = [
       ['最大速度', 'spd'], ['机动性', 'mob'], ['低可探测', 'stl'],
       ['火力', 'fire'], ['生存性', 'dur'], ['航程', 'rng']
     ];
     var sh = '';
     for (var k = 0; k < stats.length; k++) {
-      var v = ac.stats[stats[k][1]];
+      var key = stats[k][1];
+      var base = ac.stats[key];
+      var v = base;
+      if (key === 'spd') v = base * lp.vMax;
+      else if (key === 'mob') v = base * ((lp.pitch + lp.roll + lp.acc) / 3);
+
+      var lostK = Math.max(0, base - v);
       sh += '<div class="stat-row"><span class="l">' + stats[k][0] + '</span>' +
-        '<span class="stat-bar"><i style="width:' + (v * 100).toFixed(0) + '%"></i></span>' +
-        '<span class="v">' + (v * 100).toFixed(0) + '</span></div>';
+        '<span class="stat-bar"><i style="width:' + Math.round(v * 100) + '%"></i>' +
+        (lostK > 0.004
+          ? '<u style="left:' + Math.round(v * 100) + '%;width:' +
+            (lostK * 100).toFixed(1) + '%"></u>'
+          : '') +
+        '</span>' +
+        '<span class="v">' + Math.round(v * 100) +
+        (lostK > 0.004 ? '<em>−' + Math.round(lostK * 100) + '</em>' : '') +
+        '</span></div>';
     }
     document.getElementById('acStats').innerHTML = sh;
     document.getElementById('acDesc').innerHTML = ac.desc;
 
     buildHardpointEditor(ac, lo);
-
-    /* ---- 载弹与重量汇总 ---- */
-    var list = resolveLoadout(ac, lo);
-    var mass = loadoutMass(ac, lo);
-    var mtow = ac.maxLoad || 5000;
-    var loadK = Math.min(1, mass / mtow);
-    var gun = WEAPONS[ac.gun];
 
     var sum = '<div class="ld-head">出击配置</div>';
     sum += '<div class="ld-row"><span class="n">' + gun.name + '</span>' +
@@ -396,12 +414,30 @@ var Game = (function () {
     sum += '<div class="ld-row"><span class="n">干扰弹</span>' +
       '<span class="a">×8</span><span class="s">固定</span></div>';
 
-    var pen = Math.round(loadK * 100);
-    sum += '<div class="ld-mass">挂载重量 <b>' + mass + ' / ' + mtow + ' kg</b>' +
-      '<br>机动性 ' + (pen > 1
-        ? '<b class="warn">−' + Math.round(loadK * 18) + '%</b>（空置挂架可以换回一点）'
-        : '<b>无损失</b>') +
-      '</div>';
+    /* 挂载影响：逐项列出来。
+       以前这里只有一句 "机动性 −(loadK×18)%" —— 那只取了俯仰一项，
+       把最狠的加速 −26% 和失速速度上升整个漏掉了，
+       玩家看到的损失比真实手感小得多。另外它在 loadK 很小时
+       会算出 "−0%"，因为判断阈值和显示系数是两套数。 */
+    function pctTxt(x) {
+      if (x <= 0) return '0';
+      var v = x * 100;
+      return v < 1 ? '&lt;1' : String(Math.round(v));
+    }
+
+    sum += '<div class="ld-mass">挂载重量 <b>' + mass + ' / ' + mtow + ' kg</b>';
+    if (loadK > 0.015) {
+      sum += '<div class="ld-pen"><span class="l">挂载影响</span>' +
+        '<b class="warn">加速 −' + pctTxt(1 - lp.acc) + '%</b>' +
+        '<b class="warn">俯仰 −' + pctTxt(1 - lp.pitch) + '%</b>' +
+        '<b class="warn">滚转 −' + pctTxt(1 - lp.roll) + '%</b>' +
+        '<b>最大速度 −' + pctTxt(1 - lp.vMax) + '%</b>' +
+        '<b>失速 +' + pctTxt(lp.vStall - 1) + '%</b>' +
+        '</div>';
+    } else {
+      sum += '<div class="ld-pen"><span class="l">挂载影响</span><b>无损失</b></div>';
+    }
+    sum += '</div>';
     sum += '<div class="ld-note">编号前缀取自逻辑语词根 —— ' +
       '环带工程自 2062 年起以逻辑语为签字语言，详见资料库。</div>';
     document.getElementById('acLoadout').innerHTML = sum;

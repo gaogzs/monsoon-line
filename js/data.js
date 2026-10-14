@@ -981,6 +981,28 @@ var STORE_COOLDOWN = {
   }
 })();
 
+/**
+ * 挂载对飞行性能的影响系数。
+ *
+ * **界面和物理必须用这一份。** 它们各写一套数字的结果就是漂移：
+ * 机库面板曾经只显示 `×18`（俯仰），而实际最狠的是加速的 −26%，
+ * 玩家看到的损失比真实手感小得多。
+ *
+ * lf = loadFactor，挂载重量 / 最大挂载，0..1。
+ * 返回值是**乘数**（失速速度那项大于 1，因为挂载让它变高）。
+ */
+function loadoutPenalty(lf) {
+  lf = Math.max(0, Math.min(1, lf || 0));
+  return {
+    vMax: 1 - 0.08 * lf,
+    vMil: 1 - 0.06 * lf,
+    vStall: 1 + 0.05 * lf,
+    acc: 1 - 0.26 * lf,
+    pitch: 1 - 0.18 * lf,
+    roll: 1 - 0.12 * lf
+  };
+}
+
 var MISSILE_LEAD = {
   srm: 0.38, trm: 0.48, hos: 0.30, qsr: 0.42, wasp: 0.55,
   v9: 0.52, v11: 0.62, mrm: 0.78, v17: 0.82, arm: 0.72,

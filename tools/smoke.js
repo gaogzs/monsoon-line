@@ -590,6 +590,48 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 挂载性能系数 ---- */
+  {
+    const lp0 = sandbox.loadoutPenalty(0);
+    const lp1 = sandbox.loadoutPenalty(1);
+    const bad = [];
+    if (lp0.acc !== 1 || lp0.pitch !== 1 || lp0.vMax !== 1 || lp0.vStall !== 1) {
+      bad.push('空载时不该有任何损失');
+    }
+    if (!(lp1.acc < lp1.pitch && lp1.pitch < lp1.roll)) {
+      bad.push('惩罚权重排序不对：加速应当最重、滚转最轻（现在界面只显示俯仰那一项）');
+    }
+    if (!(lp1.vStall > 1)) bad.push('满载时失速速度应当升高');
+    if (bad.length) bad.forEach(fail);
+    else ok('挂载性能系数：空载无损、满载加速 −26% 最重、失速速度升高');
+  }
+
+  /* ---- 六维条必须随挂载变化 ---- */
+  {
+    const statsEl = byId.get('acStats');
+    if (!statsEl) {
+      fail('index.html 缺少 #acStats');
+    } else {
+      const base = statsEl.__html || '';
+      const picker2 = byId.get('hpPicker');
+      const cards2 = picker2
+        ? picker2.children.filter(c => /pk-card/.test(c.className || ''))
+        : [];
+
+      // 逐个试：只要有一种挂载让六维条变了，就说明它是动态算的
+      let changed = false;
+      for (const c of cards2) {
+        c.fire('click');
+        if ((byId.get('acStats').__html || '') !== base) { changed = true; break; }
+      }
+      if (!changed) {
+        fail('换了挂载但六维条纹丝不动 —— 面板显示的是机型的固有值，不是实际配置');
+      } else {
+        ok('六维条随挂载变化');
+      }
+    }
+  }
+
   /* ---- 敌机的呼号与型号不能混为一谈 ---- */
   {
     let bad = 0, withCall = 0, noCall = 0;

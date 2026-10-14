@@ -215,14 +215,16 @@ var Ent = (function () {
     // 挂载越重越笨拙：加速、转向、滚转都吃一点亏。
     // loadFactor 只由玩家按机库配置设定，AI 不带挂载所以是 undefined。
     if (a.loadFactor) {
-      var lf = M3.clamp(a.loadFactor, 0, 1);
+      // 系数来自 loadoutPenalty() —— 和机库面板显示的是同一份，
+      // 免得界面上的数字与实际手感对不上
+      var lp = loadoutPenalty(a.loadFactor);
       p = {
-        vMax: p.vMax * (1 - 0.08 * lf),
-        vMil: p.vMil * (1 - 0.06 * lf),
-        vStall: p.vStall * (1 + 0.05 * lf),
-        acc: p.acc * (1 - 0.26 * lf),
-        pitch: p.pitch * (1 - 0.18 * lf),
-        roll: p.roll * (1 - 0.12 * lf)
+        vMax: p.vMax * lp.vMax,
+        vMil: p.vMil * lp.vMil,
+        vStall: p.vStall * lp.vStall,
+        acc: p.acc * lp.acc,
+        pitch: p.pitch * lp.pitch,
+        roll: p.roll * lp.roll
       };
     }
 
