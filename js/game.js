@@ -781,23 +781,49 @@ var Game = (function () {
       g.beginPath(); g.moveTo(W * i / 6, 0); g.lineTo(W * i / 6, H); g.stroke();
       g.beginPath(); g.moveTo(0, H * i / 6); g.lineTo(W, H * i / 6); g.stroke();
     }
-    // 岛屿轮廓（示意）
-    g.fillStyle = 'rgba(40,60,72,0.55)';
-    g.beginPath();
-    g.ellipse(W * 0.34, H * 0.62, W * 0.20, H * 0.13, 0.5, 0, Math.PI * 2);
-    g.fill();
-    g.beginPath();
-    g.ellipse(W * 0.70, H * 0.40, W * 0.13, H * 0.09, -0.3, 0, Math.PI * 2);
-    g.fill();
-
     var R = 17000;
     var cx = W / 2, cy = H * 0.72;
+    // 世界坐标 → 屏幕坐标。x 与 z 的缩放系数不同（地图是压扁的），
+    // 所以陆块在屏幕上也会被相应拉伸。
+    function MX(wx) { return cx + wx / R * (W * 0.45); }
+    function MY(wz) { return cy - wz / R * (H * 0.62); }
+
+    /* 陆块：每个任务自己定义（见 missions.js 的 land 字段）。
+       以前这里是两个写死比例的椭圆，注释写着"示意" ——
+       于是三关长得一模一样，还会让人以为关卡是围着它们摆的。 */
+    var lands = m.land || [];
+    for (i = 0; i < lands.length; i++) {
+      var lg = lands[i];
+      var sx = (lg.rx / R) * (W * 0.45);
+      var sy = (lg.rz / R) * (H * 0.62);
+      var lx = MX(lg.x), ly = MY(lg.z);
+
+      g.fillStyle = 'rgba(40,60,72,0.55)';
+      g.strokeStyle = 'rgba(74,110,130,0.60)';
+      g.lineWidth = 1.1;
+      g.beginPath();
+      // 屏幕 y 轴朝下，所以世界里的正向旋转要取负
+      g.ellipse(lx, ly, sx, sy, -lg.rot, 0, Math.PI * 2);
+      g.fill(); g.stroke();
+
+      // 叠两块暗色，看起来像地形起伏而不是一块纯色斑
+      g.fillStyle = 'rgba(24,38,48,0.45)';
+      g.beginPath();
+      g.ellipse(lx - sx * 0.26, ly + sy * 0.20, sx * 0.42, sy * 0.36,
+        -lg.rot + 0.4, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.ellipse(lx + sx * 0.30, ly - sy * 0.16, sx * 0.33, sy * 0.29,
+        -lg.rot - 0.3, 0, Math.PI * 2);
+      g.fill();
+    }
+
     var cols = { base: '#4fe08a', enemy: '#ff4d4d', relay: '#ffb03a', sam: '#ff8b2a', site: '#45d6ff' };
 
     for (i = 0; i < m.map.length; i++) {
       var p = m.map[i];
-      var x = cx + p.x / R * (W * 0.45);
-      var y = cy - p.z / R * (H * 0.62);
+      var x = MX(p.x);
+      var y = MY(p.z);
       var col = cols[p.type] || '#8fa3b2';
       g.strokeStyle = col; g.lineWidth = 1.6;
       g.beginPath();
