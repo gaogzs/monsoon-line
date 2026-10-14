@@ -1897,6 +1897,76 @@ var Game = (function () {
   }
 
   /* ============================================================
+     挂架上的实物
+
+     以前挂载只存在于 HUD 的俯视缩略图里，飞机模型永远是"干净"的 ——
+     打出去多少弹，机身外观一点变化都没有。现在按挂点逐个渲染：
+     **槽就绪时挂着弹，冷却中就是空的**。
+
+     这样"还剩几发"不用盯 HUD 也知道，而且打完最后一发的瞬间
+     整片机翼会明显变干净 —— 比数字更直观。
+
+     高度数据：hardpointGroups 的 pts 只有 (x, y)，
+     对应机体的(横向, 前后)，没有高度。所以按挂点类型补一个默认值，
+     翼下吊挂比翼尖低、机腹最低。
+     ============================================================ */
+  var STORE_HY = { tip: -0.35, heavy: -1.35, light: -1.15, belly: -1.95 };
+
+  function pushOneStore(a, pt, gkind, w) {
+    var hy = STORE_HY[gkind];
+    if (hy === undefined) hy = -1.2;
+    // 机体坐标 → 世界：x 取右、y 取上、z 取机头方向
+    var local = M3.V(pt.x, hy, pt.y);
+    var wp = M3.add(a.pos, M3.add(M3.mul(a.right, local.x),
+      M3.add(M3.mul(a.up, local.y), M3.mul(a.fwd, local.z))));
+    var mdl = MODELS[w.model] || MODELS.missile;
+    Renderer.pushModel(mdl, wp, a.fwd, a.up, { scale: 0.85 });
+  }
+
+  function pushStores(a) {
+    if (!a.ac || !a.ac.hardpointGroups) return;
+    if (a === player && !a.loadout) return;
+
+    var lo = a.loadout || {};
+    var slots = a.slotCd || {};
+    var gi, pi;
+
+    for (gi = 0; gi < a.ac.hardpointGroups.length; gi++) {
+      var g = a.ac.hardpointGroups[gi];
+      var wid = lo[g.id];
+      // NPC 没有 loadout，退到它的制式弹种
+      if (!wid && a.special) wid = a.special;
+      if (!wid) continue;
+
+      var w = WEAPONS[wid];
+      if (!w || w.kind === 'gun') continue;
+      /* 这种弹能不能挂在这种挂点上。
+
+         玩家那边由选装界面保证，NPC 是代码直接指定弹种的，得自己查 ——
+         否则一枚只能进弹舱的巡航弹会被画到翼尖上去。 */
+      if (w.fits && w.fits.indexOf(g.kind) < 0) continue;
+
+      // 已经打光：冷却早已归零，但挂架上不该再有任何东西
+      var pool = a.ammoPool ? a.ammoPool[wid] : undefined;
+      if (pool !== undefined && pool <= 0) continue;
+
+      if (w.kind === 'ecm' && w.passive) {
+        // 被动吊舱没有冷却，装上就一直在
+        for (pi = 0; pi < g.pts.length; pi++) pushOneStore(a, g.pts[pi], g.kind, w);
+        continue;
+      }
+
+      var arr = slots[wid] || [];
+      var total = w.cd > 0 ? w.cd : 1;
+      for (pi = 0; pi < g.pts.length; pi++) {
+        // 这个发射槽还在装填 → 挂架空着
+        if ((arr[pi] || 0) > 0) continue;
+        pushOneStore(a, g.pts[pi], g.kind, w);
+      }
+    }
+  }
+
+  /* ============================================================
      渲染
      ============================================================ */
   function render() {
@@ -1925,6 +1995,7 @@ var Game = (function () {
       if (!m2) continue;
       // sweep 只对带 morph 数据的模型（DB-11 的可变后掠翼）有意义
       Renderer.pushModel(m2, a.pos, a.fwd, a.up, { sweep: a.sweep || 0 });
+      pushStores(a);
     }
     // 导弹
     for (i = 0; i < world.missiles.length; i++) {

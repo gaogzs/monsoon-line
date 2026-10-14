@@ -1131,6 +1131,45 @@ if (Ent && M3 && me && world) {
     else ok('鼠标压到屏幕下方改用滚转仰起（三种 FOV 下一致）');
   }
 
+  /* ---- 挂架上的实物：冷却中应当是空的 ----
+     以前挂载只存在于 HUD 的俯视缩略图里，飞机模型永远是干净的。
+     现在按挂点渲染实体，槽就绪时挂着、冷却中是空的。
+     这条断言数的是"渲染器实际收到的模型数"，所以能真的抓到
+     "打完弹机身外观没变化"这类问题。 */
+  {
+    const R = sandbox.Renderer;
+    let calls = 0;
+    const orig = R.pushModel;
+    R.pushModel = function (mdl, pos, fwd, up, opts) {
+      calls++;
+      return orig(mdl, pos, fwd, up, opts);
+    };
+
+    sandbox.Game.startMission(0);
+    const pl = sandbox.Game.__player();
+
+    pump(1);
+    const before = calls;
+
+    // 把所有发射槽全部打进冷却
+    for (const wid in (pl.slotCd || {})) {
+      const arr = pl.slotCd[wid];
+      for (let i = 0; i < arr.length; i++) arr[i] = 999;
+    }
+    calls = 0;
+    pump(1);
+    const after = calls;
+
+    R.pushModel = orig;
+
+    if (after >= before) {
+      fail('打空所有发射槽后，渲染的模型数没有减少（' +
+        before + ' → ' + after + '）—— 挂架上的实物没跟着消失');
+    } else {
+      ok('挂架实物随冷却变化：' + before + ' → ' + after + ' 个模型');
+    }
+  }
+
   /* ---- 诊断：AI 到底用不用机炮 ---- */
   {
     const Ent2 = sandbox.Ent, M3d = sandbox.M3, Wd = sandbox.WEAPONS;
