@@ -175,7 +175,15 @@ var AI = (function () {
     if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 
     /* ---------- 3. 选择目标 ---------- */
-    if (s.retargetT <= 0 || !s.target || !s.target.alive) {
+    if (s.role === 'drone') {
+      /* 无人僚机没有自主判断力：目标永远来自长机的授权。
+
+         长机锁定了谁，它才打谁；长机没锁定，它就一弹不发。
+         设定里写得清楚 —— 它自己看不见任何东西，全靠长机把参数喂过来。 */
+      var dLead = world.player;
+      s.target = (dLead && dLead.alive && dLead.target && dLead.target.alive)
+        ? dLead.target : null;
+    } else if (s.retargetT <= 0 || !s.target || !s.target.alive) {
       s.retargetT = 0.35 + (1 - s.skill) * 0.9;
       if (s.role === 'wingman' && s.cmd === 'focus' && world.player && world.player.target) {
         s.target = world.player.target;
@@ -213,6 +221,33 @@ var AI = (function () {
       else desired = a.fwd;
       desired = M3.norm(M3.V(desired.x, 0.06, desired.z));
       throttle = 1; ab = true;
+    } else if (s.role === 'drone') {
+      /* 无人僚机永远待在编队里，不追出去。
+
+         它的价值在于替长机挡导弹、探路、把导弹挂架打空 ——
+         一旦追出去，这三件事就都做不成了。
+         所以它的机动**只跟编队位置有关**，目标只用于决定何时开火。 */
+      var dLead2 = world.player;
+      if (dLead2 && dLead2.alive) {
+        var sl = s.formation || { dx: 140, dy: 25, dz: -190 };
+        var wpD = M3.add(dLead2.pos,
+          M3.add(M3.mul(dLead2.right, sl.dx),
+            M3.add(M3.mul(dLead2.fwd, sl.dz), M3.V(0, sl.dy, 0))));
+        desired = M3.norm(M3.sub(wpD, a.pos));
+        var dWp = M3.dist(wpD, a.pos);
+        // 落后就开加力追，到位就收油门省油
+        if (dWp > 700) { throttle = 1; ab = true; }
+        else throttle = 0.75;
+      } else {
+        /* 长机没了：原地盘旋到燃料耗尽。
+
+           它不会接管战局，也不会自己选目标 —— 这不是能力问题，
+           是它压根没有那套东西。设定里就是这么写的。 */
+        var tan = a.right;
+        var climb = a.pos.y < 3200 ? 0.12 : -0.05;
+        desired = M3.norm(M3.V(tan.x, climb, tan.z));
+        throttle = 0.6;
+      }
     } else if (s.role === 'wingman' && (!s.target || s.cmd === 'spread')) {
       // 编队 / 巡航
       var lead = world.player;

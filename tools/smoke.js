@@ -808,6 +808,97 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 无人僚机：授权开火 + 长机阵亡后盘旋 ----
+     它和有人僚机的根本差别是"没有判断力"：
+     目标只能来自长机授权，长机死了也不会自己找架打。 */
+  {
+    const AI = sandbox.AI, M3 = sandbox.M3;
+
+    function scenario() {
+      const w = { actors: [], missiles: [], particles: [], targets: [], time: 0 };
+      const lead = Ent.makeAircraft({
+        type: 'c11', team: 0, x: 0, y: 5000, z: 0,
+        fwd: M3.V(0, 0, 1), speed: 300
+      });
+      const foe = Ent.makeAircraft({
+        type: 'm27', team: 1, x: 0, y: 5000, z: 3000,
+        fwd: M3.V(0, 0, -1), speed: 300
+      });
+      const drone = Ent.makeAircraft({
+        type: 'ucav', team: 0, x: 140, y: 5025, z: -190,
+        fwd: M3.V(0, 0, 1), speed: 300
+      });
+      w.player = lead;
+      w.actors.push(lead, foe, drone);
+      AI.attach(drone, {
+        role: 'drone', skill: 0.6,
+        formation: { dx: 140, dy: 25, dz: -190 }
+      });
+      return { w, lead, foe, drone };
+    }
+
+    const bad = [];
+
+    // 1. 长机没锁定时，无人机不得有任何目标
+    {
+      const s = scenario();
+      s.lead.target = null;
+      for (let i = 0; i < 5; i++) AI.update(s.drone, 1 / 60, s.w);
+      if (s.drone.ai.target) bad.push('长机未锁定时，无人机自己找到了目标');
+    }
+
+    // 2. 长机锁定后，无人机继承的必须是同一个目标
+    {
+      const s = scenario();
+      s.lead.target = s.foe;
+      for (let i = 0; i < 5; i++) AI.update(s.drone, 1 / 60, s.w);
+      if (s.drone.ai.target !== s.foe) bad.push('长机锁定后，无人机没有继承该目标');
+    }
+
+    // 3. 长机阵亡后，无人机不得自主接战，且不能朝敌人逼近
+    {
+      const s = scenario();
+      s.lead.target = s.foe;
+      AI.update(s.drone, 1 / 60, s.w);
+      s.lead.alive = false;
+      s.drone.ai.target = null;
+
+      const d0 = M3.dist(s.drone.pos, s.foe.pos);
+      let minD = d0;
+      for (let i = 0; i < 180; i++) {          // 3 秒
+        AI.update(s.drone, 1 / 60, s.w);
+        Ent.stepAircraft(s.drone, s.w, 1 / 60);
+        if (s.drone.ai.target) { bad.push('长机阵亡后，无人机自己选了目标'); break; }
+        const d = M3.dist(s.drone.pos, s.foe.pos);
+        if (d < minD) minD = d;
+      }
+      // 盘旋不该让它冲向敌人
+      if (minD < d0 * 0.55) {
+        bad.push('长机阵亡后无人机仍在向敌人逼近（' +
+          Math.round(d0) + 'm → ' + Math.round(minD) + 'm）');
+      }
+    }
+
+    // 4. 长机健在时，无人机应当留在编队附近
+    {
+      const s = scenario();
+      const d0 = M3.dist(s.drone.pos, s.lead.pos);
+      let maxD = d0;
+      for (let i = 0; i < 240; i++) {          // 4 秒
+        AI.update(s.drone, 1 / 60, s.w);
+        Ent.stepAircraft(s.drone, s.w, 1 / 60);
+        Ent.stepAircraft(s.lead, s.w, 1 / 60);
+        maxD = Math.max(maxD, M3.dist(s.drone.pos, s.lead.pos));
+      }
+      if (maxD > 1200) {
+        bad.push('无人机跟丢了长机：编队距离拉到 ' + Math.round(maxD) + 'm');
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('无人僚机行为正确：授权开火、长机阵亡后盘旋、编队不脱队');
+  }
+
   /* ---- 空翻：飞机翻过正上方/正下方，镜头不该跳 ----
      镜头俯仰被钳在 ±78°，飞机却可以翻过去。这时镜头的偏航要平滑转过
      180°，而俯仰始终不越界 —— 后者是关键：只要镜头永远到不了极点，

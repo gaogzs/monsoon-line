@@ -73,9 +73,10 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
   });
   a.name = CALLSIGN['wing' + idx];
   AI.attach(a, {
-    role: 'wingman', skill: 0.62,
-    formation: { dx: slotX, dy: slotY, dz: slotZ },
-    cmd: 'spread'
+    // role 用 drone 而不是 wingman：无人机没有判断力，
+    // 目标永远来自长机的授权，长机活着时也不自主接战。
+    role: 'drone', skill: 0.62,
+    formation: { dx: slotX, dy: slotY, dz: slotZ }
   });
   a.wingIdx = idx;
   w.actors.push(a);
