@@ -1436,6 +1436,47 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
     else ok('挂架装填受储备弹数约束：打光不恢复、有弹才装填');
 
+  /* ---- BIN-8 追云：一枚对空的重型拦截弹，制空/截击机必须挂得上 ----
+
+     它原来被标成"反辐射弹"、要求 strike（对地火控），于是只有攻击机
+     和多用途机能挂 —— 而它其实是对空的，最该带它的恰恰是 D-14、F-9
+     那些制空/截击机，它们没有 strike，反而挂不上。
+     更糟的是反辐射这个设定从来没有机制：全项目不读 antiRadar，
+     世界里也没有"雷达开机状态"这个概念，更没有预警机。 */
+  {
+    const A3 = sandbox.AIRCRAFT, W3 = sandbox.WEAPONS;
+    const bad = [];
+    const arm = W3.arm;
+
+    if (!arm) {
+      bad.push('找不到 BIN-8（arm）');
+    } else {
+      // 不该再有对地门槛
+      if (arm.needs && arm.needs.length) {
+        bad.push('BIN-8 仍然带有能力门槛 ' + JSON.stringify(arm.needs) +
+          ' —— 它是对空弹，不该要求对地火控');
+      }
+      if (arm.antiRadar) {
+        bad.push('BIN-8 仍标着 antiRadar，但没有任何代码读它');
+      }
+
+      // 制空 / 截击机必须挂得上
+      ['c14', 'c9', 'gal31'].forEach(id => {
+        const ac = A3.find(a => a.id === id);
+        if (!ac) return;
+        const hasHeavy = (ac.hardpointGroups || []).some(g => arm.fits.indexOf(g.kind) >= 0);
+        const needOK = !arm.needs || arm.needs.every(n => (ac.caps || []).indexOf(n) >= 0);
+        if (!(hasHeavy && needOK)) {
+          bad.push(ac.name + ' 挂不上 BIN-8（有重挂点=' + hasHeavy +
+            ' 门槛通过=' + needOK + '）—— 重型拦截弹正该由它们来带');
+        }
+      });
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('BIN-8 已去掉对地门槛：制空/截击机（D-14、F-9、GAL-31）均能挂载');
+  }
+
   /* ---- 两架高空机的性格必须真的分开 ----
 
      ctrl 只看动压，而同一高度下动压只跟空速有关 —— 不加干预的话，
