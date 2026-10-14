@@ -1333,6 +1333,17 @@ var Game = (function () {
     player.aimMag = Math.sqrt(player.aimX * player.aimX +
       player.aimDown * player.aimDown);
 
+    /* "相对镜头是不是正着飞"—— 机体 up 与**镜头** up 的一致度。
+
+       注意不能用 a.up.y（相对世界）。追尾机位有俯仰角（低头看飞机），
+       camUp 并不等于世界正上方：
+           镜头俯 60°、飞机相对镜头平飞时，a.up.y = cos60° = 0.50，
+           用世界判据会把它误判成"不正"，而它明明是正着的。
+
+       俯仰越大这个差别越明显，所以只能按镜头算。 */
+    var camNow = Renderer.getCam();
+    if (camNow) player.aimUpright = M3.dot(player.up, camNow.up);
+
     // 传 player 自身作为锁存容器（提供 rollLock / aimMag）
     AI.steerTo(player, dir, player.ctrl, player);
     player.aimDir = dir;

@@ -1202,6 +1202,30 @@ if (Ent && M3 && me && world) {
             ' —— 那姿态下绕 right 轴转是水平转向，不是压机头');
         }
       }
+
+      /* 判据必须是"相对镜头"，不能是"相对世界"。
+
+         追尾机位有俯仰角（低头看飞机），camUp ≠ 世界正上方。
+         镜头俯 60° 且飞机相对镜头平飞时，a.up.y 只有 cos60° = 0.50，
+         用世界判据会被误判成"不正"。这里直接喂 aimUpright = 1，
+         模拟"相对镜头正着飞"，必须仍然推杆。 */
+      {
+        const p = 60 * Math.PI / 180;
+        const camUp = M3.V(0, Math.cos(p), Math.sin(p));
+        const fwd = M3.V(0, 0, 1);
+        const dir = M3.norm(M3.add(M3.mul(camUp, -1), M3.mul(fwd, 0.2)));
+        const a = {
+          fwd: fwd, up: camUp, right: M3.norm(M3.cross(camUp, fwd)),
+          ctrl: { pitch: 0, roll: 0, yaw: 0 },
+          rollLock: 0, aimX: 0, aimDown: 0.12, aimMag: 0.12,
+          aimUpright: 1                    // 相对镜头是正着的
+        };
+        AI.steerTo(a, dir, a.ctrl, a);
+        if (!(a.ctrl.pitch < -0.01 && Math.abs(a.ctrl.roll) < 0.10)) {
+          bad.push('镜头大俯角时，相对镜头正着飞却没有推杆' +
+            '（a.up.y = ' + camUp.y.toFixed(2) + '，说明判据用成了世界方向）');
+        }
+      }
     }
 
     // ⑤ 靠近中心整体缩杆（gain，平方衰减）
