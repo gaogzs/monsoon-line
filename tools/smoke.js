@@ -1130,20 +1130,16 @@ if (Ent && M3 && me && world) {
       return a.ctrl.roll === 0 && a.ctrl.pitch < -0.02;
     }
 
-    /* 中心死区：不是"僵住"，而是柔和的自动回正 ——
-       滚转慢慢摆回机翼水平，俯仰朝镜头前方收敛。
-       这里返回 ctrl，好同时检查方向与力度。 */
-    function deadzoneCtrl(mag, rollDeg) {
-      const r = (rollDeg || 0) * Math.PI / 180;
-      const fwd = M3.V(0, 0, 1);
-      const o = M3.orthonormalize(fwd, M3.rotAxis(M3.V(0, 1, 0), fwd, r));
-      const right = M3.norm(M3.cross(o.up, fwd));
+    /* 用**固定的目标方向**、只改屏幕半径，来看整体缩杆倍率。
+       方向必须固定，否则比较的就是两个不同的分支了。 */
+    function ctrlAtMag(mag) {
       const a = {
-        fwd: fwd, up: o.up, right: right,
+        fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
         ctrl: { pitch: 0, roll: 0, yaw: 0 },
-        rollLock: 0, aimX: 0, aimDown: mag, aimMag: mag
+        rollLock: 0, aimX: mag, aimDown: 0, aimMag: mag
       };
-      AI.steerTo(a, M3.norm(M3.V(0, -mag * 0.3, 1)), a.ctrl, a);
+      const dir = M3.norm(M3.V(0.5, 0, 0.866));    // 固定：右前方 30°
+      AI.steerTo(a, dir, a.ctrl, a);
       return a.ctrl;
     }
 
@@ -1155,35 +1151,37 @@ if (Ent && M3 && me && world) {
     for (const k of [0.75, 0.9]) {
       if (pushesDown(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处仍在推杆');
     }
-    /* 1c. 中心死区（半径 0.05）：柔和的自动回正
+    /* 1c. 靠近中心时整体缩杆（**没有死区**）
 
-       检查三件事：
-         · 死区内杆量必须受限（不能变成自动改平按钮）
-         · 倾斜时必须给出**回正方向**的滚转
-         · 死区外不能再回正 */
-    for (const m of [0, 0.02, 0.04]) {
-      const c = deadzoneCtrl(m, 0);
-      if (Math.abs(c.roll) > 0.36 || Math.abs(c.pitch) > 0.31) {
-        bad.push('死区内杆量过大（m=' + m + ' roll=' + c.roll.toFixed(2) +
-          ' pitch=' + c.pitch.toFixed(2) + '）');
-      }
-    }
-    for (const d of [30, 90, 150]) {
-      const c = deadzoneCtrl(0.02, d);
-      if (!(c.roll > 0)) {
-        bad.push('滚转 ' + d + '° 时死区没有给出回正方向的杆量（' + c.roll.toFixed(2) + '）');
-      }
-    }
+       倍率是平方衰减，满杆点 AIM_FULL_MAG = 0.35：
+           半径 0.35  → 1.00
+           半径 0.175 → 0.25
+           半径 0.05  → 0.02
+       中心处必须趋近于 0（而不是被硬切断）。 */
     {
-      const c = deadzoneCtrl(0.02, 0);
-      if (c.roll !== 0) bad.push('机翼已水平时死区仍在滚转（' + c.roll.toFixed(2) + '）');
-    }
-    // 死区半径 0.05：0.06 应当已经出去
-    {
-      const c = deadzoneCtrl(0.06, 60);
-      if (Math.abs(c.roll) <= 0.36 && Math.abs(c.pitch) <= 0.31 &&
-        c.roll > 0 && c.pitch === 0) {
-        bad.push('鼠标在 6% 处仍然处于死区（半径应为 0.05）');
+      const full = ctrlAtMag(0.35);
+      const base = Math.abs(full.roll) + Math.abs(full.pitch);
+      if (base < 0.05) {
+        bad.push('满杆点处杆量几乎为 0（' + base.toFixed(3) + '），缩杆把正常输入也压掉了');
+      }
+
+      const center = ctrlAtMag(0.005);
+      if (Math.abs(center.roll) + Math.abs(center.pitch) > base * 0.02) {
+        bad.push('画面中心处杆量没有趋近于 0（' +
+          (Math.abs(center.roll) + Math.abs(center.pitch)).toFixed(4) + '）');
+      }
+
+      // 半径减半 → 杆量约剩四分之一（平方衰减）
+      const half = ctrlAtMag(0.175);
+      const ratio = (Math.abs(half.roll) + Math.abs(half.pitch)) / base;
+      if (ratio > 0.35 || ratio < 0.15) {
+        bad.push('半径减半时杆量倍率应为约 0.25，实测 ' + ratio.toFixed(3));
+      }
+
+      // 超过满杆点不再增长
+      const over = ctrlAtMag(0.9);
+      if (Math.abs(over.roll) > base + 1e-6) {
+        bad.push('超过满杆点后杆量仍在增长');
       }
     }
     // 2. 压到底部：必须走滚转仰起

@@ -52,11 +52,10 @@ var AI = (function () {
    */
   /* 鼠标的这些界限都按**屏幕归一化距离**定（1 = 屏幕边缘，
      屏幕角落约 1.41），所以与 FOV 无关。 */
-  var AIM_DEADZONE = 0.05;    // 中央 5% 内进入回正
   var AIM_PUSH_MAG = 0.65;    // 径向幅度小于它才可能走推杆
-  // 死区里自动回正的强度上限（不是"不动"，是"轻轻扶正"）
-  var AIM_TRIM_ROLL = 0.35;
-  var AIM_TRIM_PITCH = 0.30;
+  /* 满杆点：鼠标到这个屏幕半径时杆量给足。比它更靠近中心就整体缩杆，
+     而且是平方衰减 —— 中心附近掉得极快（见 steerTo 里的 gain）。 */
+  var AIM_FULL_MAG = 0.35;
 
   function steerTo(a, desired, out, st) {
     var fx = M3.dot(desired, a.fwd);
@@ -66,38 +65,26 @@ var AI = (function () {
     var off0 = Math.acos(M3.clamp(fx, -1, 1));
     var mag0 = M3.clamp(off0 * 2.3, 0, 1);
 
-    /* ---------- 中心死区：柔和自动回正 ----------
+    /* ---------- 靠近中心时整体缩杆（没有死区） ----------
 
-       鼠标停在画面中央一小片区域时，不做机动转向，而是**缓慢地**
-       把飞机扶回稳定状态：
+       鼠标越靠近画面中心，所有转向杆量越小，而且是**平方衰减** ——
+       中心附近掉得极快：
 
-         ① 滚转回正 —— 把世界正上方转到机翼上方（机翼恢复水平）
-         ② 俯仰对齐 —— 机头朝镜头正前方靠拢，也就是照当前视线直飞
+          半径 0.35（满杆点） → gain 1.00
+          半径 0.175          → gain 0.25
+          半径 0.05           → gain 0.02
 
-       早期版本这里直接给 0（完全不动），结果是飞机带着一个歪斜姿态
-       一直飞下去 —— 玩家松开鼠标想让飞机"稳下来"的预期落空。
+       刻意不做成死区：死区里"完全不动"会让飞机带着歪斜姿态一直飞，
+       而硬边界的另一侧又突然满杆。平方衰减两头都平滑，
+       鼠标在中心时杆量趋近于 0，飞机自然就稳住当前姿态，
+       但玩家真要微调也还留得下一点点。
 
-       力度刻意压得很低（ROLL/PITCH 上限约最大杆量的三分之一），
-       否则死区本身就成了一个自动改平按钮。
-
-       回正是绕机体轴做的，所以要先把"世界正上方"换算到机体坐标系里，
-       不能直接用世界坐标 —— 那样侧飞时会往奇怪的方向滚。 */
+       注意 gain 乘的是**所有**分支的输出，包括推杆那一支。 */
     var aimMag = (st && st.aimMag !== undefined) ? st.aimMag : null;
-
-    if (aimMag !== null && aimMag < AIM_DEADZONE) {
-      if (st) st.rollLock = 0;            // 解锁，免得出死区时带着旧锁存
-
-      // ① 世界正上方在机体 right / up 上的分量 → 需要滚多少才能摆正
-      var wx = M3.dot(M3.V(0, 1, 0), a.right);
-      var wy = M3.dot(M3.V(0, 1, 0), a.up);
-      var trimErr = Math.atan2(-wx, wy);
-
-      out.roll = M3.clamp(-trimErr * 1.3, -AIM_TRIM_ROLL, AIM_TRIM_ROLL);
-
-      // ② 镜头前方在机体 up 上的分量 → 决定抬头还是低头
-      out.pitch = M3.clamp(ux * 1.2, -AIM_TRIM_PITCH, AIM_TRIM_PITCH);
-      out.yaw = 0;
-      return out;
+    var gain = 1;
+    if (aimMag !== null) {
+      var kk = M3.clamp(aimMag / AIM_FULL_MAG, 0, 1);
+      gain = kk * kk;
     }
 
     /* ---------- 唯一的例外：指向机腹一侧，而且屏幕上偏得不多 → 推杆 ----------
@@ -120,7 +107,7 @@ var AI = (function () {
 
     if (ux < -0.02 && smallMag) {
       out.roll = 0;                       // 纯推杆，不叠滚转
-      out.pitch = -mag0 * (0.55 + 0.45 * Math.sqrt(M3.clamp(-ux, 0, 1)));
+      out.pitch = -mag0 * (0.55 + 0.45 * Math.sqrt(M3.clamp(-ux, 0, 1))) * gain;
       out.yaw = 0;
       return out;
     }
@@ -163,9 +150,9 @@ var AI = (function () {
     var yawCmd = 0;
     if (fx < -0.45) yawCmd = M3.clamp(rx * 1.8, -1, 1);
 
-    out.pitch = pitchCmd;
-    out.roll = rollCmd;
-    out.yaw = yawCmd;
+    out.pitch = pitchCmd * gain;
+    out.roll = rollCmd * gain;
+    out.yaw = yawCmd * gain;
     return out;
   }
 
