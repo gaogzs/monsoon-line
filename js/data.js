@@ -579,7 +579,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
     turn: 1.75, seeker: 'ir', lockCone: 45 * Math.PI / 180, lockDist: 4200,
-    dmg: 30, ammo: 8, cd: 0.55, salvo: 1, flare: 0.38, prox: 20,
+    dmg: 30, ammo: 8, cd: 0.11, salvo: 1, flare: 0.38, prox: 20,
     target: 'air', highAltScale: true,
     desc: `基础短程红外弹。转弯率 2.4 rad/s，抗干扰一般，锁定锥 45°。
       单点挂载量是全部弹种里最高的 —— 它就是用来"多带几发"的。`,
@@ -596,7 +596,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 820, boost: 210, life: 5.0, vsLife: 13.0,
     turn: 1.95, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4800,
-    dmg: 32, ammo: 6, cd: 0.70, salvo: 1, flare: 0.24, prox: 20,
+    dmg: 32, ammo: 6, cd: 0.14, salvo: 1, flare: 0.24, prox: 20,
     target: 'air', highAltScale: true,
     desc: '短哨是基础弹的抗干扰改型：换了双色导引头，flare 从 0.38 降到 0.24，' +
       '代价是单价上去了、单挂点只能带 6 发。',
@@ -608,7 +608,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 700, boost: 240, life: 4.0, vsLife: 11.0,
     turn: 2.60, seeker: 'ir', lockCone: 88 * Math.PI / 180, lockDist: 3200,
-    dmg: 28, ammo: 4, cd: 0.60, salvo: 1, flare: 0.42, prox: 18,
+    dmg: 28, ammo: 4, cd: 0.12, salvo: 1, flare: 0.42, prox: 18,
     target: 'air', highAltScale: true, hobs: true,
     desc: '环刃的导引头能在 88° 离轴角上锁定 —— 机头都不用转过去就能打。' +
       '转弯率是全家族最高的，但射程和抗干扰都垫底。',
@@ -620,7 +620,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 900, boost: 200, life: 8.0, vsLife: 20.0,
     turn: 1.45, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 8600,
-    dmg: 40, ammo: 4, cd: 3.20, salvo: 1, flare: 0.30, prox: 26,
+    dmg: 40, ammo: 4, cd: 0.64, salvo: 1, flare: 0.30, prox: 26,
     target: 'air', highAltScale: true, reAcquire: true,
     desc: '主动雷达中距弹。不吃干扰弹 —— 对付它只能靠机动和地形。' +
       '锁定需要时间，打完就得脱离，否则对方会用同样的东西回敬你。',
@@ -632,7 +632,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 880, boost: 190, life: 7.5, vsLife: 18.0,
     turn: 1.35, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 9500,
-    dmg: 52, ammo: 2, cd: 4.60, salvo: 1, flare: 0.35, prox: 28,
+    dmg: 52, ammo: 2, cd: 0.92, salvo: 1, flare: 0.35, prox: 28,
     target: 'air',
     /* 这里原本写着 antiRadar: true，以及一句"对开机状态的敌方雷达与
        预警机伤害翻倍"。但那从来不是真的：全项目没有任何地方读
@@ -657,7 +657,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 1150, boost: 160, life: 10.0, vsLife: 24.0,
     turn: 0.92, seeker: 'radar', lockCone: 22 * Math.PI / 180, lockDist: 12500,
-    dmg: 58, ammo: 2, cd: 5.20, salvo: 1, flare: 0.72, prox: 30,
+    dmg: 58, ammo: 2, cd: 1.04, salvo: 1, flare: 0.72, prox: 30,
     target: 'air', highAltScale: true, scramjet: true, nezer: true,
     desc: '冲压发动机远距弹的改进型。不可逃逸区是全家族最大的，' +
       '但 18 km 以上缺氧，动力段会从 10 秒掉到 2.4 秒 —— 高空它反而不好用。',
@@ -669,7 +669,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 980, boost: 150, life: 12.0, vsLife: 30.0,
     turn: 0.78, seeker: 'radar', lockCone: 18 * Math.PI / 180, lockDist: 16000,
-    dmg: 66, ammo: 1, cd: 7.50, salvo: 1, flare: 0.66, prox: 34,
+    dmg: 66, ammo: 1, cd: 1.5, salvo: 1, flare: 0.66, prox: 34,
     target: 'air', highAltScale: true, bigTarget: true,
     desc: '一发就占满一个重挂点。它存在的意义是把预警机和浮空平台' +
       '从护航圈里拽下来 —— 打战斗机是浪费。',
@@ -681,7 +681,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 740, boost: 190, life: 4.2, vsLife: 11.0,
     turn: 1.70, seeker: 'ir', lockCone: 52 * Math.PI / 180, lockDist: 4000,
-    dmg: 24, ammo: 12, cd: 1.40, salvo: 3, flare: 0.40, prox: 16,
+    dmg: 24, ammo: 12, cd: 0.28, salvo: 3, flare: 0.40, prox: 16,
     target: 'air', highAltScale: true,
     desc: '三联装发射巢，一个挂点就是三枚。单发威力最小，' +
       '但一次齐射能铺开一片 —— 用来逼对方放弃进攻航线比用来击落更有效。',
@@ -693,7 +693,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 860, boost: 260, life: 4.8, vsLife: 12.0,
     turn: 2.15, seeker: 'ir', lockCone: 58 * Math.PI / 180, lockDist: 5200,
-    dmg: 38, ammo: 3, cd: 1.90, salvo: 1, flare: 0.36, prox: 22,
+    dmg: 38, ammo: 3, cd: 0.38, salvo: 1, flare: 0.36, prox: 22,
     target: 'air', highAltScale: true, reAcquire: true,
     desc: '锥刺的轻量版：推力更猛、加速更快，进不可逃逸区比谁都快。' +
       '代价是动力段短，追不上掉头就跑的目标。',
@@ -707,7 +707,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 320, boost: 90, life: 14.0, vsLife: 26.0,
     turn: 0.55, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 6000,
-    dmg: 150, ammo: 4, cd: 2.40, salvo: 1, flare: 0.55, prox: 26,
+    dmg: 150, ammo: 4, cd: 0.48, salvo: 1, flare: 0.55, prox: 26,
     target: 'ground',
     desc: '无动力滑翔制导炸弹。轻、便宜、能多带 —— 一个重挂点塞得下四枚。' +
       '缺点是扔出去之后就只能等，目标挪了就打空。',
@@ -719,7 +719,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 480, boost: 140, life: 10.0, vsLife: 22.0,
     turn: 0.90, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 9000,
-    dmg: 340, ammo: 2, cd: 3.60, salvo: 1, flare: 0.75, prox: 34,
+    dmg: 340, ammo: 2, cd: 0.72, salvo: 1, flare: 0.75, prox: 34,
     target: 'ground',
     desc: '重型侵彻战斗部，专门对付加固机堡和指挥所。' +
       '一发就能解决一座控制站，但一个挂点只带得下两枚。',
@@ -731,7 +731,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 540, boost: 130, life: 9.0, vsLife: 20.0,
     turn: 1.05, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 8200,
-    dmg: 260, ammo: 2, cd: 3.20, salvo: 1, flare: 0.68, prox: 30,
+    dmg: 260, ammo: 2, cd: 0.64, salvo: 1, flare: 0.68, prox: 30,
     target: 'ship', bigTarget: true,
     desc: '为浮空平台设计的串联战斗部：先撕气囊、再打吊舱。' +
       '打战斗机和海上目标都是浪费。',
@@ -756,7 +756,7 @@ var WEAPONS = {
     id: 'rkt', name: 'PEJ-6', cn: '撒星 · STARSCATTER', kind: 'bomb',
     model: 'bomb',
     speed: 620, life: 3.0, vsLife: 3.0,
-    dmg: 22, ammo: 28, cd: 1.10, salvo: 7, prox: 14,
+    dmg: 22, ammo: 28, cd: 0.22, salvo: 7, prox: 14,
     target: 'ground', unguided: true, ballistic: true,
     desc: '无制导火箭巢。一个挂点就是一片弹雨，覆盖而不瞄准 ——' +
       '对付软目标群最划算，但精度完全靠飞机对准。' +
@@ -771,7 +771,7 @@ var WEAPONS = {
     id: 'clb', name: 'PEJ-9', cn: '碎玉 · SHARDRIFT', kind: 'bomb',
     model: 'bomb',
     speed: 300, life: 12.0, vsLife: 24.0,
-    dmg: 118, ammo: 2, cd: 3.00, salvo: 1, prox: 34,
+    dmg: 118, ammo: 2, cd: 0.6, salvo: 1, prox: 34,
     target: 'ground', cluster: true, unguided: true, ballistic: true,
     desc: '子母弹。抛撒覆盖一整片阵地，对分散的软目标效率极高，' +
       '但打不动加固目标 —— 破片啃不开机堡。' +
@@ -854,7 +854,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 720, boost: 300, life: 3.5, vsLife: 9.0,
     turn: 2.55, seeker: 'ir', lockCone: 55 * Math.PI / 180, lockDist: 3400,
-    dmg: 16, ammo: 8, cd: 0.85, salvo: 4, flare: 0.44, prox: 14,
+    dmg: 16, ammo: 8, cd: 0.17, salvo: 4, flare: 0.44, prox: 14,
     target: 'air', highAltScale: true,
     desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下十六发，
       一次齐射四枚 —— 它的用法不是"击落"，而是把蜂群从天上扫下来。
@@ -867,7 +867,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 980, boost: 240, life: 8.0, vsLife: 18.0,
     turn: 1.30, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 11000,
-    dmg: 62, ammo: 1, cd: 6.0, salvo: 1, flare: 0.70, prox: 32,
+    dmg: 62, ammo: 1, cd: 1.2, salvo: 1, flare: 0.70, prox: 32,
     target: 'air', highAltImmune: true, bigTarget: true,
     desc: `为两万米以上专门设计的拦截弹。舵面比同级大将近一倍，
       代价是低空阻力大、加速慢。
@@ -883,7 +883,7 @@ var WEAPONS = {
     // 否则"远程巡航弹"的射程会算得还不如一枚中距弹
     speed: 480, boost: 110, life: 30.0, vsLife: 42.0,
     turn: 0.48, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 14000,
-    dmg: 300, ammo: 1, cd: 8.0, salvo: 1, flare: 0.85, prox: 36,
+    dmg: 300, ammo: 1, cd: 1.6, salvo: 1, flare: 0.85, prox: 36,
     target: 'ground', bigTarget: true,
     desc: `涡扇动力的对地巡航弹，射程是全家族里最远的。
       但它飞得慢、转弯迟钝 —— 一旦被拦，连躲的能力都没有。
@@ -897,7 +897,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 790, boost: 280, life: 5.0, vsLife: 11.0,
     turn: 2.45, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4600,
-    dmg: 56, ammo: 16, cd: 1.15, salvo: 1, flare: 0.35, prox: 26,
+    dmg: 56, ammo: 16, cd: 0.23, salvo: 1, flare: 0.35, prox: 26,
     target: 'air', reAcquire: true, highAltScale: true,
     desc: `高机动缠斗弹。转弯率 <b>3.4 rad/s</b>（约 60G），
       失去目标后还有<b>一次</b>重新捕获的机会 —— 它会绕回来。抗干扰差。
@@ -909,7 +909,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 830, boost: 200, life: 4.0, vsLife: 9.0,
     turn: 1.90, seeker: 'ir', lockCone: 75 * Math.PI / 180, lockDist: 3800,
-    dmg: 44, ammo: 44, cd: 0.80, salvo: 2, flare: 0.50, prox: 22,
+    dmg: 44, ammo: 44, cd: 0.16, salvo: 2, flare: 0.50, prox: 22,
     target: 'air', hobs: true, highAltScale: true,
     desc: `大离轴角格斗弹，锁定锥 <b>±75°</b> —— 目标甚至不需要在你前方。
       双发齐射、冷却只有 0.8 秒，是狗斗中的弹药倾泻器。`,
@@ -920,7 +920,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 1060, boost: 150, life: 10.0, vsLife: 30.0,
     turn: 1.02, seeker: 'radar', lockCone: 25 * Math.PI / 180, lockDist: 9200,
-    dmg: 62, ammo: 8, cd: 2.10, salvo: 1, flare: 0.78, prox: 30,
+    dmg: 62, ammo: 8, cd: 0.42, salvo: 1, flare: 0.78, prox: 30,
     target: 'air', nezer: true, highAltScale: true, scramjet: true,
     desc: `固体燃料冲压发动机。海平面动力段长达 <b>10 秒</b>，总寿命 30 秒。
       <br><span class="rd">18 公里以上因空气稀薄缺氧，自动降级为火箭模式 ——
@@ -932,7 +932,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 920, boost: 130, life: 12.0, vsLife: 45.0,
     turn: 0.55, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 8600,
-    dmg: 260, ammo: 6, cd: 2.4, salvo: 1, flare: 0.85, prox: 34,
+    dmg: 260, ammo: 6, cd: 0.48, salvo: 1, flare: 0.85, prox: 34,
     target: 'ship', bigTarget: true,
     desc: `对大型目标的重型弹。命中大型结构时造成毁灭性伤害，
       对战斗机几乎无法命中。<b>靠近调节单元时被交战规则禁用。</b>`,
@@ -943,7 +943,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 730, boost: 120, life: 14.0, vsLife: 50.0,
     turn: 0.62, seeker: 'radar', lockCone: 45 * Math.PI / 180, lockDist: 8000,
-    dmg: 175, ammo: 10, cd: 1.7, salvo: 1, flare: 0.80, prox: 30,
+    dmg: 175, ammo: 10, cd: 0.34, salvo: 1, flare: 0.80, prox: 30,
     target: 'ground',
     desc: `防区外空地导弹，攻顶弹道。对固定海上目标一击必毁。
       <b>靠近调节单元时被交战规则禁用。</b>`,
@@ -960,7 +960,7 @@ var WEAPONS = {
        原来的 unguided: true 是错的，它明明写着"命中前保持照射"。 */
     speed: 280, life: 12.0, vsLife: 24.0,
     turn: 0.20, lockCone: 60 * Math.PI / 180, lockDist: 2400,
-    dmg: 210, ammo: 6, cd: 1.2, salvo: 1, prox: 42,
+    dmg: 210, ammo: 6, cd: 0.24, salvo: 1, prox: 42,
     target: 'ground', cluster: true, ballistic: true,
     desc: `激光制导集束炸弹，抛撒 <b>72 枚</b>子弹药，覆盖半径 80 米。
       需要俯冲投放并在命中前保持照射。<b>交战规则禁用区同样锁定。</b>`,
@@ -971,7 +971,7 @@ var WEAPONS = {
     model: null,
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-    dmg: 0, ammo: 99, cd: 25.0, salvo: 0, flare: 1.0, prox: 0,
+    dmg: 0, ammo: 99, cd: 5, salvo: 0, flare: 1.0, prox: 0,
     target: 'none', duration: 6.0, lockReduce: 0.40, selfBlind: true,
     desc: `认知电子战吊舱。开启后 <b>6 秒</b>内敌方对你的锁定距离缩短 <b>40%</b>，
       但你自己的雷达同时被压制。冷却 25 秒。
@@ -983,7 +983,7 @@ var WEAPONS = {
     model: null,
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-    dmg: 0, ammo: 99, cd: 18.0, salvo: 0, flare: 1.0, prox: 0,
+    dmg: 0, ammo: 99, cd: 3.6, salvo: 0, flare: 1.0, prox: 0,
     target: 'none', charges: 3,
     interceptRange: 1200, interceptCone: 35 * Math.PI / 180,
     interceptChance: 0.55, highAltChance: 0.35,
@@ -1009,7 +1009,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-    dmg: 0, ammo: 0, cd: 34, salvo: 1, flare: 1.0, prox: 0,
+    dmg: 0, ammo: 0, cd: 6.8, salvo: 1, flare: 1.0, prox: 0,
     target: 'air', passive: true,
     passiveEffect: { lockResist: 0.30 },
     fits: [], perPoint: 0, mass: 0,
@@ -1024,7 +1024,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 430, boost: 120, life: 9.0, vsLife: 20.0,
     turn: 0.62, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 7000,
-    dmg: 190, ammo: 2, cd: 55, salvo: 1, flare: 0.62, prox: 30,
+    dmg: 190, ammo: 2, cd: 11, salvo: 1, flare: 0.62, prox: 30,
     target: 'ground',
     fits: [], perPoint: 0, mass: 0,
     desc: `下游的通用对地弹。精度比不上上游的 GUT-9，但便宜、库存大 ——
@@ -1038,7 +1038,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 560, boost: 150, life: 11.0, vsLife: 24.0,
     turn: 0.55, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 9000,
-    dmg: 260, ammo: 1, cd: 78, salvo: 1, flare: 0.72, prox: 34,
+    dmg: 260, ammo: 1, cd: 15.6, salvo: 1, flare: 0.72, prox: 34,
     target: 'ship',
     fits: [], perPoint: 0, mass: 0,
     desc: `打大型目标的半穿甲弹，飞行剖面很高、末段俯冲 ——
@@ -1052,7 +1052,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 780, boost: 300, life: 4.0, vsLife: 10.0,
     turn: 2.10, seeker: 'ir', lockCone: 62 * Math.PI / 180, lockDist: 4200,
-    dmg: 42, ammo: 2, cd: 40, salvo: 1, flare: 0.58, prox: 20,
+    dmg: 42, ammo: 2, cd: 8, salvo: 1, flare: 0.58, prox: 20,
     target: 'air',
     fits: [], perPoint: 0, mass: 0,
     desc: `两个导引头共用一个弹体 —— 打丢一个还有第二个。
@@ -1066,7 +1066,7 @@ var WEAPONS = {
     model: 'missile',
     speed: 620, boost: 200, life: 3.0, vsLife: 7.0,
     turn: 1.35, seeker: 'ir', lockCone: 38 * Math.PI / 180, lockDist: 3000,
-    dmg: 30, ammo: 2, cd: 30, salvo: 1, flare: 0.86, prox: 18,
+    dmg: 30, ammo: 2, cd: 6, salvo: 1, flare: 0.86, prox: 18,
     target: 'air',
     fits: [], perPoint: 0, mass: 0,
     desc: `上游二十年前的外销型，如今在群岛国手里算是主力。
@@ -1079,7 +1079,7 @@ var WEAPONS = {
     id: 'dl4', name: 'DAR-4', cn: '砾石 · GRAVEL', kind: 'aam', model: 'missile',
     speed: 880, boost: 210, life: 6.5, vsLife: 16.0,
     turn: 1.25, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 7200,
-    dmg: 30, ammo: 8, cd: 3.4, salvo: 1, flare: 0.45, prox: 28,
+    dmg: 30, ammo: 8, cd: 0.68, salvo: 1, flare: 0.45, prox: 28,
     target: 'air', highAltScale: true,
     // 下游专用弹：fits 为空表示玩家挂不上它
     fits: [], perPoint: 0, mass: 0,
@@ -1089,7 +1089,7 @@ var WEAPONS = {
     id: 'dl6', name: 'BIN-6', cn: '燧火 · FLINTFIRE', kind: 'aam', model: 'missile',
     speed: 780, boost: 190, life: 4.5, vsLife: 10.0,
     turn: 2.05, seeker: 'ir', lockCone: 60 * Math.PI / 180, lockDist: 3600,
-    dmg: 26, ammo: 6, cd: 2.2, salvo: 1, flare: 0.35, prox: 24,
+    dmg: 26, ammo: 6, cd: 0.44, salvo: 1, flare: 0.35, prox: 24,
     target: 'air', highAltScale: true,
     fits: [], perPoint: 0, mass: 0,
     desc: '下游格斗弹。'
@@ -1098,7 +1098,7 @@ var WEAPONS = {
     id: 'dl9', name: 'BAD-9', cn: '高墙 · RAMPART', kind: 'aam', model: 'missile',
     speed: 940, boost: 320, life: 9.0, vsLife: 22.0,
     turn: 1.50, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 9000,
-    dmg: 48, ammo: 4, cd: 7.0, salvo: 1, flare: 0.60, prox: 34,
+    dmg: 48, ammo: 4, cd: 1.4, salvo: 1, flare: 0.60, prox: 34,
     target: 'air', highAltScale: true,
     fits: [], perPoint: 0, mass: 0,
     desc: '地面发射的远程防空导弹。'
@@ -1371,23 +1371,27 @@ function canCarry(ac, w) {
   return true;
 }
 
+/* 每个发射槽的装填时间（秒）。
+
+   注意这是**每一槽**的时间，不是一个挂点。所以三联装的 GIR-5
+   一次出去三枚，但只占一个槽 —— 打完等 7.6 秒可以再打一轮。 */
 var STORE_COOLDOWN = {
-  /* 空空 —— 单发从十几秒到两分半，重弹基本一场只能打一次 */
-  srm: 24, trm: 28, hos: 26, qsr: 38, wasp: 42,
-  v9: 30, v11: 46,
-  v17: 100, mrm: 75, arm: 90, ram: 120, vlar: 160,
-  swm: 22, hva: 130,
+  /* 空空 —— 单发 5 到 30 秒，重弹仍然一场打不了几次 */
+  srm: 4.8, trm: 5.6, hos: 5.2, qsr: 7.6, wasp: 8.4,
+  v9: 6, v11: 9.2,
+  v17: 20, mrm: 15, arm: 18, ram: 24, vlar: 32,
+  swm: 4.4, hva: 26,
 
   /* 对地与反大型 */
-  asl: 55, asl2: 80, v25: 90, lcm: 180,
-  sat: 95, v22: 110,
-  rkt: 20, clb: 70, v30: 80,
+  asl: 11, asl2: 16, v25: 18, lcm: 36,
+  sat: 19, v22: 22,
+  rkt: 4, clb: 14, v30: 16,
 
-  /* 吊舱（电子战设备要重新充能，一场基本一次） */
-  e4: 250, l2: 180,
+  /* 吊舱：电子战设备要重新充能，仍然是全场最慢的一档 */
+  e4: 50, l2: 36,
 
   /* 下游 */
-  dl4: 34, dl6: 22, dl9: 70
+  dl4: 6.8, dl6: 4.4, dl9: 14
 };
 
 (function () {
