@@ -93,6 +93,34 @@ square(1150Hz) → gain → master
 
 ---
 
+## 一个必须知道的 WebAudio 陷阱
+
+**`AudioParam` 的最终值 = 基础值 + 所有连入信号之和。**
+
+机炮音的节点图是：
+
+```
+gunSrc(循环噪声) → gunF → gunG(gain) → master
+                              ↑
+                     gunLfo(64Hz 方波) → gunLfoG → gunG.gain
+```
+
+`gunG.gain.value = 0` 只是把**基础值**设成 0，那个 64 Hz 方波
+仍然会把增益推到 ±0.075 —— 而 `gunSrc` 一直在播。结果就是一路常驻的、
+被 64 Hz 门控的噪声，**而且它在 `volSfx` 之前，任何子项音量都管不住它**。
+
+告警音（1150 Hz 被 7 Hz 调制）同理。
+
+**开关持续音时必须把 LFO 深度也一起归零：**
+
+```js
+gunG.gain.setTargetAtTime(on ? 0.115 * volSfx : 0, t, 0.012);
+gunLfoG.gain.setTargetAtTime(on ? 0.075 * volSfx : 0, t, 0.012);   // ← 关键
+```
+
+改音量时也要用 `API.gun(gunOn)` 重新施加一次，
+否则正在响的音要等下一次开关才跟上新值。
+
 ## 一次性音效
 
 三个底层原语：

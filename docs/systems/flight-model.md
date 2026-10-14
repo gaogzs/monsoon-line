@@ -106,6 +106,28 @@ speed += clamp(vTarget - speed, -acc*dt, acc*dt);
 
 ---
 
+## 可变后掠翼
+
+只有 C-11 军舰鸟有（数据里的 `variableSweep: true`）：
+
+```js
+a.sweep = clamp((a.speed - 170) / 250, 0, 1);   // 0 = 展开，1 = 后掠
+```
+
+渲染时 `pushModel()` 按 `opts.sweep` 在**展开位**与**后掠位**两套顶点之间
+插值（模型数据里的 `morph.map / spread / swept`）。后掠位约 35°，展开位约 11°。
+
+**为什么做成真变形而不是删掉这个设定**：变后掠是 C-11 唯一的辨识特征，
+而顶点插值成本很低 —— 只在 `pushModel` 的顶点循环里加一次线性插值。
+
+**加新机型时**：只有带 `morph` 数据的模型才响应 `opts.sweep`，
+其他机型传什么都不影响。
+
+## 挂载重量
+
+见 [loadout.md](loadout.md#重量惩罚)。在 `stepAircraft()` 里对机型物理数据
+做临时缩放，**AI 没有 `loadFactor` 所以完全不受影响**。
+
 ## 失速
 
 `speed < vStall` 时：
