@@ -1321,16 +1321,29 @@ var Game = (function () {
        要么在另一些 FOV 下过早触发。
 
        直接看鼠标在屏幕上的位置就没有这个耦合。 */
-    /* 鼠标在屏幕上的归一化位置（±1 = 边缘）。
+    /* 推杆区的 ux 阈值**必须随 FOV 换算**。
 
-       这是 steerTo 判断"推杆还是滚转"的依据 —— **必须用屏幕坐标**。
-       飞机滚转之后"屏幕下方"和"机体下方"根本不是一回事：
-       侧飞 90° 时屏幕右侧恰好落在机体 up 方向上，用机体坐标判断
-       会把"拉右"误判成"抬头"。 */
-    player.aimX = (mouse.x - Renderer.W / 2) / (Renderer.W * 0.5);
-    player.aimDown = (mouse.y - Renderer.H / 2) / (Renderer.H * 0.5);
+       鼠标能指到的最大下方角度只有半个 FOV，所以"屏幕上的同一个位置"
+       对应的机体坐标 ux 是随 FOV 变的：
+           FOV  56°  屏幕 62% 处 → ux ≈ -0.31
+           FOV 100°  屏幕 62% 处 → ux ≈ -0.59
+       写死一个 ux 阈值，结果就是窄 FOV 下永远够不到、
+       宽 FOV 下鼠标还在画面上半部就切走了。
 
-    // 传 player 自身作为锁存容器（提供 rollLock / aimDown 字段）
+       所以先定"屏幕上哪个位置分界"，再反推出 ux。
+
+       屏幕纵向比例 k（0 = 屏幕中心，1 = 底边）与 ux 的关系：
+           cy = -k · tan(FOV/2)
+           ux = cy / √(1 + cy²)          （平飞时；滚转后 ux 还会更小） */
+    var tanHalf = Math.tan((S.fov || 56) * Math.PI / 360);
+    function uxAtScreen(k) {
+      var cy = -k * tanHalf;
+      return cy / Math.sqrt(1 + cy * cy);
+    }
+    player.uxShallow = uxAtScreen(0.12);   // 超过它才算"在下方"
+    player.uxDeep = uxAtScreen(0.62);      // 超过它就算"很靠下"，改用滚转
+
+    // 传 player 自身作为锁存容器（提供 rollLock / uxShallow / uxDeep）
     AI.steerTo(player, dir, player.ctrl, player);
     player.aimDir = dir;
   }

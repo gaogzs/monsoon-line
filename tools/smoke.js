@@ -1105,31 +1105,43 @@ if (Ent && M3 && me && world) {
     const M3 = sandbox.M3, AI = sandbox.AI;
     const bad = [];
 
-    // 给定 FOV 与鼠标纵向位置（0=屏幕中心，1=底边），返回是否走了滚转
-    function rolls(FOV, k) {
+    /* 给定 FOV 与鼠标纵向位置（0 = 屏幕中心，1 = 底边），
+       返回是否走了"推杆俯下"分支。
+
+       判据不能只看 ctrl.roll —— 推杆分支自己也会输出一点滚转修正
+       （把目标摆到正下方）。所以用它的特征组合：
+       pitch 明显为负，且 roll 只是小幅修正（系数 0.5 封顶）。
+       走通用滚转对齐时 rollErr 接近 ±π，roll 会饱和到 ±1。 */
+    function pushesDown(FOV, k) {
       const H = 720;
       const focal = (H / 2) / Math.tan(FOV / 2 * Math.PI / 180);
       const cy = -(k * (H / 2)) / focal;
       const dir = M3.norm(M3.V(0, cy, 1));
+
+      // 阈值随 FOV 换算 —— 与 game.js 的 updateAim 同一套公式
+      const tanHalf = Math.tan(FOV * Math.PI / 360);
+      const at = kk => { const c = -kk * tanHalf; return c / Math.sqrt(1 + c * c); };
+
       const a = {
         fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
         ctrl: { pitch: 0, roll: 0, yaw: 0 },
-        rollLock: undefined, aimDown: k
+        rollLock: undefined,
+        uxShallow: at(0.12), uxDeep: at(0.62)
       };
       AI.steerTo(a, dir, a.ctrl, a);
-      return Math.abs(a.ctrl.roll) > 0.35;
+      return a.ctrl.pitch < -0.05 && Math.abs(a.ctrl.roll) <= 0.55;
     }
 
     // 1. 屏幕下方 25%~65%：应当推杆俯下（阈值 0.25 / 0.65）
     for (const k of [0.3, 0.45, 0.6]) {
-      if (rolls(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处就触发了滚转');
+      if (!pushesDown(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处没有推杆');
     }
     // 1b. 超过 65% 应当交给滚转
     for (const k of [0.75, 0.9]) {
-      if (!rolls(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处仍未改用滚转');
+      if (pushesDown(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处仍在推杆');
     }
     // 2. 压到底部：必须走滚转仰起
-    if (!rolls(56, 0.95)) bad.push('鼠标压到屏幕底部仍未触发滚转仰起');
+    if (pushesDown(56, 0.95)) bad.push('鼠标压到屏幕底部仍在推杆');
     /* 2c. 大滚转角**不该**推杆。
 
        "推杆"是绕机体 right 轴转。左滚 90° 侧飞时 right 轴指向世界上下，
@@ -1154,9 +1166,15 @@ if (Ent && M3 && me && world) {
 
     // 3. 换 FOV 结果必须一致（这是解耦的关键）
     for (const FOV of [38, 56, 100]) {
-      const mid = rolls(FOV, 0.5), bottom = rolls(FOV, 0.95);
-      if (mid) bad.push('FOV ' + FOV + ' 下屏幕中部误触发滚转');
-      if (!bottom) bad.push('FOV ' + FOV + ' 下屏幕底部未触发滚转');
+      /* 关键：同一屏幕位置在三档 FOV 下必须给同样的分支。
+         阈值是从屏幕位置反推的，所以这里应当完全一致。 */
+      const mid = pushesDown(FOV, 0.5), bottom = pushesDown(FOV, 0.95);
+      if (mid !== pushesDown(56, 0.5)) {
+        bad.push('FOV ' + FOV + ' 下屏幕中部（50%）的分支与 FOV 56 不一致');
+      }
+      if (bottom !== pushesDown(56, 0.95)) {
+        bad.push('FOV ' + FOV + ' 下屏幕底部（95%）的分支与 FOV 56 不一致');
+      }
     }
 
     if (bad.length) bad.forEach(fail);
