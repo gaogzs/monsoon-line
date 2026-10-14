@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------
+# 统一行尾：仓库内一律 LF，检出时不自动改写
+# 这样 Windows / macOS / Linux 上 clone 下来的内容完全一致
+# ---------------------------------------------------------------
+* text=auto eol=lf
+
+*.html text
+*.css  text
+*.js   text
+*.md   text
+
+# ---------------------------------------------------------------
+# 二进制文件（当前项目没有，保留以防将来加入资源）
+# ---------------------------------------------------------------
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.bmp   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.mp3   binary
+*.ogg   binary
+*.wav   binary

@@ -1,0 +1,277 @@
+/* ============================================================
+   audio.js —— 全程序化音效合成（WebAudio，无外部资源）
+   ============================================================ */
+'use strict';
+
+var SFX = (function () {
+
+  var ctx = null, master = null, noiseBuf = null;
+  var muted = false;
+  var ready = false;
+
+  /* ---------- 持续音节点 ---------- */
+  var engA = null, engB = null, engF = null, engG = null, engLfo = null, engLfoG = null;
+  var gunSrc = null, gunF = null, gunG = null, gunLfo = null, gunLfoG = null;
+  var warnOsc = null, warnG = null, warnLfo = null, warnLfoG = null;
+  var warnOn = false;
+
+  function makeNoise(sec) {
+    var len = Math.floor(ctx.sampleRate * sec);
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  /* ============================================================
+     初始化（必须在用户手势之后调用）
+     ============================================================ */
+  function unlock() {
+    if (!ctx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = 0.45;
+      master.connect(ctx.destination);
+      noiseBuf = makeNoise(2.0);
+      buildEngine();
+      buildGun();
+      buildWarn();
+      ready = true;
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+
+  function T() { return ctx.currentTime; }
+
+  /* ---------- 引擎：锯齿 + 方波 → 低通 ---------- */
+  function buildEngine() {
+    engG = ctx.createGain(); engG.gain.value = 0.0;
+    engF = ctx.createBiquadFilter();
+    engF.type = 'lowpass'; engF.frequency.value = 700; engF.Q.value = 3.0;
+
+    engA = ctx.createOscillator(); engA.type = 'sawtooth'; engA.frequency.value = 74;
+    engB = ctx.createOscillator(); engB.type = 'square'; engB.frequency.value = 37;
+    var gB = ctx.createGain(); gB.gain.value = 0.45;
+
+    engLfo = ctx.createOscillator(); engLfo.type = 'sine'; engLfo.frequency.value = 17;
+    engLfoG = ctx.createGain(); engLfoG.gain.value = 6;
+    engLfo.connect(engLfoG); engLfoG.connect(engA.frequency);
+
+    engA.connect(engF);
+    engB.connect(gB); gB.connect(engF);
+    engF.connect(engG); engG.connect(master);
+    engA.start(); engB.start(); engLfo.start();
+  }
+
+  /* ---------- 机炮：带通噪声 + 65Hz 方波调制 ---------- */
+  function buildGun() {
+    gunG = ctx.createGain(); gunG.gain.value = 0.0;
+    gunF = ctx.createBiquadFilter();
+    gunF.type = 'bandpass'; gunF.frequency.value = 1250; gunF.Q.value = 0.9;
+
+    gunSrc = ctx.createBufferSource();
+    gunSrc.buffer = noiseBuf; gunSrc.loop = true;
+
+    gunLfo = ctx.createOscillator(); gunLfo.type = 'square'; gunLfo.frequency.value = 64;
+    gunLfoG = ctx.createGain(); gunLfoG.gain.value = 0.075;
+    gunLfo.connect(gunLfoG); gunLfoG.connect(gunG.gain);
+
+    gunSrc.connect(gunF); gunF.connect(gunG); gunG.connect(master);
+    gunSrc.start(); gunLfo.start();
+  }
+
+  /* ---------- 导弹告警：脉冲高频 ---------- */
+  function buildWarn() {
+    warnG = ctx.createGain(); warnG.gain.value = 0.0;
+    warnOsc = ctx.createOscillator(); warnOsc.type = 'square'; warnOsc.frequency.value = 1150;
+    warnLfo = ctx.createOscillator(); warnLfo.type = 'square'; warnLfo.frequency.value = 7;
+    warnLfoG = ctx.createGain(); warnLfoG.gain.value = 0.055;
+    warnLfo.connect(warnLfoG); warnLfoG.connect(warnG.gain);
+    warnOsc.connect(warnG); warnG.connect(master);
+    warnOsc.start(); warnLfo.start();
+  }
+
+  /* ============================================================
+     一次性音效
+     ============================================================ */
+
+  /** 通用噪声爆发 */
+  function burst(vol, f0, f1, dur, type) {
+    if (!ready || muted) return;
+    var t = T();
+    var s = ctx.createBufferSource(); s.buffer = noiseBuf;
+    var f = ctx.createBiquadFilter();
+    f.type = type || 'lowpass';
+    f.frequency.setValueAtTime(Math.max(40, f0), t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(master);
+    s.start(t); s.stop(t + dur + 0.05);
+  }
+
+  /** 正弦扫频 */
+  function sweep(vol, f0, f1, dur, type) {
+    if (!ready || muted) return;
+    var t = T();
+    var o = ctx.createOscillator();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(Math.max(20, f0), t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  /** 短促哔声 */
+  function beep(vol, freq, dur, type) {
+    if (!ready || muted) return;
+    var t = T();
+    var o = ctx.createOscillator();
+    o.type = type || 'square';
+    o.frequency.value = freq;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+
+  /* ============================================================
+     对外的音效接口
+     ============================================================ */
+  var API = {
+
+    unlock: function () { unlock(); },
+    isReady: function () { return ready; },
+
+    setMuted: function (m) {
+      muted = m;
+      if (ready) master.gain.value = m ? 0 : 0.45;
+    },
+    isMuted: function () { return muted; },
+
+    /** 每帧：油门 0..1，加力，是否开加力视觉 */
+    engine: function (throttle, ab, alive) {
+      if (!ready) return;
+      var t = T();
+      var base = 52 + throttle * 62 + (ab ? 22 : 0);
+      engA.frequency.setTargetAtTime(base, t, 0.09);
+      engB.frequency.setTargetAtTime(base * 0.5, t, 0.09);
+      engF.frequency.setTargetAtTime(560 + throttle * 1500 + (ab ? 500 : 0), t, 0.10);
+      engLfo.frequency.setTargetAtTime(12 + throttle * 16, t, 0.2);
+      var vol = alive ? (0.030 + throttle * 0.075 + (ab ? 0.030 : 0)) : 0;
+      engG.gain.setTargetAtTime(vol, t, 0.12);
+    },
+
+    /** 机炮持续音开关 */
+    gun: function (on) {
+      if (!ready) return;
+      gunG.gain.setTargetAtTime(on ? 0.115 : 0.0, T(), 0.012);
+    },
+
+    /** 导弹告警开/关 */
+    warning: function (on) {
+      if (!ready) return;
+      if (on === warnOn) return;
+      warnOn = on;
+      warnG.gain.setTargetAtTime(on ? 0.075 : 0.0, T(), 0.03);
+    },
+
+    /** 雷达锁定：递增哔声 */
+    lock: function () { beep(0.10, 1480, 0.055, 'square'); },
+    lockTone: function (hi) { beep(0.09, hi ? 2100 : 1250, 0.045, 'square'); },
+    loseLock: function () { beep(0.07, 620, 0.11, 'triangle'); },
+
+    /** 机炮单发（用于点射反馈） */
+    gunShot: function () { burst(0.16, 2600, 500, 0.055, 'bandpass'); },
+
+    /** 导弹点火 */
+    missile: function () {
+      sweep(0.20, 1500, 180, 0.42, 'sawtooth');
+      burst(0.22, 3400, 320, 0.55, 'lowpass');
+    },
+
+    /** 敌方发射（更远、更闷） */
+    missileFar: function () {
+      sweep(0.10, 900, 130, 0.5, 'sawtooth');
+    },
+
+    /** 爆炸：size 0.3 小 / 1.0 中 / 2.6 大 */
+    boom: function (size) {
+      size = size || 1;
+      burst(0.30 * size, 2200, 80, 0.75 * size, 'lowpass');
+      sweep(0.26 * size, 110, 26, 0.52 * size, 'sine');
+    },
+
+    /** 命中金属声 */
+    hit: function () { burst(0.22, 4200, 1400, 0.10, 'bandpass'); },
+
+    /** 被击中（自己） */
+    playerHit: function () {
+      burst(0.34, 1500, 120, 0.42, 'lowpass');
+      sweep(0.22, 200, 40, 0.36, 'square');
+    },
+
+    /** 干扰弹 */
+    flare: function () { burst(0.14, 3000, 2600, 0.35, 'highpass'); },
+
+    /** UI 点击 */
+    click: function () { beep(0.07, 880, 0.045, 'square'); },
+    confirm: function () { beep(0.09, 1180, 0.07, 'square'); setTimeout(function () { beep(0.09, 1580, 0.09, 'square'); }, 70); },
+
+    /** 无线电语音条的底噪 */
+    radio: function () { burst(0.045, 2400, 1900, 0.20, 'bandpass'); },
+
+    /** 任务达成 / 失败 */
+    fanfare: function () {
+      var seq = [523, 659, 784, 1046], i = 0;
+      var self = this;
+      (function step() {
+        if (i >= seq.length) return;
+        beep(0.11, seq[i++], 0.30, 'triangle');
+        setTimeout(step, 165);
+      })();
+    },
+    fail: function () {
+      var seq = [392, 330, 262], i = 0;
+      (function step() {
+        if (i >= seq.length) return;
+        beep(0.11, seq[i++], 0.45, 'sawtooth');
+        setTimeout(step, 260);
+      })();
+    },
+
+    /** 定向能武器开火 */
+    laser: function () { sweep(0.14, 2400, 900, 0.28, 'sawtooth'); },
+
+    /** 警告：失速 / 撞地 */
+    stall: function () { beep(0.09, 400, 0.20, 'triangle'); },
+    terrain: function () { beep(0.10, 320, 0.14, 'square'); },
+
+    /** 大型目标受创 */
+    bigHit: function () {
+      burst(0.34, 1200, 60, 1.15, 'lowpass');
+      sweep(0.30, 90, 22, 1.0, 'sine');
+    },
+
+    /** 全部静音（暂停用） */
+    silence: function () {
+      if (!ready) return;
+      engG.gain.setTargetAtTime(0, T(), 0.05);
+      gunG.gain.setTargetAtTime(0, T(), 0.05);
+      warnG.gain.setTargetAtTime(0, T(), 0.05);
+      warnOn = false;
+    }
+  };
+
+  return API;
+})();

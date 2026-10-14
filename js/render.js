@@ -1,0 +1,476 @@
+/* ============================================================
+   render.js —— 3D 渲染管线
+     · 天空渐变 / 太阳 / 体积云
+     · 地面网格（近平面裁剪）
+     · 多边形面收集 → 深度排序 → 平面着色绘制
+     · 面法线光照 + 距离大气透视
+     · 粒子（加色混合）
+   ============================================================ */
+'use strict';
+
+var Renderer = (function () {
+
+  var cv = null, ctx = null;
+  var W = 0, H = 0, DPR = 1;
+
+  var cam = null;
+
+  /* ---------- 光照 ---------- */
+  var LIGHT = M3.norm(M3.V(-0.42, 0.80, 0.43));
+  var FOG_R = 150, FOG_G = 176, FOG_B = 196;
+  var FOG_NEAR = 900, FOG_FAR = 9000, FOG_MAX = 0.82;
+
+  /* ---------- 颜色缓存（量化亮度/雾浓度，避免每帧拼字符串） ---------- */
+  var colorCache = {};
+  function shade(hex, b, fog) {
+    var bi = b < 0 ? 0 : (b > 0.999 ? 15 : (b * 16) | 0);
+    var fi = fog < 0 ? 0 : (fog > 0.999 ? 15 : (fog * 16) | 0);
+    var key = hex + bi * 32 + fi;
+    var c = colorCache[key];
+    if (c !== undefined) return c;
+    var r = parseInt(hex.substr(1, 2), 16);
+    var g = parseInt(hex.substr(3, 2), 16);
+    var bl = parseInt(hex.substr(5, 2), 16);
+    var k = (bi + 0.5) / 16;
+    r *= k; g *= k; bl *= k;
+    var f = (fi + 0.5) / 16;
+    r = r * (1 - f) + FOG_R * f;
+    g = g * (1 - f) + FOG_G * f;
+    bl = bl * (1 - f) + FOG_B * f;
+    c = 'rgb(' + ((r + 0.5) | 0) + ',' + ((g + 0.5) | 0) + ',' + ((bl + 0.5) | 0) + ')';
+    colorCache[key] = c;
+    return c;
+  }
+
+  /* ---------- 对象池 ---------- */
+  var pool = [], poolN = 0;
+  function getP() {
+    if (poolN < pool.length) { var o = pool[poolN++]; o.x = o.y = o.z = 0; return o; }
+    var n = { x: 0, y: 0, z: 0 };
+    pool.push(n); poolN++;
+    return n;
+  }
+
+  /* ---------- 面缓冲 ---------- */
+  var faceList = [], faceN = 0;
+  function getFace() {
+    if (faceN < faceList.length) return faceList[faceN++];
+    var f = { d: 0, n: 0, px: new Float32Array(10), py: new Float32Array(10), c: '#000', a: 1 };
+    faceList.push(f); faceN++;
+    return f;
+  }
+
+  /* ---------- 暂存顶点缓冲 ---------- */
+  var MAXV = 2048;
+  var wX = new Float32Array(MAXV), wY = new Float32Array(MAXV), wZ = new Float32Array(MAXV);
+  var cX = new Float32Array(MAXV), cY = new Float32Array(MAXV), cZ = new Float32Array(MAXV);
+  var clipX = new Float32Array(16), clipY = new Float32Array(16), clipZ = new Float32Array(16);
+
+  /* ---------- 相机抖动 ---------- */
+  var shake = 0, shakeX = 0, shakeY = 0;
+
+  /* ============================================================
+     初始化
+     ============================================================ */
+  function init(canvas) {
+    cv = canvas;
+    ctx = cv.getContext('2d', { alpha: false });
+    resize();
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    cv.width = Math.floor(W * DPR);
+    cv.height = Math.floor(H * DPR);
+    cv.style.width = W + 'px';
+    cv.style.height = H + 'px';
+  }
+
+  function setCamera(pos, fwd, up, fovDeg) {
+    cam = M3.makeCamera(pos, fwd, up, W, H, fovDeg || 58);
+  }
+
+  function getCam() { return cam; }
+
+  function addShake(v) { shake = Math.min(shake + v, 26); }
+
+  /* ============================================================
+     天空 + 地面
+     ============================================================ */
+  var cloudSeeds = [];
+  (function () {
+    for (var i = 0; i < 46; i++) {
+      cloudSeeds.push({
+        ox: M3.rnd(-2600, 2600), oz: M3.rnd(-2600, 2600),
+        y: M3.rnd(700, 2600), s: M3.rnd(320, 1100),
+        a: M3.rnd(0.05, 0.17)
+      });
+    }
+  })();
+  var CLOUD_CELL = 5200;
+
+  function horizonY() {
+    var d = M3.V(cam.fwd.x, 0, cam.fwd.z);
+    var l = Math.sqrt(d.x * d.x + d.z * d.z);
+    if (l < 1e-4) {
+      d = M3.V(cam.up.x, 0, cam.up.z);
+      l = Math.sqrt(d.x * d.x + d.z * d.z);
+      if (l < 1e-4) return cam.fwd.y > 0 ? -H : H * 2;
+    }
+    d.x /= l; d.z /= l;
+    var far = M3.V(cam.pos.x + d.x * 1e6, cam.pos.y, cam.pos.z + d.z * 1e6);
+    var s = M3.project(cam, far);
+    return s ? s.y : (cam.fwd.y > 0 ? -H * 2 : H * 2);
+  }
+
+  function drawSky() {
+    var hy = horizonY();
+    var top = cam.fwd.y * 0.55;                  // 抬头看时天空更"高"
+    var g = ctx.createLinearGradient(0, Math.min(0, hy - H), 0, Math.max(H, hy));
+    g.addColorStop(0, '#122c47');
+    g.addColorStop(0.42, '#2f6c95');
+    g.addColorStop(0.78, '#7fb2cc');
+    g.addColorStop(1, '#c9d8dd');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // 太阳 / 光晕（固定在世界方向 LIGHT）
+    var sunDist = 9000;
+    var sp = M3.V(cam.pos.x + LIGHT.x * sunDist, cam.pos.y + LIGHT.y * sunDist, cam.pos.z + LIGHT.z * sunDist);
+    var ss = M3.project(cam, sp);
+    if (ss && ss.z > 0) {
+      var r = Math.max(24, cam.focal * 0.055);
+      var sg = ctx.createRadialGradient(ss.x, ss.y, 0, ss.x, ss.y, r * 5);
+      sg.addColorStop(0, 'rgba(255,246,220,0.95)');
+      sg.addColorStop(0.08, 'rgba(255,238,190,0.55)');
+      sg.addColorStop(0.30, 'rgba(220,225,205,0.14)');
+      sg.addColorStop(1, 'rgba(200,210,210,0)');
+      ctx.fillStyle = sg;
+      ctx.beginPath();
+      ctx.arc(ss.x, ss.y, r * 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return hy;
+  }
+
+  function drawClouds() {
+    var bx = Math.round(cam.pos.x / CLOUD_CELL) * CLOUD_CELL;
+    var bz = Math.round(cam.pos.z / CLOUD_CELL) * CLOUD_CELL;
+    ctx.save();
+    for (var i = 0; i < cloudSeeds.length; i++) {
+      var s = cloudSeeds[i];
+      for (var ax = -1; ax <= 1; ax++) {
+        for (var az = -1; az <= 1; az++) {
+          var px = bx + ax * CLOUD_CELL + s.ox;
+          var pz = bz + az * CLOUD_CELL + s.oz;
+          var dx = px - cam.pos.x, dz = pz - cam.pos.z;
+          var dh = dx * dx + dz * dz;
+          if (dh > 7000 * 7000) continue;
+          var p = M3.project(cam, M3.V(px, s.y, pz));
+          if (!p) continue;
+          var rr = cam.focal * s.s / p.z;
+          if (rr < 12 || rr > H * 4) continue;
+          var fade = 1 - Math.sqrt(dh) / 7000;
+          ctx.globalAlpha = s.a * fade * 0.9;
+          ctx.fillStyle = '#dfe9ee';
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, rr, rr * 0.34, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawGround(hy) {
+    var y0 = Math.max(-2, Math.min(H + 2, hy));
+    var g = ctx.createLinearGradient(0, y0, 0, H);
+    g.addColorStop(0, '#4d6472');
+    g.addColorStop(0.06, '#2b3a46');
+    g.addColorStop(0.5, '#16222b');
+    g.addColorStop(1, '#0b1319');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, y0, W, H - y0);
+
+    // 海面高光（分水群岛，海比陆多）
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#6f8fa3';
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 1;
+
+    if (cam.pos.y < 1) return;
+
+    var G = 500;
+    var N = 9;
+    var cx = Math.round(cam.pos.x / G) * G;
+    var cz = Math.round(cam.pos.z / G) * G;
+    var far = N * G;
+
+    for (var pass = 0; pass < 2; pass++) {
+      ctx.strokeStyle = pass === 0 ? 'rgba(120,160,190,0.30)' : 'rgba(70,110,140,0.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (var i = -N; i <= N; i++) {
+        var seg = null;
+        if (pass === 0) {
+          var x = cx + i * G;
+          seg = M3.clipSeg(cam, M3.V(x, 0, cz - far), M3.V(x, 0, cz + far));
+        } else {
+          var z = cz + i * G;
+          seg = M3.clipSeg(cam, M3.V(cx - far, 0, z), M3.V(cx + far, 0, z));
+        }
+        if (seg) { ctx.moveTo(seg[0], seg[1]); ctx.lineTo(seg[2], seg[3]); }
+      }
+      ctx.stroke();
+    }
+  }
+
+  /* ============================================================
+     模型面收集
+     ============================================================ */
+  function pushModel(model, P, fwd, up, opts) {
+    opts = opts || {};
+    var verts = model.v;
+    var nv = verts.length;
+    if (nv > MAXV) return;
+
+    var scale = opts.scale === undefined ? 1 : opts.scale;
+    var rx = up.y * fwd.z - up.z * fwd.y;
+    var ry = up.z * fwd.x - up.x * fwd.z;
+    var rz = up.x * fwd.y - up.y * fwd.x;
+    // 归一化（保证基是正交的）
+    var rl = Math.sqrt(rx * rx + ry * ry + rz * rz);
+    if (rl > 1e-6) { rx /= rl; ry /= rl; rz /= rl; }
+
+    var i, v;
+    for (i = 0; i < nv; i++) {
+      v = verts[i];
+      var x = v[0] * scale, y = v[1] * scale, z = v[2] * scale;
+      wX[i] = P.x + rx * x + up.x * y + fwd.x * z;
+      wY[i] = P.y + ry * x + up.y * y + fwd.y * z;
+      wZ[i] = P.z + rz * x + up.z * y + fwd.z * z;
+    }
+
+    var near = cam.near;
+    var faces = model.f;
+    var tint = opts.tint || 0;
+    var alphaMul = opts.alpha === undefined ? 1 : opts.alpha;
+    var emissive = opts.emissive || 0;
+
+    for (var fi = 0; fi < faces.length; fi++) {
+      var face = faces[fi];
+      var idx = face.i;
+      var np = idx.length;
+
+      // ---- 世界坐标法线（前三点，双面取绝对值） ----
+      var a0 = idx[0], a1 = idx[1], a2 = idx[2];
+      var e1x = wX[a1] - wX[a0], e1y = wY[a1] - wY[a0], e1z = wZ[a1] - wZ[a0];
+      var e2x = wX[a2] - wX[a0], e2y = wY[a2] - wY[a0], e2z = wZ[a2] - wZ[a0];
+      var nx = e1y * e2z - e1z * e2y;
+      var ny = e1z * e2x - e1x * e2z;
+      var nz = e1x * e2y - e1y * e2x;
+      var nl = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      var bright = 0.62;
+      if (nl > 1e-9) {
+        nx /= nl; ny /= nl; nz /= nl;
+        var dl = Math.abs(nx * LIGHT.x + ny * LIGHT.y + nz * LIGHT.z);
+        bright = 0.44 + 0.56 * dl;
+      }
+      bright += tint;
+
+      // ---- 顶点 → 相机空间 ----
+      var allFront = true, anyFront = false;
+      var minZ = 1e9, sumZ = 0;
+      for (i = 0; i < np; i++) {
+        var k = idx[i];
+        var dx = wX[k] - cam.pos.x, dy = wY[k] - cam.pos.y, dz = wZ[k] - cam.pos.z;
+        var px = dx * cam.right.x + dy * cam.right.y + dz * cam.right.z;
+        var py = dx * cam.up.x + dy * cam.up.y + dz * cam.up.z;
+        var pz = dx * cam.fwd.x + dy * cam.fwd.y + dz * cam.fwd.z;
+        cX[i] = px; cY[i] = py; cZ[i] = pz;
+        sumZ += pz;
+        if (pz < minZ) minZ = pz;
+        if (pz < near) allFront = false; else anyFront = true;
+      }
+      if (!anyFront) continue;
+
+      // ---- 近平面裁剪 ----
+      var m = np;
+      if (!allFront) {
+        m = 0;
+        for (i = 0; i < np; i++) {
+          var j = (i + 1) % np;
+          var az1 = cZ[i], az2 = cZ[j];
+          var ain = az1 >= near, bin = az2 >= near;
+          if (ain) { clipX[m] = cX[i]; clipY[m] = cY[i]; clipZ[m] = cZ[i]; m++; }
+          if (ain !== bin) {
+            var t = (near - az1) / (az2 - az1);
+            clipX[m] = cX[i] + (cX[j] - cX[i]) * t;
+            clipY[m] = cY[i] + (cY[j] - cY[i]) * t;
+            clipZ[m] = near;
+            m++;
+          }
+          if (m >= 15) break;
+        }
+        if (m < 3) continue;
+        for (i = 0; i < m; i++) { cX[i] = clipX[i]; cY[i] = clipY[i]; cZ[i] = clipZ[i]; }
+      }
+
+      // ---- 投影 ----
+      var fo = cam.focal;
+      var sxMin = 1e9, sxMax = -1e9, syMin = 1e9, syMax = -1e9;
+      var ok = true;
+      for (i = 0; i < m; i++) {
+        var iz = fo / cZ[i];
+        var sx = cam.cx + cX[i] * iz;
+        var sy = cam.cy - cY[i] * iz;
+        if (!(sx > -1e7 && sx < 1e7 && sy > -1e7 && sy < 1e7)) { ok = false; break; }
+        clipX[i] = sx; clipY[i] = sy;
+        if (sx < sxMin) sxMin = sx;
+        if (sx > sxMax) sxMax = sx;
+        if (sy < syMin) syMin = sy;
+        if (sy > syMax) syMax = sy;
+      }
+      if (!ok) continue;
+
+      // ---- 屏幕外剔除 / 太小剔除 ----
+      if (sxMax < -8 || sxMin > W + 8 || syMax < -8 || syMin > H + 8) continue;
+      var area = (sxMax - sxMin) * (syMax - syMin);
+      if (area < 1.6) continue;
+
+      var depth = sumZ / np;
+
+      // ---- 雾 ----
+      var fog = (depth - FOG_NEAR) / (FOG_FAR - FOG_NEAR);
+      fog = fog < 0 ? 0 : (fog > FOG_MAX ? FOG_MAX : fog);
+
+      var f = getFace();
+      f.d = depth;
+      f.n = m;
+      f.c = shade(face.c, Math.min(1.5, bright + emissive), fog);
+      f.a = alphaMul;
+      for (i = 0; i < m; i++) { f.px[i] = clipX[i]; f.py[i] = clipY[i]; }
+    }
+  }
+
+  /* ---------- 排序 + 绘制全部面 ---------- */
+  function flush() {
+    var arr = [];
+    for (var i = 0; i < faceN; i++) arr.push(faceList[i]);
+    arr.sort(function (a, b) { return b.d - a.d; });
+
+    var prevA = 1;
+    ctx.globalAlpha = 1;
+    for (i = 0; i < arr.length; i++) {
+      var f = arr[i];
+      if (f.a !== prevA) { ctx.globalAlpha = f.a; prevA = f.a; }
+      ctx.fillStyle = f.c;
+      ctx.beginPath();
+      ctx.moveTo(f.px[0], f.py[0]);
+      for (var k = 1; k < f.n; k++) ctx.lineTo(f.px[k], f.py[k]);
+      ctx.closePath();
+      ctx.fill();
+      // 细微描边，压掉多边形之间的接缝
+      if (f.n <= 4 && f.d < 900) {
+        ctx.strokeStyle = f.c;
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ============================================================
+     粒子
+     ============================================================ */
+  function drawParticles(list) {
+    if (!list.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      if (!p.alive) continue;
+      var s = M3.project(cam, p.pos);
+      if (!s) continue;
+      var lifeK = p.life / p.life0;
+      var r = Math.max(0.7, (cam.focal * p.size / s.z) * (p.grow ? (1.6 - lifeK) : 1));
+      if (r < 0.4 || s.x < -r * 3 || s.x > W + r * 3 || s.y < -r * 3 || s.y > H + r * 3) continue;
+      ctx.globalAlpha = Math.max(0, Math.min(1, lifeK)) * (p.alpha === undefined ? 1 : p.alpha);
+      ctx.fillStyle = p.color;
+      if (r < 1.4) {
+        ctx.fillRect(s.x - r, s.y - r, r * 2, r * 2);
+      } else {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  /* ============================================================
+     每帧开始
+     ============================================================ */
+  function begin() {
+    poolN = 0;
+    faceN = 0;
+
+    // 相机未设置时给一个安全默认值（标题界面会走到这里）
+    if (!cam) {
+      cam = M3.makeCamera(M3.V(0, 3200, 0), M3.V(0, -0.12, 1), M3.V(0, 1, 0), W, H, 58);
+    }
+
+    if (shake > 0.01) {
+      shakeX = M3.rnd(-shake, shake);
+      shakeY = M3.rnd(-shake, shake);
+      shake *= 0.86;
+    } else { shakeX = shakeY = 0; shake = 0; }
+
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    var hy = drawSky();
+    drawClouds();
+    drawGround(hy);
+
+    ctx.save();
+    if (shakeX || shakeY) ctx.translate(shakeX, shakeY);
+  }
+
+  function end() {
+    ctx.restore();
+  }
+
+  /** 屏幕空间绘制辅助 */
+  function line(x1, y1, x2, y2, col, w) {
+    ctx.strokeStyle = col; ctx.lineWidth = w || 1;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+  function rect(x, y, w, h, col) { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
+  function circle(x, y, r, col) {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  function ring(x, y, r, col, w) {
+    ctx.strokeStyle = col; ctx.lineWidth = w || 1;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  function text(t, x, y, col, font, align) {
+    ctx.fillStyle = col;
+    ctx.font = font || '12px Consolas, monospace';
+    ctx.textAlign = align || 'left';
+    ctx.fillText(t, x, y);
+    ctx.textAlign = 'left';
+  }
+
+  return {
+    init: init, resize: resize, setCamera: setCamera, getCam: getCam,
+    begin: begin, end: end, pushModel: pushModel, flush: flush,
+    drawParticles: drawParticles, addShake: addShake,
+    line: line, rect: rect, circle: circle, ring: ring, text: text,
+    get W() { return W; }, get H() { return H; },
+    get ctx() { return ctx; }
+  };
+})();
