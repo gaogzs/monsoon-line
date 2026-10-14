@@ -76,9 +76,11 @@ var Game = (function () {
   var activeHpGroup = null;
   var keys = {}, mouse = { left: false, right: false, x: 0, y: 0 };
   var aimMode = true;              // true = 鼠标引导（指令增稳），false = 键盘直控
-  var last = 0, camMode = 0;
-  /* 追尾镜头的两个平滑状态。camYawBase 是基准偏航（按最短角差平滑），
-     camPitchSmooth 是平滑后的基准俯仰。首帧惰性初始化。 */
+  var last = 0;
+  /* 机位现在由设置项 S.camMode 决定，没有热切换键 ——
+     切换机位会让玩家瞬间失去态势感知，必须主动确认。
+     另外两个是追尾镜头的平滑状态：camYawBase 是按最短角差平滑的基准偏航，
+     camPitchSmooth 是平滑后的基准俯仰，首帧惰性初始化。 */
   var camYawBase = 0, camPitchSmooth = null;
 
   /* 单一油门轴：0..1 是常规推力区，1..1.25 是加力区。
@@ -141,7 +143,9 @@ var Game = (function () {
     hudScale: 100,
     compass: true,
     pitchLadder: true,
-    targetMarkers: true
+    targetMarkers: true,
+    // 0 = 追尾，1 = 座舱，2 = 目标。只能在这里改，没有热切换键。
+    camMode: 0
   };
 
   var S = {};
@@ -161,6 +165,14 @@ var Game = (function () {
       title: '视角',
       hint: '暂停时调整可以实时看到画面变化 —— 不用退出去再进来。',
       items: [
+        {
+          k: 'camMode', label: '机位', type: 'select',
+          options: [
+            { v: 0, t: '追尾（地平线保持水平）' },
+            { v: 1, t: '座舱（跟随滚转）' },
+            { v: 2, t: '目标（从侧上方看双方）' }
+          ]
+        },
         { k: 'fov', label: '视场角 FOV', type: 'range', min: 38, max: 100, unit: '°' },
         { k: 'camDist', label: '镜头距离', type: 'range', min: 16, max: 200, unit: ' m' },
         { k: 'camHeight', label: '镜头高度', type: 'range', min: -15, max: 60, unit: ' m' }
@@ -219,7 +231,28 @@ var Game = (function () {
     lab.textContent = item.label;
     row.appendChild(lab);
 
-    if (item.type === 'range') {
+    if (item.type === 'select') {
+      /* 下拉选择：给那些**不该热切换**的选项用。
+
+         视角模式原来绑在 C 键上，按一下就换 —— 问题是误触的代价很大：
+         画面在一瞬间变成另一个机位，玩家会当场失去态势感知，
+         而空战里那一秒往往就是生死。放进设置里就必须主动选、确认。 */
+      var sel = document.createElement('select');
+      sel.className = 'set-select';
+      for (var oi = 0; oi < item.options.length; oi++) {
+        var op = document.createElement('option');
+        op.value = item.options[oi].v;
+        op.textContent = item.options[oi].t;
+        if (S[item.k] === item.options[oi].v) op.selected = true;
+        sel.appendChild(op);
+      }
+      sel.addEventListener('change', function () {
+        S[item.k] = parseInt(sel.value, 10);
+        onSettingChanged(item.k);
+      });
+      row.appendChild(sel);
+      row.appendChild(document.createElement('span'));
+    } else if (item.type === 'range') {
       var inp = document.createElement('input');
       inp.type = 'range';
       inp.min = item.min; inp.max = item.max; inp.step = item.step || 1;
@@ -304,7 +337,7 @@ var Game = (function () {
     ['F / Tab', '切换目标'],
     ['R', '切换挂载'],
     ['V', '投放干扰弹 —— 热焰弹与箔丝同时撒出，按住连续投放'],
-    ['C', '切换视角（追尾 / 座舱 / 目标）'],
+    ['—', '机位（追尾 / 座舱 / 目标）在「设置 → 视角」里改，无热键'],
     ['1 / 2 / 3', '僚机指令：散开 / 集火 / 掩护'],
     ['G', '高 G 机动 —— 大幅转向时按住，拉出额外过载，代价是掉速'],
     ['H', '暂停（暂停后可实时调整设置）']
@@ -1076,7 +1109,6 @@ var Game = (function () {
 
       if (state === 'playing') {
         if (e.code === 'KeyH') togglePause();
-        if (e.code === 'KeyC') { camMode = (camMode + 1) % 3; SFX.click(); }
         if (e.code === 'KeyM') toggleAimMode();
         if (e.code === 'KeyF' || e.code === 'Tab') cycleTarget();
         if (e.code === 'KeyR') cycleSpecial();
@@ -1542,7 +1574,7 @@ var Game = (function () {
     if (!keys.ArrowLeft && !keys.ArrowRight) camYaw = M3.smooth(camYaw, 0, 2.2, dt);
     if (!keys.ArrowUp && !keys.ArrowDown) camPitch = M3.smooth(camPitch, 0, 2.2, dt);
 
-    if (camMode === 0) {
+    if (S.camMode === 0) {
       /* 追尾：不跟随滚转，地平线永远水平。
 
          **镜头俯仰限制在 ±78°，飞机可以翻过去，镜头不跟。**
@@ -1629,7 +1661,7 @@ var Game = (function () {
        而且目标视角写死世界 up，于是画面看起来完全退回"地平线永远水平"。
        这个 bug 骗过了所有相机测试，因为那些测试只复现 camMode===0 的计算，
        不经过这里的分支。 */
-    else if (camMode === 1) {
+    else if (S.camMode === 1) {
       // 座舱：跟随滚转
       var cp = M3.add(p.pos, M3.add(M3.mul(p.fwd, 3.4), M3.mul(p.up, 1.1)));
       Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);
@@ -1905,7 +1937,7 @@ var Game = (function () {
     }
 
     // ---- 鼠标引导的瞄准环 ----
-    if (aimMode && player.alive && camMode !== 2) {
+    if (aimMode && player.alive && S.camMode !== 2) {
       var ax = M3.clamp(mouse.x, 14, Renderer.W - 14);
       var ay = M3.clamp(mouse.y, 14, Renderer.H - 14);
       var qk = M3.clamp(player.q / 22, 0, 1);

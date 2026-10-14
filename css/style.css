@@ -407,6 +407,13 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
   grid-column:2 / span 2; justify-self:start; }
 .set-row .set-toggle:hover{ color:#fff; border-color:var(--amber); }
 .set-row .set-toggle.on{ background:#1a2b1f; border-color:var(--green); color:var(--green); }
+/* 下拉选择：给不该热切换的选项（如机位）用 */
+.set-row .set-select{ font-family:var(--mono); font-size:12px; letter-spacing:.5px; width:100%;
+  padding:5px 9px; background:#0d1620; color:var(--green); cursor:pointer; outline:none;
+  border:1px solid rgba(79,224,138,0.28); border-radius:0; }
+.set-row .set-select:hover{ border-color:var(--amber); color:#fff; }
+.set-row .set-select:focus{ border-color:var(--green); }
+.set-row .set-select option{ background:#0d1620; color:#c8d8e4; }
 .set-hint{ font-size:12px; color:var(--txt-d); line-height:1.9; padding:4px 0 2px; }
 
 /* ============================================================

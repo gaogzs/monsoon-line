@@ -162,7 +162,19 @@ var Ent = (function () {
        俯仰放大得比滚转多 —— 拉杆才是真正产生过载的那个动作。 */
     var gl = (a.gLoad === undefined) ? 1 : M3.clamp(a.gLoad, 1, 2.3);
 
-    var dPitch = p.pitch * ctrl * dt * gl;
+    /* 俯仰权限是不对称的，向上远大于向下。
+
+       现实里飞行员能承受大约 +9G 的拉起过载，却只能承受 -3G 的推杆过载；
+       机翼在负迎角方向的失速边界也来得更早。结果是**同一架飞机，
+       向下机动的能力明显小于向上** —— 这就是为什么"推杆俯冲"从来
+       不是空战里的首选动作，而"拉杆爬升"是。
+
+       这里用 0.5 的系数体现，即推杆效率只有拉杆的一半。
+       取 0.5 而不是现实里的约 1/3，是因为 1/3 会让俯冲攻击
+       这个基本战术变得过于笨重。 */
+    var PITCH_DOWN_K = 0.5;
+    var pitchAuth = (pIn >= 0) ? 1 : PITCH_DOWN_K;
+    var dPitch = p.pitch * pitchAuth * ctrl * dt * gl;
     var dRoll = p.roll * M3.clamp(ctrl * 1.8, 0.28, 1) * dt * (1 + (gl - 1) * 0.45);
     var dYaw = p.yaw * ctrl * dt;
 
