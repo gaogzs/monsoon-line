@@ -1172,6 +1172,50 @@ if (Ent && M3 && me && world) {
       }
     }
 
+    /* ④ 推杆的几何前提：机体必须**相对镜头正着飞**（up.y > 0.7）
+
+       追尾机位下相机上方向就是世界上方，所以"正着飞"就是机体 up 朝上。
+       没有这个前提的话，侧飞时鼠标在屏幕下方对应的世界方向会落进机体
+       的下半空间，被误判成推杆 —— 而那姿态下绕 right 轴转是水平转向。
+
+       也不能用 |up.y|：倒飞（up.y ≈ -1）不算"相对镜头正着飞"。 */
+    {
+      const DOWN = M3.norm(M3.V(0, -0.15, 0.99));
+      function poseAt(rollDeg) {
+        const r = (rollDeg || 0) * Math.PI / 180;
+        const fwd = M3.V(0, 0, 1);
+        const o = M3.orthonormalize(fwd, M3.rotAxis(M3.V(0, 1, 0), fwd, r));
+        const a = {
+          fwd: fwd, up: o.up, right: M3.norm(M3.cross(o.up, fwd)),
+          ctrl: { pitch: 0, roll: 0, yaw: 0 },
+          rollLock: 0, aimX: 0, aimDown: 0.12, aimMag: 0.12
+        };
+        AI.steerTo(a, DOWN, a.ctrl, a);
+        return a.ctrl;
+      }
+      const pushes = c => c.pitch < -0.01 && Math.abs(c.roll) < 0.10;
+
+      if (!pushes(poseAt(0))) bad.push('正着飞时鼠标略微向下没有推杆');
+      for (const d of [90, -90, 180]) {
+        if (pushes(poseAt(d))) {
+          bad.push('滚转 ' + d + '° 时鼠标略微向下误触发了推杆' +
+            ' —— 那姿态下绕 right 轴转是水平转向，不是压机头');
+        }
+      }
+    }
+
+    // ⑤ 靠近中心整体缩杆（gain，平方衰减）
+    {
+      const full = ctrlAt(56, 0.35);
+      const near = ctrlAt(56, 0.05);
+      const base = Math.abs(full.roll) + Math.abs(full.pitch);
+      const nearMag = Math.abs(near.roll) + Math.abs(near.pitch);
+      if (base > 0.05 && nearMag > base * 0.05) {
+        bad.push('靠近中心时杆量没有急剧减少（' + nearMag.toFixed(4) +
+          ' vs 满杆 ' + base.toFixed(3) + '）');
+      }
+    }
+
     if (bad.length) bad.forEach(fail);
     else ok('鼠标幅度 → 转向方式全程插值：中心推杆、离开中心转为滚转仰起');
   }
