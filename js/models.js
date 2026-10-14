@@ -142,7 +142,7 @@ var MODELS = (function () {
   var M = {};
 
   /* ============================================================
-     DB-11「军鸟」Warbird —— 舰载多用途战斗机
+     DB-11「军舰鸟」Frigatebird —— 舰载多用途战斗机
      变后掠翼；为了在 280 m 浮岛平台上起降、又要维持超巡而做的取舍
      ============================================================ */
   M.c11 = (function () {
@@ -158,14 +158,35 @@ var MODELS = (function () {
     ], C.body, C.body3);
 
     /* 主翼 —— 可变后掠。
-       机翼顶点单独记录索引，渲染时按 opts.sweep 在展开位与后掠位之间插值。
-       后掠位约 35°，展开位约 11°，视觉差异足够明显。 */
-    var SW = [
-      V(1.2, -0.16, 2.5), V(7.6, -0.52, -1.9), V(7.6, -0.52, -3.7), V(1.2, -0.16, -3.3)
-    ];
-    var SP = [
-      V(1.2, -0.16, 2.5), V(7.8, -0.40, 1.2), V(7.8, -0.40, -1.4), V(1.2, -0.16, -3.3)
-    ];
+
+       机翼顶点单独记录索引，渲染时按 opts.sweep 在两组位置之间插值。
+
+       两组点必须差得够大才看得出来。先前那版只差 18°（2.6° → 20.5°），
+       翼尖后移 2.7 米，在 15 米翼展上几乎看不出来 ——
+       注释里却写着"差异足够明显"，是注释骗了自己。
+
+       现在按真实机构重做：机翼**绕枢轴旋转**，所以后掠的同时翼展也会缩。
+       取 20° → 62°，和 F-14 的 20° → 68° 同一量级：
+         展开  翼尖 (7.4, -1.3)   翼展 14.8 m
+         后掠  翼尖 (4.3, -4.8)   翼展  8.6 m
+       翼尖后移 3.5 米、翼展收掉近一半，一眼就能看出机翼在动。 */
+    var PIVOT = V(1.2, -0.16, 1.0);          // 翼根枢轴
+    var R_SPAN = 6.6;                        // 翼尖到枢轴的距离
+    function sweepPt(deg, chordF, chordB) {
+      var r = deg * Math.PI / 180;
+      var ex = PIVOT.x + R_SPAN * Math.cos(r);
+      var ez = PIVOT.z - R_SPAN * Math.sin(r);
+      // 弦线与翼展方向垂直，弦长由参数给定
+      var nx = Math.sin(r), nz = Math.cos(r);   // 弦向单位向量
+      return [
+        V(PIVOT.x, PIVOT.y, PIVOT.z + chordF),
+        V(ex + nx * chordF * 0.5, -0.46, ez + nz * chordF * 0.5),
+        V(ex - nx * chordB * 0.5, -0.46, ez - nz * chordB * 0.5),
+        V(PIVOT.x, PIVOT.y, PIVOT.z - chordB)
+      ];
+    }
+    var SP = sweepPt(20, 2.2, 1.6);          // 展开位
+    var SW = sweepPt(62, 1.7, 1.1);          // 后掠位
 
     var addWingPts = function (pts) {
       var a = b.vt(pts[0]), c = b.vt(pts[1]), d = b.vt(pts[2]), e = b.vt(pts[3]);

@@ -213,7 +213,7 @@ roll   × lp.roll      // 1 − 0.12·lf
 
 | 机型 | caps |
 |---|---|
-| DB-11 军鸟 | `strike` `ew` |
+| DB-11 军舰鸟 | `strike` `ew` |
 | D-14 旗鱼 | `intercept` |
 | G-6 鲣鸟 | `strike` |
 | F-9 海燕 | `intercept` |
@@ -277,7 +277,7 @@ roll   × lp.roll      // 1 − 0.12·lf
 
 | 机型 | caps |
 |---|---|
-| DB-11 军鸟 | `strike` `ew` |
+| DB-11 军舰鸟 | `strike` `ew` |
 | D-14 旗鱼 | `intercept` |
 | G-6 鲣鸟 | `strike` |
 | F-9 海燕 | `intercept` |
