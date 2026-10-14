@@ -157,9 +157,39 @@ var MODELS = (function () {
       { z: -9.9, w: 0.88, h: 0.82 }
     ], C.body, C.body3);
 
-    // 主翼（后掠 42°）
-    b.wing(V(1.2, -0.16, 2.5), V(7.6, -0.52, -1.9), V(7.6, -0.52, -3.7), V(1.2, -0.16, -3.3), C.wing);
-    b.wingM(V(1.2, -0.16, 2.5), V(7.6, -0.52, -1.9), V(7.6, -0.52, -3.7), V(1.2, -0.16, -3.3), C.wing);
+    /* 主翼 —— 可变后掠。
+       机翼顶点单独记录索引，渲染时按 opts.sweep 在展开位与后掠位之间插值。
+       后掠位约 35°，展开位约 11°，视觉差异足够明显。 */
+    var SW = [
+      V(1.2, -0.16, 2.5), V(7.6, -0.52, -1.9), V(7.6, -0.52, -3.7), V(1.2, -0.16, -3.3)
+    ];
+    var SP = [
+      V(1.2, -0.16, 2.5), V(7.8, -0.40, 1.2), V(7.8, -0.40, -1.4), V(1.2, -0.16, -3.3)
+    ];
+
+    var addWingPts = function (pts) {
+      var a = b.vt(pts[0]), c = b.vt(pts[1]), d = b.vt(pts[2]), e = b.vt(pts[3]);
+      b.quad(a, c, d, e, C.wing);
+      return [a, c, d, e];
+    };
+    var mirrorP = function (p) { return V(-p.x, p.y, p.z); };
+
+    var wRight = addWingPts(SW);
+    var wLeft = addWingPts([mirrorP(SW[0]), mirrorP(SW[1]), mirrorP(SW[2]), mirrorP(SW[3])]);
+
+    var morphMap = [];
+    for (var mi = 0; mi < b.v.length; mi++) morphMap.push(-1);
+    var morphSpread = [], morphSwept = [];
+    for (var side = 0; side < 2; side++) {
+      var idx = side ? wLeft : wRight;
+      for (var k2 = 0; k2 < 4; k2++) {
+        morphMap[idx[k2]] = morphSpread.length;
+        var s1 = side ? mirrorP(SP[k2]) : SP[k2];
+        morphSpread.push([s1.x, s1.y, s1.z]);
+        var s2 = side ? mirrorP(SW[k2]) : SW[k2];
+        morphSwept.push([s2.x, s2.y, s2.z]);
+      }
+    }
 
     // 平尾
     b.wing(V(0.95, 0.05, -6.7), V(3.3, 0.16, -8.5), V(3.3, 0.16, -9.7), V(0.95, 0.05, -9.1), C.wing2);
@@ -185,7 +215,10 @@ var MODELS = (function () {
     b.box(3.1, -0.62, -0.4, 0.16, 0.34, 3.0, C.dark);
     b.box(-3.1, -0.62, -0.4, 0.16, 0.34, 3.0, C.dark);
 
-    return done(b, { span: 15.2, len: 20.5 });
+    return done(b, {
+      span: 15.2, len: 20.5,
+      morph: { map: morphMap, spread: morphSpread, swept: morphSwept }
+    });
   })();
 
   /* ============================================================

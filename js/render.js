@@ -294,10 +294,26 @@ var Renderer = (function () {
     var rl = Math.sqrt(rx * rx + ry * ry + rz * rz);
     if (rl > 1e-6) { rx /= rl; ry /= rl; rz /= rl; }
 
+    // 可变后掠：在展开位与后掠位之间插值（只有标了 morph 的模型有）
+    var morph = model.morph;
+    var sw = opts.sweep === undefined ? 0 : M3.clamp(opts.sweep, 0, 1);
+
     var i, v;
     for (i = 0; i < nv; i++) {
       v = verts[i];
-      var x = v[0] * scale, y = v[1] * scale, z = v[2] * scale;
+      var x = v[0], y = v[1], z = v[2];
+
+      if (morph) {
+        var mi = morph.map[i];
+        if (mi >= 0) {
+          var A = morph.spread[mi], Bv = morph.swept[mi];
+          x = A[0] + (Bv[0] - A[0]) * sw;
+          y = A[1] + (Bv[1] - A[1]) * sw;
+          z = A[2] + (Bv[2] - A[2]) * sw;
+        }
+      }
+
+      x *= scale; y *= scale; z *= scale;
       wX[i] = P.x + rx * x + up.x * y + fwd.x * z;
       wY[i] = P.y + ry * x + up.y * y + fwd.y * z;
       wZ[i] = P.z + rz * x + up.z * y + fwd.z * z;

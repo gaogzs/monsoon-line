@@ -55,6 +55,17 @@ var Ent = (function () {
     for (i = 0; i < AIRCRAFT.length; i++) if (AIRCRAFT[i].id === o.type) ac = AIRCRAFT[i];
     if (!ac) ac = AIRCRAFT[0];
 
+    /* 挂载武器：优先用调用方指定的，没指定就退回该机型默认配置里的第一种
+       （AI 走这条路）。注意不能再用 ac.defSpecial —— 挂载系统改造后
+       那个字段已经不存在了，早先这里会读到 undefined 然后崩掉。 */
+    var spWid = o.special || null;
+    if (!spWid && ac.defaultLoadout) {
+      for (var dk in ac.defaultLoadout) {
+        if (ac.defaultLoadout[dk]) { spWid = ac.defaultLoadout[dk]; break; }
+      }
+    }
+    if (spWid && !WEAPONS[spWid]) spWid = null;
+
     var a = {
       kind: 'air',
       team: o.team === undefined ? 0 : o.team,
@@ -88,8 +99,8 @@ var Ent = (function () {
       gunHeat: 0,
       firingGun: false,
 
-      special: o.special || ac.defSpecial,
-      spAmmo: WEAPONS[o.special || ac.defSpecial].ammo,
+      special: spWid,
+      spAmmo: spWid ? WEAPONS[spWid].ammo : 0,
       spCd: 0,
       spActive: 0,        // ECM 剩余生效时间
       spCharges: 0,       // DEW 充能数（构造末尾按武器初始化）
@@ -172,7 +183,10 @@ var Ent = (function () {
     a.fwd = B.fwd; a.up = B.up; a.right = B.right;
 
     // ---- 速度 ----
-    var vTarget = M3.lerp(p.vStall * 0.74, a.ab ? p.vMax : p.vMil, a.throttle);
+    // 油门轴可能超过 1（加力区），插值前先夹回 0..1；
+    // 是否加力由 a.ab 单独决定，见 game.js controlPlayer()
+    var th = M3.clamp(a.throttle, 0, 1);
+    var vTarget = M3.lerp(p.vStall * 0.74, a.ab ? p.vMax : p.vMil, th);
     vTarget -= a.fwd.y * 52;                                  // 爬升掉速 / 俯冲增速
     vTarget = Math.max(vTarget, p.vStall * 0.52);
 
@@ -180,6 +194,25 @@ var Ent = (function () {
     if (a.pos.y > 11000) {
       var k = M3.clamp(1 - (a.pos.y - 11000) / 15000, 0.20, 1);
       vTarget = M3.lerp(p.vStall * 0.55, vTarget, k);
+    }
+
+    // 可变后掠翼：低速展开（改善低速盘旋），高速后掠（减小波阻）
+    if (a.ac && a.ac.variableSweep) {
+      a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
+    }
+
+    // 挂载越重越笨拙：加速、转向、滚转都吃一点亏。
+    // loadFactor 只由玩家按机库配置设定，AI 不带挂载所以是 undefined。
+    if (a.loadFactor) {
+      var lf = M3.clamp(a.loadFactor, 0, 1);
+      p = {
+        vMax: p.vMax * (1 - 0.08 * lf),
+        vMil: p.vMil * (1 - 0.06 * lf),
+        vStall: p.vStall * (1 + 0.05 * lf),
+        acc: p.acc * (1 - 0.26 * lf),
+        pitch: p.pitch * (1 - 0.18 * lf),
+        roll: p.roll * (1 - 0.12 * lf)
+      };
     }
 
     if (a.brake) vTarget = Math.min(vTarget, p.vStall * 0.92);
@@ -443,14 +476,25 @@ var Ent = (function () {
       world.bullets.push({
         kind: 'bullet', team: a.team, alive: true,
         pos: muzzle,
+        prev: M3.clone(muzzle),
         vel: M3.add(M3.mul(dir, w.speed), a.vel),
         dmg: w.dmg, life: 2.2, owner: a
       });
     }
+
+    // 炮口火光（整轮开火只生成一次，不是每发子弹一次）
+    var mz = M3.add(a.pos, M3.add(M3.mul(a.fwd, 7.5), M3.mul(a.right, 0.9)));
+    spawnParticle(world.particles, mz, M3.mul(a.vel, 0.15),
+      0.055, 3.2, '#fff2c0', { grow: true });
+    spawnParticle(world.particles, mz, M3.V(0, 0, 0),
+      0.10, 1.6, '#ffd070', { grow: true });
   }
 
   function stepBullet(b, dt) {
     if (!b.alive) return;
+    // 保留上一帧位置，渲染曳光弹时用它画线段。
+    // M3.add 返回新对象，所以这里的引用不会被下一步覆盖。
+    b.prev = b.pos;
     b.vel.y -= G * dt;
     b.pos = M3.add(b.pos, M3.mul(b.vel, dt));
     b.life -= dt;

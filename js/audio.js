@@ -15,6 +15,9 @@ var SFX = (function () {
   var volEngine = 0.45;
   var volSfx = 0.85;
 
+  /* 持续音开关状态，改音量时要用它重新施加 */
+  var gunOn = false;
+
   /* ---------- 持续音节点 ---------- */
   var engA = null, engB = null, engF = null, engG = null, engLfo = null, engLfoG = null;
   var gunSrc = null, gunF = null, gunG = null, gunLfo = null, gunLfoG = null;
@@ -173,7 +176,11 @@ var SFX = (function () {
       volMaster = M3.clamp(m, 0, 1);
       volEngine = M3.clamp(e, 0, 1);
       volSfx = M3.clamp(s, 0, 1);
-      if (ready) master.gain.value = muted ? 0 : volMaster;
+      if (!ready) return;
+      master.gain.value = muted ? 0 : volMaster;
+      // 正在响的持续音要立刻跟上新音量，否则要等下一次状态翻转
+      API.gun(gunOn);
+      if (warnOn) { warnOn = false; API.warning(true); }
     },
     getVolumes: function () {
       return { master: volMaster, engine: volEngine, sfx: volSfx };
@@ -192,18 +199,31 @@ var SFX = (function () {
       engG.gain.setTargetAtTime(vol, t, 0.12);
     },
 
-    /** 机炮持续音开关 */
+    /**
+     * 机炮持续音开关。
+     *
+     * 这里有一个 AudioParam 的坑：参数的最终值 = 基础值 + 所有连入信号之和。
+     * gunLfo 直接连在 gunG.gain 上，所以就算把基础值设成 0，
+     * LFO 依然会把增益推到 ±0.075 —— 而 gunSrc 是循环噪声、一直在播，
+     * 结果就是一路常驻的"突突"底噪，且不受 volSfx 控制。
+     * 关炮时必须把 LFO 深度也归零。
+     */
     gun: function (on) {
       if (!ready) return;
-      gunG.gain.setTargetAtTime(on ? 0.115 * volSfx : 0.0, T(), 0.012);
+      gunOn = on;
+      var t = T();
+      gunG.gain.setTargetAtTime(on ? 0.115 * volSfx : 0.0, t, 0.012);
+      gunLfoG.gain.setTargetAtTime(on ? 0.075 * volSfx : 0.0, t, 0.012);
     },
 
-    /** 导弹告警开/关 */
+    /** 导弹告警开关（同样的坑：warnLfo 也直接接在 warnG.gain 上） */
     warning: function (on) {
       if (!ready) return;
       if (on === warnOn) return;
       warnOn = on;
-      warnG.gain.setTargetAtTime(on ? 0.075 * volSfx : 0.0, T(), 0.03);
+      var t = T();
+      warnG.gain.setTargetAtTime(on ? 0.075 * volSfx : 0.0, t, 0.03);
+      warnLfoG.gain.setTargetAtTime(on ? 0.055 * volSfx : 0.0, t, 0.03);
     },
 
     /** 雷达锁定：递增哔声 */
@@ -286,9 +306,14 @@ var SFX = (function () {
     /** 全部静音（暂停用） */
     silence: function () {
       if (!ready) return;
-      engG.gain.setTargetAtTime(0, T(), 0.05);
-      gunG.gain.setTargetAtTime(0, T(), 0.05);
-      warnG.gain.setTargetAtTime(0, T(), 0.05);
+      var t = T();
+      engG.gain.setTargetAtTime(0, t, 0.05);
+      gunG.gain.setTargetAtTime(0, t, 0.05);
+      warnG.gain.setTargetAtTime(0, t, 0.05);
+      // LFO 深度也要归零，不然噪声门还开着
+      gunLfoG.gain.setTargetAtTime(0, t, 0.05);
+      warnLfoG.gain.setTargetAtTime(0, t, 0.05);
+      gunOn = false;
       warnOn = false;
     }
   };

@@ -336,9 +336,72 @@ try {
   fail('主循环抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
+/* ============================================================
+   挂载系统
+   ============================================================ */
+console.log('\n== 挂载系统 ==');
+
+const WEAPONS = sandbox.WEAPONS, AIRCRAFT = sandbox.AIRCRAFT;
+
+// 每种武器都要能算重量与挂载量
+let badStore = 0;
+for (const k in WEAPONS) {
+  const w = WEAPONS[k];
+  if (w.kind === 'gun') continue;
+  if (!w.fits || w.perPoint === undefined || w.mass === undefined) {
+    fail('武器 ' + k + ' 缺少 fits / perPoint / mass');
+    badStore++;
+  }
+}
+if (!badStore) ok('全部武器都有挂载属性');
+
+// 每个挂载点组都得有武器挂得上，且成对
+let badGroup = 0;
+for (const ac of AIRCRAFT) {
+  if (!ac.hardpointGroups || !ac.hardpointGroups.length) {
+    fail('机型 ' + ac.id + ' 没有挂载点组'); badGroup++; continue;
+  }
+  for (const g of ac.hardpointGroups) {
+    if (g.pts.length % 2 !== 0) {
+      fail('机型 ' + ac.id + ' 组' + g.id + ' 的点数是奇数，齐射数不会是偶数');
+      badGroup++;
+    }
+    const okW = Object.keys(WEAPONS).some(k =>
+      WEAPONS[k].kind !== 'gun' && WEAPONS[k].fits.indexOf(g.kind) >= 0);
+    if (!okW) { fail('机型 ' + ac.id + ' 组' + g.id + ' 无可用武器'); badGroup++; }
+  }
+}
+if (!badGroup) ok('每个机型的挂载点组都有效且成对');
+
+// 玩家出击后应当拿到武器列表与弹药池
+try {
+  const p = sandbox.Game.__player();
+  if (!p) fail('取不到玩家对象');
+  else if (!p.loadoutList || !p.loadoutList.length) {
+    fail('玩家出击后没有挂载武器列表');
+  } else {
+    let sum = 0;
+    for (const e of p.loadoutList) {
+      sum += e.salvo;
+      if (!p.ammoPool || p.ammoPool[e.wid] === undefined) {
+        fail('武器 ' + e.wid + ' 没有弹药池');
+      }
+      if (e.salvo !== e.points) {
+        fail('武器 ' + e.wid + ' 的齐射数 ' + e.salvo + ' 与挂载点数 ' + e.points + ' 不一致');
+      }
+      if (e.salvo % 2 !== 0 && e.points > 1) {
+        fail('武器 ' + e.wid + ' 的齐射数是奇数 ' + e.salvo);
+      }
+    }
+    ok('武器列表：' + p.loadoutList.map(e => e.w.name + '×' + e.ammo + '(齐射' + e.salvo + ')').join(' '));
+  }
+} catch (e) {
+  fail('挂载状态检查抛出异常 —— ' + e.message);
+}
+
 // 检查世界确实动起来了
 try {
-  const world = sandbox.Game.__debugWorld ? sandbox.Game.__debugWorld() : null;
+  const world = sandbox.Game.__world ? sandbox.Game.__world() : null;
   if (world) {
     ok('世界状态：飞行器 ' + world.actors.length +
       ' · 导弹 ' + world.missiles.length +

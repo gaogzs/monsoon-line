@@ -152,6 +152,41 @@ canvas#cv{ position:fixed; inset:0; width:100%; height:100%; display:block; z-in
   background:#070d12; }
 .ac-view-cap{ font-family:var(--mono); font-size:11px; color:var(--txt-d);
   margin-top:9px; line-height:1.85; letter-spacing:.4px; }
+
+/* ---- 挂载点编辑器 ---- */
+.hp-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.hp-row{ display:grid; grid-template-columns:26px minmax(0,1fr) 190px;
+  align-items:center; gap:12px; padding:7px 10px;
+  border:1px solid var(--line); border-left:3px solid transparent;
+  background:rgba(10,16,22,.6); transition:border-color .12s, background .12s; }
+.hp-row.on{ border-left-color:var(--amber); background:rgba(255,176,58,.05); }
+.hp-id{ font-family:var(--mono); font-size:15px; font-weight:700;
+  color:var(--txt-d); text-align:center; }
+.hp-row.on .hp-id{ color:var(--amber); }
+.hp-lb{ font-size:13px; color:var(--txt); line-height:1.34; }
+.hp-lb i{ display:block; font-style:normal; font-family:var(--mono);
+  font-size:10px; color:var(--txt-d); letter-spacing:.4px; }
+.hp-sel{ font-family:var(--mono); font-size:12px; padding:5px 7px;
+  color:var(--green); background:#0a1016; border:1px solid var(--line2);
+  outline:none; cursor:pointer; width:100%; }
+.hp-sel:hover{ border-color:var(--green); }
+.hp-sel option{ background:#0a1016; color:var(--txt); }
+
+/* ---- 载弹汇总 ---- */
+.ld-head{ font-family:var(--mono); font-size:11px; letter-spacing:1.6px;
+  color:var(--txt-d); margin:4px 0 7px; }
+.ld-row{ display:grid; grid-template-columns:1fr 64px 82px;
+  font-family:var(--mono); font-size:12px; padding:3px 0;
+  border-bottom:1px solid rgba(30,44,56,.5); }
+.ld-row .n{ color:var(--txt); }
+.ld-row .a{ color:var(--cy); text-align:right; }
+.ld-row .s{ color:var(--txt-d); text-align:right; font-size:11px; }
+.ld-row.empty .n{ color:var(--txt-d); }
+.ld-mass{ margin-top:10px; font-family:var(--mono); font-size:11px;
+  color:var(--txt-d); line-height:1.8; }
+.ld-mass b{ color:var(--green); }
+.ld-mass b.warn{ color:var(--amber); }
+.ld-note{ margin-top:9px; font-size:11px; color:#4a6172; line-height:1.7; }
 .ac-view-cap b{ color:var(--green); }
 .ac-view-cap .hw{ color:var(--cy); }
 .ac-name{ font-family:var(--mono); font-size:28px; color:var(--amber); letter-spacing:2px; }

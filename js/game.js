@@ -67,10 +67,20 @@ var Game = (function () {
 
   var cv, state = 'title', paused = false;
   var world = null, player = null, mission = null, missionIdx = 0;
-  var selectedAC = 0, selectedSpecial = null;
+  var selectedAC = 0;
+
+  /* 挂载配置：机型 id → { 组 id: 武器 id | null }
+     玩家在机库里改的就是这个，改动会一直留着直到换机型 */
+  var loadouts = {};
+  /* 当前正在编辑的挂载点组，用于在俯视图上高亮 */
+  var activeHpGroup = null;
   var keys = {}, mouse = { left: false, right: false, x: 0, y: 0 };
   var aimMode = true;              // true = 鼠标引导（指令增稳），false = 键盘直控
   var last = 0, camMode = 0;
+
+  /* 单一油门轴：0..1 是常规推力区，1..1.25 是加力区。
+     不再需要单独的加力/减速板按键。 */
+  var THR_MAX = 1.25;
   var camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0), camPos = M3.V(0, 0, 0);
   var camYaw = 0, camPitch = 0;
   var banner = { t: 0, title: '', sub: '', col: '' };
@@ -109,8 +119,8 @@ var Game = (function () {
     volSfx: 85,
     muted: false,
     fov: 56,
-    camDist: 74,
-    camHeight: 22,
+    camDist: 52,
+    camHeight: 13,
     hudOpacity: 100,
     compass: true,
     targetMarkers: true
@@ -134,8 +144,8 @@ var Game = (function () {
       hint: '暂停时调整可以实时看到画面变化 —— 不用退出去再进来。',
       items: [
         { k: 'fov', label: '视场角 FOV', type: 'range', min: 38, max: 100, unit: '°' },
-        { k: 'camDist', label: '镜头距离', type: 'range', min: 28, max: 200, unit: ' m' },
-        { k: 'camHeight', label: '镜头高度', type: 'range', min: -10, max: 70, unit: ' m' }
+        { k: 'camDist', label: '镜头距离', type: 'range', min: 16, max: 200, unit: ' m' },
+        { k: 'camHeight', label: '镜头高度', type: 'range', min: -15, max: 60, unit: ' m' }
       ]
     },
     {
@@ -266,8 +276,8 @@ var Game = (function () {
     ['W / S', '拉杆抬头 / 推杆低头'],
     ['A / D', '左滚 / 右滚'],
     ['Q / E', '方向舵'],
-    ['Shift / Ctrl', '油门增 / 减'],
-    ['X / Z', '加力燃烧室 / 减速板'],
+    ['Shift / Ctrl', '油门杆 —— 推满自动进加力，收到底自动张减速板'],
+    ['X / Z', '直接推到底（加力）/ 收到底（减速板）'],
     ['↑ ↓ ← →', '自由视角（松开自动回中）'],
     ['鼠标左键 / Space', '机炮'],
     ['鼠标右键 / Enter', '发射特殊武器'],
@@ -321,7 +331,7 @@ var Game = (function () {
           '<div class="r">' + ac.role + '</div>';
         d.onclick = function () {
           selectedAC = idx;
-          selectedSpecial = AIRCRAFT[idx].defSpecial;
+          activeHpGroup = null;
           SFX.click();
           buildHangar();
         };
@@ -330,8 +340,9 @@ var Game = (function () {
     }
 
     var ac = AIRCRAFT[selectedAC];
-    if (!selectedSpecial || ac.specials.indexOf(selectedSpecial) < 0) {
-      selectedSpecial = ac.defSpecial;
+    var lo = getLoadout(ac);
+    if (!activeHpGroup && ac.hardpointGroups && ac.hardpointGroups.length) {
+      activeHpGroup = ac.hardpointGroups[0].id;
     }
     document.getElementById('acName').textContent = ac.name + '  「' + ac.cn + '」';
     document.getElementById('acRole').textContent = ac.role + '  ·  ' + ac.maker;
@@ -350,40 +361,192 @@ var Game = (function () {
     document.getElementById('acStats').innerHTML = sh;
     document.getElementById('acDesc').innerHTML = ac.desc;
 
-    var sp = document.getElementById('spList');
-    sp.innerHTML = '';
-    for (k = 0; k < ac.specials.length; k++) {
-      (function (sid) {
-        var w = WEAPONS[sid];
-        var d = document.createElement('div');
-        d.className = 'sp-item' + (sid === selectedSpecial ? ' sel' : '');
-        d.innerHTML = '<div class="n">' + w.name + ' 「' + w.cn + '」</div>' +
-          '<div class="d">' + w.desc + '</div>' +
-          '<div class="q">' + kindLabel(w.kind) +
-          (w.ammo ? '  ·  备弹 ' + w.ammo : '') +
-          (w.cd ? '  ·  冷却 ' + w.cd + 's' : '') + '</div>' +
-          '<div class="q root">编号含义 · ' + (ROOTS[sid] || '—') + '</div>';
-        d.onclick = function () { selectedSpecial = sid; SFX.click(); buildHangar(); };
-        sp.appendChild(d);
-      })(ac.specials[k]);
+    buildHardpointEditor(ac, lo);
+
+    /* ---- 载弹与重量汇总 ---- */
+    var list = resolveLoadout(ac, lo);
+    var mass = loadoutMass(ac, lo);
+    var mtow = ac.maxLoad || 5000;
+    var loadK = Math.min(1, mass / mtow);
+    var gun = WEAPONS[ac.gun];
+
+    var sum = '<div class="ld-head">出击配置</div>';
+    sum += '<div class="ld-row"><span class="n">' + gun.name + '</span>' +
+      '<span class="a">×' + gun.ammo + '</span><span class="s">机炮</span></div>';
+    if (list.length) {
+      for (k = 0; k < list.length; k++) {
+        sum += '<div class="ld-row"><span class="n">' + list[k].w.name + '</span>' +
+          '<span class="a">×' + list[k].ammo + '</span>' +
+          '<span class="s">齐射 ' + list[k].salvo + '</span></div>';
+      }
+    } else {
+      sum += '<div class="ld-row empty"><span class="n">无挂载</span></div>';
+    }
+    sum += '<div class="ld-row"><span class="n">干扰弹</span>' +
+      '<span class="a">×8</span><span class="s">固定</span></div>';
+
+    var pen = Math.round(loadK * 100);
+    sum += '<div class="ld-mass">挂载重量 <b>' + mass + ' / ' + mtow + ' kg</b>' +
+      '<br>机动性 ' + (pen > 1
+        ? '<b class="warn">−' + Math.round(loadK * 18) + '%</b>（空置挂架可以换回一点）'
+        : '<b>无损失</b>') +
+      '</div>';
+    sum += '<div class="ld-note">编号前缀取自逻辑语词根 —— ' +
+      '环带工程自 2062 年起以逻辑语为签字语言，详见资料库。</div>';
+    document.getElementById('acLoadout').innerHTML = sum;
+
+    /* ---- 俯视识别图 ---- */
+    PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup);
+    document.getElementById('planCap').innerHTML =
+      '绿色为挂载，<b>琥珀为当前编辑的挂载点组</b>，青色虚线为可变后掠翼的展开位' +
+      '<br><span class="hw">同一种武器挂到多个组上，弹药池与齐射数会一起累加</span>';
+  }
+
+  /* ============================================================
+     挂载系统
+     ============================================================ */
+
+  /** 取某机型的挂载配置（按需初始化成默认值） */
+  function getLoadout(ac) {
+    if (!loadouts[ac.id]) {
+      var lo = {};
+      var groups = ac.hardpointGroups || [];
+      for (var i = 0; i < groups.length; i++) {
+        var g = groups[i];
+        lo[g.id] = (ac.defaultLoadout && ac.defaultLoadout[g.id]) || null;
+      }
+      loadouts[ac.id] = lo;
+    }
+    return loadouts[ac.id];
+  }
+
+  /**
+   * 把挂载配置展开成武器列表。
+   * 同一种武器占了多个挂载点就合并成一條：弹药累加，齐射数 = 挂载点总数。
+   */
+  function resolveLoadout(ac, lo) {
+    var groups = ac.hardpointGroups || [];
+    var map = {};
+    var order = [];
+
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i];
+      var wid = lo ? lo[g.id] : null;
+      if (!wid || !WEAPONS[wid]) continue;
+      var w = WEAPONS[wid];
+      var e = map[wid];
+      if (!e) {
+        e = map[wid] = { wid: wid, w: w, points: 0, ammo: 0, salvo: 0 };
+        order.push(wid);
+      }
+      e.points += g.pts.length;
+      e.salvo += g.pts.length;
+      e.ammo += g.pts.length * (w.perPoint || 1);
     }
 
-    var gun = WEAPONS[ac.gun];
-    document.getElementById('acLoadout').innerHTML =
-      '标准配置 —— <b>' + gun.name + '</b> ' + gun.cn + ' · 备弹 ' + gun.ammo + '<br>' +
-      '特殊挂载 —— <b>' + WEAPONS[selectedSpecial].name + '</b> ' +
-      WEAPONS[selectedSpecial].cn + '<br>' +
-      '干扰弹 —— <b>8</b> 发<br>' +
-      '<span style="color:#4a6172">编号前缀取自逻辑语词根 —— ' +
-      '环带工程自 2062 年起以逻辑语为签字语言，详见资料库。</span>';
+    // 空空弹排前面，其余按名称
+    order.sort(function (a, b) {
+      var wa = WEAPONS[a], wb = WEAPONS[b];
+      var ka = wa.kind === 'aam' ? 0 : 1, kb = wb.kind === 'aam' ? 0 : 1;
+      if (ka !== kb) return ka - kb;
+      return wa.name < wb.name ? -1 : 1;
+    });
 
-    // 俯视识别图：挂载形状跟着选中的特殊武器变
-    var spw = WEAPONS[selectedSpecial];
-    PLANFORM.draw(document.getElementById('planCv'), ac, selectedSpecial);
-    document.getElementById('planCap').innerHTML =
-      '当前挂载 —— <b>' + spw.name + '</b> ' + spw.cn +
-      (ROOTS[selectedSpecial] ? '<br><span class="hw">编号含义 · ' + ROOTS[selectedSpecial] + '</span>' : '') +
-      '<br><span style="color:#4a6172">绿色为挂载，琥珀为机炮，虚线为参考线</span>';
+    var out = [];
+    for (i = 0; i < order.length; i++) out.push(map[order[i]]);
+    return out;
+  }
+
+  /** 挂载总重量（kg） */
+  function loadoutMass(ac, lo) {
+    var m = 0;
+    var groups = ac.hardpointGroups || [];
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i];
+      var wid = lo ? lo[g.id] : null;
+      if (!wid || !WEAPONS[wid]) continue;
+      var w = WEAPONS[wid];
+      m += g.pts.length * (w.perPoint || 1) * (w.mass || 100);
+    }
+    return m;
+  }
+
+  function hpKindLabel(k) {
+    return ({ tip: '翼尖', light: '通用', heavy: '重挂', belly: '机腹' })[k] || k;
+  }
+
+  function buildHardpointEditor(ac, lo) {
+    var host = document.getElementById('hpList');
+    if (!host) return;
+    host.innerHTML = '';
+
+    var groups = ac.hardpointGroups || [];
+    for (var i = 0; i < groups.length; i++) {
+      (function (g) {
+        var row = document.createElement('div');
+        row.className = 'hp-row' + (g.id === activeHpGroup ? ' on' : '');
+        row.setAttribute('data-hp', g.id);
+
+        var idEl = document.createElement('span');
+        idEl.className = 'hp-id';
+        idEl.textContent = g.id;
+
+        var lbEl = document.createElement('span');
+        lbEl.className = 'hp-lb';
+        lbEl.innerHTML = g.label + '<i>' + g.pts.length + ' 点 · ' + hpKindLabel(g.kind) + '</i>';
+
+        var sel = document.createElement('select');
+        sel.className = 'hp-sel';
+
+        var o0 = document.createElement('option');
+        o0.value = '';
+        o0.textContent = '空置';
+        sel.appendChild(o0);
+
+        for (var wid in WEAPONS) {
+          if (!Object.prototype.hasOwnProperty.call(WEAPONS, wid)) continue;
+          var w = WEAPONS[wid];
+          if (w.kind === 'gun') continue;
+          if (!w.fits || w.fits.indexOf(g.kind) < 0) continue;
+          var o = document.createElement('option');
+          o.value = wid;
+          o.textContent = w.name + ' ×' + (g.pts.length * (w.perPoint || 1));
+          sel.appendChild(o);
+        }
+        sel.value = lo[g.id] || '';
+
+        sel.addEventListener('change', function () {
+          lo[g.id] = sel.value || null;
+          activeHpGroup = g.id;
+          SFX.click();
+          buildHangar();
+        });
+        sel.addEventListener('focus', function () {
+          activeHpGroup = g.id;
+          PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup);
+          markHpRows();
+        });
+
+        row.addEventListener('mouseenter', function () {
+          activeHpGroup = g.id;
+          PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup);
+          markHpRows();
+        });
+
+        row.appendChild(idEl);
+        row.appendChild(lbEl);
+        row.appendChild(sel);
+        host.appendChild(row);
+      })(groups[i]);
+    }
+  }
+
+  /** 只切高亮，不重建控件（悬停时用，避免打断下拉框） */
+  function markHpRows() {
+    var rows = document.querySelectorAll('[data-hp]');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].classList.toggle('on', rows[i].getAttribute('data-hp') === activeHpGroup);
+    }
   }
 
   function kindLabel(k) {
@@ -588,10 +751,19 @@ var Game = (function () {
     }
     if (!target && wp.target !== 'ground' && wp.target !== 'ship') return false;
 
-    var n = wp.salvo || 1;
+    /* 齐射数 = 该武器占用的挂载点总数。
+       挂载点成对，所以这个数通常是偶数 —— 一次按下，两侧一起打出去。 */
+    var n = Math.max(1, actor.spSalvo || wp.salvo || 1);
+    n = Math.min(n, actor.spAmmo);
+    if (n <= 0) return false;
+
     for (var i = 0; i < n; i++) {
+      // 按左右交替、由内向外错开挂架，避免全从同一个点飞出来
       var side = (i % 2) ? 1 : -1;
-      var hp = M3.add(actor.pos, M3.add(M3.mul(actor.fwd, 4), M3.mul(actor.right, side * 2.6)));
+      var rank = Math.floor(i / 2);
+      var hp = M3.add(actor.pos, M3.add(
+        M3.mul(actor.fwd, 4),
+        M3.mul(actor.right, side * (2.4 + rank * 1.9))));
       var m = Ent.makeMissile({
         weapon: actor.special,
         team: actor.team,
@@ -603,9 +775,10 @@ var Game = (function () {
       });
       w.missiles.push(m);
     }
-    actor.spAmmo -= 1;
+    actor.spAmmo -= n;
     actor.spCd = wp.cd;
     if (actor.isPlayer) {
+      if (actor.ammoPool) actor.ammoPool[actor.special] = actor.spAmmo;
       w.shotsFired += n;
       SFX.missile();
     } else {
@@ -625,13 +798,28 @@ var Game = (function () {
     stats = { startTime: 0, endTime: 0 };
 
     var ac = AIRCRAFT[selectedAC];
+    var lo = getLoadout(ac);
+    var wl = resolveLoadout(ac, lo);
+    var loadK = Math.min(1, loadoutMass(ac, lo) / (ac.maxLoad || 5000));
+
     var p = Ent.makeAircraft({
       type: ac.id, team: 0, isPlayer: true,
       x: 0, y: mission.altStart, z: 0,
       fwd: M3.V(0, 0, 1),
       speed: mission.speedStart,
-      special: selectedSpecial
+      special: wl.length ? wl[0].wid : null
     });
+
+    // 挂载配置落到飞机上：武器列表 + 各自的弹药池 + 齐射数
+    p.loadoutList = wl;
+    p.ammoPool = {};
+    for (var wi = 0; wi < wl.length; wi++) p.ammoPool[wl[wi].wid] = wl[wi].ammo;
+    p.wpIdx = 0;
+    p.spAmmo = wl.length ? wl[0].ammo : 0;
+    p.spSalvo = wl.length ? wl[0].salvo : 1;
+    // 挂载重量：拖累机动性，空挂架能换回一点
+    p.loadFactor = loadK;
+
     p.name = CALLSIGN.player;
     p.label = CALLSIGN.player;
     world.player = p;
@@ -712,7 +900,7 @@ var Game = (function () {
 
     cv.addEventListener('wheel', function (e) {
       if (state !== 'playing' || !player) return;
-      player.throttle = M3.clamp(player.throttle - e.deltaY * 0.0006, 0, 1);
+      player.throttle = M3.clamp(player.throttle - e.deltaY * 0.0007, 0, THR_MAX);
     }, { passive: true });
 
     window.addEventListener('resize', function () { Renderer.resize(); });
@@ -760,12 +948,13 @@ var Game = (function () {
 
   function cycleSpecial() {
     if (!player || !player.alive) return;
-    var list = player.ac.specials;
-    var at = list.indexOf(player.special);
-    var next = list[(at + 1) % list.length];
-    player.special = next;
-    var w = WEAPONS[next];
-    player.spAmmo = w.ammo;
+    if (!player.loadoutList || player.loadoutList.length < 2) {
+      SFX.loseLock();
+      return;
+    }
+    player.wpIdx = (player.wpIdx + 1) % player.loadoutList.length;
+    syncWeapon(player);
+    var w = WEAPONS[player.special];
     player.spCd = 0;
     player.spActive = 0;
     if (w.kind === 'dew') player.spCharges = w.charges;
@@ -889,11 +1078,18 @@ var Game = (function () {
       c.yaw = (keys.KeyE ? 1 : 0) + (keys.KeyQ ? -1 : 0);
     }
 
-    if (keys.ShiftLeft || keys.ShiftRight) player.throttle = Math.min(1, player.throttle + dt * 0.65);
-    if (keys.ControlLeft || keys.ControlRight) player.throttle = Math.max(0, player.throttle - dt * 0.65);
+    // 单一油门轴：推满自动进加力，收到底自动张减速板。
+    // X / Z 保留为"一把推到底 / 一把收到底"的快捷键。
+    var thrIn = 0;
+    if (keys.ShiftLeft || keys.ShiftRight) thrIn += 1;
+    if (keys.ControlLeft || keys.ControlRight) thrIn -= 1;
+    if (thrIn) player.throttle += thrIn * dt * 0.62;
+    if (keys.KeyX) player.throttle = THR_MAX;
+    if (keys.KeyZ) player.throttle = 0;
 
-    player.ab = !!keys.KeyX && player.throttle > 0.72;
-    player.brake = !!keys.KeyZ;
+    player.throttle = M3.clamp(player.throttle, 0, THR_MAX);
+    player.ab = player.throttle > 1.0;
+    player.brake = player.throttle < 0.04;
 
     var wantGun = mouse.left || keys.Space;
     if (wantGun) Ent.fireGun(player, world);
@@ -1100,7 +1296,9 @@ var Game = (function () {
       var want = M3.add(p.pos, M3.add(off0, M3.V(0, S.camHeight + camPitch * 70, 0)));
       var k = 1 - Math.exp(-7.5 * dt);
       camPos = M3.lerpV(camPos, want, k);
-      var look = M3.add(p.pos, M3.mul(p.fwd, S.camDist * 0.62));
+      // 观察点前移：镜头距离很小的时候，如果还盯着机身本身，
+      // 飞机的下沉角会大到跑出视场。给一个下限让视线稳定在前方。
+      var look = M3.add(p.pos, M3.mul(p.fwd, Math.max(30, S.camDist * 1.45)));
       camFwd = M3.lerpV(camFwd, M3.norm(M3.sub(look, camPos)), 1 - Math.exp(-8.5 * dt));
       camFwd = M3.norm(camFwd);
       camUp = M3.V(0, 1, 0);
@@ -1250,7 +1448,8 @@ var Game = (function () {
       if (!a.alive) continue;
       var m2 = MODELS[a.model];
       if (!m2) continue;
-      Renderer.pushModel(m2, a.pos, a.fwd, a.up, {});
+      // sweep 只对带 morph 数据的模型（C-11 的可变后掠翼）有意义
+      Renderer.pushModel(m2, a.pos, a.fwd, a.up, { sweep: a.sweep || 0 });
     }
     // 导弹
     for (i = 0; i < world.missiles.length; i++) {
@@ -1260,6 +1459,11 @@ var Game = (function () {
       Renderer.pushModel(mm, ms.pos, ms.fwd, ms.up, {});
     }
     Renderer.flush();
+
+    // 曳光弹画在模型之上并用加色混合 —— 弹道本来就该是亮线，
+    // 被机翼挡掉反而看不清楚
+    drawTracers();
+
     Renderer.drawParticles(world.particles);
     Renderer.end();
 
@@ -1327,6 +1531,49 @@ var Game = (function () {
       ctx.fillText('CMD', ax, ay + rad + 13);
       ctx.restore();
     }
+  }
+
+  /* ============================================================
+     曳光弹
+     子弹本身是真实弹体（有位置和速度），但之前完全没有渲染，
+     所以开火除了声音之外看不到任何东西。这里按上一帧到当前帧的
+     线段画成曳光，并用加色混合让它发光。
+     ============================================================ */
+  function drawTracers() {
+    if (!world || !world.bullets.length) return;
+    var cam = Renderer.getCam();
+    if (!cam) return;
+
+    var ctx = Renderer.ctx;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+
+    for (var i = 0; i < world.bullets.length; i++) {
+      var b = world.bullets[i];
+      if (!b.alive) continue;
+
+      var head = M3.project(cam, b.pos);
+      if (!head) continue;
+      var tail = M3.project(cam, b.prev || b.pos);
+      if (!tail) tail = head;
+
+      var mine = player && b.team === player.team;
+
+      ctx.strokeStyle = mine ? 'rgba(255,228,150,0.92)' : 'rgba(255,148,88,0.85)';
+      ctx.lineWidth = mine ? 1.8 : 1.3;
+      ctx.beginPath();
+      ctx.moveTo(tail.x, tail.y);
+      ctx.lineTo(head.x, head.y);
+      ctx.stroke();
+
+      ctx.fillStyle = mine ? 'rgba(255,250,215,1)' : 'rgba(255,196,150,1)';
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, mine ? 1.7 : 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
   /* ============================================================
@@ -1443,13 +1690,33 @@ var Game = (function () {
       var ac = AIRCRAFT[i];
       if (!MODELS[ac.model]) problems.push('机型 ' + ac.id + ' 引用了不存在的模型 "' + ac.model + '"');
       if (!WEAPONS[ac.gun]) problems.push('机型 ' + ac.id + ' 引用了不存在的机炮 "' + ac.gun + '"');
-      for (j = 0; j < ac.specials.length; j++) {
-        if (!WEAPONS[ac.specials[j]]) {
-          problems.push('机型 ' + ac.id + ' 引用了不存在的挂载 "' + ac.specials[j] + '"');
+      // 挂载点组：组内每个点都要有坐标，且能被某种武器适配
+      var grps = ac.hardpointGroups || [];
+      if (!grps.length) problems.push('机型 ' + ac.id + ' 没有定义挂载点组');
+      for (j = 0; j < grps.length; j++) {
+        var gg = grps[j];
+        if (!gg.pts || gg.pts.length < 2) {
+          problems.push('机型 ' + ac.id + ' 的挂载点组 ' + gg.id + ' 不是成对的');
         }
+        var ok = false;
+        for (var wk in WEAPONS) {
+          var ww = WEAPONS[wk];
+          if (ww.kind !== 'gun' && ww.fits && ww.fits.indexOf(gg.kind) >= 0) { ok = true; break; }
+        }
+        if (!ok) problems.push('机型 ' + ac.id + ' 的挂载点组 ' + gg.id + ' 没有任何武器挂得上');
       }
-      if (ac.specials.indexOf(ac.defSpecial) < 0) {
-        problems.push('机型 ' + ac.id + ' 的默认挂载不在可选列表里');
+      // 默认配置里引用的武器必须真的能挂到那一组
+      for (var dk in (ac.defaultLoadout || {})) {
+        var dw = ac.defaultLoadout[dk];
+        if (!dw) continue;
+        var dg = null;
+        for (j = 0; j < grps.length; j++) if (grps[j].id === dk) dg = grps[j];
+        if (!dg) { problems.push('机型 ' + ac.id + ' 的默认配置引用了不存在的组 ' + dk); continue; }
+        if (!WEAPONS[dw]) { problems.push('机型 ' + ac.id + ' 的默认配置引用了不存在的武器 ' + dw); continue; }
+        if (!WEAPONS[dw].fits || WEAPONS[dw].fits.indexOf(dg.kind) < 0) {
+          problems.push('机型 ' + ac.id + ' 的默认配置把 ' + WEAPONS[dw].name +
+            ' 挂到了挂不下的 ' + dg.label);
+        }
       }
       if (!ac.phys || !ac.phys.vMax) problems.push('机型 ' + ac.id + ' 缺少飞行性能参数');
       if (!PLANFORM.planes[ac.model]) problems.push('机型 ' + ac.id + ' 缺少俯视识别图数据');
@@ -1568,7 +1835,7 @@ var Game = (function () {
     document.addEventListener('mousedown', function () { SFX.unlock(); }, { once: false });
 
     // 默认特殊武器
-    selectedSpecial = AIRCRAFT[selectedAC].defSpecial;
+    getLoadout(AIRCRAFT[selectedAC]);
 
     // 鼠标瞄准：初始把瞄准点放在屏幕中心
     mouse.x = window.innerWidth / 2;
@@ -1579,7 +1846,13 @@ var Game = (function () {
     requestAnimationFrame(function (t) { last = t; requestAnimationFrame(loop); });
   }
 
-  return { init: init, startMission: startMission };
+  return {
+    init: init,
+    startMission: startMission,
+    // 调试/测试接口：把内部状态露出来，tools/smoke.js 靠它做断言
+    __player: function () { return player; },
+    __world: function () { return world; }
+  };
 })();
 
 window.addEventListener('load', function () { Game.init(); });

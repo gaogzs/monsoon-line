@@ -38,6 +38,7 @@ var HUD = (function () {
     drawThreatRing(ctx, W, H, p, world);
     drawTargets(ctx, W, H, cam, p, world);
     drawWeaponPanel(ctx, W, H, p);
+    drawTargetBearing(ctx, W, H, p, p.target);
     drawWarnings(ctx, W, H, p, world);
     drawObjective(ctx, W, H, world);
 
@@ -226,10 +227,15 @@ var HUD = (function () {
     text(ctx, 'THR', tx, ty - 8, DIM, FS, 'center');
     ctx.strokeStyle = DIM; ctx.lineWidth = 1;
     ctx.strokeRect(tx - 7, ty, 14, 108);
-    var th = M3.clamp(p.throttle, 0, 1);
+    // 油门轴量程 0..1.25，1.0 以上是加力区
+    var th = M3.clamp(p.throttle / 1.25, 0, 1);
     ctx.fillStyle = p.ab ? AMBER : GREEN;
     ctx.fillRect(tx - 5, ty + 106 - 104 * th, 10, 104 * th);
-    if (p.ab) text(ctx, 'A/B', tx, ty + 124, AMBER, FS, 'center');
+    // 常规推力上限刻度
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fillRect(tx - 8, ty + 106 - 104 * 0.8, 16, 1.5);
+    if (p.brake) text(ctx, 'BRK', tx, ty + 124, CY, FS, 'center');
+    else if (p.ab) text(ctx, 'A/B', tx, ty + 124, AMBER, FS, 'center');
   }
 
   function tape(ctx, x, top, hgt, val, minor, major, side, label, col, scale) {
@@ -563,31 +569,48 @@ var HUD = (function () {
      ============================================================ */
   function drawWeaponPanel(ctx, W, H, p) {
     var x = W / 2, y = H - 74;
-    var spW = WEAPONS[p.special];
 
     ctx.textAlign = 'center';
 
     // 机炮
     var gCol = p.gunAmmo > 0 ? GREEN : RED;
-    text(ctx, 'GUN  ' + p.gunAmmo, x - 150, y, gCol, FB, 'center');
-
-    // 特殊武器
-    var sCol = (p.spAmmo > 0 && p.spCd <= 0) ? CY : DIM;
-    var spTxt;
-    if (spW.kind === 'ecm') {
-      spTxt = 'ECM  ' + (p.spActive > 0 ? 'ON ' + p.spActive.toFixed(1) : (p.spCd > 0 ? p.spCd.toFixed(0) + 's' : 'RDY'));
-      sCol = p.spActive > 0 ? AMBER : sCol;
-    } else if (spW.kind === 'dew') {
-      spTxt = 'DEW  ' + '◆'.repeat(p.spCharges) + '◇'.repeat(Math.max(0, spW.charges - p.spCharges));
-    } else {
-      spTxt = spW.name + '  ' + p.spAmmo;
-      if (p.spCd > 0) spTxt += '  (' + p.spCd.toFixed(0) + ')';
-    }
-    text(ctx, spTxt, x, y, sCol, FB, 'center');
-    text(ctx, spW.cn, x, y + 15, DIM, FS, 'center');
+    text(ctx, 'GUN  ' + p.gunAmmo, x - 172, y, gCol, FB, 'center');
 
     // 干扰弹
-    text(ctx, 'FLARE ' + p.flares, x + 160, y, p.flares > 0 ? GREEN : RED, FB, 'center');
+    text(ctx, 'FLARE ' + p.flares, x + 172, y, p.flares > 0 ? GREEN : RED, FB, 'center');
+
+    /* ---- 挂载武器纵列表 ----
+       一行一种武器，当前选中的用 ">" 指出来。
+       从"一个固定特殊武器"改成"多组挂载"之后这是必需的 ——
+       没有它玩家不知道按 R 会切到什么，也不知道还剩多少。 */
+    var lst = p.loadoutList || [];
+    var rowH = 15;
+    var top = y - 10 - (lst.length - 1) * rowH;
+
+    for (var i = 0; i < lst.length; i++) {
+      var e = lst[i];
+      var cur = (i === p.wpIdx);
+      var ammo = p.ammoPool ? (p.ammoPool[e.wid] || 0) : (e.ammo || 0);
+      var ry = top + i * rowH;
+
+      var col = ammo > 0 ? (cur ? CY : 'rgba(185,200,212,0.5)') : RED;
+      if (cur && p.spCd > 0) col = AMBER;
+
+      if (cur) text(ctx, '>', x - 92, ry, AMBER, FB, 'left');
+      text(ctx, e.w.name, x - 76, ry, col, FB, 'left');
+      text(ctx, String(ammo), x + 62, ry, col, FB, 'right');
+      if (e.salvo > 1) text(ctx, 'R' + e.salvo, x + 72, ry, DIM, FS, 'left');
+    }
+
+    if (lst.length) {
+      var cw = lst[p.wpIdx] ? lst[p.wpIdx].w : lst[0].w;
+      text(ctx, cw.cn, x, top + lst.length * rowH + 4, DIM, FS, 'center');
+      if (p.spCd > 0) {
+        text(ctx, 'RLD ' + p.spCd.toFixed(1) + 's', x + 132, y - 12, AMBER, FS, 'left');
+      }
+    } else {
+      text(ctx, '无挂载 / CLEAN', x, y - 10, RED, FB, 'center');
+    }
 
     // 结构完整度
     var hpK = p.hp / p.maxHp;
@@ -626,6 +649,90 @@ var HUD = (function () {
   /* ============================================================
      任务目标
      ============================================================ */
+  /* ============================================================
+     目标方位尺
+     锁定目标跑出视野时，屏幕边缘那个小箭头太容易错过 ——
+     尤其是被云和地面网格淹没的时候。所以在屏幕中下方再给一条方位尺：
+     中间是机头方向，标记的左右偏移表示方位角、上下偏移表示俯仰角。
+     ============================================================ */
+  function drawTargetBearing(ctx, W, H, p, t) {
+    if (!t || !t.alive) return;
+
+    var toT = M3.sub(t.pos, p.pos);
+    var dist = M3.len(toT);
+    if (dist < 2) return;
+    var d = M3.mul(toT, 1 / dist);
+
+    var rx = M3.dot(d, p.right);
+    var fx = M3.dot(d, p.fwd);
+    var ux = M3.dot(d, p.up);
+
+    // 方位角（+ 为右）与俯仰角（+ 为上）
+    var az, el = Math.asin(M3.clamp(ux, -1, 1));
+    if (fx > 0.02) {
+      az = Math.atan2(rx, fx);
+    } else {
+      // 目标在侧后方或正后方：方位角没有意义，直接顶到左右边缘
+      az = (rx >= 0) ? 1.5708 : -1.5708;
+      el = 0;
+    }
+
+    var cx = W / 2;
+    var cy = H * 0.82;
+    var halfW = Math.min(200, W * 0.16);
+
+    // 尺身
+    ctx.strokeStyle = 'rgba(79,224,138,0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - halfW, cy);
+    ctx.lineTo(cx + halfW, cy);
+    ctx.stroke();
+
+    // 左右各 30° / 60° 刻度
+    for (var k = -2; k <= 2; k++) {
+      var tx = cx + (k * halfW) / 2;
+      ctx.beginPath();
+      ctx.moveTo(tx, cy - 4);
+      ctx.lineTo(tx, cy + 4);
+      ctx.stroke();
+    }
+
+    // 机头参考（中间朝上的小三角）
+    ctx.fillStyle = 'rgba(79,224,138,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 13);
+    ctx.lineTo(cx - 4, cy - 21);
+    ctx.lineTo(cx + 4, cy - 21);
+    ctx.closePath();
+    ctx.fill();
+
+    // 目标标记
+    var mx = cx + M3.clamp(az / 1.5708, -1, 1) * halfW;
+    var my = cy - M3.clamp(el / 1.5708, -1, 1) * 30;
+    var col = (t.kind === 'target') ? '#ffb03a' : RED;
+
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(mx, my - 9);
+    ctx.lineTo(mx - 6, my + 2);
+    ctx.lineTo(mx + 6, my + 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(mx - 7, my + 6);
+    ctx.lineTo(mx + 7, my + 6);
+    ctx.stroke();
+
+    // 距离 / 方位读数
+    text(ctx, (dist / 1000).toFixed(1) + ' KM', cx - halfW - 12, cy + 4,
+      col, FS, 'right');
+    text(ctx, (az >= 0 ? 'R' : 'L') + Math.abs(Math.round(az * 57.2958)) + '°',
+      cx + halfW + 12, cy + 4, col, FS, 'left');
+  }
+
   function drawObjective(ctx, W, H, world) {
     if (!world.objective) return;
     // 让开顶部的指南针

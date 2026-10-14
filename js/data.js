@@ -56,8 +56,20 @@ var AIRCRAFT = [
     stats: { spd: 0.68, mob: 0.72, stl: 0.55, fire: 0.70, dur: 0.62, rng: 0.76 },
     phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.60, roll: 3.0, yaw: 0.30, hp: 130 },
     gun: 'k3',
-    specials: ['v9', 'v11', 'v22'],
-    defSpecial: 'v11',
+    variableSweep: true,
+    maxLoad: 6500,          // 最大挂载重量 kg，超过只会拖慢自己
+
+    /* 挂载点分组。
+       pts 是机体系俯视坐标（机头 +y，右翼 +x，单位米），
+       同时也是机库俯视识别图上 Group 引线的锚点 —— 单一数据源。
+       kind 决定这一组能挂什么，见文件末尾的挂载属性补丁。 */
+    hardpointGroups: [
+      { id: 'A', label: '翼尖', kind: 'tip', pts: [{ x: 7.5, y: -2.8 }, { x: -7.5, y: -2.8 }] },
+      { id: 'B', label: '翼下内侧', kind: 'heavy', pts: [{ x: 3.2, y: -0.3 }, { x: -3.2, y: -0.3 }] },
+      { id: 'C', label: '翼下外侧', kind: 'light', pts: [{ x: 5.6, y: -2.4 }, { x: -5.6, y: -2.4 }] },
+      { id: 'D', label: '翼根', kind: 'light', pts: [{ x: 1.95, y: -1.8 }, { x: -1.95, y: -1.8 }] }
+    ],
+    defaultLoadout: { A: 'srm', B: 'v11', C: 'v9', D: null },
     desc: `
 <p>上游公约的舰载主力。变后掠翼是为了同时满足两件互相矛盾的事：
 在 <b>280 米</b>长的浮岛平台上起降，以及在 15 公里以上维持超音速巡航。</p>
@@ -79,8 +91,15 @@ var AIRCRAFT = [
     stats: { spd: 0.96, mob: 0.84, stl: 0.86, fire: 0.54, dur: 0.32, rng: 0.48 },
     phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.63, roll: 3.4, yaw: 0.28, hp: 92 },
     gun: 'k3',
-    specials: ['v17', 'v9', 'e4'],
-    defSpecial: 'v17',
+    maxLoad: 4800,
+
+    // C-14 没有翼尖挂架，但有多一处机腹重挂点
+    hardpointGroups: [
+      { id: 'A', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 2.6, y: -2.3 }, { x: -2.6, y: -2.3 }] },
+      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 4.2, y: -4.2 }, { x: -4.2, y: -4.2 }] },
+      { id: 'C', label: '机腹', kind: 'belly', pts: [{ x: 0.95, y: -4.2 }, { x: -0.95, y: -4.2 }] }
+    ],
+    defaultLoadout: { A: 'v17', B: 'v9', C: 'e4' },
     desc: `
 <p>整个上游公约空军只有 <b>31 架</b>。它的存在理由只有一个：<b>两万米</b>。</p>
 <p>翼载压到 <b>240 kg/m²</b>，配上第三涵道在 20 公里高度仍能给出的推力，
@@ -102,8 +121,16 @@ var AIRCRAFT = [
     stats: { spd: 0.34, mob: 0.44, stl: 0.30, fire: 0.98, dur: 0.98, rng: 0.60 },
     phys: { vMax: 380, vMil: 320, vStall: 88, accel: 18, decel: 44, pitch: 0.50, roll: 2.2, yaw: 0.34, hp: 250 },
     gun: 'k7',
-    specials: ['v25', 'v30', 'l2'],
-    defSpecial: 'v25',
+    maxLoad: 7200,
+
+    // 攻击机：挂点最多，但全是翼下，没有机腹舱
+    hardpointGroups: [
+      { id: 'A', label: '翼下内侧', kind: 'heavy', pts: [{ x: 3.8, y: -0.4 }, { x: -3.8, y: -0.4 }] },
+      { id: 'B', label: '翼下中', kind: 'light', pts: [{ x: 6.2, y: -1.0 }, { x: -6.2, y: -1.0 }] },
+      { id: 'C', label: '翼下外侧', kind: 'light', pts: [{ x: 7.8, y: -1.05 }, { x: -7.8, y: -1.05 }] }
+    ],
+    // 集束弹只适配重挂点，翼下中那个通用挂架挂不下它
+    defaultLoadout: { A: 'v25', B: 'srm', C: 'l2' },
     desc: `
 <p>鲣鸟是一种以将近 <b>100 公里时速</b>俯冲入水的海鸟。
 上游公约的命名委员会在这件事上没花什么心思。</p>
@@ -124,15 +151,30 @@ var WEAPONS = {
   /* ---------- 机炮 ---------- */
   k3: {
     name: 'CEL-3', cn: '20mm 六管转膛炮', kind: 'gun',
-    rpm: 3900, speed: 1100, dmg: 7, spread: 0.0022, ammo: 480,
+    rpm: 3900, speed: 1100, dmg: 7, spread: 0.0022, ammo: 6000,
     range: 1600, highRange: 2600,
     desc: '上游公约制式机炮。高射速低单发威力，靠命中数堆伤害。在 18 公里以上有效射程翻倍。'
   },
   k7: {
     name: 'CEL-7', cn: '30mm 四管转膛炮', kind: 'gun',
-    rpm: 3900, speed: 1020, dmg: 17, spread: 0.0028, ammo: 1350,
+    rpm: 3900, speed: 1020, dmg: 17, spread: 0.0028, ammo: 14000,
     range: 2000, highRange: 3100,
     desc: 'S-6 专用。一发足以打穿装甲车辆的顶甲。'
+  },
+
+  /* ---------- 基础短程空空导弹 ----------
+     不再是"默认自带"的东西，而是和其他弹一样占挂载点。
+     便宜、量大、性能平庸 —— 这就是它作为基准弹的意义。 */
+  srm: {
+    id: 'srm', name: 'TOR-2', cn: '短矢 · BOLT', kind: 'aam',
+    model: 'missile',
+    speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
+    turn: 2.40, seeker: 'ir', lockCone: 45 * Math.PI / 180, lockDist: 4200,
+    dmg: 30, ammo: 8, cd: 0.55, salvo: 1, flare: 0.38, prox: 20,
+    target: 'air', highAltScale: true,
+    desc: `基础短程红外弹。转弯率 2.4 rad/s，抗干扰一般，锁定锥 45°。
+      单点挂载量是全部弹种里最高的 —— 它就是用来"多带几发"的。`,
+    stat: { dmg: 0.34, spd: 0.50, trn: 0.68, rng: 0.36, ecm: 0.30 }
   },
 
   /* ---------- 上游公约特殊武器 ---------- */
@@ -238,6 +280,8 @@ var WEAPONS = {
     turn: 1.70, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 7200,
     dmg: 30, ammo: 8, cd: 3.4, salvo: 1, flare: 0.45, prox: 28,
     target: 'air', highAltScale: true,
+    // 下游专用弹：fits 为空表示玩家挂不上它
+    fits: [], perPoint: 0, mass: 0,
     desc: '下游中距弹。'
   },
   dl6: {
@@ -246,6 +290,7 @@ var WEAPONS = {
     turn: 2.90, seeker: 'ir', lockCone: 60 * Math.PI / 180, lockDist: 3600,
     dmg: 26, ammo: 6, cd: 2.2, salvo: 1, flare: 0.35, prox: 24,
     target: 'air', highAltScale: true,
+    fits: [], perPoint: 0, mass: 0,
     desc: '下游格斗弹。'
   },
   dl9: {
@@ -254,9 +299,42 @@ var WEAPONS = {
     turn: 2.10, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 9000,
     dmg: 48, ammo: 4, cd: 7.0, salvo: 1, flare: 0.60, prox: 34,
     target: 'air', highAltScale: true,
+    fits: [], perPoint: 0, mass: 0,
     desc: '地面发射的远程防空导弹。'
   }
 };
+
+/* ============================================================
+   挂载属性
+   —— 单独放在这里而不是塞进 WEAPONS 表里，是为了让"这个弹能挂在
+   哪些挂点上、一个挂点带几发、有多重"集中在一处，一眼横着能比较。
+
+     fits     能挂的挂点类型
+              tip   翼尖（轻，只受得起小型空空弹）
+              light 通用挂架
+              heavy 重挂点（大型弹只有这里挂得下）
+              belly 机腹（吊舱与对地弹）
+     perPoint 单个挂载点提供几发
+     mass     单件重量 kg，用来算挂载对机动性的拖累
+   ============================================================ */
+var STORE_ATTR = {
+  srm: { fits: ['tip', 'light', 'heavy'], perPoint: 4, mass: 95 },
+  v9:  { fits: ['tip', 'light', 'heavy'], perPoint: 2, mass: 110 },
+  v11: { fits: ['light', 'heavy'],        perPoint: 2, mass: 135 },
+  v17: { fits: ['heavy'],                 perPoint: 1, mass: 285 },
+  v22: { fits: ['heavy'],                 perPoint: 1, mass: 640 },
+  v25: { fits: ['heavy', 'belly'],        perPoint: 2, mass: 330 },
+  v30: { fits: ['heavy', 'belly'],        perPoint: 1, mass: 295 },
+  e4:  { fits: ['light', 'belly'],        perPoint: 1, mass: 215 },
+  l2:  { fits: ['light', 'belly'],        perPoint: 1, mass: 190 }
+};
+
+(function () {
+  for (var k in STORE_ATTR) {
+    if (!Object.prototype.hasOwnProperty.call(WEAPONS, k)) continue;
+    for (var f in STORE_ATTR[k]) WEAPONS[k][f] = STORE_ATTR[k][f];
+  }
+})();
 
 /* ============================================================
    无线电台词

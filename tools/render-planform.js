@@ -299,7 +299,7 @@ sandbox.document = { getElementById: () => null, createElement: () => ({ getCont
 const ctxVm = vm.createContext(sandbox);
 
 // 只加载绘制所需的最小集合：math3d（无关但无害）→ models → planform → data → 其余按需
-for (const name of ['math3d', 'data', 'planform']) {
+for (const name of ['math3d', 'data', 'planform', 'models']) {
   if (!scripts.includes(name)) continue;
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', name + '.js'), 'utf8'), ctxVm,
     { filename: name + '.js' });
@@ -318,23 +318,49 @@ fs.mkdirSync(OUT, { recursive: true });
 // 底板色，和游戏里的 #070d12 一致
 const BG = [0x07, 0x0d, 0x12];
 
-let count = 0;
-for (const ac of AIRCRAFT) {
-  const specials = ac.specials.concat([null]);   // 最后一轮画空挂点
-  for (const sp of specials) {
-    const ras = new Raster(W, H);
-    for (let i = 0; i < W * H; i++) {
-      ras.rgb[i * 3] = BG[0]; ras.rgb[i * 3 + 1] = BG[1]; ras.rgb[i * 3 + 2] = BG[2];
-      ras.a[i] = 1;
-    }
-    const canvas = { width: W, height: H, getContext: () => makeCtx(ras) };
-    PLANFORM.draw(canvas, ac, sp);
+const WEAPONS = sandbox.WEAPONS;
 
-    const name = ac.id + '-' + (sp || 'empty');
-    fs.writeFileSync(path.join(OUT, name + '.png'), encodePNG(W, H, ras.rgb, ras.a));
-    console.log('  ' + name + '.png');
-    count++;
+/* 把某武器装满所有挂得下的组 */
+function fillWith(ac, wid) {
+  const w = WEAPONS[wid];
+  const lo = {};
+  for (const g of ac.hardpointGroups) {
+    lo[g.id] = (w.fits && w.fits.indexOf(g.kind) >= 0) ? wid : null;
   }
+  return lo;
+}
+
+function blank() {
+  return {};
+}
+
+const shots = [];
+for (const ac of AIRCRAFT) {
+  shots.push({ ac, name: ac.id + '-default', lo: ac.defaultLoadout, hi: null });
+  shots.push({ ac, name: ac.id + '-clean', lo: blank(), hi: null });
+  for (const wid of Object.keys(WEAPONS)) {
+    if (WEAPONS[wid].kind === 'gun') continue;
+    const lo = fillWith(ac, wid);
+    let any = false;
+    for (const k in lo) if (lo[k]) any = true;
+    if (!any) continue;                       // 这架机挂不上，跳过
+    shots.push({ ac, name: ac.id + '-' + wid, lo, hi: ac.hardpointGroups[0].id });
+  }
+}
+
+let count = 0;
+for (const s of shots) {
+  const ras = new Raster(W, H);
+  for (let i = 0; i < W * H; i++) {
+    ras.rgb[i * 3] = BG[0]; ras.rgb[i * 3 + 1] = BG[1]; ras.rgb[i * 3 + 2] = BG[2];
+    ras.a[i] = 1;
+  }
+  const canvas = { width: W, height: H, getContext: () => makeCtx(ras) };
+  PLANFORM.draw(canvas, s.ac, s.lo, s.hi);
+
+  fs.writeFileSync(path.join(OUT, s.name + '.png'), encodePNG(W, H, ras.rgb, ras.a));
+  console.log('  ' + s.name + '.png');
+  count++;
 }
 
 console.log('\n生成 ' + count + ' 张预览图 → tools/preview/');
