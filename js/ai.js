@@ -50,6 +50,11 @@ var AI = (function () {
    * 返回 {pitch, roll, yaw}，pitch>0 抬头、roll>0 右滚。
    * st 可选，提供一个带 rollLock 字段的对象用于滚转方向锁存。
    */
+  /* 鼠标的这些界限都按**屏幕归一化距离**定（1 = 屏幕边缘，
+     屏幕角落约 1.41），所以与 FOV 无关。 */
+  var AIM_DEADZONE = 0.10;    // 中央 10% 内不转向
+  var AIM_PUSH_MAG = 0.65;    // 径向幅度小于它才可能走推杆
+
   function steerTo(a, desired, out, st) {
     var fx = M3.dot(desired, a.fwd);
     var rx = M3.dot(desired, a.right);
@@ -58,11 +63,27 @@ var AI = (function () {
     var off0 = Math.acos(M3.clamp(fx, -1, 1));
     var mag0 = M3.clamp(off0 * 2.3, 0, 1);
 
-    /* ---------- 唯一的例外：就在机腹一侧，而且偏得不多 → 推杆 ----------
+    /* ---------- 中心死区 ----------
+
+       鼠标停在画面中央一小片区域时不触发任何转向，飞机保持当前姿态。
+
+       没有它的话，鼠标随手一碰就开始滚转或俯仰，"稳稳飞一段"变成了
+       需要一直微调的事。死区判定用**屏幕径向距离**，与 FOV 无关。 */
+    var aimMag = (st && st.aimMag !== undefined) ? st.aimMag : null;
+
+    if (aimMag !== null && aimMag < AIM_DEADZONE) {
+      if (st) st.rollLock = 0;            // 顺手解锁，免得出死区时带着旧锁存
+      out.roll = 0;
+      out.pitch = 0;
+      out.yaw = 0;
+      return out;
+    }
+
+    /* ---------- 唯一的例外：指向机腹一侧，而且屏幕上偏得不多 → 推杆 ----------
 
        只判两件事：
          ① 鼠标指向落在机体下方（机腹那一侧）：ux < 0
-         ② 偏离机头的幅度相对于 FOV 不算大：off < 半个FOV × 0.65
+         ② 鼠标在屏幕上的幅度不大：aimMag < AIM_PUSH_MAG
 
        两条都满足才推杆。**其余任何方向一律走下面的默认逻辑** ——
        滚转到目标所在的方向，然后仰起。
@@ -71,13 +92,12 @@ var AI = (function () {
        接近 ±π，玩家把鼠标轻轻往下推一点，飞机会先滚半圈再抬头 ——
        完全不是"俯下"。
 
-       为什么幅度用"相对 FOV"而不是固定角度：鼠标能指到的最大偏角
-       就是半个 FOV，写死角度会让窄 FOV 永远够不到、宽 FOV 过早触发。
+       AI 没有屏幕位置，退回按离轴角判断（用 56° 半视场折算）。 */
+    var smallMag = (aimMag !== null)
+      ? (aimMag < AIM_PUSH_MAG)
+      : (off0 < 0.4887 * AIM_PUSH_MAG);
 
-       为什么不需要额外处理侧飞：那时机体 up 指向水平方向，鼠标在屏幕
-       下方对应的世界方向在机体系里偏"上方"，ux 不满足 ①。 */
-    var fovHalf = (st && st.fovHalf !== undefined) ? st.fovHalf : 0.4887; // 56°/2
-    if (ux < -0.02 && off0 < fovHalf * 0.65) {
+    if (ux < -0.02 && smallMag) {
       out.roll = 0;                       // 纯推杆，不叠滚转
       out.pitch = -mag0 * (0.55 + 0.45 * Math.sqrt(M3.clamp(-ux, 0, 1)));
       out.yaw = 0;

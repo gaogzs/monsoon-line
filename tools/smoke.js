@@ -1122,11 +1122,24 @@ if (Ent && M3 && me && world) {
         fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
         ctrl: { pitch: 0, roll: 0, yaw: 0 },
         rollLock: undefined,
-        fovHalf: FOV * Math.PI / 360              // 与 game.js 的 updateAim 一致
+        // 幅度改用屏幕位置判定，与 FOV 无关
+        aimX: 0, aimDown: k, aimMag: Math.abs(k)
       };
       AI.steerTo(a, dir, a.ctrl, a);
       // 推杆分支：roll 恒为 0，pitch 为负
       return a.ctrl.roll === 0 && a.ctrl.pitch < -0.02;
+    }
+
+    // 中心死区：中央一小片区域内必须完全不转向
+    function inDeadzone(mag) {
+      const a = {
+        fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
+        ctrl: { pitch: 0, roll: 0, yaw: 0 },
+        rollLock: 0, aimX: 0, aimDown: mag, aimMag: mag
+      };
+      const dir = M3.norm(M3.V(0, -mag * 0.3, 1));
+      AI.steerTo(a, dir, a.ctrl, a);
+      return a.ctrl.roll === 0 && a.ctrl.pitch === 0 && a.ctrl.yaw === 0;
     }
 
     // 1. 屏幕下方 25%~65%：应当推杆俯下（阈值 0.25 / 0.65）
@@ -1137,6 +1150,11 @@ if (Ent && M3 && me && world) {
     for (const k of [0.75, 0.9]) {
       if (pushesDown(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处仍在推杆');
     }
+    // 1c. 中心死区
+    for (const m of [0, 0.04, 0.08]) {
+      if (!inDeadzone(m)) bad.push('鼠标在中心 ' + (m * 100) + '% 处仍然触发了转向');
+    }
+    if (inDeadzone(0.25)) bad.push('鼠标偏到 25% 处仍然处于死区');
     // 2. 压到底部：必须走滚转仰起
     if (pushesDown(56, 0.95)) bad.push('鼠标压到屏幕底部仍在推杆');
     /* 2c. 大滚转角**不该**推杆。

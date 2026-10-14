@@ -1321,13 +1321,19 @@ var Game = (function () {
        要么在另一些 FOV 下过早触发。
 
        直接看鼠标在屏幕上的位置就没有这个耦合。 */
-    /* 半个视场角，交给 steerTo 判断"鼠标偏得算不算大"。
+    /* 鼠标的屏幕位置，交给 steerTo。
 
-       鼠标能指到的最大偏角就是半个 FOV，所以"偏得不大"这个界限
-       必须按 FOV 缩放，不能写死角度。 */
-    player.fovHalf = (S.fov || 56) * Math.PI / 360;
+       分工是刻意的：
+         · **方向**判断用机体坐标（在 steerTo 里算的 ux）——
+           "鼠标是不是指向机腹那一侧"本身就是个机体问题。
+         · **幅度**判断用屏幕位置 —— 它是归一化的（±1 = 屏幕边缘），
+           天然与 FOV 无关，不必再去换算角度。 */
+    player.aimX = (mouse.x - Renderer.W / 2) / (Renderer.W * 0.5);
+    player.aimDown = (mouse.y - Renderer.H / 2) / (Renderer.H * 0.5);
+    player.aimMag = Math.sqrt(player.aimX * player.aimX +
+      player.aimDown * player.aimDown);
 
-    // 传 player 自身作为锁存容器（提供 rollLock / fovHalf）
+    // 传 player 自身作为锁存容器（提供 rollLock / aimMag）
     AI.steerTo(player, dir, player.ctrl, player);
     player.aimDir = dir;
   }
