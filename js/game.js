@@ -1062,7 +1062,16 @@ var Game = (function () {
     p.slotCd = {};
     for (wi = 0; wi < wl.length; wi++) {
       var sArr = [];
-      for (var sj = 0; sj < wl[wi].salvo; sj++) sArr.push(0);
+      /* 初始分配：发射槽数 = 挂点数，而储备弹数可能少于它
+         （一个挂点只带一发、而飞机上有两个这样的挂点）。
+
+         这时多出来的挂架**一开始就该是空的**，不能当成"已装填" ——
+         否则挂架上的弹会比仓库里还多。空位用 SLOT_EMPTY 标记，
+         它在 stepAircraft 里永远不会被减到 0。 */
+      var ammoW = wl[wi].ammo;
+      for (var sj = 0; sj < wl[wi].salvo; sj++) {
+        sArr.push(sj < ammoW ? 0 : Ent.SLOT_EMPTY);
+      }
       p.slotCd[wl[wi].wid] = sArr;
     }
 

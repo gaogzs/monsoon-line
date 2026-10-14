@@ -1176,6 +1176,63 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 储备打光后，挂架不再恢复 ----
+     发射槽数 = 挂点数，而储备弹数可能刚好等于它（perPoint = 1 时）。
+     打光之后那几个槽不该再"装填完成" —— 仓库里确实没有弹了。
+     让它们停在冷却状态最省事，但那样 HUD 会一直显示"装填中"，等于说谎。 */
+  {
+    const Ent2 = sandbox.Ent, M3e = sandbox.M3;
+    const bad = [];
+    const dt = 1 / 60;
+    const w0 = { missiles: [], particles: [], actors: [], targets: [] };
+
+    function make(slots, pool) {
+      const a = Ent2.makeAircraft({
+        type: 'c11', team: 0, x: 0, y: 6000, z: 0,
+        fwd: M3e.V(0, 0, 1), speed: 300
+      });
+      a.slotCd.srm = slots.slice();
+      a.ammoPool = { srm: pool };
+      a.special = 'srm';
+      // 把 phys 之外的依赖备齐，stepAircraft 要用
+      a.phys = a.phys || sandbox.AIRCRAFT[0].phys;
+      return a;
+    }
+
+    // 1. 打光（pool = 0）：所有槽停在冷却里，永远不归零
+    {
+      const a = make([3, 3], 0);
+      for (let i = 0; i < 900; i++) Ent2.stepAircraft(a, dt, w0);   // 15 秒
+      if (a.slotCd.srm.some(v => v === 0)) {
+        bad.push('弹打光后挂架仍然恢复了（' + a.slotCd.srm.join(',') + '）');
+      }
+    }
+
+    // 2. 库存充足：正常装填完成
+    {
+      const a = make([3, 0], 3);
+      for (let i = 0; i < 300; i++) Ent2.stepAircraft(a, dt, w0);
+      if (a.slotCd.srm[0] !== 0) {
+        bad.push('库存充足时挂架没能装填完成（剩余 ' + a.slotCd.srm[0].toFixed(2) + '）');
+      }
+    }
+
+    // 3. 储备刚好够再装一发：应当恢复，但恢复后不再有多余的弹
+    {
+      const a = make([3, 3], 1);
+      for (let i = 0; i < 900; i++) Ent2.stepAircraft(a, dt, w0);
+      const ready = a.slotCd.srm.filter(v => v === 0).length;
+      if (ready > 1) {
+        bad.push('储备只剩 1 发，却有 ' + ready + ' 个挂架恢复了');
+      } else if (ready < 1) {
+        bad.push('储备还有 1 发，却没有任何挂架恢复');
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('挂架装填受储备弹数约束：打光不恢复、有弹才装填');
+  }
+
   /* ---- 诊断：AI 到底用不用机炮 ---- */
   {
     const Ent2 = sandbox.Ent, M3d = sandbox.M3, Wd = sandbox.WEAPONS;

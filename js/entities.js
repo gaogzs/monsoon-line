@@ -120,6 +120,10 @@ var Ent = (function () {
       locked: false,
       rwr: [],            // 正在锁定本机的导弹/敌机
 
+      /* 空挂架：用一个远大于任何装填时间的冷却值表示"这里永远不会装填"。
+         储备少于挂架数时，多出来的挂点从一开始就是这个状态。 */
+      // （SLOT_EMPTY 在下方定义，slotCd 在 game.js 里填充时用到）
+
       q: 0,
       stall: false,
       dead: false,
@@ -136,6 +140,15 @@ var Ent = (function () {
     if (w0 && w0.kind === 'dew') a.spCharges = w0.charges;
     return a;
   }
+
+  /* 空挂架的冷却值。
+
+     储备弹数少于挂架数时，打出去之后那几个槽不该再"装填完成" ——
+     因为仓库里确实没有弹了。让它们停在冷却状态是最省事的做法，
+     但那样 HUD 会一直显示"装填中"，等于说谎。
+
+     所以用一个永远减不到 0 的值，语义是"这个挂架本来就空着"。 */
+  var SLOT_EMPTY = 1e9;
 
   /* ============================================================
      飞机每帧更新
@@ -274,8 +287,23 @@ var Ent = (function () {
     // 那会让"打一发就换枪"变成无冷却连射。
     for (var ck in a.slotCd) {
       var slots = a.slotCd[ck];
-      for (var si = 0; si < slots.length; si++) {
-        if (slots[si] > 0) slots[si] = Math.max(0, slots[si] - dt);
+      var pool = a.ammoPool ? a.ammoPool[ck] : undefined;
+
+      // 就绪（= 挂着弹）的槽数。SLOT_EMPTY 是大正数，不会被算进来。
+      var ready = 0;
+      for (var si = 0; si < slots.length; si++) if (slots[si] === 0) ready++;
+
+      for (si = 0; si < slots.length; si++) {
+        if (slots[si] <= 0) continue;
+        if (slots[si] >= SLOT_EMPTY) continue;      // 空挂架，永不装填
+        /* 就绪的槽已经和剩余弹数一样多 → 没有弹能装进这个槽了。
+
+           储备少于挂架数时，打出去的那几个槽会一直空着。
+           玩家看到的不是"还在装填"，而是"没得装了" ——
+           这比让挂架凭空变出一发弹诚实。 */
+        if (pool !== undefined && ready >= pool) continue;
+        slots[si] = Math.max(0, slots[si] - dt);
+        if (slots[si] === 0) ready++;               // 装完占用一枚储备
       }
     }
     if (a.spActive > 0) a.spActive -= dt;
@@ -748,7 +776,7 @@ var Ent = (function () {
     makeAircraft: makeAircraft, stepAircraft: stepAircraft,
     makeMissile: makeMissile, stepMissile: stepMissile, effectiveLife: effectiveLife,
     breakLock: breakLock,
-    fireGun: fireGun, stepBullet: stepBullet,
+    fireGun: fireGun, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
     spawnParticle: spawnParticle, stepParticles: stepParticles, explode: explode,
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
     makeTarget: makeTarget, stepTarget: stepTarget,
