@@ -145,8 +145,90 @@ var AIRCRAFT = [
 <p>两台自适应循环发动机塞在翼根，第三涵道的冷气流优先供给那口浴缸和弹药舱 ——
 S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。</p>
 <p><b>特点：</b>唯一能把机炮当主武器用的飞机。用它打空战是自杀，用它舔地是艺术。</p>`
-  }
-,
+  },
+
+  /* ============================================================
+     C-9 海燕 —— 高空高速截击机
+     ============================================================ */
+  {
+    id: 'c9',
+    name: 'C-9', nick: 'Petrel', cn: '海燕',
+    role: '高空高速截击机',
+    faction: '上游公约',
+    planformType: '三角翼',
+    maker: '上游公约 · 北岭重工',
+    model: 'c9',
+    desc: `海燕不是为缠斗造的。它的设计出发点只有一个：
+      在最短时间内爬到两万米，然后把那里的东西全打下来。
+      <p>为此它付出的代价很直接 —— 翼载高、盘旋差、五千米以下
+      笨得像块铁。北岭重工的说法是：<b>海燕不需要低空性能，
+      因为低空不是它的战场。</b></p>`,
+    stats: { spd: 0.95, mob: 0.40, stl: 0.30, fire: 0.74, dur: 0.58, rng: 0.62 },
+    phys: { vMax: 620, vMil: 500, vStall: 138, accel: 34, decel: 32, pitch: 0.48, roll: 2.2, yaw: 0.24, hp: 110 },
+    gun: 'k3',
+    maxLoad: 5200,
+    hardpointGroups: [
+      { id: 'A', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 4.1, y: -1.2 }, { x: -4.1, y: -1.2 }] },
+      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.9, y: -2.6 }, { x: -5.9, y: -2.6 }] }
+    ],
+    defaultLoadout: { A: 'ram', B: 'mrm' }
+  },
+
+  /* ============================================================
+     C-21 贼鸥 —— 多用途隐形战斗机
+     ============================================================ */
+  {
+    id: 'c21',
+    name: 'C-21', nick: 'Skua', cn: '贼鸥',
+    role: '多用途隐形战斗机',
+    faction: '上游公约',
+    planformType: '无尾菱形翼',
+    maker: '上游公约 · 环带工程',
+    model: 'c21',
+    desc: `上游公约第一种真正意义上的低可探测飞机，
+      正面雷达反射面积大约相当于一只海鸟 —— 名字就是这么来的。
+      <p>代价在载弹量上：为了保住隐身，大部分武器必须塞进内埋弹舱。
+      一旦外挂，它的隐身性能会掉到和普通战机差不多的水平 ——
+      <b>隐身不是一种属性，是一种状态。</b></p>`,
+    stats: { spd: 0.72, mob: 0.66, stl: 0.96, fire: 0.56, dur: 0.50, rng: 0.70 },
+    phys: { vMax: 540, vMil: 430, vStall: 118, accel: 26, decel: 36, pitch: 0.66, roll: 3.1, yaw: 0.26, hp: 96 },
+    gun: 'k3',
+    maxLoad: 4200,
+    hardpointGroups: [
+      { id: 'A', label: '内埋弹舱', kind: 'belly', pts: [{ x: 1.1, y: -2.2 }, { x: -1.1, y: -2.2 }] },
+      { id: 'B', label: '翼下挂点', kind: 'light', pts: [{ x: 3.6, y: -3.4 }, { x: -3.6, y: -3.4 }] }
+    ],
+    defaultLoadout: { A: 'mrm', B: 'oep' }
+  },
+
+  /* ============================================================
+     C-33 信天翁 —— 无人僚机母机
+     ============================================================ */
+  {
+    id: 'c33',
+    name: 'C-33', nick: 'Albatross', cn: '信天翁',
+    role: '无人僚机母机',
+    faction: '上游公约',
+    planformType: '前掠翼',
+    maker: '上游公约 · 丹湾飞机厂',
+    model: 'c33',
+    desc: `前掠翼有个老问题：翼尖会先失速，然后机翼会以一种
+      非常壮观的方式自己拧断。这个问题困扰了工程师将近一百年，
+      直到复合材料让机翼能按需要弯曲。
+      <p>信天翁是上游公约第一架量产的前掠翼飞机。
+      它不快，但转得比这里任何一架都快 ——
+      而在它后面，通常还跟着两架没有飞行员的飞机。</p>`,
+    stats: { spd: 0.52, mob: 0.90, stl: 0.24, fire: 0.60, dur: 0.62, rng: 0.80 },
+    phys: { vMax: 470, vMil: 380, vStall: 96, accel: 24, decel: 42, pitch: 0.74, roll: 3.6, yaw: 0.36, hp: 118 },
+    gun: 'k3',
+    maxLoad: 5000,
+    hardpointGroups: [
+      { id: 'A', label: '翼下内侧', kind: 'heavy', pts: [{ x: 3.0, y: 0.4 }, { x: -3.0, y: 0.4 }] },
+      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.4, y: 1.6 }, { x: -5.4, y: 1.6 }] },
+      { id: 'C', label: '翼尖', kind: 'tip', pts: [{ x: 7.4, y: 2.4 }, { x: -7.4, y: 2.4 }] }
+    ],
+    defaultLoadout: { A: 'wasp', B: 'qsr', C: 'irp' }
+  },
 
   /* ============================================================
      下游同盟的制式机（不可驾驶）
@@ -651,7 +733,8 @@ var STORE_ATTR = {
   wasp: { fits: ['tip', 'light', 'heavy'], perPoint: 3,  mass: 145 },
   v9:   { fits: ['tip', 'light', 'heavy'], perPoint: 2,  mass: 110 },
   v11:  { fits: ['light', 'heavy'],        perPoint: 2,  mass: 135 },
-  mrm:  { fits: ['light', 'heavy'],        perPoint: 4,  mass: 195 },
+  // 中距弹可以进内埋弹舱 —— 隐形机就是靠这个保住隐身的
+  mrm:  { fits: ['light', 'heavy', 'belly'], perPoint: 4, mass: 195 },
   v17:  { fits: ['heavy'],                 perPoint: 1,  mass: 285 },
   arm:  { fits: ['heavy'],                 perPoint: 2,  mass: 310 },
   ram:  { fits: ['heavy'],                 perPoint: 2,  mass: 340 },
