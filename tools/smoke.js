@@ -1087,6 +1087,50 @@ if (Ent && M3 && me && world) {
     else ok('无人僚机行为正确：授权开火、长机阵亡后盘旋、编队不脱队');
   }
 
+  /* ---- 鼠标压到屏幕下方 → 改用滚转仰起 ----
+     这个行为踩过一次坑：原判据是目标方向的 ux 阈值（-0.62），
+     但鼠标能指到的最大下方角度只有**半个 FOV** ——
+     FOV 56° 时归一化后 ux 最小只有 -0.47，永远够不到，
+     所以"移到屏幕底部还是俯下"。
+
+     现在按鼠标在屏幕上的归一化位置判断，与 FOV 无关，
+     这条断言就是锁住那个解耦。 */
+  {
+    const M3 = sandbox.M3, AI = sandbox.AI;
+    const bad = [];
+
+    // 给定 FOV 与鼠标纵向位置（0=屏幕中心，1=底边），返回是否走了滚转
+    function rolls(FOV, k) {
+      const H = 720;
+      const focal = (H / 2) / Math.tan(FOV / 2 * Math.PI / 180);
+      const cy = -(k * (H / 2)) / focal;
+      const dir = M3.norm(M3.V(0, cy, 1));
+      const a = {
+        fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
+        ctrl: { pitch: 0, roll: 0, yaw: 0 },
+        rollLock: undefined, aimDown: k
+      };
+      AI.steerTo(a, dir, a.ctrl, a);
+      return Math.abs(a.ctrl.roll) > 0.35;
+    }
+
+    // 1. 屏幕中部到偏下：应当推杆俯下
+    for (const k of [0.3, 0.5, 0.7, 0.8]) {
+      if (rolls(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处就触发了滚转');
+    }
+    // 2. 压到底部：必须走滚转仰起
+    if (!rolls(56, 0.95)) bad.push('鼠标压到屏幕底部仍未触发滚转仰起');
+    // 3. 换 FOV 结果必须一致（这是解耦的关键）
+    for (const FOV of [38, 56, 100]) {
+      const mid = rolls(FOV, 0.5), bottom = rolls(FOV, 0.95);
+      if (mid) bad.push('FOV ' + FOV + ' 下屏幕中部误触发滚转');
+      if (!bottom) bad.push('FOV ' + FOV + ' 下屏幕底部未触发滚转');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('鼠标压到屏幕下方改用滚转仰起（三种 FOV 下一致）');
+  }
+
   /* ---- 诊断：AI 到底用不用机炮 ---- */
   {
     const Ent2 = sandbox.Ent, M3d = sandbox.M3, Wd = sandbox.WEAPONS;

@@ -1302,7 +1302,19 @@ var Game = (function () {
       cam.fwd.z + cam.right.z * cx + cam.up.z * cy
     ));
 
-    // 传 player 自身作为锁存容器（提供 rollLock 字段）
+    /* 把鼠标的纵向位置也交给 steerTo。
+
+       为什么不让它自己按目标方向的 ux 判断：ux 取决于 FOV。
+       鼠标能指到的最大下方角度只有**半个 FOV** ——
+       FOV 56° 时是 28°，归一化后 ux 最小只有 -0.47；
+       FOV 38° 时只有 19°，最小 -0.33。用固定的 ux 阈值，
+       要么在某些 FOV 下永远够不到（这正是"移到屏幕底部还是俯下"的原因），
+       要么在另一些 FOV 下过早触发。
+
+       直接看鼠标在屏幕上的位置就没有这个耦合。 */
+    player.aimDown = (mouse.y - Renderer.H / 2) / (Renderer.H * 0.5);
+
+    // 传 player 自身作为锁存容器（提供 rollLock / aimDown 字段）
     AI.steerTo(player, dir, player.ctrl, player);
     player.aimDir = dir;
   }

@@ -74,7 +74,17 @@ var AI = (function () {
 
        分界取 ux = -0.62，约合离轴角 128°：比它更靠前的走推杆，
        更靠后的交给下面那套滚转仰起。 */
-    if (fx > 0.25 && ux < -0.05 && ux > -0.62) {
+    /* 分界不再用固定的 ux 阈值。
+
+       ux 能取到多小取决于 FOV（鼠标最多只能指到半个 FOV 之外），
+       固定阈值会导致某些 FOV 下永远够不到、另一些下过早触发。
+       玩家对象带 aimDown（鼠标在屏幕上的归一化纵向位置），有它就按它判；
+       AI 没有鼠标，退回按角度，阈值取 -0.55。 */
+    var tooFarDown = (st && st.aimDown !== undefined)
+      ? (st.aimDown > 0.8)
+      : (ux <= -0.55);
+
+    if (fx > 0.25 && ux < -0.05 && !tooFarDown) {
       var down = M3.clamp(-ux, 0, 1);
       // 小幅滚转把目标摆到"正下方"，而不是正上方
       var sideErr = Math.atan2(rx, -ux);
