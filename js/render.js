@@ -136,7 +136,31 @@ var Renderer = (function () {
       if (l < 1e-4) return cam.fwd.y > 0 ? -H : H * 2;
     }
     d.x /= l; d.z /= l;
-    var far = M3.V(cam.pos.x + d.x * 1e6, cam.pos.y, cam.pos.z + d.z * 1e6);
+
+    /* 地球曲率：海平面不是一块无限大的平板，它会随着高度"沉下去"。
+
+       站在高度 h 上，地平线的俯角是 acos(R / (R + h))：
+
+           h = 1 000 m  →  1.0°
+           h = 6 000 m  →  2.5°
+           h = 20 000 m →  4.5°
+
+       原来的实现把远点放在与相机等高处（far.y = cam.pos.y），
+       等于假设地球是平的 —— 所以无论飞多高，海平面都停在同一个位置，
+       连爬升都少了参照。任务三在 21 公里上打，那里本来应该能明显
+       看出"海在往下沉"。
+
+       FOV 56° 之下，20 公里的 4.5° 约占屏幕高度 8%，是一眼可见的差别。 */
+    var R = 6371000;
+    var h = Math.max(0, cam.pos.y);
+    var dip = Math.acos(R / (R + h));
+    var cd = Math.cos(dip), sd = Math.sin(dip);
+
+    var far = M3.V(
+      cam.pos.x + d.x * cd * 1e6,
+      cam.pos.y - sd * 1e6,
+      cam.pos.z + d.z * cd * 1e6
+    );
     var s = M3.project(cam, far);
     return s ? s.y : (cam.fwd.y > 0 ? -H * 2 : H * 2);
   }

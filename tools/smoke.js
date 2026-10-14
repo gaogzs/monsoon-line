@@ -1055,7 +1055,7 @@ if (Ent && M3 && me && world) {
       let minD = d0;
       for (let i = 0; i < 180; i++) {          // 3 秒
         AI.update(s.drone, 1 / 60, s.w);
-        Ent.stepAircraft(s.drone, s.w, 1 / 60);
+        Ent.stepAircraft(s.drone, 1 / 60, s.w);
         if (s.drone.ai.target) { bad.push('长机阵亡后，无人机自己选了目标'); break; }
         const d = M3.dist(s.drone.pos, s.foe.pos);
         if (d < minD) minD = d;
@@ -1074,8 +1074,8 @@ if (Ent && M3 && me && world) {
       let maxD = d0;
       for (let i = 0; i < 240; i++) {          // 4 秒
         AI.update(s.drone, 1 / 60, s.w);
-        Ent.stepAircraft(s.drone, s.w, 1 / 60);
-        Ent.stepAircraft(s.lead, s.w, 1 / 60);
+        Ent.stepAircraft(s.drone, 1 / 60, s.w);
+        Ent.stepAircraft(s.lead, 1 / 60, s.w);
         maxD = Math.max(maxD, M3.dist(s.drone.pos, s.lead.pos));
       }
       if (maxD > 1200) {
