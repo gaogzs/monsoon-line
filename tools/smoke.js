@@ -734,6 +734,45 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 极点附近的相机不能跳变 ----
+     追尾视角的 up 参考在机头垂直时与视线共线，正交基退化，
+     退化保护会临时换轴 —— 而 |f.y| 在极点附近逐帧抖动，
+     于是画面在两套姿态间反复横跳。修复办法是平滑过渡到机体 up。
+     这里让机头从水平压到正下方，检查相机 up 是否连续。 */
+  {
+    const M3 = sandbox.M3;
+    let prev = null, maxJump = 0, maxVert = 0;
+    for (let i = 0; i <= 60; i++) {
+      const a = (i / 60) * (Math.PI / 2);
+      const camFwd = M3.norm(M3.V(0, -Math.sin(a), Math.cos(a)));
+      // 机体 up 随俯仰转动（垂直向下时指向水平后方）
+      const bodyUp = M3.norm(M3.V(0, Math.cos(a), Math.sin(a)));
+
+      const vert = Math.abs(camFwd.y);
+      let mix = Math.min(1, Math.max(0, (vert - 0.90) / 0.09));
+      mix = mix * mix * (3 - 2 * mix);
+      const upRef = M3.lerpV(M3.V(0, 1, 0), bodyUp, mix);
+
+      const cam = M3.makeCamera(M3.V(0, 0, 0), camFwd, upRef, 100, 100, 56);
+      if (!isFinite(cam.up.x) || !isFinite(cam.up.y) || !isFinite(cam.up.z)) {
+        fail('极点附近相机 up 出现非有限值');
+        break;
+      }
+      if (prev) {
+        const d = Math.abs(cam.up.x - prev.x) + Math.abs(cam.up.y - prev.y) +
+          Math.abs(cam.up.z - prev.z);
+        if (d > maxJump) maxJump = d;
+        if (d > maxVert) maxVert = d;
+      }
+      prev = cam.up;
+    }
+    if (maxJump > 0.30) {
+      fail('极点附近相机 up 仍在跳变，最大帧间差 ' + maxJump.toFixed(3));
+    } else {
+      ok('极点附近镜头连续（最大帧间差 ' + maxJump.toFixed(3) + '）');
+    }
+  }
+
   /* ---- 命名体系（设定集 8.1）----
      装备编号一律取逻辑语三字母词根，机型用「单字母 + 序号」。
      两份表分开，所以 C-11（飞机）和 CEL-3（机炮）不会混。

@@ -1541,7 +1541,28 @@ var Game = (function () {
       var look = M3.add(p.pos, M3.mul(p.fwd, Math.max(30, S.camDist * 1.45)));
       camFwd = M3.lerpV(camFwd, M3.norm(M3.sub(look, camPos)), 1 - Math.exp(-8.5 * dt));
       camFwd = M3.norm(camFwd);
-      camUp = M3.V(0, 1, 0);
+
+      /* 相机 up 的参考轴。
+
+         平时用世界 up：地平线永远水平，也不会跟着滚转。
+         但机头逼近正上/正下时，视线本身也是垂直的，世界 up 与它共线，
+         正交基退化；退化保护会临时换一个参考轴，而 |f.y| 在极点附近
+         每帧抖动，于是画面在两套姿态之间来回跳 —— 就是"极点卡动"。
+
+         解法是让参考轴**平滑过渡**到机体 up：一般机动完全不受影响，
+         只有最后约 10° 才逐渐跟随飞机滚转。那里数学上本来就不存在
+         "正"的参考，跟着飞机是唯一连续的选择。
+
+         注意垂直俯冲时飞机自己的"上"指向水平后方，所以画面是**侧过来**
+         而不是**翻过来** —— 不会让人失去上下方向感。 */
+      // 过渡带 |fwd.y| ∈ [0.90, 0.99]，约合俯仰 64°–82°。
+      // 起点定在 64° 而不是更早，是为了让常规俯冲、爬升、盘旋
+      // 完全不碰这条逻辑 —— 只有真正压到接近垂直时才会介入。
+      var vert = Math.abs(camFwd.y);
+      var mix = M3.clamp((vert - 0.90) / 0.09, 0, 1);
+      mix = mix * mix * (3 - 2 * mix);          // smoothstep，过渡不带折角
+      camUp = M3.lerpV(M3.V(0, 1, 0), p.up, mix);
+
       Renderer.setCamera(camPos, camFwd, camUp, S.fov);
     } else if (camMode === 1) {
       // 座舱：跟随滚转
