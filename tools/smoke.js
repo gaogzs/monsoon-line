@@ -328,12 +328,17 @@ if (runError) {
   ok('startMission(0) 成功');
 }
 
+/* 用自己推进的假时钟，而不是 Date.now()。
+   原来每次 pump 都传 Date.now()，连续调 pump(1) 时时间戳几乎不变，
+   于是 dt≈0、飞机不动 —— 卡死检测因此误报过。 */
+let fakeClock = Date.now();
 function pump(frames) {
   for (let i = 0; i < frames; i++) {
     const q = rafQ;
     rafQ = [];
     if (!q.length) break;
-    q.forEach(fn => fn(Date.now() + i * 16));
+    fakeClock += 16;
+    q.forEach(fn => fn(fakeClock));
   }
 }
 
@@ -342,6 +347,135 @@ try {
   ok('主循环推进 240 帧无异常');
 } catch (e) {
   fail('主循环抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ---- 卡死检测：不能有飞机长时间停在原地 ----
+   曾经出现过"有些敌人突然定在一个点不动"。
+   位置来自 pos += vel*dt，所以停下只有两种可能：
+   speed 归零，或者 vel 变成 NaN。这里跑一段较长的模拟，
+   记录每架飞机连续静止的帧数，超过阈值就把它当时的
+   状态整个打出来。 */
+try {
+  const fin = v => typeof v === 'number' && isFinite(v);
+  const nanBad = [], stuckBad = [], dupeInFrame = [];
+  let worst = 0, seen = 0;
+
+  // 包装 stepAircraft，统计每架飞机究竟被处理了多少帧。
+  // 主循环里读的就是 Ent.stepAircraft，所以包装是有效的。
+  const origStepAircraft = sandbox.Ent.stepAircraft;
+  const stepCount = new Map();
+  sandbox.Ent.stepAircraft = function (a, dt, w) {
+    stepCount.set(a, (stepCount.get(a) || 0) + 1);
+    return origStepAircraft(a, dt, w);
+  };
+
+  // 三个任务都跑一遍 —— 有些问题只在特定任务的 AI 编成下出现
+  for (const mi of [0, 1, 2]) {
+    try { sandbox.Game.startMission(mi); } catch (e) { continue; }
+
+    const tracks = new Map();
+    let lastTime = null;
+    for (let f = 0; f < 900; f++) {
+      pump(1);
+      const frameSeen = new Set();
+
+      /* 任务结束（坠机/完成）之后 update() 就不再推进世界时间，
+         这时所有飞机都会"静止" —— 那是正常的，不是卡死。
+         判据用 world.time 是否还在走，比猜状态机可靠。 */
+      const W = sandbox.Game.__world();
+      if (lastTime !== null && W.time === lastTime) {
+        tracks.forEach(t => { t.still = 0; t.prevObj = null; });
+        continue;
+      }
+      lastTime = W.time;
+      for (const a of sandbox.Game.__world().actors) {
+        if (!a.alive) continue;
+
+        // 同一帧里同一个对象出现两次 = 数组里有重复
+        if (frameSeen.has(a)) {
+          if (!dupeInFrame.includes(a.name || a.id)) dupeInFrame.push(a.name || a.id);
+        }
+        frameSeen.add(a);
+
+        // NaN 一旦出现就会污染位置，之后那架飞机要么消失要么卡在一点
+        if (!fin(a.pos.x) || !fin(a.pos.y) || !fin(a.pos.z) ||
+            !fin(a.speed) || !fin(a.fwd.x) || !fin(a.fwd.y) || !fin(a.fwd.z)) {
+          if (nanBad.length < 3) {
+            nanBad.push('任务' + (mi + 1) + ' ' + (a.name || a.id) +
+              ' 出现非有限值：speed=' + a.speed +
+              ' pos=(' + a.pos.x + ',' + a.pos.y + ',' + a.pos.z + ')' +
+              ' fwd=(' + a.fwd.x + ',' + a.fwd.y + ',' + a.fwd.z + ')' +
+              ' ctrl=' + JSON.stringify(a.ctrl));
+          }
+          continue;
+        }
+
+        let t = tracks.get(a);
+        if (!t) { t = { prev: a.pos, still: 0, max: 0 }; tracks.set(a, t); }
+        else {
+          // pos 每帧都会被重新赋值（M3.add 返回新对象）。
+          // 如果引用没变，说明 stepAircraft 根本没走到位置那一行。
+          t.sameObj = (a.pos === t.prevObj);
+          const d = sandbox.M3.dist(a.pos, t.prev);
+          t.prevObj = a.pos;
+          t.prev = a.pos;
+          t.lastD = d;
+          // 正常飞行每帧移动几十厘米以上；接近 0 才算静止
+          if (d < 0.02) {
+            if (t.still === 0) t.snap = a.pos;      // 记下开始静止时的位置
+            t.still++;
+            if (t.still > t.max) t.max = t.still;
+          } else t.still = 0;
+        }
+      }
+    }
+
+    seen += tracks.size;
+    for (const [a, t] of tracks) {
+      if (t.max > worst) worst = t.max;
+      if (t.max > 60 && stuckBad.length < 3) {
+        stuckBad.push('任务' + (mi + 1) + ' ' + (a.name || a.id) +
+          ' 连续静止 ' + t.max + ' 帧' +
+          '  speed=' + a.speed.toFixed(2) +
+          '  ctrl=' + JSON.stringify(a.ctrl) +
+          '  fwd=(' + a.fwd.x.toFixed(3) + ',' + a.fwd.y.toFixed(3) + ',' + a.fwd.z.toFixed(3) + ')' +
+          '  vel=(' + a.vel.x.toFixed(1) + ',' + a.vel.y.toFixed(1) + ',' + a.vel.z.toFixed(1) + ')' +
+          '  pos=(' + a.pos.x.toFixed(0) + ',' + a.pos.y.toFixed(0) + ',' + a.pos.z.toFixed(0) + ')' +
+          '  throttle=' + (a.throttle === undefined ? '?' : a.throttle) +
+          '  静止起点pos=' + (t.snap
+            ? '(' + t.snap.x.toFixed(1) + ',' + t.snap.y.toFixed(1) + ',' + t.snap.z.toFixed(1) + ')'
+            : '?') +
+          '  帧间位移=' + (t.lastD === undefined ? '?' : t.lastD.toFixed(4)) +
+          '  pos引用未变=' + t.sameObj +
+          '  alive=' + a.alive + ' dead=' + a.dead +
+          '  ai.mode=' + (a.ai ? a.ai.mode : '无') +
+          '  被step次数=' + (stepCount.get(a) || 0));
+      }
+    }
+  }
+
+  // world.actors 里不该有重复条目 —— 如果有，说明某个 spawn
+  // 被调用了两次，数组里会躺着永远不被处理（或处理两次）的幽灵
+  {
+    const seenActors = new Set();
+    const dupes = [];
+    for (const a of sandbox.Game.__world().actors) {
+      if (seenActors.has(a)) dupes.push(a.name || a.id);
+      seenActors.add(a);
+    }
+    if (dupes.length) fail('world.actors 里有重复条目：' + dupes.join('、'));
+  }
+
+  sandbox.Ent.stepAircraft = origStepAircraft;
+
+  nanBad.forEach(fail);
+  stuckBad.forEach(fail);
+  dupeInFrame.forEach(n => fail('同一帧里 ' + n + ' 出现两次'));
+  if (!nanBad.length && !stuckBad.length && !dupeInFrame.length) {
+    ok('卡死检测：三任务共 ' + seen + ' 架次，最长静止 ' + worst + ' 帧，无 NaN');
+  }
+} catch (e) {
+  fail('卡死检测抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
 /* ============================================================
@@ -666,10 +800,10 @@ if (Ent && M3 && me && world) {
     const lp0 = sandbox.loadoutPenalty(0);
     const lp1 = sandbox.loadoutPenalty(1);
     const bad = [];
-    if (lp0.acc !== 1 || lp0.pitch !== 1 || lp0.vMax !== 1 || lp0.vStall !== 1) {
+    if (lp0.accel !== 1 || lp0.pitch !== 1 || lp0.vMax !== 1 || lp0.vStall !== 1) {
       bad.push('空载时不该有任何损失');
     }
-    if (!(lp1.acc < lp1.pitch && lp1.pitch < lp1.roll)) {
+    if (!(lp1.accel < lp1.pitch && lp1.pitch < lp1.roll)) {
       bad.push('惩罚权重排序不对：加速应当最重、滚转最轻（现在界面只显示俯仰那一项）');
     }
     if (!(lp1.vStall > 1)) bad.push('满载时失速速度应当升高');

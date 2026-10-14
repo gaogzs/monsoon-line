@@ -386,7 +386,7 @@ var Game = (function () {
       var base = ac.stats[key];
       var v = base;
       if (key === 'spd') v = base * lp.vMax;
-      else if (key === 'mob') v = base * ((lp.pitch + lp.roll + lp.acc) / 3);
+      else if (key === 'mob') v = base * ((lp.pitch + lp.roll + lp.accel) / 3);
 
       var lostK = Math.max(0, base - v);
       sh += '<div class="stat-row"><span class="l">' + stats[k][0] + '</span>' +
@@ -434,7 +434,7 @@ var Game = (function () {
     sum += '<div class="ld-mass">挂载重量 <b>' + mass + ' / ' + mtow + ' kg</b>';
     if (loadK > 0.015) {
       sum += '<div class="ld-pen"><span class="l">挂载影响</span>' +
-        '<b class="warn">加速 −' + pctTxt(1 - lp.acc) + '%</b>' +
+        '<b class="warn">加速 −' + pctTxt(1 - lp.accel) + '%</b>' +
         '<b class="warn">俯仰 −' + pctTxt(1 - lp.pitch) + '%</b>' +
         '<b class="warn">滚转 −' + pctTxt(1 - lp.roll) + '%</b>' +
         '<b>最大速度 −' + pctTxt(1 - lp.vMax) + '%</b>' +

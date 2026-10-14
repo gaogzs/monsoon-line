@@ -217,12 +217,17 @@ var Ent = (function () {
     if (a.loadFactor) {
       // 系数来自 loadoutPenalty() —— 和机库面板显示的是同一份，
       // 免得界面上的数字与实际手感对不上
+      /* 注意：这里是**整体替换** p，所以每个用到的字段都得列上。
+         之前漏了 accel / decel，还写了个根本不存在的 acc ——
+         于是下面 `p.accel` 取到 undefined，加减速彻底失去节流，
+         推油门的速度变化变成瞬时的。 */
       var lp = loadoutPenalty(a.loadFactor);
       p = {
         vMax: p.vMax * lp.vMax,
         vMil: p.vMil * lp.vMil,
         vStall: p.vStall * lp.vStall,
-        acc: p.acc * lp.acc,
+        accel: p.accel * lp.accel,
+        decel: p.decel * lp.decel,
         pitch: p.pitch * lp.pitch,
         roll: p.roll * lp.roll
       };

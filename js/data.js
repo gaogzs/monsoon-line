@@ -1058,7 +1058,8 @@ function loadoutPenalty(lf) {
     vMax: 1 - 0.08 * lf,
     vMil: 1 - 0.06 * lf,
     vStall: 1 + 0.05 * lf,
-    acc: 1 - 0.26 * lf,
+    accel: 1 - 0.26 * lf,
+    decel: 1 + 0.10 * lf,     // 阻力变大，收油门时掉速更快
     pitch: 1 - 0.18 * lf,
     roll: 1 - 0.12 * lf
   };
