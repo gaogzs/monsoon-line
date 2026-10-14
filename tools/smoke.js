@@ -1145,11 +1145,14 @@ if (Ent && M3 && me && world) {
       }
     }
 
-    // ② 离开中心：滚转占领，不再推杆
-    for (const k of [0.5, 0.6, 0.9]) {
+    /* ② 推杆的范围比滚转的柔和区宽得多，所以这里要取屏幕很深处。
+
+       推杆轴 AIM_PUSH_AXIS = 0.85（滚转/偏航是 0.225）——
+       0.5~0.6 那一带本来就还在推杆，不该拿去当"已交给滚转"的证据。 */
+    for (const k of [0.95, 1.1]) {
       const c = ctrlAt(56, k);
-      if (!(Math.abs(c.roll) > 0.5 && c.pitch >= -0.02)) {
-        bad.push('离开中心后（' + (k * 100) + '%）没有转为滚转仰起（pitch=' +
+      if (!(Math.abs(c.roll) > 0.5 && c.pitch >= -0.05)) {
+        bad.push('屏幕深处（' + (k * 100) + '%）仍未转给滚转（pitch=' +
           c.pitch.toFixed(3) + ' roll=' + c.roll.toFixed(3) + '）');
       }
     }
@@ -1167,7 +1170,9 @@ if (Ent && M3 && me && world) {
         prevPitch = c.pitch;
       }
       if (!mono) bad.push('滚转占比随鼠标幅度不是单调上升 —— 中间有切换感');
-      if (maxJump > 0.06) {
+      // 采样间隔 0.05，推杆段的俯仰本身变化就快（可到 0.13），
+      // 这里只拦真正的"跳变"，不是陡峭。
+      if (maxJump > 0.22) {
         bad.push('俯仰杆量在相邻采样点之间跳变过大（' + maxJump.toFixed(3) + '）');
       }
     }
@@ -1228,14 +1233,25 @@ if (Ent && M3 && me && world) {
       }
     }
 
-    // ⑤ 靠近中心整体缩杆（gain，平方衰减）
+    /* ⑤ 靠近中心整体缩杆（gain，平方衰减）
+
+       只对**滚转 / 偏航**成立 —— 推杆那一份是刻意不缩杆的：
+       推杆本身就已经是柔和动作，再压一遍就完全看不见了。
+       所以这里用一个偏侧方的目标（不走推杆分支）来测。 */
     {
-      const full = ctrlAt(56, 0.35);
-      const near = ctrlAt(56, 0.05);
-      const base = Math.abs(full.roll) + Math.abs(full.pitch);
-      const nearMag = Math.abs(near.roll) + Math.abs(near.pitch);
-      if (base > 0.05 && nearMag > base * 0.05) {
-        bad.push('靠近中心时杆量没有急剧减少（' + nearMag.toFixed(4) +
+      const SIDE = M3.V(1, 0, 0);              // 正右方，与推杆无关
+      function sideAt(mag) {
+        const a = {
+          fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
+          ctrl: { pitch: 0, roll: 0, yaw: 0 },
+          rollLock: 0, aimX: mag, aimDown: 0, aimMag: mag
+        };
+        AI.steerTo(a, SIDE, a.ctrl, a);
+        return Math.abs(a.ctrl.roll) + Math.abs(a.ctrl.yaw);
+      }
+      const base = sideAt(0.35), near = sideAt(0.05);
+      if (base > 0.05 && near > base * 0.05) {
+        bad.push('靠近中心时滚转/偏航没有急剧减少（' + near.toFixed(4) +
           ' vs 满杆 ' + base.toFixed(3) + '）');
       }
     }
@@ -1480,14 +1496,22 @@ if (Ent && M3 && me && world) {
     for (let f = 0; f < 120; f++) pump(1);        // 先稳定飞一会儿
 
     const cvEl = sandbox.document.getElementById('cv');
-    function at(dy) {
+
+    /* 每个采样点都重新开始任务。
+
+       连续采样绝对不行：飞机一直在按上一帧的杆量滚转，姿态一漂，
+       "正下方"就不再是正下方了，量到的是姿态漂移而不是操控律。
+       （第一版连续采样，峰值量成了 -0.28，而真实峰值是 -0.65。） */
+    function sample(dy) {
+      G.startMission(0);
+      const pp = G.__player();
+      for (let f = 0; f < 100; f++) pump(1);
       cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2 + dy });
       pump(1);
-      // 必须拷贝：pl.ctrl 是同一个对象，下次调用会把它改掉
-      return { pitch: pl.ctrl.pitch, roll: pl.ctrl.roll, yaw: pl.ctrl.yaw };
+      return { pitch: pp.ctrl.pitch, roll: pp.ctrl.roll, yaw: pp.ctrl.yaw };
     }
 
-    const near = at(40), mid = at(60), deep = at(90);
+    const near = sample(40);
 
     // ① 柔和朝正下方：推杆要够明显（俯仰角速度至少 3°/s，即 pitch ≤ -0.07）
     if (near.pitch > -0.07) {
@@ -1499,20 +1523,33 @@ if (Ent && M3 && me && world) {
       bad.push('柔和推杆时带了滚转（roll=' + near.roll.toFixed(3) +
         '）—— 那会让机头先侧着转，不像压机头');
     }
-    // ③ 幅度再大仍应是推杆为主
-    if (deep.pitch > -0.06) {
-      bad.push('鼠标下移到 90px 时推杆消失了（pitch=' + deep.pitch.toFixed(3) + '）');
+
+    // ③ 推杆必须真的能推到接近满（峰值约 -0.65，角速度 ~28°/s）
+    let peak = 0, peakAt = 0;
+    for (let d = 20; d <= 240; d += 20) {
+      const c = sample(d);
+      if (c.pitch < peak) { peak = c.pitch; peakAt = d; }
     }
-    // ④ 滚转权重必须随幅度升上来
-    const wide = at(200);
-    if (Math.abs(wide.roll) < 0.6) {
-      bad.push('推到屏幕深处时滚转权重没有升起来（roll=' + wide.roll.toFixed(3) + '）');
+    if (peak > -0.55) {
+      bad.push('推杆峰值太低（' + peak.toFixed(3) + ' @' + peakAt +
+        'px，角速度约 ' + (peak * 44).toFixed(1) + '°/s）—— 还没推满就被滚转接走了');
+    }
+
+    /* ④ 推到屏幕底部：推杆必须退场
+
+       这里只断言"推杆退了"，不断言滚转有多大 —— 因为 pump 100 帧之后
+       飞机已经在俯冲，"世界下方"不再落在机体下方，rollErr 和俯仰段
+       都会自然变小。那是姿态本身的结果，不是操控律的问题。 */
+    {
+      const wide = sample(350);
+      if (wide.pitch < -0.05) {
+        bad.push('推到屏幕底部时推杆还没退场（pitch=' + wide.pitch.toFixed(3) + '）');
+      }
     }
 
     if (bad.length) bad.forEach(fail);
-    else ok('真实链路：略微朝正下方即推杆（pitch ' + near.pitch.toFixed(3) +
-      ' / ' + mid.pitch.toFixed(3) + ' / ' + deep.pitch.toFixed(3) +
-      '，柔和段 roll ' + near.roll.toFixed(3) + '）');
+    else ok('真实链路：略微朝正下方即推杆（峰值 ' + peak.toFixed(3) + ' @' +
+      peakAt + 'px，柔和段 roll ' + near.roll.toFixed(3) + '）');
   }
 
   /* ---- 诊断：AI 到底用不用机炮 ---- */

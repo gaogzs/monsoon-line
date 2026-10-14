@@ -69,7 +69,7 @@ var AI = (function () {
        dy=60px  aimMag=0.167  pitch=-0.023  roll=0.157   ← 推杆已经快没了
        dy=90px  aimMag=0.250  pitch= 0.000  roll=0.510
      换成 0.5 之后同样位置 pushW 分别是 0.87 / 0.74 / 0.50。 */
-  var AIM_PUSH_AXIS = 0.5;
+  var AIM_PUSH_AXIS = 0.85;
 
   /* "柔和转向"与"快速转向"之间的过渡轴。
 
@@ -249,10 +249,20 @@ var AI = (function () {
        按用户的模型，策略切换本来就是一个离散决定。 */
     var downCone = (up < -0.5);
 
+    /* 推杆权重用立方衰减（"后降"），不是 smoothstep。
+
+       推杆的**强度**要到离轴角 25°（屏幕纵向约 46%）才封顶，而
+       smoothstep 在中段掉得太快 —— 两者刚好错开，结果永远在还没
+       推满的时候就被滚转接走。立方曲线把大部分幅度都留给推杆：
+
+           aimMag   0.25  →  pushW 0.98
+           aimMag   0.47  →  pushW 0.84   ← 推杆强度刚封顶，权重仍高
+           aimMag   0.70  →  pushW 0.44
+           aimMag   0.85+ →  pushW 0        （交给滚转） */
     var pushW = 0;
     if (downCone && upright > 0.7) {
       var tp = M3.clamp(aimMag === null ? 1 : aimMag / AIM_PUSH_AXIS, 0, 1);
-      pushW = 1 - tp * tp * (3 - 2 * tp);      // smoothstep
+      pushW = 1 - tp * tp * tp;
     }
 
     /* 走推杆的时候**不能同时滚转**。
@@ -301,7 +311,19 @@ var AI = (function () {
        所以滚转/偏航照旧缩杆，推杆单独给足。 */
     out.pitch = pitchCmd * gain;
     if (pushW > 0.01) {
-      out.pitch -= mag0 * (0.55 + 0.45 * Math.sqrt(M3.clamp(-ux, 0, 1))) * pushW;
+      /* 推杆的**强度**由方位决定：目标越接近正下方，机头压得越狠。
+
+         这里原来乘的是 mag0 = clamp(off0 × 2.3, 0, 1)，也就是用
+         **离轴角**定量。但两者刚好错开：off0 要到 25° 才封顶，而
+         25° 离轴角对应的 aimMag 已经是 0.875 —— 那时 pushW 早就归零，
+         推杆**永远到不了满幅度**（实测峰值只有 -0.28）。
+
+         改用方位 up（-1 = 正下方，0 = 正侧方）：
+             正下方  → 强度 1.00
+             锥边缘  → 强度 0.70（up = -0.5）
+         鼠标幅度只管 pushW（推杆 vs 滚转的比例），不再管推杆多狠。 */
+      var pushAmt = 0.4 + 0.6 * M3.clamp(-up, 0, 1);
+      out.pitch -= pushAmt * pushW;
     }
     out.roll = rollCmd * gain;
     out.yaw = yawCmd * gain;
