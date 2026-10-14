@@ -376,6 +376,14 @@ var Game = (function () {
       '干扰弹 —— <b>8</b> 发<br>' +
       '<span style="color:#4a6172">编号前缀取自逻辑语词根 —— ' +
       '环带工程自 2062 年起以逻辑语为签字语言，详见资料库。</span>';
+
+    // 俯视识别图：挂载形状跟着选中的特殊武器变
+    var spw = WEAPONS[selectedSpecial];
+    PLANFORM.draw(document.getElementById('planCv'), ac, selectedSpecial);
+    document.getElementById('planCap').innerHTML =
+      '当前挂载 —— <b>' + spw.name + '</b> ' + spw.cn +
+      (ROOTS[selectedSpecial] ? '<br><span class="hw">编号含义 · ' + ROOTS[selectedSpecial] + '</span>' : '') +
+      '<br><span style="color:#4a6172">绿色为挂载，琥珀为机炮，虚线为参考线</span>';
   }
 
   function kindLabel(k) {
@@ -1424,7 +1432,7 @@ var Game = (function () {
     var problems = [];
     var i, j;
 
-    var core = ['M3', 'MODELS', 'CODEX', 'AIRCRAFT', 'WEAPONS', 'VOICES',
+    var core = ['M3', 'MODELS', 'PLANFORM', 'CODEX', 'AIRCRAFT', 'WEAPONS', 'VOICES',
       'CALLSIGN', 'SFX', 'Renderer', 'Ent', 'AI', 'HUD', 'MISSIONS', 'Radio'];
     for (i = 0; i < core.length; i++) {
       if (typeof window[core[i]] === 'undefined') problems.push('核心模块 ' + core[i] + ' 未加载');
@@ -1444,6 +1452,7 @@ var Game = (function () {
         problems.push('机型 ' + ac.id + ' 的默认挂载不在可选列表里');
       }
       if (!ac.phys || !ac.phys.vMax) problems.push('机型 ' + ac.id + ' 缺少飞行性能参数');
+      if (!PLANFORM.planes[ac.model]) problems.push('机型 ' + ac.id + ' 缺少俯视识别图数据');
     }
 
     var needModels = ['c11', 'c14', 's6', 'm27', 'ucav', 'sower', 'relay', 'cell',

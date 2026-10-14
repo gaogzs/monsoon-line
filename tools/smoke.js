@@ -19,8 +19,13 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
-const ORDER = ['math3d', 'models', 'codex', 'data', 'audio',
-  'render', 'entities', 'ai', 'hud', 'missions', 'game'];
+const HTML_PATH = path.join(ROOT, 'index.html');
+const htmlSrc = fs.readFileSync(HTML_PATH, 'utf8');
+
+/* 加载顺序直接从 index.html 里读，不手工维护 ——
+   手工维护过一次就漏掉了新加的模块，测试反而先炸。 */
+const ORDER = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/script>/g)]
+  .map(m => m[1]);
 
 const problems = [];
 function fail(msg) { problems.push(msg); console.log('  \x1b[31mFAIL\x1b[0m  ' + msg); }
@@ -140,7 +145,7 @@ function makeEl(tag, id) {
 /* ============================================================
    从 index.html 建立元素注册表
    ============================================================ */
-const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const html = htmlSrc;
 
 const screenIds = [...html.matchAll(/<section id="(scr-[^"]+)" class="([^"]*)"/g)]
   .map(m => ({ id: m[1], cls: m[2] }));

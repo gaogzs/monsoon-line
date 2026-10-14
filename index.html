@@ -53,15 +53,25 @@
   <div class="hangar-grid">
     <div class="ac-list" id="acList"></div>
     <div class="ac-panel">
-      <div class="ac-name" id="acName">—</div>
-      <div class="ac-role" id="acRole">—</div>
-      <div class="stat" id="acStats"></div>
-      <div class="ac-desc" id="acDesc"></div>
 
-      <div class="sp-head">特殊武器 / SPECIAL WEAPON</div>
-      <div class="sp-list" id="spList"></div>
+      <div class="ac-main">
+        <div class="ac-name" id="acName">—</div>
+        <div class="ac-role" id="acRole">—</div>
+        <div class="stat" id="acStats"></div>
+        <div class="ac-desc" id="acDesc"></div>
+      </div>
 
-      <div class="ac-loadout" id="acLoadout"></div>
+      <div class="ac-view">
+        <canvas id="planCv" width="640" height="440"></canvas>
+        <div class="ac-view-cap" id="planCap">—</div>
+      </div>
+
+      <div class="ac-weapons">
+        <div class="sp-head">特殊武器 / SPECIAL WEAPON</div>
+        <div class="sp-list" id="spList"></div>
+        <div class="ac-loadout" id="acLoadout"></div>
+      </div>
+
     </div>
   </div>
 
@@ -190,6 +200,7 @@
 <!-- ============ 脚本 ============ -->
 <script src="js/math3d.js"></script>
 <script src="js/models.js"></script>
+<script src="js/planform.js"></script>
 <script src="js/codex.js"></script>
 <script src="js/data.js"></script>
 <script src="js/audio.js"></script>

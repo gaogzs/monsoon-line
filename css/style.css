@@ -140,7 +140,20 @@ canvas#cv{ position:fixed; inset:0; width:100%; height:100%; display:block; z-in
 .ac-card .c{ font-family:var(--mono); font-size:11px; color:var(--txt-d); margin-top:3px; letter-spacing:1px; }
 .ac-card .r{ font-size:12px; color:#6e8494; margin-top:5px; }
 
-.ac-panel{ overflow-y:auto; padding:22px 28px; }
+/* 机库详情面板：左上文字、右上俯视识别图、下方武器选择 */
+.ac-panel{ overflow-y:auto; padding:22px 28px; display:grid;
+  grid-template-columns:minmax(0,1fr) 340px;
+  grid-template-areas:"main view" "weapons weapons";
+  gap:20px 26px; align-content:start; }
+.ac-main{ grid-area:main; min-width:0; }
+.ac-view{ grid-area:view; min-width:0; }
+.ac-weapons{ grid-area:weapons; min-width:0; }
+#planCv{ width:100%; height:auto; display:block; border:1px solid var(--line);
+  background:#070d12; }
+.ac-view-cap{ font-family:var(--mono); font-size:11px; color:var(--txt-d);
+  margin-top:9px; line-height:1.85; letter-spacing:.4px; }
+.ac-view-cap b{ color:var(--green); }
+.ac-view-cap .hw{ color:var(--cy); }
 .ac-name{ font-family:var(--mono); font-size:28px; color:var(--amber); letter-spacing:2px; }
 .ac-role{ font-size:13px; color:var(--txt-d); margin-top:4px; letter-spacing:2px; }
 .stat{ margin:18px 0; max-width:520px; }
@@ -384,4 +397,5 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
   .brief-wrap{ grid-template-columns:1fr; }
   .brief-side{ display:none; }
   .help-wrap{ grid-template-columns:1fr; }
+  .ac-panel{ grid-template-columns:1fr; grid-template-areas:"view" "main" "weapons"; }
 }
