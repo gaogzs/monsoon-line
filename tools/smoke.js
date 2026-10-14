@@ -808,6 +808,73 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 轰炸机：沿航线飞、到点投弹、不参与空战 ----
+     它和所有其他单位都不一样：没有目标选择、没有追击、没有规避。
+     存在的全部意义就是"能不能飞到位"，而玩家的全部任务就是"别让它飞到"。 */
+  {
+    const M3 = sandbox.M3;
+    const AI = sandbox.AI;
+    const bad = [];
+
+    function m2() {
+      sandbox.Game.startMission(1);
+      return sandbox.Game.__world();
+    }
+
+    // 1. 第二关应当存在一架带航线的轰炸机，且基地是一个可攻击实体
+    {
+      const w = m2();
+      const bmb = w.actors.filter(a => a.route && a.alive);
+      if (bmb.length !== 2) bad.push('M2 应该有 2 架轰炸机，实际 ' + bmb.length);
+      if (!w.baseTarget) bad.push('M2 没有设置基地目标');
+      else if (!w.baseTarget.alive) bad.push('基地一开局就是毁的');
+    }
+
+    // 2. 轰炸机不得自己选目标、不得开加力缠斗
+    {
+      const w = m2();
+      const bmb = w.actors.find(a => a.route && a.alive);
+      for (let i = 0; i < 120; i++) AI.update(bmb, 1 / 60, w);
+      if (bmb.ai.target) bad.push('轰炸机自己选了目标 —— 它不该有空战逻辑');
+      if (bmb.ab) bad.push('轰炸机开了加力 —— 它不追人');
+    }
+
+    // 3. 飞到投弹点后应当真的伤到基地
+    {
+      const w = m2();
+      const bmb = w.actors.find(a => a.route && a.alive);
+      const hp0 = w.baseTarget.hp;
+      // 直接挪到投弹点附近，省掉八十多秒的航程
+      bmb.pos = M3.add(bmb.route.wp, M3.V(0, 700, 2200));
+      for (let i = 0; i < 30; i++) AI.update(bmb, 1 / 60, w);
+      if (w.baseTarget.hp >= hp0) {
+        bad.push('轰炸机抵达投弹点后基地未受损（hp ' + hp0 + ' → ' + w.baseTarget.hp + '）');
+      }
+      if (bmb.route.phase !== 'egress') {
+        bad.push('投弹后没有转入脱离，phase=' + bmb.route.phase);
+      }
+    }
+
+    // 4. 投弹两次足以摧毁基地，且摧毁后判定为失败
+    {
+      const w = m2();
+      const bmb = w.actors.find(a => a.route && a.alive);
+      Ent.damage(w.baseTarget, 100000, w, bmb);
+      const ms = sandbox.MISSIONS[1];
+      if (w.baseTarget.alive) bad.push('基地承受致命伤害后仍然存活');
+      else if (!ms.lose(w)) bad.push('基地被摧毁后没有判定为任务失败');
+    }
+
+    // 5. 基地健在且玩家存活时，不应误判失败
+    {
+      const w = m2();
+      if (sandbox.MISSIONS[1].lose(w)) bad.push('基地健在、玩家存活时误判为失败');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('轰炸机行为正确：沿航线飞、到点投弹、击毁基地即判负');
+  }
+
   /* ---- 无人僚机：授权开火 + 长机阵亡后盘旋 ----
      它和有人僚机的根本差别是"没有判断力"：
      目标只能来自长机授权，长机死了也不会自己找架打。 */

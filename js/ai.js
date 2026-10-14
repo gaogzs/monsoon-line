@@ -145,8 +145,83 @@ var AI = (function () {
   /* ============================================================
      每帧
      ============================================================ */
+  /* ============================================================
+     航线型单位（轰炸机之类）
+
+     它们不参与空战：没有目标选择、没有追击、没有规避机动。
+     整个行为由一条航线定义 —— 飞到点、做一件事、再飞走。
+
+     这比"给它们写一套 AI"简单得多，也更贴合它们在战场上的角色：
+     它们不是战斗单位，是**事件**。
+     ============================================================ */
+  function updateRoute(a, dt, world) {
+    var r = a.route;
+    var ctrl = a.ctrl;
+
+    var to = M3.sub(r.wp, a.pos);
+    var dist = M3.len(to);
+    var desired = dist > 1 ? M3.mul(to, 1 / dist) : a.fwd;
+
+    // 巡航高度保持 —— 航线给了高度，它只负责回到那上面
+    if (a.pos.y < r.alt - 150 && desired.y < 0.10) {
+      desired = M3.norm(M3.V(desired.x, 0.34, desired.z));
+    } else if (a.pos.y > r.alt + 150 && desired.y > -0.10) {
+      desired = M3.norm(M3.V(desired.x, -0.28, desired.z));
+    }
+
+    steerTo(a, desired, ctrl, a);
+    a.throttle = 0.95;
+    a.ab = false;
+
+    // 撞地保护（它很笨，别让它一头扎进海里）
+    if (a.pos.y < 500 && a.fwd.y < 0) {
+      steerTo(a, M3.norm(M3.V(a.fwd.x, 0.4, a.fwd.z)), ctrl, a);
+    }
+
+    /* 到点：执行该点的动作，然后转到下一段。
+       最后一段飞完就自行消失 —— 轰炸机不会掉头回来再打一遍。 */
+    if (dist < r.arrive) {
+      if (r.phase === 'ingress') {
+        if (r.onArrive) r.onArrive(a, world);
+        r.phase = 'egress';
+        r.wp = r.exit;
+        r.alt = r.exitAlt === undefined ? r.alt : r.exitAlt;
+      } else {
+        a.alive = false;
+        return;
+      }
+    }
+
+    /* 尾炮：只打正后方很近的东西，而且**绝不为了开火改变航向**。
+       这是它唯一的自卫手段 —— 设定里"遇到拦截只能靠护航机和尾炮"。 */
+    a.firingGun = false;
+    if (!r.tailGun || a.gunAmmo <= 0) return;
+
+    var t = null, best = 1e9;
+    var i;
+    for (i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || e.team === a.team) continue;
+      var d = M3.dist(e.pos, a.pos);
+      if (d > r.tailGun || d > best) continue;
+      // 必须在尾后锥内
+      var back = M3.norm(M3.sub(e.pos, a.pos));
+      if (M3.dot(back, a.fwd) > -0.72) continue;
+      best = d; t = e;
+    }
+    if (!t) return;
+
+    var off = M3.angleBetween(a.fwd, M3.norm(M3.sub(t.pos, a.pos)));
+    if (off < 0.30) {
+      a.firingGun = true;
+      Ent.fireGun(a, world);
+    }
+  }
+
   function update(a, dt, world) {
     if (!a.alive || !a.ai) return;
+    // 航线型单位完全不走下面那套
+    if (a.route) return updateRoute(a, dt, world);
     var s = a.ai;
     var ctrl = a.ctrl;
 

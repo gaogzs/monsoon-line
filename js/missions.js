@@ -57,6 +57,27 @@ function spawnEnemy(w, o) {
   return a;
 }
 
+/* ============================================================
+   轰炸机抵达投弹点
+
+   一大片爆炸，然后伤害记在基地上。它是玩家在第二关唯一
+   必须保护的东西 —— 也是"不拦它就得输"这条规则的落点。
+   ============================================================ */
+function bombTheBase(bomber, w) {
+  var base = w.baseTarget;
+  if (!base || !base.alive) return;
+  for (var i = 0; i < 48; i++) {
+    var d = M3.norm(M3.V(M3.rnd(-1, 1), M3.rnd(-0.15, 0.6), M3.rnd(-1, 1)));
+    Ent.spawnParticle(w.particles,
+      M3.add(base.pos, M3.mul(d, M3.rnd(0, 92))),
+      M3.mul(d, M3.rnd(30, 150)),
+      M3.rnd(1.4, 3.0), M3.rnd(8, 20),
+      (i % 3) ? '#ffb24a' : '#fff2cc',
+      { grow: true, drag: 0.9, grav: 0.15 });
+  }
+  Ent.damage(base, 340, w, bomber);
+}
+
 function spawnWingman(w, idx, slotX, slotY, slotZ) {
   // 僚机是「折翼」级无人僚机（KA-7），不是有人机 ——
   // 这里原来写的是 c11，于是设定里的无人僚机在游戏里飞着有人机。
@@ -340,8 +361,45 @@ MISSIONS.push({
       });
     }
 
+    /* ---- 我方前进基地：这一关唯一"必须保护"的东西 ----
+       一座 96 米级的浮式平台，也是玩家在这片海域的落脚点。
+       下游派了两架轰炸机来把它从海图上抹掉。 */
+    var baseT = spawnTarget(w, {
+      ttype: 'ground', model: 'station', label: '前进基地 PROGRESS',
+      x: 0, y: 0, z: -2400,
+      hp: 900, radius: 56, ground: true, value: 0
+    });
+    w.baseTarget = baseT;
+    w.baseHpFull = baseT.maxHp;
+
+    /* ---- 两架 ROK-40：这一关真正的威胁 ----
+       从南边进场、投弹、脱离，全程沿航线飞 ——
+       不选目标、不追人、不做规避。玩家要么拦住它们，要么看基地被炸。 */
+    var bombRun = [
+      { x: -2000, z: 10000, ox: -7000, oz: 19000 },
+      { x: 2400, z: 10000, ox: 7000, oz: 19000 }
+    ];
+    for (i = 0; i < bombRun.length; i++) {
+      var br = bombRun[i];
+      var bmb = spawnEnemy(w, {
+        ac: 'rok40',
+        x: br.x, y: 4300, z: -11000,
+        fwd: M3.V(0, 0, 1), speed: 250,
+        special: 'dl6', skill: 0.30,
+        callsign: downstreamCallsign(17 + i)
+      });
+      bmb.route = {
+        phase: 'ingress',
+        wp: M3.V(br.x, 0, br.z), alt: 4300, arrive: 3000,
+        exit: M3.V(br.ox, 0, br.oz), exitAlt: 6500,
+        tailGun: 1700,
+        onArrive: bombTheBase
+      };
+      bmb.bigTarget = true;
+    }
+
     w.objective = '摧毁下游中继网络';
-    w.objectiveSub = '浮空平台 3 · 控制平台 2';
+    w.objectiveSub = '浮空平台 3 · 控制平台 2 · 基地完好';
     w.flags.ambushDone = false;
     w.dangerAltitude = 1500;
   },
@@ -355,7 +413,32 @@ MISSIONS.push({
       else if (t.model === 'radar') sites++;
       else if (t.model === 'sam') sams++;
     }
-    w.objectiveSub = '浮空 ' + relays + ' · 地面 ' + sites + ' · 阵地 ' + sams;
+    /* 基地血量：这是玩家唯一"必须保护"的东西，所以要一直摆在眼前。
+       否则轰炸机投完弹玩家才发现，那就成了"突然失败"。 */
+    var basePct = 0;
+    if (w.baseTarget && w.baseTarget.alive) {
+      basePct = Math.max(0, Math.round(w.baseTarget.hp / w.baseTarget.maxHp * 100));
+    }
+    w.objectiveSub = '浮空 ' + relays + ' · 地面 ' + sites + ' · 阵地 ' + sams +
+      ' · 基地 ' + basePct + '%';
+
+    if (w.baseWarnT > 0) w.baseWarnT -= dt;
+    if (w.baseTarget && w.baseTarget.alive) {
+      if (w.baseTarget.hp < w.baseTarget.maxHp && !w.flags.baseHit) {
+        w.flags.baseHit = true;
+        w.radio.play('m2', 'baseHit');
+      }
+      // 血量过低时反复提醒，但别刷屏
+      if (w.baseTarget.hp < w.baseTarget.maxHp * 0.55 &&
+        !w.flags.baseLow && w.baseWarnT <= 0) {
+        w.flags.baseLow = true;
+        w.baseWarnT = 14;
+        w.radio.play('m2', 'baseLow');
+      }
+    } else if (w.baseTarget && !w.baseTarget.alive && !w.flags.baseLost) {
+      w.flags.baseLost = true;
+      w.radio.play('m2', 'baseLost');
+    }
 
     // 中继平台被打击后触发台词
     if (!w.flags.relayDown && relays < 3 && w.time > 4) {
@@ -411,7 +494,13 @@ MISSIONS.push({
     if (!w.flags.ambushDone) return false;
     return relays === 0 && sites === 0 && planes === 0;
   },
-  lose: function (w) { return !w.player.alive; }
+  lose: function (w) {
+    if (!w.player.alive) return true;
+    /* 基地没了就算输 —— 哪怕中继网已经拆干净了。
+       这是这一关唯一"必须保护"的东西，也是轰炸机存在的全部理由。 */
+    if (w.baseTarget && !w.baseTarget.alive) return true;
+    return false;
+  }
 });
 
 /* ============================================================
