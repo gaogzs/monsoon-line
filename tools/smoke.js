@@ -769,6 +769,54 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 追尾镜头必须真的落到渲染器上 ----
+     这条测试防的是一类特别隐蔽的 bug：镜头算对了，但紧接着被
+     另一条分支覆盖 —— 曾经 `else if (camMode === 1)` 被误改成独立的 `if`，
+     于是 camMode===0 掉进了目标视角的 else，而那里写死世界 up，
+     画面完全退回"地平线永远水平"。
+
+     上面那组三断言测试拦不住这种情况，因为它们只复现 camMode===0 的
+     计算过程，根本没经过分支。这里改从渲染器读最终结果。 */
+  {
+    const Game = sandbox.Game, R = sandbox.Renderer;
+    Game.startMission(0);
+    pump(1);
+
+    /* 拦截 setCamera，看**最后生效的那一次**传的是什么 up。
+
+       判据不能是"倾斜度是否够大"—— 那个值随飞机姿态浮动，
+       制造出 bug 时实测仍有 0.99，同样通过。
+       但写死世界 up 的目标视角传的是精确的 (0,1,0)，
+       而追尾镜头传的是 slerpDir 的平滑结果，几乎不可能正好等于它。
+       所以"是否精确等于 (0,1,0)"是个干净得多的判据。 */
+    /* 判据是**调用次数**，不是 up 的取值。
+
+       试过"up 的倾斜度"：受飞机姿态影响太大，制造出 bug 时实测仍有 0.99。
+       试过"up 是否精确等于 (0,1,0)"：飞机水平时机体 up 就等于世界 up，
+       两者根本区分不开，正常情况也会误报。
+
+       而分支结构本身有个干净的特征：camMode===0 只应该调用一次 setCamera。
+       一旦那样写错，追尾镜头算完之后目标视角又调了一次，变成两次。 */
+    const orig = R.setCamera;
+    let calls = 0, ups = [];
+    R.setCamera = function (pos, fwd, up, fov) {
+      calls++;
+      ups.push(up.x.toFixed(2) + ',' + up.y.toFixed(2) + ',' + up.z.toFixed(2));
+      return orig(pos, fwd, up, fov);
+    };
+
+    pump(1);
+    R.setCamera = orig;
+
+    if (calls === 0) fail('本帧没有任何 setCamera 调用');
+    else if (calls > 1) {
+      fail('一帧内 setCamera 被调用了 ' + calls + ' 次（' + ups.join(' / ') +
+        '）—— 追尾镜头算完之后又被另一条分支覆盖');
+    } else {
+      ok('追尾镜头是唯一生效的相机（本帧 1 次 setCamera）');
+    }
+  }
+
   /* ---- 追尾镜头：跟随姿态，但不跟着抖 ----
      这一版镜头既不是刚性的（那样会跟着每个抖动乱转），
      也不是锁世界水平的（那样会把姿态信息整个丢掉）——

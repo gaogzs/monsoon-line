@@ -1586,7 +1586,14 @@ var Game = (function () {
       Renderer.setCamera(camPos, camFwd, camUp, S.fov);
     }
 
-    if (camMode === 1) {
+    /* 注意这里是 **else if**，必须挂在上面 camMode===0 的 else 链上。
+
+       曾经被误改成独立的 if，后果是 camMode===0 时既不满足 camMode===1，
+       就掉进了下面的 else（目标视角）—— 追尾镜头算出来的结果当场被覆盖，
+       而且目标视角写死世界 up，于是画面看起来完全退回"地平线永远水平"。
+       这个 bug 骗过了所有相机测试，因为那些测试只复现 camMode===0 的计算，
+       不经过这里的分支。 */
+    else if (camMode === 1) {
       // 座舱：跟随滚转
       var cp = M3.add(p.pos, M3.add(M3.mul(p.fwd, 3.4), M3.mul(p.up, 1.1)));
       Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);
