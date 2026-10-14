@@ -97,6 +97,12 @@ var Game = (function () {
      屏幕管理
      ============================================================ */
   function show(id) {
+    /* 离开战斗界面时必须清掉通讯记录。
+       那些行的淡出是靠战斗循环里的 Radio.update() 推进的，
+       一旦回到菜单就再没人管它们 —— 于是最后几条会永远挂在屏幕上。
+       （从战斗中返回主菜单后残留的通讯记录就是这个原因。） */
+    if (id) Radio.clear();
+
     var all = document.querySelectorAll('.screen');
     for (var i = 0; i < all.length; i++) all[i].classList.remove('active');
     if (id) {
@@ -1768,7 +1774,7 @@ var Game = (function () {
     var ctx = Renderer.ctx;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.lineCap = 'round';
+    ctx.lineCap = 'butt';          // 圆头会把相邻弹丸的线"焊"在一起
 
     for (var i = 0; i < world.bullets.length; i++) {
       var b = world.bullets[i];
@@ -1776,13 +1782,18 @@ var Game = (function () {
 
       var head = M3.project(cam, b.pos);
       if (!head) continue;
-      var tail = M3.project(cam, b.prev || b.pos);
+
+      /* 曳光长度取固定的一小段，而不是"上一帧的位置"。
+         后者在高射速下会让弹丸一个接一个地首尾相接，
+         整条弹道连成一根粗面条 —— 现在每颗弹是一个独立的短划。 */
+      var dirv = M3.norm(b.vel);
+      var tail = M3.project(cam, M3.sub(b.pos, M3.mul(dirv, 13)));
       if (!tail) tail = head;
 
       var mine = player && b.team === player.team;
 
-      ctx.strokeStyle = mine ? 'rgba(255,228,150,0.92)' : 'rgba(255,148,88,0.85)';
-      ctx.lineWidth = mine ? 1.8 : 1.3;
+      ctx.strokeStyle = mine ? 'rgba(255,228,150,0.90)' : 'rgba(255,148,88,0.82)';
+      ctx.lineWidth = mine ? 1.05 : 0.85;
       ctx.beginPath();
       ctx.moveTo(tail.x, tail.y);
       ctx.lineTo(head.x, head.y);
@@ -1790,7 +1801,7 @@ var Game = (function () {
 
       ctx.fillStyle = mine ? 'rgba(255,250,215,1)' : 'rgba(255,196,150,1)';
       ctx.beginPath();
-      ctx.arc(head.x, head.y, mine ? 1.7 : 1.2, 0, Math.PI * 2);
+      ctx.arc(head.x, head.y, mine ? 1.0 : 0.8, 0, Math.PI * 2);
       ctx.fill();
     }
 

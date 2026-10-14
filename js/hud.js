@@ -622,20 +622,32 @@ var HUD = (function () {
 
     if (dist > 12000) return;      // 太远的只留框
 
+    // 相对本机的距离 —— 未锁定也要看得到，否则没法判断该不该追
+    var distTxt = dist < 1000
+      ? Math.round(dist) + ' M'
+      : (dist / 1000).toFixed(1) + ' KM';
+    var dim = 'rgba(185,200,212,0.62)';
+
     // 地面设施只有名字，没有呼号也没有机型
     if (isGnd) {
       text(ctx, t.label || t.name || '地面设施',
         s.x + sz + 7, s.y - sz + 8, col, FS, 'left');
+      text(ctx, distTxt, s.x + sz + 7, s.y - sz + 21, dim, FS, 'left');
       return;
     }
 
-    // 空中目标：第一行呼号（认人），第二行机型（认机）
+    // 空中目标：第一行呼号（认人），第二行机型（认机），最后一行距离
     var line1 = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.name || ''));
     var line2 = t.label && t.ac ? (t.ac.name + ' ' + t.ac.cn) : null;
 
     var tx = s.x + sz + 7, ty = s.y - sz + 8;
     text(ctx, line1, tx, ty, col, FS, 'left');
-    if (line2) text(ctx, line2, tx, ty + 13, 'rgba(185,200,212,0.62)', FS, 'left');
+    var ly = ty + 13;
+    if (line2) {
+      text(ctx, line2, tx, ly, dim, FS, 'left');
+      ly += 13;
+    }
+    text(ctx, distTxt, tx, ly, dim, FS, 'left');
   }
 
   function drawLockBox(ctx, s, t, p, dist, world) {

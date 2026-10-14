@@ -480,21 +480,29 @@ var Ent = (function () {
     SFX.flare();
 
     var i;
-    // 热焰弹：橙黄色，烧得亮、掉得快
+    /* 热焰弹：橙黄色，烧得亮、掉得快。
+
+       初速必须有一个明确的**向机体下方**的分量。原来只有
+       "载机速度 ×0.35 + 随机方向"，而相机就在飞机正后方，
+       于是整团火被机速带着往前、直接糊在镜头上。
+       现在继承的机速比例降到 0.22，再沿机体下方抛出去 ——
+       视觉上就是真正"投"下去的一组火球。 */
     for (i = 0; i < 6; i++) {
       var dir = randUnit();
-      var v = M3.add(M3.mul(a.vel, 0.35), M3.mul(dir, M3.rnd(35, 85)));
+      var v = M3.add(M3.mul(a.vel, 0.22), M3.mul(dir, M3.rnd(26, 62)));
+      v = M3.add(v, M3.mul(a.up, -M3.rnd(42, 78)));
       spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -6)), v,
-        M3.rnd(1.4, 2.4), 2.2, '#ffd070', { grow: true, drag: 0.5, grav: 0.6 });
+        M3.rnd(1.1, 1.9), 0.85, '#ffd070', { grow: true, drag: 0.5, grav: 0.6 });
     }
     /* 箔丝（chaff）：淡白色的金属丝云，散得更开、下落更慢、停留更久。
        现代干扰弹是热焰弹与箔丝一起投放的 —— 前者骗红外，后者骗雷达，
        所以视觉上也该是两种东西，而不是一团橙色火光。 */
     for (i = 0; i < 9; i++) {
       var cd2 = randUnit();
-      var v2 = M3.add(M3.mul(a.vel, 0.44), M3.mul(cd2, M3.rnd(18, 52)));
+      var v2 = M3.add(M3.mul(a.vel, 0.28), M3.mul(cd2, M3.rnd(14, 44)));
+      v2 = M3.add(v2, M3.mul(a.up, -M3.rnd(24, 48)));
       spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -5.5)), v2,
-        M3.rnd(2.4, 4.0), 3.2, '#e6eef4', { drag: 1.15, grav: 0.10 });
+        M3.rnd(2.0, 3.2), 1.25, '#e6eef4', { drag: 1.15, grav: 0.10 });
     }
 
     var broke = 0;
@@ -547,12 +555,15 @@ var Ent = (function () {
       });
     }
 
-    // 炮口火光（整轮开火只生成一次，不是每发子弹一次）
+    /* 炮口火光（整轮开火只生成一次，不是每发子弹一次）。
+       注意 spawnParticle 的签名是 (list, pos, vel, life, size, ...) ——
+       这里原来把 size 写成了 3.2（米），直径六米多，比飞机还大，
+       所以整团火直接把机体盖住了。 */
     var mz = M3.add(a.pos, M3.add(M3.mul(a.fwd, 7.5), M3.mul(a.right, 0.9)));
     spawnParticle(world.particles, mz, M3.mul(a.vel, 0.15),
-      0.055, 3.2, '#fff2c0', { grow: true });
+      0.055, 0.55, '#fff2c0', { grow: true });
     spawnParticle(world.particles, mz, M3.V(0, 0, 0),
-      0.10, 1.6, '#ffd070', { grow: true });
+      0.10, 0.95, '#ffd070', { grow: true });
   }
 
   function stepBullet(b, dt) {

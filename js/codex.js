@@ -360,8 +360,8 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <h4>本作数值</h4>
 <table class="cx-table">
   <tr><th>型号</th><th>口径</th><th>射速</th><th>备弹</th><th>初速</th><th>装备</th></tr>
-  <tr><td>CEL-3</td><td>20mm 六管</td><td>3900 发/分</td><td>480</td><td>1100 m/s</td><td>C-11 · C-14</td></tr>
-  <tr><td>CEL-7</td><td>30mm 四管</td><td>3900 发/分</td><td>1350</td><td>1020 m/s</td><td>S-6</td></tr>
+  <tr><td>CEL-3</td><td>20mm 六管</td><td>3900 发/分</td><td>480</td><td>1100 m/s</td><td>C-11 · I-14</td></tr>
+  <tr><td>CEL-7</td><td>30mm 四管</td><td>3900 发/分</td><td>1350</td><td>1020 m/s</td><td>A-6</td></tr>
 </table>`
   },
 
@@ -765,12 +765,14 @@ CODEX.push({
           '<td>' + w.mass + '</td>' +
           '<td>' + fits.join(' / ') + '</td>' +
           '<td>' + _seekerLabel(w) + '</td>' +
+          '<td>' + (w.cd ? w.cd + 's' : '—') + '</td>' +
           '</tr>';
       }
       if (!rows) continue;
       h += '<h4>' + cats[ci].t + '</h4>' +
         '<table class="cx-table"><tr><th>编号</th><th>代号</th><th>定位</th>' +
-        '<th>射程</th><th>单点</th><th>kg</th><th>可挂</th><th>导引</th></tr>' +
+        '<th>射程</th><th>单点</th><th>kg</th><th>可挂</th><th>导引</th>' +
+        '<th>冷却</th></tr>' +
         rows + '</table>';
     }
 
@@ -778,7 +780,7 @@ CODEX.push({
       '上游拿不到实物，条目里的数据来自缴获后的逆向测绘 —— ' +
       '所以只有参数，没有实机。</p>' +
       '<table class="cx-table"><tr><th>编号</th><th>代号</th>' +
-      '<th>定位</th><th>导引</th><th>备注</th></tr>';
+      '<th>定位</th><th>导引</th><th>冷却</th><th>备注</th></tr>';
     for (id in WEAPONS) {
       if (!Object.prototype.hasOwnProperty.call(WEAPONS, id)) continue;
       w = WEAPONS[id];
@@ -786,7 +788,9 @@ CODEX.push({
       if (w.kind === 'gun') continue;
       h += '<tr><td><b>' + w.name + '</b></td><td>' + w.cn + '</td>' +
         '<td>' + (w.role || '—') + '</td>' +
-        '<td>' + _seekerLabel(w) + '</td><td>' + (w.desc || '') + '</td></tr>';
+        '<td>' + _seekerLabel(w) + '</td>' +
+        '<td>' + (w.cd ? w.cd + 's' : '—') + '</td>' +
+        '<td>' + (w.desc || '') + '</td></tr>';
     }
     h += '</table>';
     return h;
