@@ -388,6 +388,16 @@ try {
         continue;
       }
       lastTime = W.time;
+
+      /* 模拟交战：定期给敌机扣血。
+         真实游戏里敌人会挨打、「被击中后转逃离」这类分支才会走到，
+         而之前只让它们追一个静止玩家，根本触发不到。 */
+      if (f % 90 === 45) {
+        const foes = W.actors.filter(x => x.team === 1 && x.alive);
+        if (foes.length) {
+          sandbox.Ent.damage(foes[(f / 90) % foes.length | 0], 25, W, null);
+        }
+      }
       for (const a of sandbox.Game.__world().actors) {
         if (!a.alive) continue;
 
