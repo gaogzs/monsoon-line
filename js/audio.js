@@ -25,6 +25,10 @@ var SFX = (function () {
   var engA = null, engB = null, engG = null, engLfo = null, engLfoG = null;
   var gunSrc = null, gunF = null, gunG = null, gunLfo = null, gunLfoG = null;
   var warnOsc = null, warnG = null, warnLfo = null, warnLfoG = null;
+  // 附近飞机的共享引擎链
+  var nearSrc = null, nearF = null, nearG = null;
+  // 远处机炮/导弹的采样节流（见 API.gunShotAt / missileAt）
+  var lastGunAt = 0, lastMslAt = 0;
   var warnOn = false;
 
   function makeNoise(sec) {
@@ -50,6 +54,7 @@ var SFX = (function () {
       buildEngine();
       buildGun();
       buildWarn();
+      buildNear();
       ready = true;
     }
     if (ctx.state === 'suspended') ctx.resume();
@@ -120,6 +125,24 @@ var SFX = (function () {
 
     gunSrc.connect(gunF); gunF.connect(gunG); gunG.connect(master);
     gunSrc.start(); gunLfo.start();
+  }
+
+  /* ---------- 附近飞机的引擎声 ----------
+
+     不可能给每架 NPC 各建一条音链：11 架 × 4 个振荡器 = 44 个节点，
+     而大部分时间它们都听不见。所以只做**一条共享音链**，
+     由 game.js 每帧传入"最近的一架"的距离与油门来驱动。
+
+     丢失的是方向感（听不出声音来自左边还是右边），
+     保住的是最重要的那条信息：**附近有人，而且他推了油门**。 */
+  function buildNear() {
+    nearG = ctx.createGain(); nearG.gain.value = 0.0;
+    nearSrc = ctx.createBufferSource();
+    nearSrc.buffer = noiseBuf; nearSrc.loop = true;
+    nearF = ctx.createBiquadFilter();
+    nearF.type = 'lowpass'; nearF.frequency.value = 600; nearF.Q.value = 0.7;
+    nearSrc.connect(nearF); nearF.connect(nearG); nearG.connect(master);
+    nearSrc.start();
   }
 
   /* ---------- 导弹告警：脉冲高频 ---------- */
@@ -282,6 +305,45 @@ var SFX = (function () {
 
     /** 机炮单发（用于点射反馈） */
     gunShot: function () { burst(0.16, 2600, 500, 0.055, 'bandpass'); },
+
+    /* 别人开炮，按距离衰减 —— 这是"敌人到底有没有在打我"的主要线索。
+
+       必须做**采样节流**：机炮每秒六十多发，每帧都触发会瞬间堆几十个
+       burst，既爆音又吃 CPU。近处 60 ms 一次，越远越稀。
+       远处的炮声还要更闷：高频先被空气吃掉。 */
+    gunShotAt: function (dist) {
+      if (!ready || muted) return;
+      var att = 1 - dist / 2600;
+      if (att <= 0) return;
+      att = att * att;
+      var t = T();
+      if (t - lastGunAt < 0.06 + (1 - att) * 0.15) return;
+      lastGunAt = t;
+      burst(0.13 * att, 2500 - (1 - att) * 1500, 420, 0.06, 'bandpass');
+    },
+
+    /** 别人发射导弹，同样按距离衰减 */
+    missileAt: function (dist) {
+      if (!ready || muted) return;
+      var att = 1 - dist / 6000;
+      if (att <= 0) return;
+      var t = T();
+      if (t - lastMslAt < 0.05) return;
+      lastMslAt = t;
+      sweep(0.13 * att, 1250 - (1 - att) * 650, 150, 0.45, 'sawtooth');
+      burst(0.15 * att, 3000 - (1 - att) * 1800, 300, 0.5, 'lowpass');
+    },
+
+    /* 附近飞机的引擎声（共享音链，由 game.js 传"最近的一架"） */
+    nearby: function (dist, throttle, ab) {
+      if (!ready || !nearG) return;
+      var t = T();
+      var att = Math.max(0, Math.min(1, 1 - dist / 1500));
+      nearF.frequency.setTargetAtTime(
+        480 + throttle * 1300 + (ab ? 520 : 0), t, 0.2);
+      nearG.gain.setTargetAtTime(
+        att * att * (0.018 + throttle * 0.05) * volEngine, t, 0.15);
+    },
 
     /** 导弹点火 */
     missile: function () {

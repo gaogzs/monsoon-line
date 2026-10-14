@@ -666,7 +666,9 @@ var HUD = (function () {
     var i;
     for (i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (e.alive && e !== p && e.team !== p.team) list.push(e);
+      // 友军也要进列表 —— 以前这里过滤掉了同队，于是僚机在视野里
+      // 完全没有标记，编队飞行时根本找不到自己的二号三号机。
+      if (e.alive && e !== p) list.push(e);
     }
     if (world.targets) {
       for (i = 0; i < world.targets.length; i++) {
@@ -678,19 +680,50 @@ var HUD = (function () {
       var t = list[i];
       var s = M3.projectUnclamped(cam, t.pos);
       var dist = M3.dist(p.pos, t.pos);
+      var isAlly = (t.team === p.team);
       var isLock = (p.target === t);
 
       if (s.behind || s.x < 0 || s.x > W || s.y < 0 || s.y > H) {
-        drawOffscreen(ctx, W, H, s, t, isLock, dist);
+        drawOffscreen(ctx, W, H, s, t, isLock, dist, isAlly);
         continue;
       }
 
-      if (isLock) {
-        drawLockBox(ctx, s, t, p, dist, world);
-      } else {
-        drawPlainMark(ctx, s, t, dist);
-      }
+      if (isAlly) drawAllyMark(ctx, s, t, dist);
+      else if (isLock) drawLockBox(ctx, s, t, p, dist, world);
+      else drawPlainMark(ctx, s, t, dist);
     }
+  }
+
+  /* ============================================================
+     友军标记
+
+     绿色在 HUD 里的语义本来就是"友军"，正好用上。
+     画法和敌方刻意区分：敌方是**实线整框**，友军是**四角短线**，
+     而且更细、更暗 —— 远处一眼扫过不会混淆。
+
+     呼号优先，没有呼号就退到机型。
+     ============================================================ */
+  function drawAllyMark(ctx, s, t, dist) {
+    var col = 'rgba(79,224,138,0.62)';
+    var c = 9, g = c * 0.45;
+
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(s.x - c, s.y - c + g); ctx.lineTo(s.x - c, s.y - c); ctx.lineTo(s.x - c + g, s.y - c);
+    ctx.moveTo(s.x + c - g, s.y - c); ctx.lineTo(s.x + c, s.y - c); ctx.lineTo(s.x + c, s.y - c + g);
+    ctx.moveTo(s.x + c, s.y + c - g); ctx.lineTo(s.x + c, s.y + c); ctx.lineTo(s.x + c - g, s.y + c);
+    ctx.moveTo(s.x - c + g, s.y + c); ctx.lineTo(s.x - c, s.y + c); ctx.lineTo(s.x - c, s.y + c - g);
+    ctx.stroke();
+
+    if (dist > 14000) return;
+
+    var distTxt = dist < 1000
+      ? Math.round(dist) + ' M'
+      : (dist / 1000).toFixed(1) + ' KM';
+    var nm = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.name || '僚机'));
+    text(ctx, nm, s.x + c + 6, s.y - c + 8, col, FS, 'left');
+    text(ctx, distTxt, s.x + c + 6, s.y - c + 21, 'rgba(120,170,140,0.55)', FS, 'left');
   }
 
   /* ============================================================
@@ -839,7 +872,7 @@ var HUD = (function () {
     return Math.min(nez, w.lockDist);
   }
 
-  function drawOffscreen(ctx, W, H, s, t, isLock, dist) {
+  function drawOffscreen(ctx, W, H, s, t, isLock, dist, isAlly) {
     var cx = W / 2, cy = H / 2;
     var m = 54;
     var px = M3.clamp(s.x, m, W - m);
@@ -848,11 +881,14 @@ var HUD = (function () {
 
     /* 屏幕外的箭头沿用同一套语义：
        未锁定的敌人是半透明红，锁定的是琥珀色（够不着），
-       进了 NEZ 才会变红 —— 但屏外不显示 NEZ 状态，统一用琥珀。 */
-    var col = t.kind === 'target'
-      ? 'rgba(143,163,178,0.7)'
-      : (isLock ? AMBER : 'rgba(255,77,77,0.5)');
-    var sz = isLock ? 11 : 9;
+       进了 NEZ 才会变红 —— 但屏外不显示 NEZ 状态，统一用琥珀。
+       友军则是绿色，与框内的四角标记同一套颜色。 */
+    var col = isAlly
+      ? 'rgba(79,224,138,0.52)'
+      : (t.kind === 'target'
+        ? 'rgba(143,163,178,0.7)'
+        : (isLock ? AMBER : 'rgba(255,77,77,0.5)'));
+    var sz = isLock ? 11 : (isAlly ? 8 : 9);
 
     ctx.save();
     ctx.translate(px, py);

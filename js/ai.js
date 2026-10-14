@@ -395,7 +395,17 @@ var AI = (function () {
     var gunRange = (a.pos.y > 18000 ? gunW.highRange : gunW.range);
     var gunCone = 0.028 + (1 - s.skill) * 0.02;
     a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
-    if (a.firingGun) Ent.fireGun(a, world);
+    if (a.firingGun) {
+      Ent.fireGun(a, world);
+      /* 别人开火的声音。
+
+         以前只有玩家自己的机炮有音效，AI 打出去的子弹是**无声**的 ——
+         而它们通常在视线的侧后方，于是玩家会以为"敌人从来不开炮"。
+         实测 AI 每 30 秒开火约 490 次，多数就是被这样忽略掉的。
+
+         gunShotAt 内部做了采样节流：这里每秒会被调用六十多次。 */
+      if (world.player) SFX.gunShotAt(M3.dist(a.pos, world.player.pos));
+    }
 
     // --- 导弹 ---
     if (s.shootT <= 0 && dist < 7200) {

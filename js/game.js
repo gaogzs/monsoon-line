@@ -915,7 +915,18 @@ var Game = (function () {
       roeBlocked: false, detected: false,
       killed: 0, hitsLanded: 0, shotsFired: 0
     };
-    w.fireMissile = function (actor, target) { return launch(actor, target, w); };
+    w.fireMissile = function (actor, target) {
+      var m = launch(actor, target, w);
+      /* 别人发射导弹的声音，按距离衰减。
+
+         这条路径也是 AI 唯一的发射入口，所以挂在这里就全覆盖了。
+         玩家自己发射时 SFX.missile() 已经在 fireSpecial 里播过，
+         不要重复。 */
+      if (m && player && actor !== player) {
+        SFX.missileAt(M3.dist(actor.pos, player.pos));
+      }
+      return m;
+    };
     w.radio = Radio;
     return w;
   }
@@ -1789,6 +1800,22 @@ var Game = (function () {
     resolveBullets(dt);
     updateTargets(dt);
     Ent.stepParticles(world.particles, dt);
+
+    /* 附近飞机的引擎声：取**最近的一架**驱动那条共享音链。
+
+       不可能每架 NPC 各建一条（11 架 × 4 个振荡器 = 44 个节点），
+       而绝大多数时候它们根本听不见。战场环境里最该被听见的，
+       恰好就是最近的那一架 —— 无论敌机咬尾还是僚机归队，
+       都是这个音最先起变化。 */
+    var nBest = null, nBd = 1e9;
+    for (i = 0; i < world.actors.length; i++) {
+      var na = world.actors[i];
+      if (!na.alive || na === player) continue;
+      var nd = M3.dist(na.pos, player.pos);
+      if (nd < nBd) { nBd = nd; nBest = na; }
+    }
+    if (nBest && nBd < 1500) SFX.nearby(nBd, nBest.throttle || 0.8, !!nBest.ab);
+    else SFX.nearby(99999, 0, false);
 
     // 导弹告警
     var warn = false;
