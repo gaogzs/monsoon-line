@@ -590,6 +590,35 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 命名体系（设定集 8.1）----
+     装备编号一律取逻辑语三字母词根，机型用「单字母 + 序号」。
+     两份表分开，所以 C-11（飞机）和 CEL-3（机炮）不会混。
+     词根表在这里硬编码而不是从现有编号推导 ——
+     推导出来的话，新武器用错词根就测不出来了。 */
+  {
+    const RAFSI = ['CEL', 'TOR', 'SUT', 'GIR', 'CLA', 'SPO', 'GUT', 'PEJ',
+      'GUS', 'ZUN', 'DAR', 'BIN', 'BAD', 'CAV', 'DIL'];
+    const bad = [];
+
+    sandbox.AIRCRAFT.forEach(a => {
+      const m = a.name.match(/^([A-Z])-(\d+)$/);
+      if (!m) bad.push('机型 ' + a.name + ' 不是「单字母-序号」格式');
+      else if (RAFSI.indexOf(m[1]) >= 0) bad.push('机型 ' + a.name + ' 撞上了逻辑语词根');
+    });
+
+    for (const k in WEAPONS) {
+      const w = WEAPONS[k];
+      const m = w.name.match(/^([A-Z]+)-(\d+)$/);
+      if (!m) { bad.push('武器 ' + w.name + ' 编号格式异常'); continue; }
+      if (RAFSI.indexOf(m[1]) < 0) {
+        bad.push('武器 ' + w.name + ' 的前缀 ' + m[1] + ' 不是逻辑语词根');
+      }
+    }
+
+    if (bad.length) bad.slice(0, 5).forEach(fail);
+    else ok('命名体系一致：机型单字母、武器一律逻辑语三字母词根');
+  }
+
   /* ---- 挂载的机体能力门槛 ---- */
   {
     const playable = sandbox.AIRCRAFT.filter(a => !a.npcOnly);
