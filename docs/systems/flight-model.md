@@ -53,7 +53,7 @@ HUD 上的 `Q` 表显示 kPa，**12 kPa 以下开始告警**（`ctrl ≈ 0.55`�
 
 | | vMax | vStall | accel | pitch | roll | hp |
 |---|---|---|---|---|---|---|
-| DB-11 军舰鸟 | 480 | 105 | 26 | 0.60 | 3.0 | 130 |
+| DB-11 军鸟 | 480 | 105 | 26 | 0.60 | 3.0 | 130 |
 | D-14 旗鱼 | 566 | 122 | 33 | 0.63 | 3.4 | 92 |
 | G-6 鲣鸟 | 380 | 88 | 18 | 0.50 | 2.2 | 250 |
 
@@ -108,7 +108,7 @@ speed += clamp(vTarget - speed, -acc*dt, acc*dt);
 
 ## 可变后掠翼
 
-只有 DB-11 军舰鸟有（数据里的 `variableSweep: true`）：
+只有 DB-11 军鸟有（数据里的 `variableSweep: true`）：
 
 ```js
 a.sweep = clamp((a.speed - 170) / 250, 0, 1);   // 0 = 展开，1 = 后掠

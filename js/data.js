@@ -49,8 +49,8 @@ var AIRCRAFT = [
     id: 'c11',
     model: 'c11',
     name: 'DB-11',
-    nick: 'Frigatebird',
-    cn: '军舰鸟',
+    nick: 'Warbird',
+    cn: '军鸟',
     role: '舰载多用途战斗机',
     faction: '上游公约',
     planformType: '可变后掠翼',
@@ -242,7 +242,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
 
      以前它只作为模型键 m27 存在，AIRCRAFT 表里查不到 ——
      于是 makeAircraft() 会静默回退到 AIRCRAFT[0]，
-     HUD 上把 ROK-27 标成"DB-11 军舰鸟"。
+     HUD 上把 ROK-27 标成"DB-11 军鸟"。
      现在它有正式条目：npcOnly 让它不出现在机库，
      但资料库和 HUD 都能正确引用它。
      ============================================================ */
