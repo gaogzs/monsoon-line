@@ -40,6 +40,33 @@ var HUD = (function () {
   }
 
   /* ============================================================
+     右下角布局
+
+     俯视图与 RWR 环是挨着放的两个元素，位置必须由同一处算出来 ——
+     否则任何一边改了尺寸，另一边就会错位或者叠上去。
+
+     排列是：
+         [ RWR 环 ]  [ 挂载俯视图 ]
+     两者底边对齐，俯视图贴右下角，RWR 在它左边。
+     ============================================================ */
+  function hmiLayout(W, H) {
+    var m = gap(16, W, 0.025);
+    var size = Math.min(U(168), Math.min(W, H) * 0.20);
+    var storeX = W - size - m;
+    var storeY = H - size - m;
+
+    var rwrR = Math.min(U(70), Math.min(W, H) * 0.09);
+    var rwrX = storeX - U(26) - rwrR;      // 俯视图左侧
+    var rwrY = H - m - rwrR;               // 与俯视图底边对齐
+
+    return {
+      margin: m,
+      size: size, storeX: storeX, storeY: storeY,
+      rwrR: rwrR, rwrX: rwrX, rwrY: rwrY
+    };
+  }
+
+  /* ============================================================
      主入口
      ============================================================ */
   var CARD = ['N', 'E', 'S', 'W'];
@@ -523,9 +550,10 @@ var HUD = (function () {
   }
 
   function drawThreatRing(ctx, W, H, p, world) {
-    // RWR 从"右下角"定位
-    var R = Math.min(U(70), Math.min(W, H) * 0.09);
-    var cx = W - R - U(28), cy = H - R - U(28);
+    // RWR 环现在挂在挂载俯视图的左边（见 hmiLayout）
+    var L = hmiLayout(W, H);
+    var R = L.rwrR;
+    var cx = L.rwrX, cy = L.rwrY;
     ctx.strokeStyle = 'rgba(255,176,58,0.25)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.55, 0, Math.PI * 2); ctx.stroke();
@@ -570,7 +598,8 @@ var HUD = (function () {
       if (e.target === p) { any = true; plot(M3.sub(e.pos, p.pos), 'rgba(255,77,77,0.85)'); }
     }
 
-    text(ctx, 'RWR', cx, cy + R + 16, 'rgba(255,176,58,0.5)', FS, 'center');
+    // 标签放环**上方** —— 环的底边已经贴到页边距了，写下面会出屏
+    text(ctx, 'RWR', cx, cy - R - 26, 'rgba(255,176,58,0.5)', FS, 'center');
     if (msIn) {
       var bl = Math.sin(performance.now() * 0.016) > 0;
       if (bl) {
@@ -900,11 +929,10 @@ var HUD = (function () {
     if (!p.ac || !p.ac.hardpointGroups || !p.ac.hardpointGroups.length) return;
     if (!p.loadout) return;
 
-    var size = Math.min(U(168), Math.min(W, H) * 0.20);
-    var m = gap(16, W, 0.025);
-    var bx = W - size - m;
-    // 让开右下角的 RWR 环
-    var by = H - size - m - Math.min(U(180), H * 0.26);
+    var L = hmiLayout(W, H);
+    var size = L.size;
+    var bx = L.storeX;
+    var by = L.storeY;          // 俯视图自己占右下角，RWR 让到了左边
 
     ctx.fillStyle = 'rgba(6,14,20,0.38)';
     ctx.fillRect(bx, by, size, size);
