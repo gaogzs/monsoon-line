@@ -89,8 +89,7 @@ var Game = (function () {
   var camYaw = 0, camPitch = 0;
   /* 追尾镜头的基准朝向。它不直接等于机头方向 —— 见 updateCamera 里的说明：
      俯仰被限制在 ±78°，而且偏航要按最短角差平滑，否则翻过顶点时会瞬移。 */
-  var camYawBase = 0;           // 追尾镜头的基准偏航（已按最短角差平滑）
-  var camPitchSmooth = null;    // 基准俯仰的平滑值，首帧惰性初始化
+
   var banner = { t: 0, title: '', sub: '', col: '' };
   var hits = [];
   var stats = null;
@@ -1553,77 +1552,41 @@ var Game = (function () {
          极点附近逐帧抖动，参考轴就跟着反复横跳，画面来回侧翻。
          之前那套"混合参考"只能把跳变抹成旋转，抹不掉极点本身；
          把俯仰限住，镜头就永远不会到达那个位置。 */
-      var CAM_PITCH_LIM = 78 * Math.PI / 180;
-      var SIN_LIM = Math.sin(CAM_PITCH_LIM);   // 视线 y 分量的上限
+      /* ---------- 追尾镜头：跟随姿态，但不跟着抖 ----------
 
-      /* 只平滑**偏航角**，俯仰始终钳在限位内。
+         三个约束要同时成立，少一个就不是这个手感：
+         · **不锁世界水平** —— 飞机滚转，画面跟着倾斜
+         · **跟着空翻**   —— 飞机翻过去，画面也翻过去
+         · **不跟着抖**   —— 姿态的细小抖动不该直接传到画面上
 
-         两点都试过，都有坑：
-         · 直接跟水平投影 —— 翻过顶点时它会瞬间反向 180°，镜头瞬移。
-         · 对"受限朝向"做球面插值 —— 最短弧在两个 78°/66° 的方向之间
-           会从 84° 高处拱过去，正好穿过极点，反而把退化保护重新引出来。
+         做法是让镜头的机体基**平滑地追踪**飞机的机体基：
+         用球面插值（走最短弧，不会绕远路），时间常数取适中值。
 
-         所以偏航单独按最短角差慢慢转：镜头会以限位仰角缓缓转过 180°，
-         全程不碰极点。俯仰则永远被钳住，不存在"拱过去"的可能。 */
-      var hx = p.fwd.x, hz = p.fwd.z;
-      var hlen = Math.sqrt(hx * hx + hz * hz);
-      if (hlen > 0.12) {
-        var tYaw = Math.atan2(hx, hz);
-        var dYaw = tYaw - camYawBase;
-        while (dYaw > Math.PI) dYaw -= Math.PI * 2;
-        while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-        // 转速不能太快：翻越顶点时要转 180°，而每帧的转角直接决定
-        // 画面"上"方向的变化率。1.2 对应约一秒转完，肉眼是平滑的。
-        camYawBase += dYaw * (1 - Math.exp(-1.2 * dt));
-        if (camYawBase > Math.PI) camYawBase -= Math.PI * 2;
-        if (camYawBase < -Math.PI) camYawBase += Math.PI * 2;
-      }
+         这是"刚性连死"和"锁世界 up"之间的那条路 ——
+         前者会跟着每一个抖动乱转，后者会把姿态信息整个丢掉。
 
-      var camPitchAng = Math.atan2(p.fwd.y, Math.max(hlen, 1e-4));
-      camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
+         关键细节：fwd 和 up 必须用**同一个**时间常数。
+         否则两者滞后不同步，会一个跟上了另一个还没跟上，
+         基就可能在极点附近接近共线，把正交化逼进退化分支。 */
+      camFwd = M3.slerpDir(camFwd, p.fwd, 1 - Math.exp(-8 * dt));
+      camUp = M3.slerpDir(camUp, p.up, 1 - Math.exp(-8 * dt));
 
-      /* 俯仰也要平滑 —— 这一点和偏航不同，之前漏了。
+      // slerp 之后两者不再严格垂直，正交化一次
+      var onb = M3.orthonormalize(camFwd, camUp);
+      camFwd = onb.fwd;
+      camUp = onb.up;
 
-         相机 up 恒为世界 up，正交化之后 up 的长度是 cos(pitch)：
-         俯仰越接近限位，这个长度越小，同样的视线变化引起的 up 变化越大。
-         所以猛拉杆时如果俯仰直接阶跃，地平线就会跟着抖。
-         时间常数取 9（比偏航的 1.2 快得多），因为俯仰是玩家直接控制的，
-         滞后感太强会显得操纵迟滞。 */
-      if (camPitchSmooth === null) camPitchSmooth = camPitchAng;
-      camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-9 * dt));
-
-      var cpc = Math.cos(camPitchSmooth), cps = Math.sin(camPitchSmooth);
-      var camDir = M3.V(Math.sin(camYawBase) * cpc, cps, Math.cos(camYawBase) * cpc);
-
-      var off0 = M3.rotAxis(M3.mul(camDir, -S.camDist), M3.V(0, 1, 0), camYaw);
-      var want = M3.add(p.pos, M3.add(off0, M3.V(0, S.camHeight + camPitch * 70, 0)));
-      var k = 1 - Math.exp(-7.5 * dt);
-      camPos = M3.lerpV(camPos, want, k);
-      // 观察点前移：镜头距离很小的时候，如果还盯着机身本身，
-      // 飞机的下沉角会大到跑出视场。给一个下限让视线稳定在前方。
-      /* 视线方向**直接取 camDir**，不再做第二次插值。
-
-         以前这里是从 (观察点 − camPos) 插值出来的。问题在于 camPos 本身
-         就是插值量，天生滞后 camDir：姿态越猛烈滞后越多，实测能偏到 8.5°，
-         把 78° 的俯仰限位一路推到 86° 以上 —— 限位等于白加了。
-         而 camDir 已经过了俯仰、偏航两重平滑，再插一次纯属多余。
-
-         这条链路修过三次，教训是一样的：**不要用滞后的位置去反推方向。** */
-      camFwd = camDir;
-
-      /* 相机 up 直接取世界 up，**没有任何兜底逻辑**。
-
-         这里原来留了一段"混合参考"：视线变陡时让 camUp 平滑过渡到
-         机体 up。那是限位方案之前的东西，限位生效后它不仅多余，
-         而且有害 —— 视线只要稍微陡一点它就开始跟随机体滚转，
-         而机体 up 在极点附近变化极快，等于是把抖动提前引了出来。
-
-         现在视线被硬钳在 78° 以内，世界 up 与它永远不共线，
-         orthonormalize 不可能退化，兜底也就没有存在的理由。 */
-      camUp = M3.V(0, 1, 0);
+      // 镜头位置也在机体基里 —— 所以倒飞时看到的是机腹，和 WT 一样
+      var offBody = M3.add(
+        M3.mul(camFwd, -S.camDist),
+        M3.mul(camUp, S.camHeight)
+      );
+      camPos = M3.lerpV(camPos, M3.add(p.pos, offBody), 1 - Math.exp(-14 * dt));
 
       Renderer.setCamera(camPos, camFwd, camUp, S.fov);
-    } else if (camMode === 1) {
+    }
+
+    if (camMode === 1) {
       // 座舱：跟随滚转
       var cp = M3.add(p.pos, M3.add(M3.mul(p.fwd, 3.4), M3.mul(p.up, 1.1)));
       Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);

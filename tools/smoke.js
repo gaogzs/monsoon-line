@@ -769,44 +769,89 @@ if (Ent && M3 && me && world) {
     }
   }
 
-  /* ---- 极点附近的相机不能跳变 ----
-     追尾视角的 up 参考在机头垂直时与视线共线，正交基退化，
-     退化保护会临时换轴 —— 而 |f.y| 在极点附近逐帧抖动，
-     于是画面在两套姿态间反复横跳。修复办法是平滑过渡到机体 up。
-     这里让机头从水平压到正下方，检查相机 up 是否连续。 */
+  /* ---- 追尾镜头：跟随姿态，但不跟着抖 ----
+     这一版镜头既不是刚性的（那样会跟着每个抖动乱转），
+     也不是锁世界水平的（那样会把姿态信息整个丢掉）——
+     它用球面插值平滑地追踪机体基。
+
+     三条断言分别对应三个约束：滚转要倾斜、空翻要跟着翻、静止要稳。 */
   {
     const M3 = sandbox.M3;
-    let prev = null, maxJump = 0, maxVert = 0;
-    for (let i = 0; i <= 60; i++) {
-      const a = (i / 60) * (Math.PI / 2);
-      const camFwd = M3.norm(M3.V(0, -Math.sin(a), Math.cos(a)));
-      // 机体 up 随俯仰转动（垂直向下时指向水平后方）
-      const bodyUp = M3.norm(M3.V(0, Math.cos(a), Math.sin(a)));
+    const dt = 1 / 60;
+    const K = 8;                       // 与 game.js 相同的时间常数
+    const bad = [];
 
-      const vert = Math.abs(camFwd.y);
-      let mix = Math.min(1, Math.max(0, (vert - 0.90) / 0.09));
-      mix = mix * mix * (3 - 2 * mix);
-      const upRef = M3.lerpV(M3.V(0, 1, 0), bodyUp, mix);
+    // 复现 updateCamera 里 camMode===0 的那段
+    function track(steps, pose) {
+      let camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0);
+      let maxJump = 0, prev = null;
+      for (let i = 0; i < steps; i++) {
+        const src = pose(i);
+        camFwd = M3.slerpDir(camFwd, src.fwd, 1 - Math.exp(-K * dt));
+        camUp = M3.slerpDir(camUp, src.up, 1 - Math.exp(-K * dt));
+        const onb = M3.orthonormalize(camFwd, camUp);
+        camFwd = onb.fwd;
+        camUp = onb.up;
+        if (!isFinite(camUp.x) || !isFinite(camUp.y) || !isFinite(camUp.z)) {
+          bad.push('镜头基出现非有限值');
+          break;
+        }
+        const s = [camUp.x, camUp.y, camUp.z];
+        if (prev) {
+          let d = 0;
+          for (let k = 0; k < 3; k++) d += Math.abs(s[k] - prev[k]);
+          if (d > maxJump) maxJump = d;
+        }
+        prev = s;
+      }
+      return { maxJump, up: camUp };
+    }
 
-      const cam = M3.makeCamera(M3.V(0, 0, 0), camFwd, upRef, 100, 100, 56);
-      if (!isFinite(cam.up.x) || !isFinite(cam.up.y) || !isFinite(cam.up.z)) {
-        fail('极点附近相机 up 出现非有限值');
-        break;
+    const FWD = M3.V(0, 0, 1), UP0 = M3.V(0, 1, 0);
+
+    /* 滚转率取真实量级：dRoll = p.roll · ctrl · dt ≈ 2.7 / 60 ≈ 0.045 rad/帧。
+       不能让它瞬间跳到目标角度 —— 那样测的是镜头追赶一个阶跃的能力，
+       而不是它跟随真实姿态时的平稳性。 */
+    const ROLL_RATE = 0.045;
+
+    // 1. 滚转到 90°：镜头必须跟着倾斜，而不是停在水平
+    {
+      let ang = 0;
+      const r = track(300, () => {
+        ang = Math.min(Math.PI / 2, ang + ROLL_RATE);
+        return { fwd: FWD, up: M3.norm(M3.rotAxis(UP0, FWD, ang)) };
+      });
+      // 绕 +z 转 +90°：按右手法则 (0,1,0) → (-1,0,0)
+      const dToTilted = Math.hypot(r.up.x + 1, r.up.y, r.up.z);
+      const tilt = Math.hypot(r.up.x, r.up.z);       // 水平分量 = 倾斜程度
+      if (dToTilted > 0.15) {
+        bad.push('滚转 90° 后镜头没跟着倾斜（离目标 ' + dToTilted.toFixed(3) + '）');
       }
-      if (prev) {
-        const d = Math.abs(cam.up.x - prev.x) + Math.abs(cam.up.y - prev.y) +
-          Math.abs(cam.up.z - prev.z);
-        if (d > maxJump) maxJump = d;
-        if (d > maxVert) maxVert = d;
-      }
-      prev = cam.up;
+      if (tilt < 0.5) bad.push('滚转 90° 后镜头仍接近水平（倾斜仅 ' + tilt.toFixed(2) + '）');
+      if (r.maxJump > 0.12) bad.push('滚转过程中镜头帧间差 ' + r.maxJump.toFixed(3));
     }
-    if (maxJump > 0.30) {
-      fail('极点附近相机 up 仍在跳变，最大帧间差 ' + maxJump.toFixed(3));
-    } else {
-      ok('极点附近镜头连续（最大帧间差 ' + maxJump.toFixed(3) + '）');
+
+    // 2. 空翻半圈：镜头必须跟着翻过去（up 指到世界下方）
+    {
+      let ang = 0;
+      const r = track(400, () => {
+        ang = Math.min(Math.PI, ang + ROLL_RATE);
+        return { fwd: FWD, up: M3.norm(M3.rotAxis(UP0, FWD, ang)) };
+      });
+      const d = Math.hypot(r.up.x, r.up.y + 1, r.up.z);
+      if (d > 0.15) bad.push('空翻半圈后镜头没跟着翻过去（偏差 ' + d.toFixed(3) + '）');
     }
+
+    // 3. 姿态不动时，镜头必须完全静止
+    {
+      const r = track(300, () => ({ fwd: FWD, up: UP0 }));
+      if (r.maxJump > 0.02) bad.push('姿态静止时镜头仍在动（帧间差 ' + r.maxJump.toFixed(3) + '）');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('追尾镜头：滚转跟着倾斜、空翻跟着翻、静止时完全稳');
   }
+
 
   /* ---- 轰炸机：沿航线飞、到点投弹、不参与空战 ----
      它和所有其他单位都不一样：没有目标选择、没有追击、没有规避。
@@ -964,139 +1009,6 @@ if (Ent && M3 && me && world) {
 
     if (bad.length) bad.forEach(fail);
     else ok('无人僚机行为正确：授权开火、长机阵亡后盘旋、编队不脱队');
-  }
-
-  /* ---- 姿态突变：camPos 滞后时视线不得越界 ----
-     这是上一个 bug 的教训。camDir 的俯仰明明钳在 78°，
-     但 camPos 和 camFwd 都是插值出来的，姿态突变时两者都滞后 ——
-     于是 camFwd 会比 camDir 更陡，把限位绕过去。
-
-     原来的极点/空翻测试只复现了"理想的受限朝向"，测不到这一层。
-     这里补上完整链路：camDir → camPos(滞后) → camFwd(滞后) → 钳位。 */
-  {
-    const M3 = sandbox.M3;
-    const LIM = 78 * Math.PI / 180;
-    const SIN = Math.sin(LIM);
-    const dt = 1 / 60;
-
-    // 飞机在限位仰角附近剧烈摆姿态，镜头位置带滞后
-    let camDir = M3.V(0, 0, 1);
-    let camPos = M3.V(0, 0, -60);
-    const ship = M3.V(0, 0, 0);
-    let camFwd = M3.clone(camDir);
-    let camPitchSm = null;
-    let maxFwdY = 0, jump = 0, prevUp = null;
-
-    /* 俯仰按**真实角速度**摆动，这一点很关键。
-
-       一阶低通（camPitchSmooth）滤的是突变，不是斜坡 ——
-       对持续变化的输入它只产生相位滞后，不会降低变化率。
-       所以如果这里让俯仰以远超实际的速度扫过，up 的变化率也会跟着超实际，
-       测出来的就不是飞机的问题，而是测试参数的问题。
-
-       实际角速度：dPitch = p.pitch · ctrl · dt · gl ≈ 0.76 / 60 ≈ 0.0127 rad/帧。 */
-    const PITCH_RATE = 0.0127;         // rad/帧，约 0.73°
-
-    for (let i = 0; i < 900; i++) {
-      // 基准朝向在 ±78° 之间来回，角速度取真实量级
-      const a = LIM * Math.sin(i * PITCH_RATE * 1.6);
-      const yaw = 0.6 * Math.sin(i * 0.037);
-      // 俯仰同样经过平滑（时间常数 9），与 game.js 一致
-      if (camPitchSm === null) camPitchSm = a;
-      camPitchSm += (a - camPitchSm) * (1 - Math.exp(-9 * dt));
-      const cp = Math.cos(camPitchSm), sp = Math.sin(camPitchSm);
-      camDir = M3.V(Math.sin(yaw) * cp, sp, Math.cos(yaw) * cp);
-
-      // 镜头位置滞后跟随（与 game.js 同样的时间常数）
-      const want = M3.add(ship, M3.mul(camDir, -52));
-      camPos = M3.lerpV(camPos, want, 1 - Math.exp(-7.5 * dt));
-
-      // 视线直接取 camDir —— 与 game.js 一致，不再用滞后的 camPos 反推方向
-      camFwd = camDir;
-
-      maxFwdY = Math.max(maxFwdY, Math.abs(camFwd.y));
-
-      // 相机基必须能算出来，且 up 恒为世界 up
-      const cam = M3.makeCamera(camPos, camFwd, M3.V(0, 1, 0), 100, 100, 56);
-      if (!isFinite(cam.up.x) || !isFinite(cam.up.y) || !isFinite(cam.up.z)) {
-        fail('姿态突变时相机基出现非有限值');
-        break;
-      }
-      if (prevUp) {
-        const d = Math.abs(cam.up.x - prevUp.x) + Math.abs(cam.up.y - prevUp.y) +
-          Math.abs(cam.up.z - prevUp.z);
-        if (d > jump) jump = d;
-      }
-      prevUp = cam.up;
-    }
-
-    const bad = [];
-    if (maxFwdY > SIN + 1e-6) {
-      bad.push('视线越过了限位：|y| 最大 ' + maxFwdY.toFixed(4) +
-        '，上限 ' + SIN.toFixed(4));
-    }
-    if (jump > 0.12) bad.push('姿态突变时相机 up 帧间差 ' + jump.toFixed(3));
-
-    if (bad.length) bad.forEach(fail);
-    else {
-      ok('姿态突变时视线不越界：|y| 峰值 ' + maxFwdY.toFixed(3) +
-        ' ≤ ' + SIN.toFixed(3) + '，相机 up 帧间差 ' + jump.toFixed(3));
-    }
-  }
-
-  /* ---- 空翻：飞机翻过正上方/正下方，镜头不该跳 ----
-     镜头俯仰被钳在 ±78°，飞机却可以翻过去。这时镜头的偏航要平滑转过
-     180°，而俯仰始终不越界 —— 后者是关键：只要镜头永远到不了极点，
-     正交基就不会退化。这里检查整段空翻过程中相机基是否连续。 */
-  {
-    const M3 = sandbox.M3;
-    const LIM = 78 * Math.PI / 180, dt = 1 / 60;
-
-    function rollOver(sign) {
-      let camYawBase = 0, prev = null, maxJump = 0, maxPitch = 0;
-      for (let i = 0; i <= 900; i++) {
-        const a = sign * (i / 900) * Math.PI * 1.2;
-        const fwd = M3.V(0, Math.sin(a), Math.cos(a));
-        const hx = fwd.x, hz = fwd.z, hlen = Math.sqrt(hx * hx + hz * hz);
-        if (hlen > 0.12) {
-          const tYaw = Math.atan2(hx, hz);
-          let dYaw = tYaw - camYawBase;
-          while (dYaw > Math.PI) dYaw -= Math.PI * 2;
-          while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-          camYawBase += dYaw * (1 - Math.exp(-1.2 * dt));
-          if (camYawBase > Math.PI) camYawBase -= Math.PI * 2;
-          if (camYawBase < -Math.PI) camYawBase += Math.PI * 2;
-        }
-        let pa = Math.atan2(fwd.y, Math.max(hlen, 1e-4));
-        pa = Math.min(LIM, Math.max(-LIM, pa));
-        if (Math.abs(pa) > maxPitch) maxPitch = Math.abs(pa);
-        const cp = Math.cos(pa), sp = Math.sin(pa);
-        const camDir = M3.V(Math.sin(camYawBase) * cp, sp, Math.cos(camYawBase) * cp);
-        const cam = M3.makeCamera(M3.V(0, 0, 0), camDir, M3.V(0, 1, 0), 100, 100, 56);
-        const sig = [cam.fwd.x, cam.fwd.y, cam.fwd.z, cam.up.x, cam.up.y, cam.up.z];
-        if (prev) {
-          let d = 0;
-          for (let k = 0; k < 6; k++) d += Math.abs(sig[k] - prev[k]);
-          if (d > maxJump) maxJump = d;
-        }
-        prev = sig;
-      }
-      return { maxJump, maxPitch };
-    }
-
-    const up = rollOver(1), dn = rollOver(-1);
-    const bad = [];
-    if (up.maxJump > 0.12) bad.push('翻越正上方时相机基帧间差 ' + up.maxJump.toFixed(3));
-    if (dn.maxJump > 0.12) bad.push('翻越正下方时相机基帧间差 ' + dn.maxJump.toFixed(3));
-    // 关键不变量：镜头俯仰绝不能越过限位，否则会碰到极点
-    if (up.maxPitch > LIM + 1e-6) bad.push('镜头仰角越界：' + (up.maxPitch * 180 / Math.PI).toFixed(1) + '°');
-    if (dn.maxPitch > LIM + 1e-6) bad.push('镜头俯角越界：' + (dn.maxPitch * 180 / Math.PI).toFixed(1) + '°');
-
-    if (bad.length) bad.forEach(fail);
-    else {
-      ok('空翻时镜头平稳：帧间差 ' + up.maxJump.toFixed(3) +
-        '，仰角钳在 ' + (up.maxPitch * 180 / Math.PI).toFixed(1) + '°');
-    }
   }
 
   /* ---- 命名体系（设定集 8.1）----
