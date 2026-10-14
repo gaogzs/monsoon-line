@@ -92,6 +92,7 @@ var HUD = (function () {
     drawRadar(ctx, W, H, p, world);
     drawThreatRing(ctx, W, H, p, world);
     drawTargets(ctx, W, H, cam, p, world);
+    drawLaserStatus(ctx, W, H, p, world);
     drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
     drawIncomingMissiles(ctx, W, H, cam, p, world);
     drawStores(ctx, W, H, p);
@@ -699,6 +700,55 @@ var HUD = (function () {
         drawPlainMark(ctx, s, t, dist);
         if (isLock) drawLockBox(ctx, s, t, p, dist, world);
       }
+    }
+  }
+
+  /* ============================================================
+     激光照射状态
+
+     激光制导武器（目前只有 PEJ-30 铁蒺藜）的核心操作是
+     "投放之后继续保持照射"：弹每一帧都在问载机"你还在照着目标吗"，
+     机头一偏出 25° 它就不再修正，之后只是一块自由落体的铁。
+
+     这件事如果不显示出来，玩家根本不知道有这回事，
+     只会觉得"这炸弹有时候准有时候不准"。所以两段都要给：
+
+       投放前 —— 目标框下方写照射进度（它和锁定环是同一个量）
+       投放后 —— 屏幕下缘一条常驻状态条，直接告诉他照射还在不在
+     ============================================================ */
+  function drawLaserStatus(ctx, W, H, p, world) {
+    var w = WEAPONS[p.special];
+
+    // ---- 投放前：手里拿着激光弹，而且已经锁上了 ----
+    if (w && w.seeker === 'laser' && p.target && p.target.alive) {
+      var s = M3.projectUnclamped(Renderer.getCam(), p.target.pos);
+      if (!s.behind && s.x > 0 && s.x < W && s.y > 0 && s.y < H) {
+        var ready = p.lockProgress >= 1;
+        text(ctx, ready ? '照射中' : '照射 ' + Math.round(p.lockProgress * 100) + '%',
+          s.x, s.y + 32, ready ? AMBER : 'rgba(255,176,58,0.55)', FS, 'center');
+      }
+    }
+
+    // ---- 投放后：自己的激光弹还在飞 ----
+    var flying = null;
+    if (world && world.missiles) {
+      for (var i = 0; i < world.missiles.length; i++) {
+        var m = world.missiles[i];
+        if (m.alive && m.owner === p && m.w && m.w.seeker === 'laser') {
+          flying = m;
+          break;
+        }
+      }
+    }
+    if (!flying) return;
+
+    var y = H * 0.87;
+    if (flying.laserLost) {
+      text(ctx, '✕ 照射中断 — 弹已停止修正', W / 2, y, RED, FB, 'center');
+      text(ctx, '把机头转回目标可重新照射', W / 2, y + 16,
+        'rgba(185,200,212,0.72)', FS, 'center');
+    } else {
+      text(ctx, '◎ 照射保持中', W / 2, y, AMBER, FB, 'center');
     }
   }
 

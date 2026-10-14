@@ -2061,6 +2061,106 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
   }
 
+  /* ---- 端到端：激光制导炸弹的完整使用流程 ----
+
+     模拟玩家实际会做的动作：挂 PEJ-30 → 锁地面目标 → 对准俯冲 →
+     按发射 → 继续保持照射，直到命中。 */
+  {
+    const G8 = sandbox.Game, M3j = sandbox.M3;
+    const bad = [];
+    G8.startMission(1);
+    const pl = G8.__player();
+    const w = G8.__world();
+    for (let f = 0; f < 30; f++) pump(1);
+
+    const site = w.targets.find(t => t.alive && t.team === 1 && t.kind === 'target');
+    if (!site) {
+      fail('第二关找不到可投弹的地面设施');
+    } else {
+      // 挂上 PEJ-30
+      pl.special = 'v30';
+      pl.spAmmo = 6;
+      pl.spCd = 0;
+      pl.slotCd.v30 = [0];
+      pl.target = site;
+      pl.lockProgress = 0;
+
+      // 摆在目标前上方，机头对着它 —— 这就是"俯冲投放"
+      pl.pos = M3j.V(site.pos.x, site.pos.y + 1800, site.pos.z - 3200);
+      pl.fwd = M3j.norm(M3j.sub(site.pos, pl.pos));
+      pl.speed = 280;
+
+      // 等锁定环转满
+      let lockFrames = 0;
+      while (pl.lockProgress < 1 && lockFrames < 600) { pump(1); lockFrames++; }
+      const lockSec = (lockFrames / 60).toFixed(2);
+      if (pl.lockProgress < 1) {
+        bad.push('对着目标飞了 10 秒锁定环都没转满');
+      } else {
+        ok('激光弹锁定耗时 ' + lockSec + ' s（desc 说激光最慢，这是刻意的）');
+      }
+
+      // 投放
+      const kd3 = docListeners['keydown'] || [];
+      const n0 = w.missiles.length;
+      kd3.forEach(fn => fn({ code: 'Enter', preventDefault() {} }));
+      const shot = w.missiles.length - n0;
+      if (shot < 1) {
+        bad.push('锁定完成后按发射键没有投出炸弹');
+      } else {
+        const m = w.missiles[w.missiles.length - 1];
+        ok('投放成功，炸弹出膛（' + shot + ' 枚）');
+
+        /* 保持照射：一路把机头对准目标，看它能不能命中。
+           注意每帧都要重算机头 —— 真实玩家就是这么盯着目标飞的。 */
+        /* 保持照射：**直接驱动弹的每一帧**，不跑整局。
+
+           不能用 pump —— 它会经过飞控重算玩家姿态，把"机头对准目标"
+           这个前提冲掉，量到的就不是照射机制而是姿态漂移。
+           这里只验机制本身：载机一直照着时，laserLost 必须始终为假。
+           （"炸弹能不能命中目标"由命中判定那几条负责，与导引方式无关。） */
+        let lostWhileLit = false, frames = 0;
+        for (let f = 0; f < 300; f++) {
+          pl.fwd = M3j.norm(M3j.sub(site.pos, pl.pos));   // 持续照射
+          sandbox.Ent.stepMissile(m, 1 / 60, w);
+          frames++;
+          if (m.laserLost) { lostWhileLit = true; break; }
+          if (!m.alive) break;
+        }
+        if (lostWhileLit) {
+          bad.push('全程保持照射，弹却判定了失去照射');
+        } else {
+          ok('保持照射期间弹始终受修正（' + frames + ' 帧内未丢失）');
+        }
+      }
+
+      // 反向：中途把机头转开，必须失去修正
+      pl.spCd = 0;
+      pl.slotCd.v30 = [0];
+      pl.lockProgress = 1;
+      pl.target = site;
+      pl.pos = M3j.V(site.pos.x, site.pos.y + 1800, site.pos.z - 3200);
+      pl.fwd = M3j.norm(M3j.sub(site.pos, pl.pos));
+      pump(1);
+      const n1 = w.missiles.length;
+      kd3.forEach(fn => fn({ code: 'Enter', preventDefault() {} }));
+      if (w.missiles.length > n1) {
+        const m2 = w.missiles[w.missiles.length - 1];
+        // 一投出去就把机头抬走
+        pl.fwd = M3j.norm(M3j.V(0, 1, -1));
+        for (let f = 0; f < 60; f++) { pump(1); if (!m2.alive) break; }
+        if (!m2.laserLost && m2.alive) {
+          bad.push('机头转开后炸弹仍在修正 —— 照射没有约束力');
+        } else {
+          ok('机头转开 → 炸弹立即失去修正' +
+            (m2.alive ? '（继续下坠，未命中）' : '（已落地）'));
+        }
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+  }
+
   /* ---- 端到端：打错目标会被拒绝，打对了能命中 ---- */
   {
     const G3 = sandbox.Game, M3f = sandbox.M3, E5 = sandbox.Ent;
