@@ -199,6 +199,9 @@ canvas#cv{ position:fixed; inset:0; width:100%; height:100%; display:block; z-in
 .cx-table td .d{ color:var(--txt-d); font-size:11px; }
 .cx-table td b{ color:var(--cy); }
 .cx-note{ font-size:12.5px; color:var(--txt-d); line-height:1.85; margin:0 0 14px; }
+.cx-fly{ display:inline-block; font-size:9px; padding:0 4px; margin-left:5px;
+  border:1px solid var(--green); color:var(--green); vertical-align:middle;
+  letter-spacing:.5px; white-space:nowrap; }
 .ac-view-cap b{ color:var(--green); }
 .ac-view-cap .hw{ color:var(--cy); }
 .ac-name{ font-family:var(--mono); font-size:28px; color:var(--amber); letter-spacing:2px; }

@@ -52,6 +52,8 @@ var AIRCRAFT = [
     nick: 'Frigatebird',
     cn: '军舰鸟',
     role: '舰载多用途战斗机',
+    faction: '上游公约',
+    planformType: '可变后掠翼',
     maker: '上游公约 · 北岸航空',
     stats: { spd: 0.68, mob: 0.72, stl: 0.55, fire: 0.70, dur: 0.62, rng: 0.76 },
     phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.76, roll: 3.0, yaw: 0.30, hp: 130 },
@@ -87,6 +89,8 @@ var AIRCRAFT = [
     nick: 'Sailfish',
     cn: '旗鱼',
     role: '平流层制空战斗机',
+    faction: '上游公约',
+    planformType: '菱形翼',
     maker: '上游公约 · 高空试验局',
     stats: { spd: 0.96, mob: 0.84, stl: 0.86, fire: 0.54, dur: 0.32, rng: 0.48 },
     phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.80, roll: 3.4, yaw: 0.28, hp: 92 },
@@ -117,6 +121,8 @@ var AIRCRAFT = [
     nick: 'Booby',
     cn: '鲣鸟',
     role: '近距空中支援攻击机',
+    faction: '上游公约',
+    planformType: '平直翼',
     maker: '上游公约 · 铁砧重工',
     stats: { spd: 0.34, mob: 0.44, stl: 0.30, fire: 0.98, dur: 0.98, rng: 0.60 },
     phys: { vMax: 380, vMil: 320, vStall: 88, accel: 18, decel: 44, pitch: 0.62, roll: 2.2, yaw: 0.34, hp: 250 },
@@ -148,15 +154,17 @@ S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
      以前它只作为模型键 m27 存在，AIRCRAFT 表里查不到 ——
      于是 makeAircraft() 会静默回退到 AIRCRAFT[0]，
      HUD 上把 M-27 标成"C-11 军舰鸟"。
-     现在它有正式条目：enemyOnly 让它不出现在机库，
+     现在它有正式条目：npcOnly 让它不出现在机库，
      但资料库和 HUD 都能正确引用它。
      ============================================================ */
   {
     id: 'm27',
     name: 'M-27', nick: '片岩', cn: 'SCHIST',
     role: '多用途战斗机',
+    faction: '下游同盟',
+    planformType: '后掠翼',
     maker: '下游同盟 · 第二航空工厂',
-    enemyOnly: true,
+    npcOnly: true,
     model: 'm27',
     desc: `下游同盟能拿出的最好的东西。飞行性能大致相当于十年前的 C-11，
       火控和电子设备还要更旧一代，但产量是上游的三倍 ——
@@ -169,6 +177,59 @@ S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     hardpointGroups: [
       { id: 'A', label: '翼下内侧', kind: 'heavy', pts: [{ x: 2.9, y: -1.0 }, { x: -2.9, y: -1.0 }] },
       { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.2, y: -1.6 }, { x: -5.2, y: -1.6 }] }
+    ],
+    defaultLoadout: {}
+  },
+
+  /* ============================================================
+     分水群岛国 —— 名义中立的当地武装
+     ============================================================ */
+  {
+    id: 'k8',
+    name: 'K-8', nick: '潮线', cn: 'TIDELINE',
+    role: '轻型拦截机',
+    faction: '分水群岛国',
+    planformType: '平直翼',
+    maker: '分水群岛国 · 丹湾飞机厂',
+    npcOnly: true,
+    model: 'c14',
+    desc: `说是国产，其实只有总装线在本地 —— 发动机来自北边，
+      雷达来自南边，两边都很乐意把上一代的东西卖过来。
+      它飞不快，也打不远。但在这片空域里，它是唯一一面
+      不属于任何一方的旗。`,
+    stats: { spd: 0.44, mob: 0.62, stl: 0.14, fire: 0.40, dur: 0.44, rng: 0.48 },
+    phys: { vMax: 430, vMil: 350, vStall: 102, accel: 21, decel: 40, pitch: 0.62, roll: 2.9, yaw: 0.32, hp: 100 },
+    gun: 'k3',
+    maxLoad: 2600,
+    hardpointGroups: [
+      { id: 'A', label: '翼下', kind: 'light', pts: [{ x: 2.4, y: -0.6 }, { x: -2.4, y: -0.6 }] }
+    ],
+    defaultLoadout: {}
+  },
+
+  /* ============================================================
+     调节场管理局 —— 技术机构，状态不明
+     ============================================================ */
+  {
+    id: 'a2',
+    name: 'A-2', nick: '水准', cn: 'DATUM',
+    role: '高空勤务机',
+    faction: '调节场管理局',
+    planformType: '高展弦比直翼',
+    maker: '调节场管理局 · 自建',
+    npcOnly: true,
+    model: 'sower',
+    desc: `管理局自己的飞机。它的活是爬到两万米以上，
+      给那些谁也靠不近的单元换零件 —— 那个高度上，
+      飞得稳比飞得快重要得多。
+      名义上没有武器。不过在那个高度还没有人护航的，
+      通常也用不上武器。`,
+    stats: { spd: 0.30, mob: 0.22, stl: 0.20, fire: 0.10, dur: 0.72, rng: 0.86 },
+    phys: { vMax: 310, vMil: 260, vStall: 78, accel: 11, decel: 34, pitch: 0.34, roll: 2.0, yaw: 0.26, hp: 180 },
+    gun: 'k3',
+    maxLoad: 900,
+    hardpointGroups: [
+      { id: 'A', label: '机腹挂点', kind: 'belly', pts: [{ x: 0.9, y: -1.4 }, { x: -0.9, y: -1.4 }] }
     ],
     defaultLoadout: {}
   }

@@ -330,7 +330,7 @@ var Game = (function () {
     list.innerHTML = '';
     for (var i = 0; i < AIRCRAFT.length; i++) {
       // 敌方制式机不进机库（但资料库里能查到）
-      if (AIRCRAFT[i].enemyOnly) continue;
+      if (AIRCRAFT[i].npcOnly) continue;
       (function (idx) {
         var ac = AIRCRAFT[idx];
         var d = document.createElement('div');
@@ -1795,7 +1795,7 @@ var Game = (function () {
         }
         // 敌方机型挂的是下游弹，那些弹的 fits 是空的，
         // 所以"有没有武器挂得上"这一条只对可驾驶机型成立
-        if (ac.enemyOnly) continue;
+        if (ac.npcOnly) continue;
         var ok = false;
         for (var wk in WEAPONS) {
           var ww = WEAPONS[wk];
@@ -1818,7 +1818,7 @@ var Game = (function () {
       }
       if (!ac.phys || !ac.phys.vMax) problems.push('机型 ' + ac.id + ' 缺少飞行性能参数');
       // 敌方制式机不进机库，也就用不到俯视识别图
-      if (!ac.enemyOnly && !PLANFORM.planes[ac.model]) {
+      if (!ac.npcOnly && !PLANFORM.planes[ac.model]) {
         problems.push('机型 ' + ac.id + ' 缺少俯视识别图数据');
       }
     }

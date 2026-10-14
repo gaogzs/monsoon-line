@@ -595,24 +595,27 @@ CODEX.push({
   title: '机型图鉴',
   sub: '敌我双方的机体。数据直接读自 data.js',
   build: function () {
-    var h = '<p class="cx-note">上游公约的三种机体都可以驾驶；' +
-      '下游同盟没有独立的机体工业，他们把缴获和走私来的同型机' +
-      '做了高空化改装 —— 所以你会在天上遇到"自己人开的飞机"。</p>';
+    var h = '<p class="cx-note">这里收录分水群岛上空的全部作战机型。' +
+      '带 <b>可驾驶</b> 标记的是本战役中可用的机体；其余型号在资料库里' +
+      '只作识别用 —— 非作战单位与地面设施不在此列。</p>';
 
-    h += '<table class="cx-table"><tr><th>型号</th><th>定位</th>' +
-      '<th>最大速度</th><th>俯仰率</th><th>结构</th><th>挂点</th><th>后掠翼</th></tr>';
+    h += '<table class="cx-table"><tr><th>型号</th><th>阵营</th><th>定位</th>' +
+      '<th>最大速度</th><th>俯仰率</th><th>结构</th><th>挂点</th><th>翼型</th></tr>';
     for (var i = 0; i < AIRCRAFT.length; i++) {
       var a = AIRCRAFT[i];
       var pts = 0, grps = a.hardpointGroups || [];
       for (var g = 0; g < grps.length; g++) pts += grps[g].pts.length;
       h += '<tr>' +
-        '<td><b>' + a.name + '</b><br><span class="d">' + a.cn + '</span></td>' +
+        '<td><b>' + a.name + '</b>' +
+        (a.npcOnly ? '' : ' <span class="cx-fly">可驾驶</span>') +
+        '<br><span class="d">' + a.nick + '</span></td>' +
+        '<td>' + (a.faction || '—') + '</td>' +
         '<td>' + a.role + '</td>' +
         '<td>' + a.phys.vMax + ' m/s</td>' +
         '<td>' + a.phys.pitch.toFixed(2) + ' rad/s</td>' +
         '<td>' + a.phys.hp + '</td>' +
         '<td>' + pts + ' 点 / ' + grps.length + ' 组</td>' +
-        '<td>' + (a.variableSweep ? '可变' : '固定') + '</td>' +
+        '<td>' + (a.planformType || '—') + '</td>' +
         '</tr>';
     }
     h += '</table>';
@@ -682,8 +685,9 @@ CODEX.push({
         rows + '</table>';
     }
 
-    h += '<h4>敌方装备</h4><p class="cx-note">下游同盟的制式武器，' +
-      '上游拿不到，只能靠缴获逆向 —— 所以资料库里只有参数没有实物。</p>' +
+    h += '<h4>下游装备</h4><p class="cx-note">下游同盟的制式武器。' +
+      '上游拿不到实物，条目里的数据来自缴获后的逆向测绘 —— ' +
+      '所以只有参数，没有实机。</p>' +
       '<table class="cx-table"><tr><th>编号</th><th>代号</th><th>导引</th><th>备注</th></tr>';
     for (id in WEAPONS) {
       if (!Object.prototype.hasOwnProperty.call(WEAPONS, id)) continue;
