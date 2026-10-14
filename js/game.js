@@ -128,6 +128,7 @@ var Game = (function () {
     hudOpacity: 100,
     hudScale: 100,
     compass: true,
+    pitchLadder: true,
     targetMarkers: true
   };
 
@@ -159,6 +160,7 @@ var Game = (function () {
         { k: 'hudScale', label: 'HUD 缩放', type: 'range', min: 70, max: 160, unit: '%' },
         { k: 'hudOpacity', label: 'HUD 透明度', type: 'range', min: 25, max: 100, unit: '%' },
         { k: 'compass', label: '顶部指南针', type: 'toggle' },
+        { k: 'pitchLadder', label: '俯仰刻度', type: 'toggle' },
         { k: 'targetMarkers', label: '目标方位标记', type: 'toggle' }
       ]
     }

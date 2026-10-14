@@ -59,6 +59,7 @@ var HUD = (function () {
     }
 
     drawCompass(ctx, W, H, p, world, S);
+    drawPitchLadder(ctx, W, H, cam, p, S);
     drawBoresight(ctx, W, H, p);
     drawTapes(ctx, W, H, p, S);
     drawRadar(ctx, W, H, p, world);
@@ -68,6 +69,7 @@ var HUD = (function () {
     drawStores(ctx, W, H, p);
     drawWeaponPanel(ctx, W, H, p);
     drawTargetBearing(ctx, W, H, p, p.target);
+    drawThreatAlert(ctx, W, H, p, world);
     drawWarnings(ctx, W, H, p, world);
     drawObjective(ctx, W, H, world);
 
@@ -406,6 +408,110 @@ var HUD = (function () {
   /* ============================================================
      威胁环（RWR）
      ============================================================ */
+  /* ============================================================
+     俯仰刻度（Pitch Ladder）
+
+     一组很淡的水平刻线，标出机头相对地平线的夹角。
+     追尾视角下相机不跟随滚转，所以这些线永远是水平的 ——
+     它们只随俯仰上下移动，正好补上"我现在到底是在抬头还是低头"。
+
+     刻度线的位置不是硬算的，而是把一个"相对机头仰角为 d 的远方点"
+     投影到屏幕上 —— 这样它自动跟随视场角与镜头设置，
+     不用另写一套投影公式。
+     ============================================================ */
+  function drawPitchLadder(ctx, W, H, cam, p, S) {
+    if (S && S.pitchLadder === false) return;
+
+    var cx = W / 2;
+    var horiz = M3.V(p.fwd.x, 0, p.fwd.z);
+    var hl = M3.len(horiz);
+    if (hl < 0.10) return;                 // 接近垂直姿态，水平参考没有意义
+    horiz = M3.mul(horiz, 1 / hl);
+
+    var R = 24000;                         // 投影用的远距离（在 far 之内）
+
+    for (var d = -75; d <= 75; d += 5) {
+      var ang = d * Math.PI / 180;
+      var ca = Math.cos(ang), sa = Math.sin(ang);
+      var dir = M3.V(horiz.x * ca, sa, horiz.z * ca);
+
+      var s = M3.project(cam, M3.add(p.pos, M3.mul(dir, R)));
+      if (!s || s.y < -40 || s.y > H + 40) continue;
+
+      var zero = (d === 0);
+      var ad = Math.abs(d);
+      var halfW = zero
+        ? W * 0.19
+        : Math.max(W * 0.030, W * 0.115 - ad * W * 0.0011);
+
+      ctx.strokeStyle = zero
+        ? 'rgba(79,224,138,0.40)'
+        : 'rgba(79,224,138,' + Math.max(0.06, 0.20 - ad * 0.0016).toFixed(3) + ')';
+      ctx.lineWidth = zero ? 1.6 : 1;
+
+      // 中央留缺口，免得压住机头参考与速度矢量
+      var gapw = zero ? 0 : W * 0.028;
+      ctx.beginPath();
+      if (gapw > 0) {
+        ctx.moveTo(cx - halfW, s.y); ctx.lineTo(cx - gapw, s.y);
+        ctx.moveTo(cx + gapw, s.y); ctx.lineTo(cx + halfW, s.y);
+      } else {
+        ctx.moveTo(cx - halfW, s.y); ctx.lineTo(cx + halfW, s.y);
+      }
+      ctx.stroke();
+
+      // 每 10° 标一次数字
+      if (d % 10 === 0 && !zero) {
+        var lbl = String(ad);
+        text(ctx, lbl, cx - halfW - 7, s.y + 4, 'rgba(79,224,138,0.40)', FS, 'right');
+        text(ctx, lbl, cx + halfW + 7, s.y + 4, 'rgba(79,224,138,0.40)', FS, 'left');
+      }
+    }
+  }
+
+  /* ============================================================
+     威胁告警（屏幕中上方）
+
+     RWR 环上那两个小字，在真正忙起来的时候根本看不见 ——
+     而"有东西正朝你来"是这个游戏里最不能错过的一条信息。
+     所以单独放大一份放在屏幕中上方；环上仍然保留方位点，
+     两者是互补的：一个告诉你"有威胁"，一个告诉你"威胁在哪个方向"。
+     ============================================================ */
+  function drawThreatAlert(ctx, W, H, p, world) {
+    if (!world) return;
+
+    var inb = 0, minD = 1e9, lit = false;
+
+    for (var i = 0; i < world.missiles.length; i++) {
+      var m = world.missiles[i];
+      if (!m.alive) continue;
+      var inc = (m.target === p) ||
+        (M3.dist(m.pos, p.pos) < 3000 && m.team !== p.team);
+      if (!inc) continue;
+      inb++;
+      var d = M3.dist(m.pos, p.pos);
+      if (d < minD) minD = d;
+    }
+    for (i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (e.alive && e.team !== p.team && e.target === p) { lit = true; break; }
+    }
+    if (!inb && !lit) return;
+
+    var bl = Math.sin(performance.now() * 0.018) > -0.35;
+    var y = H * 0.14;
+    var big = 'bold ' + (30 * HUDK).toFixed(0) + 'px Consolas,monospace';
+
+    if (inb) {
+      // 导弹最优先：红色、闪烁、带距离
+      if (bl) text(ctx, '▲ 导弹逼近', W / 2, y, RED, big, 'center');
+      text(ctx, minD < 1000 ? Math.round(minD) + ' M' : (minD / 1000).toFixed(1) + ' KM',
+        W / 2, y + U(28), RED, FB, 'center');
+    } else {
+      text(ctx, '▲ 雷达照射', W / 2, y, AMBER, big, 'center');
+    }
+  }
+
   function drawThreatRing(ctx, W, H, p, world) {
     // RWR 从"右下角"定位
     var R = Math.min(U(70), Math.min(W, H) * 0.09);
@@ -723,23 +829,26 @@ var HUD = (function () {
      告警
      ============================================================ */
   function drawWarnings(ctx, W, H, p, world) {
-    var y = U(110);
+    // 让开屏幕上方的威胁告警（那一条占据了 H*0.14 附近）
+    var y = H * 0.14 + U(80);
     var bl = Math.sin(performance.now() * 0.014) > 0;
+    var F1 = 'bold ' + (24 * HUDK).toFixed(0) + 'px Consolas,monospace';
+    var F2 = 'bold ' + (21 * HUDK).toFixed(0) + 'px Consolas,monospace';
 
     if (p.stall && bl) {
-      text(ctx, 'STALL  失速', W / 2, y, RED, 'bold 20px Consolas,monospace', 'center');
-      y += 26;
+      text(ctx, 'STALL  失速', W / 2, y, RED, F1, 'center');
+      y += U(30);
     }
     if (p.pos.y < 200 && p.fwd.y < 0 && bl) {
-      text(ctx, 'TERRAIN  地形告警', W / 2, y, RED, 'bold 20px Consolas,monospace', 'center');
-      y += 26;
+      text(ctx, 'TERRAIN  地形告警', W / 2, y, RED, F1, 'center');
+      y += U(30);
     }
     if (p.pos.y > 18000 && p.q < 12 && bl) {
-      text(ctx, 'LOW Q  动压不足', W / 2, y, AMBER, 'bold 18px Consolas,monospace', 'center');
-      y += 26;
+      text(ctx, 'LOW Q  动压不足', W / 2, y, AMBER, F2, 'center');
+      y += U(30);
     }
     if (p.gunAmmo <= 0 && p.spAmmo <= 0 && bl) {
-      text(ctx, 'WINCHESTER  弹药耗尽', W / 2, y, AMBER, 'bold 18px Consolas,monospace', 'center');
+      text(ctx, 'WINCHESTER  弹药耗尽', W / 2, y, AMBER, F2, 'center');
     }
   }
 
