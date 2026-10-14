@@ -9,6 +9,7 @@
 | [systems/weapons.md](systems/weapons.md) | 武器系统：编号体系、导引、拦截、交战规则 |
 | [systems/ai.md](systems/ai.md) | AI：控制律、状态机、编队指令、难度 |
 | [systems/hud.md](systems/hud.md) | HUD、输入映射与设置系统 |
+| [systems/planform.md](systems/planform.md) | 机库俯视识别图与预览器 |
 | [systems/audio.md](systems/audio.md) | 程序化音效合成 |
 
 ---

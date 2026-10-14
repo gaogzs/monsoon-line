@@ -27,11 +27,13 @@
 monsoon-line/
 ├── index.html          所有屏幕的 DOM 结构（overlay），游戏入口
 ├── css/style.css       全部样式
-├── js/                 11 个模块，按 index.html 中的顺序加载
+├── js/                 12 个模块，加载顺序由 index.html 决定
 ├── docs/               你正在读的东西
 │   ├── world/          世界设定（可单独阅读）
 │   └── systems/        各子系统设计说明
-└── tools/smoke.js      冒烟测试
+└── tools/
+    ├── smoke.js            冒烟测试
+    └── render-planform.js  俯视图 PNG 预览器（本机无浏览器时用）
 ```
 
 ---
@@ -44,15 +46,20 @@ monsoon-line/
 |---|---|---|---|
 | 1 | `math3d.js` → `M3` | 向量、罗德里格斯旋转、相机、投影、裁剪、射线求交 | — |
 | 2 | `models.js` → `MODELS` | 低多边形几何（机体、地面目标） | M3 |
-| 3 | `codex.js` → `CODEX` | 游戏内资料库文本 | — |
-| 4 | `data.js` → `CALLSIGN` `AIRCRAFT` `WEAPONS` `VOICES` | 静态数据表 | — |
-| 5 | `audio.js` → `SFX` | 音效合成 | M3（仅 clamp） |
-| 6 | `render.js` → `Renderer` | 每帧绘制 | M3 |
-| 7 | `entities.js` → `Ent` | 实体、飞行模型、导弹、粒子 | M3, WEAPONS |
-| 8 | `ai.js` → `AI` | 控制律与行为 | M3, WEAPONS, Ent |
-| 9 | `hud.js` → `HUD` | 平显 | M3, WEAPONS |
-| 10 | `missions.js` → `MISSIONS` | 三关的战场生成与触发器 | Ent, AI |
-| 11 | `game.js` → `Game` `Radio` | 状态机、主循环、UI 绑定、设置 | 全部 |
+| 3 | `planform.js` → `PLANFORM` | 机库俯视识别图数据与绘制 | WEAPONS |
+| 4 | `codex.js` → `CODEX` | 游戏内资料库文本 | — |
+| 5 | `data.js` → `CALLSIGN` `AIRCRAFT` `WEAPONS` `VOICES` | 静态数据表 | — |
+| 6 | `audio.js` → `SFX` | 音效合成 | M3（仅 clamp） |
+| 7 | `render.js` → `Renderer` | 每帧绘制 | M3 |
+| 8 | `entities.js` → `Ent` | 实体、飞行模型、导弹、粒子 | M3, WEAPONS |
+| 9 | `ai.js` → `AI` | 控制律与行为 | M3, WEAPONS, Ent |
+| 10 | `hud.js` → `HUD` | 平显 | M3, WEAPONS |
+| 11 | `missions.js` → `MISSIONS` | 三关的战场生成与触发器 | Ent, AI |
+| 12 | `game.js` → `Game` `Radio` | 状态机、主循环、UI 绑定、设置 | 全部 |
+
+> **加载顺序只有一个权威来源：`index.html`。**
+> `tools/smoke.js` 从那里解析顺序，不手工维护 ——
+> 手工维护过一次，加新模块时测试反而先炸了。
 
 **注意**：`game.js` 末尾的 `window.addEventListener('load', ...)` 启动游戏。
 它必须最后加载。
@@ -252,6 +259,8 @@ requestAnimationFrame(loop)
 | — | 新增设置系统与暂停页签 | 音量、视角需要可调，且要能实时看到效果 |
 | — | 流程改为简报优先 | 机体选择应依据任务威胁 |
 | — | 新增 `tools/smoke.js` | 改动后需要自动验证 |
+| — | 机库新增俯视识别图（`planform.js`） | 三架机型光看文字分不出外形差异；顺带把挂载配置可视化 |
+| — | 新增 `tools/render-planform.js` | 本机无浏览器，"画风"必须肉眼确认 |
 
 ---
 
