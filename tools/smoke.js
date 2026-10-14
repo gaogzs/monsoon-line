@@ -585,10 +585,10 @@ try {
       if (!p.ammoPool || p.ammoPool[e.wid] === undefined) {
         fail('武器 ' + e.wid + ' 没有弹药池');
       }
-      const perSlot2 = (sandbox.WEAPONS[e.wid].salvo || 1);
-      if (e.salvo !== e.points * perSlot2) {
-        fail('武器 ' + e.wid + ' 的齐射数 ' + e.salvo + ' 应该是 挂点数 ' +
-          e.points + ' × 每点槽数 ' + perSlot2 + ' = ' + (e.points * perSlot2));
+      /* 一个挂点 = 一个槽，槽数就是挂点数。
+         w.salvo（三联装之类）表示"按一下出几枚"，不增加槽数。 */
+      if (e.salvo !== e.points) {
+        fail('武器 ' + e.wid + ' 的齐射数 ' + e.salvo + ' 应该等于挂点数 ' + e.points);
       }
       if (e.salvo % 2 !== 0 && e.points > 1) {
         fail('武器 ' + e.wid + ' 的齐射数是奇数 ' + e.salvo);
@@ -1263,6 +1263,7 @@ if (Ent && M3 && me && world) {
   }
 
 
+
   /* ---- 两组挂架挂同一种武器：槽下标不能撞 ----
      slotCd 是按**武器**建的（长度 = 该武器占用的挂点总数），
      而渲染按**组**遍历。如果每组都从 arr[0] 开始读，
@@ -1434,6 +1435,63 @@ if (Ent && M3 && me && world) {
 
     if (bad.length) bad.forEach(fail);
     else ok('挂架装填受储备弹数约束：打光不恢复、有弹才装填');
+
+  /* ---- 齐射：一次按键打出 w.salvo 枚，共用同一个冷却槽 ---- */
+  {
+    const Ent2 = sandbox.Ent, G2 = sandbox.Game, M3q = sandbox.M3;
+    const bad = [];
+    G2.startMission(0);
+    const pl2 = G2.__player();
+    const w2 = G2.__world();
+
+    /* 借玩家打一发来验齐射，但**必须把状态还回去** ——
+       后面的挂载渲染测试要用同一架飞机，special / slotCd 被改脏之后
+       它们的槽下标就对不上了。 */
+    const savedSpecial = pl2.special, savedAmmo = pl2.spAmmo;
+    const savedTarget = pl2.target, savedCd = pl2.slotCd.qsr;
+    const qsr = sandbox.WEAPONS.qsr;      // GIR-5，salvo = 3
+    pl2.special = 'qsr';
+    pl2.spAmmo = 30;
+    pl2.spCd = 0;
+    pl2.slotCd.qsr = [0, 0];
+    pl2.lockProgress = 1;
+    pl2.locked = true;
+
+    const foe = w2.actors.find(a => a.team !== pl2.team && a.alive);
+    if (!foe) {
+      ok('齐射检查：世界里没有敌方目标，跳过');
+    } else {
+      pl2.target = foe;
+      const n0 = w2.missiles.length;
+      G2.__fireSpecial ? G2.__fireSpecial() : null;
+      // 没有导出接口就直接调按键
+      if (w2.missiles.length === n0) {
+        const kd = docListeners['keydown'] || [];
+        kd.forEach(fn => fn({ code: 'Enter', preventDefault() {} }));
+      }
+      const got = w2.missiles.length - n0;
+      if (got !== qsr.salvo) {
+        bad.push('按一次发射键打出了 ' + got + ' 枚，应该是 ' + qsr.salvo +
+          ' 枚（' + qsr.name + ' 是三联装）');
+      }
+      if (got > 0 && pl2.slotCd.qsr[0] <= 0) {
+        bad.push('齐射之后冷却槽没有进入装填');
+      }
+      if (!bad.length) {
+        ok('齐射：' + qsr.name + ' 按一次出 ' + got + ' 枚，共用 1 个冷却槽');
+      }
+    }
+
+    // 还原玩家状态
+    pl2.special = savedSpecial;
+    pl2.spAmmo = savedAmmo;
+    pl2.target = savedTarget;
+    pl2.slotCd.qsr = savedCd;
+    pl2.lockProgress = 0;
+    pl2.locked = false;
+
+    if (bad.length) bad.forEach(fail);
+  }
   }
 
   /* ---- 诊断：海面填充高度随海拔的变化 ---- */
@@ -1855,21 +1913,15 @@ if (Ent && M3 && me && world) {
     const e = p.loadoutList[0];
     const slots = p.slotCd[e.wid];
 
-    /* 槽数 = 挂点数 × 每个挂点的槽数（w.salvo）。
+    /* 槽数 = 挂点数。
 
-       w.salvo 是"一个挂点分成几个发射巢"，perPoint 是"一个挂点总共几发"，
-       所以每槽装 perPoint / salvo 发。这个字段以前从没被读过，槽数一直
-       等于挂点数 —— GIR-5 声明三联装、GIR-12 声明四联、PEJ-6 声明七联，
-       全都无效。 */
-    const perPointSlots = (sandbox.WEAPONS[e.wid].salvo || 1);
-    const wantSlots = e.points * perPointSlots;
-    if (!slots || slots.length !== wantSlots) {
+       w.salvo（GIR-5 是 3）表示"按一下打出几枚"，**不增加槽数** ——
+       三枚共用同一个冷却槽。这样 HUD 的两处冷却显示都不用改。 */
+    if (!slots || slots.length !== e.points) {
       fail(e.wid + ' 的发射槽有 ' + (slots ? slots.length : 0) +
-        ' 个，应该是 挂点数 ' + e.points + ' × 每点槽数 ' + perPointSlots +
-        ' = ' + wantSlots);
+        ' 个，应该等于挂点数 ' + e.points);
     } else {
-      ok('发射槽数 = 挂点数 × 每点槽数（' + e.wid + ' ' + e.points + '×' +
-        perPointSlots + ' = ' + slots.length + ' 个）');
+      ok('发射槽数 = 挂点数（' + e.wid + ' ' + slots.length + ' 个）');
     }
 
     // 找一个目标，然后连续按发射键 —— 每次应当只出 1 枚，

@@ -535,14 +535,14 @@ var Game = (function () {
         order.push(wid);
       }
       e.points += g.pts.length;
-      /* 发射槽数 = 挂点数 × 每个挂点的槽数。
+      /* 一个挂点 = 一个发射槽，槽数就是挂点数。
 
-         w.salvo 是"一个挂点分成几个发射巢"，perPoint 是"一个挂点总共
-         几发"，所以每个槽装 perPoint / salvo 发。这个字段以前从来没被
-         读过 —— 槽数一直等于挂点数，于是 GIR-5 声明 salvo=3（三联装）、
-         GIR-12 声明 4、PEJ-6 声明 7 全部无效，图鉴上写着"三联装发射巢"
-         而实际打出来是每点一发。 */
-      e.salvo += g.pts.length * (w.salvo || 1);
+         "三联装"（w.salvo = 3）的含义是**按一下打出三枚**，不是
+         "一个挂点占三个冷却槽"。后者会让槽数和挂点数脱钩，
+         右下角的俯视缩略图、武器纵列表的圆点指示、3D 挂载的下标
+         都得改成"一点多槽"；而按一下出三枚共用一槽，架构完全不用动。
+         实际发射见 launch()。 */
+      e.salvo += g.pts.length;
       e.ammo += g.pts.length * (w.perPoint || 1);
     }
 
@@ -1008,18 +1008,29 @@ var Game = (function () {
       M3.mul(actor.fwd, 4),
       M3.mul(actor.right, side * (2.4 + rank * 1.9))));
 
-    var m = Ent.makeMissile({
-      weapon: actor.special,
-      team: actor.team,
-      pos: hp,
-      fwd: actor.fwd,
-      speed: actor.speed + 70,
-      target: target || null,
-      owner: actor
-    });
-    w.missiles.push(m);
+    /* 一次按键打出 wp.salvo 枚，共用同一个冷却槽。
 
-    actor.spAmmo -= 1;
+       "三联装"（GIR-5）的语义就是**按一下出三枚**，而不是"一个挂点
+       占三个冷却槽" —— 后者会让槽数和挂点数脱钩，右下角的俯视缩略图、
+       武器纵列表的圆点指示、3D 挂载的下标都得改成"一点多槽"。
+       共用一槽则架构完全不用动，玩家看到的也仍然是"按一下，三枚出去"。
+
+       三枚从同一点出膛，位置不做偏移 —— 它们是同一具发射巢里的弹。 */
+    var nShot = Math.max(1, Math.min(wp.salvo || 1, actor.spAmmo));
+    for (var q = 0; q < nShot; q++) {
+      var m = Ent.makeMissile({
+        weapon: actor.special,
+        team: actor.team,
+        pos: hp,
+        fwd: actor.fwd,
+        speed: actor.speed + 70,
+        target: target || null,
+        owner: actor
+      });
+      w.missiles.push(m);
+    }
+
+    actor.spAmmo -= nShot;
     if (slotArr) {
       slotArr[si2] = wp.cd;
       // spCd 取"最快就绪的那个槽"，供 HUD 与 AI 判断还能不能再打
@@ -2011,11 +2022,8 @@ var Game = (function () {
       if (!wid && a.special) wid = a.special;
       if (!wid) continue;
 
-      /* 每个挂点占 nSlots 个槽（w.salvo > 1 时一点多巢，例如 GIR-5 三联装），
-         所以下一组要跳过 g.pts.length × nSlots 个位置。 */
-      var nSlots = (w && w.salvo > 0) ? w.salvo : 1;
       var base = used[wid] || 0;
-      used[wid] = base + g.pts.length * nSlots;
+      used[wid] = base + g.pts.length;      // 下一组从这里接着排
 
       var w = WEAPONS[wid];
       if (!w || w.kind === 'gun') continue;
@@ -2037,14 +2045,8 @@ var Game = (function () {
 
       var arr = slots[wid] || [];
       for (pi = 0; pi < g.pts.length; pi++) {
-        /* 一个挂点可能分成多个发射巢（nSlots > 1）。
-           3D 上只在**整巢都打空之后**才把挂载撤掉 —— 挂点上还有弹
-           就得看得见。逐巢画会重叠在一起，没有意义。 */
-        var anyReady = false;
-        for (var sj = 0; sj < nSlots; sj++) {
-          if ((arr[base + pi * nSlots + sj] || 0) <= 0) { anyReady = true; break; }
-        }
-        if (!anyReady) continue;
+        // 这个发射槽还在装填 → 挂架空着
+        if ((arr[base + pi] || 0) > 0) continue;
         pushOneStore(a, g.pts[pi], g.kind, w);
       }
     }
