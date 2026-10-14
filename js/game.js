@@ -1362,7 +1362,24 @@ var Game = (function () {
     var thrIn = 0;
     if (keys.ShiftLeft || keys.ShiftRight) thrIn += 1;
     if (keys.ControlLeft || keys.ControlRight) thrIn -= 1;
-    if (thrIn) player.throttle += thrIn * dt * 0.62;
+
+    /* 加力和减速板都是"按住才有效"的临时状态。
+
+       油门轴是连续的（0 → 1.25）：越过 1.0 进加力，低于 0.04 张减速板。
+       但松手之后不该停在那个区间里 —— 否则玩家松开键，
+       飞机还在烧加力（或者还挂着减速板），而他的预期是"回到常规推力"。
+
+       所以松手时自动回落到军推区间的边界（1.0 / 0.04）。
+       回落比推进慢一些，免得一松手就"咔"地弹回来。 */
+    if (thrIn) {
+      player.throttle += thrIn * dt * 0.62;
+    } else if (player.throttle > 1.0) {
+      player.throttle = Math.max(1.0, player.throttle - dt * 1.6);
+    } else if (player.throttle < 0.04) {
+      player.throttle = Math.min(0.04, player.throttle + dt * 1.6);
+    }
+
+    // X / Z 仍然是"一把推到底 / 一把收到底"，同样松手即回落
     if (keys.KeyX) player.throttle = THR_MAX;
     if (keys.KeyZ) player.throttle = 0;
 

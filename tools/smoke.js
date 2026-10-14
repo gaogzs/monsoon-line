@@ -640,7 +640,13 @@ if (Ent && M3 && me && world) {
     const want = WEAPONS[wid].flare;      // flare 本身就是被干扰的概率
     const rate = lost / N;
     // 1500 次采样，σ≈1.1%，允许 ±4 个百分点
-    if (Math.abs(rate - want) > 0.04) {
+    /* 容差 5%。
+
+       1500 次二项采样在 p≈0.5 时 σ ≈ 1.29%，原来取 4%（3.1σ）
+       意味着大约每 500 次运行就会误报一次 —— 实测确实偶发。
+       放宽到 5%（3.9σ）把误报压到万分之一量级，
+       而真正的实现错误（比如系数写反）偏差远大于 5%，照样抓得住。 */
+    if (Math.abs(rate - want) > 0.05) {
       fail(wid + ' 干扰成功率 ' + (rate * 100).toFixed(0) +
         '%，但按 flare=' + WEAPONS[wid].flare + ' 应该是 ' + (want * 100).toFixed(0) + '%');
     } else {
