@@ -1137,6 +1137,83 @@ if (Ent && M3 && me && world) {
     else ok('鼠标压到屏幕下方改用滚转仰起（三种 FOV 下一致）');
   }
 
+  /* ---- 两组挂架挂同一种武器：槽下标不能撞 ----
+     slotCd 是按**武器**建的（长度 = 该武器占用的挂点总数），
+     而渲染按**组**遍历。如果每组都从 arr[0] 开始读，
+     两组挂同一种弹时就会变成"四个挂架共用前两个槽" ——
+     打掉一个，两个组的同一位置同时消失，后两个挂架永不消失。
+
+     发射那边一直是对的（launch 遍历整个 slotCd[wid]），
+     只有实体渲染会错位，所以断言必须数渲染出来的模型数。 */
+  {
+    const Ent2 = sandbox.Ent, M3s = sandbox.M3, R2 = sandbox.Renderer;
+    const AC = sandbox.AIRCRAFT[0];
+    const bad = [];
+
+    // 找两个不同类型但都能挂同一种弹的组
+    const W2 = sandbox.WEAPONS;
+    let gA = null, gB = null, wid = null;
+    outer:
+    for (const k in W2) {
+      const w = W2[k];
+      if (w.kind === 'gun' || w.passive) continue;
+      const fits = AC.hardpointGroups.filter(g => w.fits && w.fits.indexOf(g.kind) >= 0);
+      const uniq = [];
+      for (const g of fits) if (!uniq.some(u => u.kind === g.kind)) uniq.push(g);
+      if (uniq.length >= 2) { gA = uniq[0]; gB = uniq[1]; wid = k; break outer; }
+    }
+
+    if (!gA || !gB) {
+      ok('两组挂同一种武器：本机型找不到两个不同的兼容挂点组，跳过');
+    } else {
+      const a = Ent2.makeAircraft({
+        type: AC.id, team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
+        fwd: M3s.V(0, 0, 1), speed: 300
+      });
+      a.model = AC.model;
+      a.ac = AC;
+      a.special = wid;
+      const lo = {}; lo[gA.id] = wid; lo[gB.id] = wid;
+      a.loadout = lo;
+      const n = gA.pts.length + gB.pts.length;
+      a.slotCd[wid] = [];
+      for (let i = 0; i < n; i++) a.slotCd[wid].push(0);
+      a.ammoPool = {}; a.ammoPool[wid] = n;
+
+      // 借用渲染循环：把目标/导弹清干净，只留这一架
+      const w3 = sandbox.Game.__world();
+      if (w3) {
+        w3.actors.length = 0; w3.targets.length = 0; w3.missiles.length = 0;
+        w3.actors.push(a);
+      }
+
+      // 数"渲染器实际收到的模型数"。pump(1) 推一帧真实主循环，
+      // 而 render() 在 state==='playing' 时会画整个 world。
+      function countStores() {
+        let c = 0;
+        const o = R2.pushModel;
+        R2.pushModel = function (m, p, f, u, op) { c++; return o(m, p, f, u, op); };
+        pump(1);
+        R2.pushModel = o;
+        return c;
+      }
+
+      // 全部就绪时应当是 n 个挂载（外加飞机本身 1 个）
+      const full = countStores();
+      // 只让第一个槽冷却
+      a.slotCd[wid][0] = 99;
+      const oneDown = countStores();
+
+      if (full - 1 !== oneDown) {
+        bad.push('只有一个槽冷却，挂载却从 ' + (full - 1) + ' 变成 ' + (oneDown - 1) +
+          ' —— 槽下标撞了（' + gA.id + ' / ' + gB.id + '，共 ' + n + ' 点）');
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('两组挂同一种武器时槽下标不冲突（' + (wid || '—') + '）');
+  }
+
   /* ---- 挂架上的实物：冷却中应当是空的 ----
      以前挂载只存在于 HUD 的俯视缩略图里，飞机模型永远是干净的。
      现在按挂点渲染实体，槽就绪时挂着、冷却中是空的。

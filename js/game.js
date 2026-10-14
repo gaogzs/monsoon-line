@@ -1957,12 +1957,24 @@ var Game = (function () {
     var slots = a.slotCd || {};
     var gi, pi;
 
+    /* 槽数组是**按武器**建的，长度 = 这种武器占用的挂点总数；
+       而下面是**按组**遍历的。所以必须自己维护每组在数组里的起始下标 ——
+
+       否则两组挂同一种弹时会都从 arr[0] 开始读，变成"四个挂架共用
+       前两个槽"：打掉一个，两个组的同一位置同时消失，而后两个挂架
+       永远不会消失。发射那边是对的（launch 遍历整个 slotCd[wid]），
+       只有这里的实体渲染会错位。 */
+    var used = {};
+
     for (gi = 0; gi < a.ac.hardpointGroups.length; gi++) {
       var g = a.ac.hardpointGroups[gi];
       var wid = lo[g.id];
       // NPC 没有 loadout，退到它的制式弹种
       if (!wid && a.special) wid = a.special;
       if (!wid) continue;
+
+      var base = used[wid] || 0;
+      used[wid] = base + g.pts.length;      // 下一组从这里接着排
 
       var w = WEAPONS[wid];
       if (!w || w.kind === 'gun') continue;
@@ -1983,10 +1995,9 @@ var Game = (function () {
       }
 
       var arr = slots[wid] || [];
-      var total = w.cd > 0 ? w.cd : 1;
       for (pi = 0; pi < g.pts.length; pi++) {
         // 这个发射槽还在装填 → 挂架空着
-        if ((arr[pi] || 0) > 0) continue;
+        if ((arr[base + pi] || 0) > 0) continue;
         pushOneStore(a, g.pts[pi], g.kind, w);
       }
     }
