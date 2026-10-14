@@ -1372,6 +1372,52 @@ if (Ent && M3 && me && world) {
     else ok('挂架装填受储备弹数约束：打光不恢复、有弹才装填');
   }
 
+  /* ---- 诊断：海面填充高度随海拔的变化 ---- */
+  {
+    const R = sandbox.Renderer, G = sandbox.Game;
+    let tops = [];
+    const realFill = R.ctx.fillRect;
+    R.ctx.fillRect = function (x, y, w, h) {
+      // drawSky 也做全宽填充（从 0 开始）；海面那个 y0 不为 0
+      if (x === 0 && w === R.W && y > 0) tops.push(+y.toFixed(1));
+      return realFill.apply(this, arguments);
+    };
+
+    G.startMission(0);
+    const pl = G.__player();
+    const rows = [];
+    [50, 200, 500, 1000, 2000, 4000, 8000, 16000, 21000].forEach(hh => {
+      // 追尾镜头的 camPos 是指数平滑的，一帧跟不上；
+      // 而且物理每帧会改高度，所以每帧都要压回去，等它收敛。
+      for (let f = 0; f < 120; f++) {
+        pl.pos.y = hh;
+        pl.vel.y = 0;
+        pump(1);
+      }
+      tops = [];
+      pl.pos.y = hh;
+      pl.vel.y = 0;
+      pump(1);
+      rows.push(hh + 'm=' + (tops.length ? tops[tops.length - 1] : '?'));
+    });
+    /* 断言：海天分界必须随海拔单调下沉（地球曲率生效）。
+       高度用 0.5 / 2 / 8 公里三点，避开地面附近的异常。
+       注意 hook 还没还原，采样必须在它生效期间做。 */
+    const probe = [500, 2000, 8000].map(hh => {
+      for (let f = 0; f < 120; f++) { pl.pos.y = hh; pl.vel.y = 0; pump(1); }
+      tops = []; pl.pos.y = hh; pl.vel.y = 0; pump(1);
+      return tops.length ? tops[tops.length - 1] : NaN;
+    });
+
+    R.ctx.fillRect = realFill;
+
+    if (!(probe[0] < probe[1] && probe[1] < probe[2])) {
+      fail('海天分界没有随海拔下沉：0.5/2/8 km → ' + probe.join(' / '));
+    } else {
+      ok('海天分界随海拔下沉（0.5/2/8 km → ' + probe.join(' / ') + '）');
+    }
+  }
+
   /* ---- 诊断：AI 到底用不用机炮 ---- */
   {
     const Ent2 = sandbox.Ent, M3d = sandbox.M3, Wd = sandbox.WEAPONS;
