@@ -703,12 +703,21 @@ var WEAPONS = {
   /* ---------- 对地与反大型 ---------- */
 
   asl: {
+    /* 无动力 / 有制导 —— 这一类里最典型的一种。
+
+       desc 本来就写着"无动力滑翔制导炸弹"，但数据里带着 boost: 90
+       （发动机推力），于是它在游戏里是一枚有动力的导弹：一路拉烟、
+       还有自己的动力段。滑翔弹靠的是投放时的动能和弹翼，没有发动机。 */
     id: 'asl', name: 'GUT-9', cn: '滑翔锤 · GLIDEHAMMER', kind: 'agm',
-    model: 'missile',
-    speed: 320, boost: 90, life: 14.0, vsLife: 26.0,
+    model: 'bomb',
+    speed: 320, life: 14.0, vsLife: 26.0,
     turn: 0.55, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 6000,
-    dmg: 150, ammo: 4, cd: 0.48, salvo: 1, flare: 0.55, prox: 26,
-    target: 'ground',
+    dmg: 150, ammo: 4, cd: 0.48, salvo: 1, prox: 26,
+    /* flare 是"被干扰弹骗到的概率"，它属于**导引头**，不属于发动机。
+       滑翔锤没有发动机，但有红外导引头 —— 所以 flare 该留。
+       （我上一轮按 unguided 删除制导类字段时把它一起删了，那是错的。） */
+    flare: 0.55,
+    target: 'ground', ballistic: true,
     desc: '无动力滑翔制导炸弹。轻、便宜、能多带 —— 一个重挂点塞得下四枚。' +
       '缺点是扔出去之后就只能等，目标挪了就打空。',
     stat: { dmg: 0.52, spd: 0.20, trn: 0.30, rng: 0.48, ecm: 0.60 }
@@ -756,11 +765,18 @@ var WEAPONS = {
     id: 'rkt', name: 'PEJ-6', cn: '撒星 · STARSCATTER', kind: 'bomb',
     model: 'bomb',
     speed: 620, life: 3.0, vsLife: 3.0,
+    /* 有动力 / 无制导。
+
+       **火箭是有发动机的** —— 它靠自身的推进飞出去，正是这一点让它
+       能覆盖一整片区域而不是自由落体。它没有的只是导引头。
+       我先前把"无制导"当成了"无动力"，把推进也删了，那是错的：
+       没发动机的是滑翔弹和激光制导炸弹，不是火箭。 */
+    boost: 520,
     dmg: 22, ammo: 28, cd: 0.22, salvo: 7, prox: 14,
-    target: 'ground', unguided: true, ballistic: true,
+    target: 'ground', unguided: true,
     desc: '无制导火箭巢。一个挂点就是一片弹雨，覆盖而不瞄准 ——' +
       '对付软目标群最划算，但精度完全靠飞机对准。' +
-      '<b>打出去之后它只认重力。</b>',
+      '<b>它有发动机，但没有导引头：出膛之后的弹道是固定的。</b>',
     stat: { dmg: 0.22, spd: 0.34, trn: 0.10, rng: 0.16, ecm: 1.00 }
   },
 
@@ -959,7 +975,12 @@ var WEAPONS = {
        激光照射，被干扰弹骗不到。也删掉 flare。
        原来的 unguided: true 是错的，它明明写着"命中前保持照射"。 */
     speed: 280, life: 12.0, vsLife: 24.0,
-    turn: 0.20, lockCone: 60 * Math.PI / 180, lockDist: 2400,
+    /* seeker 是 'laser'：它没有自己的导引头，靠的是照射。
+
+       这一项不能省。updateLock 会用 seeker 决定锁定速率
+       （ir 最快、radar 居中），stepMissile 用它判断能否制导 ——
+       字段缺失时它会被当成"无导引头"，锁定表现和文案对不上。 */
+    turn: 0.20, seeker: 'laser', lockCone: 60 * Math.PI / 180, lockDist: 2400,
     dmg: 210, ammo: 6, cd: 0.24, salvo: 1, prox: 42,
     target: 'ground', cluster: true, ballistic: true,
     desc: `激光制导集束炸弹，抛撒 <b>72 枚</b>子弹药，覆盖半径 80 米。
@@ -1027,7 +1048,11 @@ var WEAPONS = {
     dmg: 190, ammo: 2, cd: 11, salvo: 1, flare: 0.62, prox: 30,
     target: 'ground',
     fits: [], perPoint: 0, mass: 0,
-    desc: `下游的通用对地弹。精度比不上上游的 GUT-9，但便宜、库存大 ——
+    /* 原文写"精度比不上上游的 GUT-9"，但 GUT-9 是一枚**无动力滑翔弹**
+       （扔出去就只能等，目标挪了就打空），拿它当精度基准说不通 ——
+       碎石是有发动机的导弹，两者根本不是一类东西。
+       改成和"上游同级弹"比，才是一致的。 */
+    desc: `下游的通用对地弹。制导比上游同级弹差一档，但便宜、库存大 ——
        而且他们从来不介意多丢几发。`,
     stat: { dmg: 0.62, spd: 0.34, trn: 0.22, rng: 0.56, ecm: 0.30 }
   },

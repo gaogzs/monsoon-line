@@ -10,6 +10,14 @@ var Ent = (function () {
 
   var G = 9.80665, RHO0 = 1.225;
 
+  /* 激光照射锥：载机的机头必须保持在这个角度内才算"还在照着"。
+
+     25° 是按玩法定的 —— 太宽（比如 45°）玩家把机头随便一偏照射都不掉，
+     那句"命中前保持照射"就形同虚设；太窄（10°）则俯冲投放时几乎
+     不可能一边修正姿态一边保持照射。25° 大致是"稍微偏一下没事、
+     真的转开就丢"的距离。 */
+  var LASER_CONE = 25 * Math.PI / 180;
+
   /* ============================================================
      标准大气密度（ISA）
      ============================================================ */
@@ -449,6 +457,37 @@ var Ent = (function () {
       t = null;
     }
 
+    /* ---------- 激光制导：弹没有导引头，靠的是载机的照射 ----------
+
+       PEJ-30 的 desc 写着"需要俯冲投放并在命中前保持照射"。
+       但在这个分支存在之前，全项目只有 ir 和 radar 两种导引方式，
+       "激光"只出现在文案里 —— 写个 seeker: 'laser' 进数据也不会
+       有人读它，图鉴还会把它显示成"雷达"。
+
+       真正的激光制导得让"保持照射"成为一件事：弹每一帧都去问
+       投放它的那架飞机"你还在照着目标吗"。载机把机头转开、
+       目标跑出照射锥，弹就立刻停止修正 ——
+
+       但**不会消失**。它带着已有的速度和弹道继续往下掉，砸在哪算哪。
+       这正是激光制导武器最真实的弱点：炸弹本身是瞎的。 */
+    if (w.seeker === 'laser' && t) {
+      var lit = false;
+      var shooter = m.owner;
+      if (shooter && shooter.alive) {
+        var toSh = M3.sub(t.pos, shooter.pos);
+        var dSh = M3.len(toSh);
+        if (dSh > 1) {
+          lit = M3.angleBetween(shooter.fwd, M3.mul(toSh, 1 / dSh)) < LASER_CONE;
+        }
+      }
+      if (!lit) {
+        m.laserLost = true;
+        t = null;                 // 停止修正，继续自由落体
+      } else {
+        m.laserLost = false;
+      }
+    }
+
     if (t && m.seekerOn) {
       var toT = M3.sub(t.pos, m.pos);
       var dist = M3.len(toT);
@@ -542,8 +581,18 @@ var Ent = (function () {
     if (m.pos.y <= 0) { killMissile(m, world, false); return; }
 
     /* ---- 尾迹：只有带发动机的才拉烟 ----
-       无动力弹没有排气，飞过去应该什么也不留下。 */
-    if (w.unguided) return;
+
+       这里必须按 **ballistic（无动力）** 判断，不能按 unguided（无制导）——
+       两者是正交的，"没发动机"和"不找目标"根本不是一回事：
+
+         PEJ-6 撒星    有发动机 / 无制导  → 拉烟（火箭当然有排气）
+         GUT-9 滑翔锤  无发动机 / 有制导  → 不拉烟
+         PEJ-30 铁蒺藜 无发动机 / 有制导  → 不拉烟
+         PEJ-9 碎玉    无发动机 / 无制导  → 不拉烟
+
+       之前按 unguided 判断，结果正好反了：火箭巢被当成纯炸弹不冒烟，
+       而滑翔弹和激光制导炸弹一路拖着尾焰，看起来像有动力。 */
+    if (w.ballistic) return;
 
     m.trailTimer -= dt;
     if (m.trailTimer <= 0) {

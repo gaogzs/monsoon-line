@@ -734,9 +734,12 @@ var Game = (function () {
       if (w.kind === 'dew' && w.interceptRange) {
         bits.push('拦截 ' + (w.interceptRange / 1000).toFixed(1) + ' km');
       }
-      var sk = ({ ir: '红外', radar: '雷达', none: '无制导' })[w.seeker];
+      var sk = ({ ir: '红外', radar: '雷达', laser: '激光照射', none: '无制导' })[w.seeker];
       if (sk && w.seeker !== 'none') {
-        bits.push('导引 ' + sk + ' ' + Math.round((w.lead || 0) * 100) + '%');
+        // 激光弹没有导引头，也就没有"预测品质"可言
+        bits.push(w.seeker === 'laser'
+          ? '导引 ' + sk + '（需保持照射）'
+          : '导引 ' + sk + ' ' + Math.round((w.lead || 0) * 100) + '%');
       }
     }
     bits.push(w.mass + ' kg');
@@ -1350,7 +1353,8 @@ var Game = (function () {
       Radio.raw({
         who: CALLSIGN.player, cls: 'ally',
         tx: w.unguided ? '<b>投放</b>'
-          : (w.seeker === 'radar' ? '<b>Fox 3</b>' : '<b>Fox 2</b>'),
+          : (w.seeker === 'radar' ? '<b>Fox 3</b>'
+            : (w.seeker === 'laser' ? '<b>照射</b>' : '<b>Fox 2</b>')),
         gap: 0.4
       });
     }
@@ -1590,7 +1594,14 @@ var Game = (function () {
       ok = dist < lockDist * 1.35 && dep > -0.10;
     }
 
-    var rate = 1 / (w.nezer ? 1.5 : (w.seeker === 'ir' ? 0.55 : 1.1));
+    /* 锁定速率按导引方式分档。
+
+       红外最快 —— 它出膛之后还能自己找目标，火控不需要那么精确；
+       雷达居中；激光最慢，因为它要求的是"稳住照射"，
+       机头一偏照射就断，得重新建立。 */
+    var rate = 1 / (w.nezer ? 1.5
+      : (w.seeker === 'ir' ? 0.55
+        : (w.seeker === 'laser' ? 1.6 : 1.1)));
     if (ok) {
       if (player.lockProgress < 1 && player.lockProgress + rate * dt >= 1) {
         SFX.lock();

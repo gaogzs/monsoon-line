@@ -1750,19 +1750,31 @@ if (Ent && M3 && me && world) {
   {
     const W4 = sandbox.WEAPONS, E4 = sandbox.Ent, M3e = sandbox.M3;
     const bad = [];
-    const GUIDS = ['seeker', 'turn', 'lead', 'flare', 'lockCone', 'lockDist',
-      'boost', 'reAcquire', 'highAltScale', 'antiRadar', 'hobs'];
+    /* 注意这里**没有 boost**。
+
+       boost 是"有没有发动机"，而这一组武器是"没有导引头" ——
+       两者互不相干：PEJ-6 撒星是无制导火箭，它**有**发动机。
+       我一度把这两个维度当成一回事，把火箭的推进也删了。 */
+    const GUID = ['seeker', 'turn', 'lead', 'flare', 'lockCone', 'lockDist',
+      'reAcquire', 'highAltScale', 'antiRadar', 'hobs'];
 
     ['rkt', 'clb'].forEach(id => {
       const w = W4[id];
       if (!w) { bad.push('找不到 ' + id); return; }
-      const left = GUIDS.filter(k => w[k] !== undefined);
+      const left = GUID.filter(k => w[k] !== undefined);
       if (left.length) {
         bad.push(w.name + ' 还留着制导/干扰类字段：' + left.join(', '));
       }
       if (!w.unguided) bad.push(w.name + ' 没有 unguided 标记');
-      if (!w.ballistic) bad.push(w.name + ' 没有 ballistic 标记');
     });
+
+    // 火箭是有发动机的，不能连推进一起删掉
+    if (W4.rkt.ballistic) {
+      bad.push('PEJ-6 是火箭巢，被当成无动力炸弹了（多删了发动机）');
+    }
+    if (!W4.rkt.boost) {
+      bad.push('PEJ-6 是火箭巢，必须有 boost');
+    }
 
     // 激光制导炸弹反过来：该有制导，但不该有发动机与导引头
     {
@@ -1814,6 +1826,55 @@ if (Ent && M3 && me && world) {
     else ok('对空/对地弹药的 target 字段自洽（发射前的匹配检查据此拒绝错误目标）');
   }
 
+  /* ---- "有没有发动机"和"有没有导引头"是两个正交的维度 ----
+
+     我一度把它们当成一回事，按 unguided 去判断烟迹，结果正好反了：
+     火箭巢被当成纯炸弹不冒烟，而滑翔弹和激光制导炸弹一路拖尾焰，
+     看起来像有动力。四种组合都得对：
+
+       有发动机 + 有制导   普通导弹
+       有发动机 + 无制导   PEJ-6 火箭巢
+       无发动机 + 有制导   GUT-9 滑翔弹 / PEJ-30 激光制导炸弹
+       无发动机 + 无制导   PEJ-9 自由落体
+
+     判据是：
+       ballistic（无动力）→ 不拉烟、弹体顺弹道
+       unguided（无制导） → 不导引 */
+  {
+    const W7 = sandbox.WEAPONS;
+    const bad = [];
+    const CASES = [
+      // id,  有发动机, 有制导
+      ['asl', false, true, '无动力滑翔制导炸弹'],
+      ['asl2', true, true, '重型侵彻导弹'],
+      ['v25', true, true, '防区外空地导弹'],
+      ['lcm', true, true, '远程巡航弹'],
+      ['rkt', true, false, '无制导火箭巢'],
+      ['clb', false, false, '自由落体子母弹'],
+      ['v30', false, true, '激光制导炸弹']
+    ];
+    CASES.forEach(([id, powered, guided, what]) => {
+      const w = W7[id];
+      if (!w) { bad.push('找不到 ' + id); return; }
+      const hasEngine = !w.ballistic;
+      const hasSeeker = !w.unguided;
+      if (hasEngine !== powered) {
+        bad.push(w.name + '（' + what + '）发动机标记不对：' +
+          (hasEngine ? '有' : '无') + '，应该是' + (powered ? '有' : '无'));
+      }
+      if (hasSeeker !== guided) {
+        bad.push(w.name + '（' + what + '）制导标记不对：' +
+          (hasSeeker ? '有' : '无') + '，应该是' + (guided ? '有' : '无'));
+      }
+      // 有发动机的才该有推力值
+      if (powered && !w.boost && w.boost !== 0) {
+        bad.push(w.name + ' 说有发动机，却没有 boost');
+      }
+    });
+    if (bad.length) bad.forEach(fail);
+    else ok('动力与制导两个维度正交：7 件对地弹药的组合全部正确');
+  }
+
   /* ---- 无制导火箭：无目标也能打，而且真的一点制导都没有 ----
 
      两件事都要验：
@@ -1852,9 +1913,12 @@ if (Ent && M3 && me && world) {
     const m = w.missiles[w.missiles.length - 1];
     if (m) {
       const ww = m.w;
-      ['turn', 'lead', 'seeker', 'flare', 'boost'].forEach(k => {
+      /* 不含 boost —— 火箭是有发动机的，它只是没有导引头。
+         把"无制导"和"无动力"混为一谈正是之前那个错误的根源。 */
+      ['turn', 'lead', 'seeker', 'flare'].forEach(k => {
         if (ww[k] !== undefined) bad.push('无制导火箭仍有 ' + k + ' = ' + ww[k]);
       });
+      if (!ww.boost) bad.push('无制导火箭被误删了发动机（boost 缺失）');
       if (m.target) bad.push('无制导火箭竟然带着目标引用');
       if (m.seekerOn === false && ww.seeker !== undefined) {
         bad.push('无制导火箭仍有导引头开关');
@@ -1877,6 +1941,55 @@ if (Ent && M3 && me && world) {
           ok('无制导火箭直飞：0.5 秒内航向变化 < 0.6°');
         }
       }
+    }
+
+    if (bad.length) bad.forEach(fail);
+  }
+
+  /* ---- 激光制导：载机必须保持照射 ----
+
+     PEJ-30 的 desc 写着"需要俯冲投放并在命中前保持照射"。
+     在此之前全项目只有 ir 和 radar 两种导引，写个 seeker: 'laser'
+     进数据是没人读的（图鉴还会把它显示成"雷达"）。现在这条机制是真的：
+     弹每一帧都去问投放它的载机"你还在照着目标吗"。 */
+  {
+    const E9 = sandbox.Ent, M3i = sandbox.M3;
+    const bad = [];
+
+    const mk = (shooter) => {
+      const tgt = { pos: M3i.V(0, 0, 3000), alive: true, kind: 'target',
+        radius: 10, dead: false };
+      const m = E9.makeMissile({
+        weapon: 'v30', team: 0,
+        pos: M3i.V(0, 2000, 0), fwd: M3i.norm(M3i.V(0, -0.4, 1)), speed: 280,
+        target: tgt, owner: shooter
+      });
+      const wd = { particles: [], actors: [], targets: [tgt] };
+      for (let f = 0; f < 90 && m.alive; f++) E9.stepMissile(m, 1 / 60, wd);
+      return m;
+    };
+
+    // ① 载机一直照着 → 不该丢照射
+    const good = mk({ pos: M3i.V(0, 2600, 0), alive: true,
+      fwd: M3i.norm(M3i.V(0, -0.5, 1)) });
+    if (good.laserLost) {
+      bad.push('载机一直照着目标，弹却判定失去照射');
+    } else {
+      ok('激光制导：载机保持照射时，弹正常受修正');
+    }
+
+    // ② 载机机头转开 → 立刻失去修正
+    const away = mk({ pos: M3i.V(0, 2600, 0), alive: true,
+      fwd: M3i.norm(M3i.V(0, 1, -1)) });
+    if (!away.laserLost) {
+      bad.push('载机机头转开了，弹却还在修正 —— 照射没有约束力');
+    } else {
+      ok('激光制导：载机一转向，弹立即失去修正（但不消失，继续下坠）');
+    }
+
+    // ③ 它必须真的读过 seeker === 'laser' 这个值
+    if (sandbox.WEAPONS.v30.seeker !== 'laser') {
+      bad.push('PEJ-30 的 seeker 不是 laser，机制挂不上');
     }
 
     if (bad.length) bad.forEach(fail);
