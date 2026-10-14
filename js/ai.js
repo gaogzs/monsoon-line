@@ -102,8 +102,18 @@ var AI = (function () {
           > 0.80       压到很下面     → 不在这里处理，交给滚转后仰起
           其余（含拉左右）            → 同样交给滚转对齐 */
     if (hasMouse) {
-      if (st.aimDown > 0.35 && st.aimDown <= 0.80) {
-        var magD = M3.clamp((st.aimDown - 0.35) / 0.45, 0, 1);
+      /* 推杆只在**机体基本正着**的时候才成立。
+
+         "推杆"是绕机体 right 轴转。而左滚 90° 侧飞时，right 轴指向
+         世界上下 —— 绕它转等于在水平面里打转，根本不是俯冲，
+         反而会把机头往左右甩。所以滚转角一大就该改用滚转。
+
+         |up.y| 正是"正飞程度"：1 = 正飞或倒飞（两种都能正常推杆），
+         0 = 侧飞。取 0.6 约合滚转 53° 以内。 */
+      var upright = Math.abs(a.up.y);
+
+      if (upright > 0.6 && st.aimDown > 0.25 && st.aimDown <= 0.65) {
+        var magD = M3.clamp((st.aimDown - 0.25) / 0.40, 0, 1);
         out.pitch = -magD * 0.9;                       // 推杆
         // 顺带把航向往鼠标左右方向带一点，免得俯冲时跑偏
         out.roll = M3.clamp(-(st.aimX || 0) * 0.8, -1, 1) * 0.45;

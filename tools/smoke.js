@@ -1120,12 +1120,38 @@ if (Ent && M3 && me && world) {
       return Math.abs(a.ctrl.roll) > 0.35;
     }
 
-    // 1. 屏幕下方 35%~80%：应当推杆俯下（阈值取 0.35，所以从 0.4 起测）
-    for (const k of [0.4, 0.5, 0.7, 0.8]) {
+    // 1. 屏幕下方 25%~65%：应当推杆俯下（阈值 0.25 / 0.65）
+    for (const k of [0.3, 0.45, 0.6]) {
       if (rolls(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处就触发了滚转');
+    }
+    // 1b. 超过 65% 应当交给滚转
+    for (const k of [0.75, 0.9]) {
+      if (!rolls(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处仍未改用滚转');
     }
     // 2. 压到底部：必须走滚转仰起
     if (!rolls(56, 0.95)) bad.push('鼠标压到屏幕底部仍未触发滚转仰起');
+    /* 2c. 大滚转角**不该**推杆。
+
+       "推杆"是绕机体 right 轴转。左滚 90° 侧飞时 right 轴指向世界上下，
+       绕它转等于在水平面里打转，不是俯冲 —— 那时该走滚转。 */
+    {
+      const H = 720, FOV = 56;
+      const focal = (H / 2) / Math.tan(FOV / 2 * Math.PI / 180);
+      const k = 0.45;
+      const cy = -(k * (H / 2)) / focal;
+      const dir = M3.norm(M3.V(0, cy, 1));
+      const a = {
+        fwd: M3.V(-1, 0, 0), up: M3.V(0, 0, 1), right: M3.V(0, 1, 0),   // 左滚 90°
+        ctrl: { pitch: 0, roll: 0, yaw: 0 },
+        rollLock: undefined, aimX: 0, aimDown: k
+      };
+      AI.steerTo(a, dir, a.ctrl, a);
+      if (a.ctrl.pitch < -0.02 && Math.abs(a.ctrl.roll) < 0.35) {
+        bad.push('左滚 90° 时鼠标在屏幕下方仍然推杆 —— ' +
+          '那时绕 right 轴转是水平转向，不是俯冲');
+      }
+    }
+
     // 3. 换 FOV 结果必须一致（这是解耦的关键）
     for (const FOV of [38, 56, 100]) {
       const mid = rolls(FOV, 0.5), bottom = rolls(FOV, 0.95);
