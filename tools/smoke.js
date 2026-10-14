@@ -1554,6 +1554,49 @@ if (Ent && M3 && me && world) {
       peakAt + 'px，柔和段 roll ' + near.roll.toFixed(3) + '）');
   }
 
+  /* ---- 切枪不该丢掉锁定 ----
+
+     锁定一架敌机后想看另一种弹打同一架（先雷达弹逼机动、再补红外弹），
+     这是多挂载的核心玩法。以前 cycleSpecial 里有一句
+     player.lockProgress = 0，切一次就得重等整圈转完。
+
+     不同武器的锥角/距离/速率都不同，但"还能不能继续锁"本来就该由
+     updateLock 按新武器重新判 —— 锁不住时进度自己会衰减。 */
+  {
+    const G = sandbox.Game;
+    const bad = [];
+    G.startMission(0);
+    const pl = G.__player();
+    for (let f = 0; f < 60; f++) pump(1);
+
+    const kd = docListeners['keydown'] || [];
+    if (!kd.length) {
+      fail('没有捕获到 keydown 监听器，切枪锁定检查无法进行');
+    } else if (!pl.loadoutList || pl.loadoutList.length < 2) {
+      ok('只有一种挂载，跳过切枪锁定检查');
+    } else {
+      const before = pl.special;
+      pl.lockProgress = 1;
+      pl.locked = true;
+      kd.forEach(fn => fn({ code: 'KeyR', preventDefault() {} }));
+
+      /* 切完**不能 pump** —— pump 会跑 updateLock，按新武器的锥角与
+         距离重新判定，本来就可能把进度衰减掉。这里要看的只是
+         "切枪这个动作本身有没有清零"。 */
+      if (pl.special === before) {
+        bad.push('按 R 没有切换武器（仍是 ' + before + '）');
+      } else if (pl.lockProgress < 0.99) {
+        bad.push('切枪把锁定进度清掉了（' + before + ' → ' + pl.special +
+          '，进度 ' + pl.lockProgress.toFixed(2) + '）—— ' +
+          '锁定同一架敌机后换弹打它，不该重等整圈');
+      } else {
+        ok('切枪保留锁定（' + before + ' → ' + pl.special + '，进度仍为 1.00）');
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+  }
+
   /* ---- 诊断：AI 到底用不用机炮 ---- */
   {
     const Ent2 = sandbox.Ent, M3d = sandbox.M3, Wd = sandbox.WEAPONS;

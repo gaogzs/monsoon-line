@@ -1235,7 +1235,17 @@ var Game = (function () {
     // 注意不重置 spCd —— syncWeapon 已经从 slotCd 取回这把武器最快就绪的槽
     player.spActive = 0;
     if (w.kind === 'dew') player.spCharges = w.charges;
-    player.lockProgress = 0;
+
+    /* 切枪**不清零锁定进度**。
+
+       不同武器的锁定锥、锁定距离、寻的头速率都不一样，但"还能不能
+       继续锁着"本来就该由 updateLock 按**新武器**的参数重新判 ——
+       锁不住时进度会自己以 -2.2/s 衰减，不需要在这里手动清零。
+
+       而清零的代价很大：锁定一架敌机之后想换另一种弹打同一架，
+       得重新等整圈转完。可"对同一个敌人连打几种弹"正是多挂载的意义 ——
+       先一枚雷达弹逼它做机动，再补一枚红外弹，这一套打不出来，
+       挂载系统就只剩下"选一发威力最大的"这一个玩法了。 */
     Radio.raw({
       who: CALLSIGN.player, cls: 'ally',
       tx: '挂载切换：<b>' + w.name + ' 「' + w.cn + '」</b>', gap: 0.5
