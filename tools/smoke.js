@@ -585,8 +585,10 @@ try {
       if (!p.ammoPool || p.ammoPool[e.wid] === undefined) {
         fail('武器 ' + e.wid + ' 没有弹药池');
       }
-      if (e.salvo !== e.points) {
-        fail('武器 ' + e.wid + ' 的齐射数 ' + e.salvo + ' 与挂载点数 ' + e.points + ' 不一致');
+      const perSlot2 = (sandbox.WEAPONS[e.wid].salvo || 1);
+      if (e.salvo !== e.points * perSlot2) {
+        fail('武器 ' + e.wid + ' 的齐射数 ' + e.salvo + ' 应该是 挂点数 ' +
+          e.points + ' × 每点槽数 ' + perSlot2 + ' = ' + (e.points * perSlot2));
       }
       if (e.salvo % 2 !== 0 && e.points > 1) {
         fail('武器 ' + e.wid + ' 的齐射数是奇数 ' + e.salvo);
@@ -1810,12 +1812,21 @@ if (Ent && M3 && me && world) {
     const e = p.loadoutList[0];
     const slots = p.slotCd[e.wid];
 
-    // 槽数必须等于该武器占用的挂载点总数
-    if (!slots || slots.length !== e.points) {
+    /* 槽数 = 挂点数 × 每个挂点的槽数（w.salvo）。
+
+       w.salvo 是"一个挂点分成几个发射巢"，perPoint 是"一个挂点总共几发"，
+       所以每槽装 perPoint / salvo 发。这个字段以前从没被读过，槽数一直
+       等于挂点数 —— GIR-5 声明三联装、GIR-12 声明四联、PEJ-6 声明七联，
+       全都无效。 */
+    const perPointSlots = (sandbox.WEAPONS[e.wid].salvo || 1);
+    const wantSlots = e.points * perPointSlots;
+    if (!slots || slots.length !== wantSlots) {
       fail(e.wid + ' 的发射槽有 ' + (slots ? slots.length : 0) +
-        ' 个，应该等于挂载点数 ' + e.points);
+        ' 个，应该是 挂点数 ' + e.points + ' × 每点槽数 ' + perPointSlots +
+        ' = ' + wantSlots);
     } else {
-      ok('发射槽数 = 挂载点数（' + e.wid + ' ' + slots.length + ' 个）');
+      ok('发射槽数 = 挂点数 × 每点槽数（' + e.wid + ' ' + e.points + '×' +
+        perPointSlots + ' = ' + slots.length + ' 个）');
     }
 
     // 找一个目标，然后连续按发射键 —— 每次应当只出 1 枚，

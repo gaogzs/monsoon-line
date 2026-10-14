@@ -535,7 +535,14 @@ var Game = (function () {
         order.push(wid);
       }
       e.points += g.pts.length;
-      e.salvo += g.pts.length;
+      /* 发射槽数 = 挂点数 × 每个挂点的槽数。
+
+         w.salvo 是"一个挂点分成几个发射巢"，perPoint 是"一个挂点总共
+         几发"，所以每个槽装 perPoint / salvo 发。这个字段以前从来没被
+         读过 —— 槽数一直等于挂点数，于是 GIR-5 声明 salvo=3（三联装）、
+         GIR-12 声明 4、PEJ-6 声明 7 全部无效，图鉴上写着"三联装发射巢"
+         而实际打出来是每点一发。 */
+      e.salvo += g.pts.length * (w.salvo || 1);
       e.ammo += g.pts.length * (w.perPoint || 1);
     }
 
@@ -1994,8 +2001,11 @@ var Game = (function () {
       if (!wid && a.special) wid = a.special;
       if (!wid) continue;
 
+      /* 每个挂点占 nSlots 个槽（w.salvo > 1 时一点多巢，例如 GIR-5 三联装），
+         所以下一组要跳过 g.pts.length × nSlots 个位置。 */
+      var nSlots = (w && w.salvo > 0) ? w.salvo : 1;
       var base = used[wid] || 0;
-      used[wid] = base + g.pts.length;      // 下一组从这里接着排
+      used[wid] = base + g.pts.length * nSlots;
 
       var w = WEAPONS[wid];
       if (!w || w.kind === 'gun') continue;
@@ -2017,8 +2027,14 @@ var Game = (function () {
 
       var arr = slots[wid] || [];
       for (pi = 0; pi < g.pts.length; pi++) {
-        // 这个发射槽还在装填 → 挂架空着
-        if ((arr[base + pi] || 0) > 0) continue;
+        /* 一个挂点可能分成多个发射巢（nSlots > 1）。
+           3D 上只在**整巢都打空之后**才把挂载撤掉 —— 挂点上还有弹
+           就得看得见。逐巢画会重叠在一起，没有意义。 */
+        var anyReady = false;
+        for (var sj = 0; sj < nSlots; sj++) {
+          if ((arr[base + pi * nSlots + sj] || 0) <= 0) { anyReady = true; break; }
+        }
+        if (!anyReady) continue;
         pushOneStore(a, g.pts[pi], g.kind, w);
       }
     }
