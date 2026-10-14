@@ -2374,6 +2374,227 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
   }
 
+  /* ============================================================
+     一轮全面体检找到的问题，逐条固化成断言
+
+     这些 bug 的共同点是**代码不报错、单测也不报错** ——
+     字段写错了位置、文案和数值脱节、条件恒真，都要靠
+     "拿数据去比对行为"才看得出来。
+     ============================================================ */
+
+  /* ---- ① 被动吊舱的加成字段必须在顶层 ---- */
+  {
+    const W11 = sandbox.WEAPONS, bad = [];
+    /* ZUN-6 原来写的是 passiveEffect: { lockResist: 0.30 } —— 多包了一层，
+       而 passiveEffects() 读的是 w.lockResist。结果是六个被动吊舱里
+       唯一一个加成失效的，而且完全静默。 */
+    for (const k in W11) {
+      const w = W11[k];
+      if (!w.passive) continue;
+      if (w.passiveEffect) {
+        bad.push(w.name + ' 的加成包在 passiveEffect 里了 —— ' +
+          'passiveEffects() 读的是顶层字段，写成嵌套会静默失效');
+      }
+      const has = ['lockResist', 'armorBonus', 'lockRangeBonus', 'flareBonus']
+        .some(f => w[f] !== undefined);
+      if (!has) bad.push(w.name + ' 是被动吊舱，却没有任何加成字段');
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('全部被动吊舱的加成都在顶层字段，无嵌套失效');
+  }
+
+  /* ---- ② 机炮射程必须真的驱动子弹寿命 ---- */
+  {
+    const W12 = sandbox.WEAPONS, E12 = sandbox.Ent, M3m = sandbox.M3;
+    const bad = [];
+
+    /* 以前 fireGun 把子弹寿命写死 2.2 秒，range / highRange 只有 AI 在读。
+       于是 CEL-3「18 公里以上有效射程翻倍」从未生效，
+       连它的基础射程 1600 也是假的。 */
+    function shootAt(y) {
+      const a = E12.makeAircraft({
+        type: 'c11', team: 0, isPlayer: true, x: 0, y: y, z: 0,
+        fwd: M3m.V(0, 0, 1), speed: 300
+      });
+      a.gun = 'k3';
+      a.gunAmmo = 100;
+      a.gunTimer = 0;
+      const wd = { particles: [], bullets: [], actors: [], targets: [], missiles: [] };
+      E12.fireGun(a, wd);
+      return wd.bullets.length ? wd.bullets[0].life : 0;
+    }
+    const g = W12.k3;
+    const lifeLo = shootAt(5000), lifeHi = shootAt(20000);
+    const rangeLo = lifeLo * g.speed, rangeHi = lifeHi * g.speed;
+
+    if (Math.abs(rangeLo - g.range) > 20) {
+      bad.push('低空机炮射程和 range 不符：实测 ' + Math.round(rangeLo) +
+        ' m，字段 ' + g.range + ' m');
+    }
+    if (Math.abs(rangeHi - g.highRange) > 20) {
+      bad.push('高空机炮射程和 highRange 不符：实测 ' + Math.round(rangeHi) +
+        ' m，字段 ' + g.highRange + ' m');
+    }
+    if (!(rangeHi > rangeLo)) bad.push('高空射程没有比低空更远');
+
+    if (bad.length) bad.forEach(fail);
+    else ok('机炮射程真的生效：低空 ' + Math.round(rangeLo) + ' m → 高空 ' +
+      Math.round(rangeHi) + ' m（' + (rangeHi / rangeLo).toFixed(2) + ' 倍）');
+  }
+
+  /* ---- ③ DEW 充能必须按 recharge 计时，不能立刻补满 ---- */
+  {
+    const W13 = sandbox.WEAPONS, E13 = sandbox.Ent, M3n = sandbox.M3;
+    const bad = [];
+    const w = W13.l2;      // GUS-2 日光
+
+    if (w.charges === undefined) bad.push('GUS-2 没有 charges');
+    if (w.recharge === undefined) bad.push('GUS-2 没有 recharge（desc 说每 18 秒）');
+
+    const a = E13.makeAircraft({
+      type: 'c11', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
+      fwd: M3n.V(0, 0, 1), speed: 300
+    });
+    a.special = 'l2';
+    a.spCharges = w.charges;
+    a.spChargeT = 0;
+    const wd = { particles: [], bullets: [], actors: [], targets: [], missiles: [] };
+
+    // 模拟拦掉一发
+    a.spCharges--;
+    a.spChargeT = w.recharge || 18;
+    const before = a.spCharges;
+
+    // 跑 10 秒：不该恢复（recharge 是 18）
+    for (let f = 0; f < 600; f++) E13.stepAircraft(a, 1 / 60, wd);
+    if (a.spCharges !== before) {
+      bad.push('充能在 ' + a.spCharges + ' 秒内就恢复了 —— ' +
+        '应该等满 recharge（' + w.recharge + ' 秒）');
+    }
+
+    // 再跑到 18 秒以后，应该恢复一发
+    let restored = -1;
+    for (let f = 600; f < 60 * 30; f++) {
+      E13.stepAircraft(a, 1 / 60, wd);
+      if (a.spCharges > before) { restored = f / 60; break; }
+    }
+    if (restored < 0) bad.push('30 秒内充能始终没有恢复');
+    else if (restored < (w.recharge || 18) - 0.5) {
+      bad.push('充能恢复太早：第 ' + restored.toFixed(1) + ' 秒');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('DEW 充能按 recharge 计时：第 ' + restored.toFixed(1) +
+      ' 秒恢复一发（recharge ' + (w.recharge || 18) + ' 秒）');
+  }
+
+  /* ============================================================
+     综合压力测试
+
+     前面每条断言都只盯着一个点，而这类项目最麻烦的 bug 往往是
+     "某个任务 + 某件武器 + 某个高度"的组合才触发的异常。
+     这里把三个维度都跑一遍，专门抓抛异常与数值崩坏（NaN）。
+     ============================================================ */
+
+  /* ---- ① 每个任务各跑 30 秒 ---- */
+  {
+    const G11 = sandbox.Game;
+    const bad = [];
+    const n = sandbox.MISSIONS.length;
+    for (let mi = 0; mi < n; mi++) {
+      try {
+        G11.startMission(mi);
+        for (let f = 0; f < 1800; f++) pump(1);
+        const w = G11.__world(), pl = G11.__player();
+        if (!pl || !isFinite(pl.pos.x) || !isFinite(pl.pos.y) || !isFinite(pl.pos.z)) {
+          bad.push('任务 ' + (mi + 1) + ' 跑 30 秒后玩家坐标不是有限数');
+        }
+        if (!isFinite(pl.speed)) bad.push('任务 ' + (mi + 1) + ' 玩家速度变成了 NaN');
+        if (w && w.missiles) {
+          const nan = w.missiles.filter(m => m.alive &&
+            (!isFinite(m.pos.x) || !isFinite(m.pos.y) || !isFinite(m.pos.z) ||
+             !isFinite(m.speed))).length;
+          if (nan) bad.push('任务 ' + (mi + 1) + ' 里有 ' + nan + ' 枚导弹位置/速度是 NaN');
+        }
+      } catch (e) {
+        bad.push('任务 ' + (mi + 1) + ' 抛异常：' + e.message);
+      }
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('全部 ' + n + ' 个任务各跑 30 秒无异常、无 NaN');
+  }
+
+  /* ---- ② 每个机型各飞 10 秒 ---- */
+  {
+    const G12 = sandbox.Game, Ass = sandbox.Assets;
+    const bad = [];
+    const acs = sandbox.AIRCRAFT;
+    for (let ai = 0; ai < acs.length; ai++) {
+      try {
+        G12.startMission(0);
+        const pl = G12.__player();
+        // 直接把玩家换成该机型（走和机库一样的路径）
+        pl.ac = acs[ai];
+        pl.phys = Object.assign({}, acs[ai].phys);
+        pl.model = acs[ai].model;
+        pl.hp = pl.maxHp = acs[ai].phys.hp;
+        for (let f = 0; f < 600; f++) pump(1);
+        if (!isFinite(pl.speed) || !isFinite(pl.pos.y)) {
+          bad.push(acs[ai].name + ' 飞 10 秒后出现 NaN');
+        }
+      } catch (e) {
+        bad.push(acs[ai].name + ' 抛异常：' + e.message);
+      }
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('全部 ' + acs.length + ' 个机型各飞 10 秒无异常、无 NaN');
+  }
+
+  /* ---- ③ 每件能发射的武器各打一发 ---- */
+  {
+    const G13 = sandbox.Game, E13 = sandbox.Ent, M3l = sandbox.M3;
+    const bad = [];
+    const W13 = sandbox.WEAPONS;
+    let tried = 0;
+    const ids = Object.keys(W13);
+    for (const k of ids) {
+      const w = W13[k];
+      if (w.kind === 'gun' || w.passive || w.kind === 'dew') continue;
+      try {
+        G13.startMission(0);
+        const pl = G13.__player();
+        const wd = G13.__world();
+        for (let f = 0; f < 20; f++) pump(1);
+        const foe = wd.actors.find(a => a.team !== pl.team && a.alive);
+        pl.special = k;
+        pl.spAmmo = 10;
+        pl.spCd = 0;
+        pl.slotCd[k] = [0];
+        pl.lockProgress = 1;
+        pl.locked = true;
+        // 对空弹给飞机、对面弹给设施，避免被类型检查拦掉
+        const surface = (w.target === 'ground' || w.target === 'ship');
+        if (surface) {
+          pl.target = wd.targets.find(t => t.alive && t.team === 1) || null;
+        } else {
+          pl.target = foe || null;
+        }
+        const kd4 = docListeners['keydown'] || [];
+        kd4.forEach(fn => fn({ code: 'Enter', preventDefault() {} }));
+        // 让弹飞一会儿，走完动力段与全弹道
+        for (let f = 0; f < 400; f++) pump(1);
+        tried++;
+        if (!isFinite(pl.pos.y) || !isFinite(pl.speed)) {
+          bad.push(w.name + ' 发射后出现 NaN');
+        }
+      } catch (e) {
+        bad.push(w.name + '（' + w.cn + '）发射时抛异常：' + e.message);
+      }
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('全部 ' + tried + ' 件可发射武器各打一发，无异常、无 NaN');
+  }
+
   /* ---- 诊断：AI 追到极高空会不会卡住 ---- */
   {
     const G = sandbox.Game, M3d = sandbox.M3, q = sandbox.Ent;

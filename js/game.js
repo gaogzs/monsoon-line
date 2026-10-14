@@ -1770,6 +1770,8 @@ var Game = (function () {
       if (Math.random() > chance * dt / 1.2) continue;
       // 拦截成功
       actor.spCharges--;
+      // 开始充能倒计时（打空了就一直走到补满为止）
+      if (actor.spChargeT <= 0) actor.spChargeT = w.recharge || 18;
       m.alive = false;
       Ent.spawnParticle(world.particles, m.pos, M3.V(0, 0, 0), 0.4, 3.2, '#7dfaff', { grow: true });
       Ent.explode(world.particles, m.pos, 0.6, 8);

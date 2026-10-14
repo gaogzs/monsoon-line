@@ -562,7 +562,10 @@ var WEAPONS = {
     name: 'CEL-3', cn: '20mm 六管转膛炮', kind: 'gun',
     rpm: 3900, speed: 1100, dmg: 7, spread: 0.0022, ammo: 6000,
     range: 1600, highRange: 2600,
-    desc: '上游公约制式机炮。高射速低单发威力，靠命中数堆伤害。在 18 公里以上有效射程翻倍。'
+    /* "翻倍"不准确：range 1600 → highRange 2600，实际 1.63 倍。
+       现在这句话和数值已经对上了 —— fireGun 会真的按射程算子弹寿命。 */
+    desc: '上游公约制式机炮。高射速低单发威力，靠命中数堆伤害。' +
+      '在 18 公里以上弹道平直，<b>有效射程提升约六成</b>。'
   },
   k7: {
     name: 'CEL-7', cn: '30mm 四管转膛炮', kind: 'gun',
@@ -1037,7 +1040,7 @@ var WEAPONS = {
     dmg: 0, ammo: 99, cd: 5, salvo: 0, flare: 1.0, prox: 0,
     target: 'none', duration: 6.0, lockReduce: 0.40, selfBlind: true,
     desc: `认知电子战吊舱。开启后 <b>6 秒</b>内敌方对你的锁定距离缩短 <b>40%</b>，
-      但你自己的雷达同时被压制。冷却 25 秒。
+      但你自己的雷达同时被压制。冷却 <b>50 秒</b>。
       <br><span class="am">干扰给的不是免疫，是时间。</span>`,
     stat: { dmg: 0.0, spd: 0.0, trn: 0.0, rng: 0.0, ecm: 1.0 }
   },
@@ -1048,6 +1051,10 @@ var WEAPONS = {
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 99, cd: 3.6, salvo: 0, flare: 1.0, prox: 0,
     target: 'none', charges: 3,
+    /* 每拦截一次后隔多久恢复一发充能（秒）—— desc 里写的"每 18 秒"。
+       原来没有这个字段，而恢复逻辑又恒真，等于打完立刻补满；
+       现在由它驱动 spChargeT。 */
+    recharge: 18,
     interceptRange: 1200, interceptCone: 35 * Math.PI / 180,
     interceptChance: 0.55, highAltChance: 0.35,
     desc: `200 kW 级固态激光吊舱。来袭导弹进入 <b>1200 米</b>且与你的夹角小于
@@ -1074,7 +1081,13 @@ var WEAPONS = {
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 0, cd: 6.8, salvo: 1, flare: 1.0, prox: 0,
     target: 'air', passive: true,
-    passiveEffect: { lockResist: 0.30 },
+    /* 顶层字段，不是嵌套的 passiveEffect。
+
+       原来写的是 `passiveEffect: { lockResist: 0.30 }` —— 多包了一层，
+       而 passiveEffects() 汇总时读的是 w.lockResist（顶层）。
+       结果是这枚吊舱的锁抗加成**完全没有生效**：
+       它是六个被动吊舱里唯一用嵌套写法的，其余五个都写顶层。 */
+    lockResist: 0.30,
     fits: [], perPoint: 0, mass: 0,
     desc: `下游的干扰吊舱，比上游的 ZUN-8 老一代，但装得更多。
        ​它们的逻辑很直白：<b>只要你先看不见，谁先发现谁就不重要了。</b>`,

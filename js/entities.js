@@ -138,6 +138,7 @@ var Ent = (function () {
       slotCd: {},
       spActive: 0,        // ECM 剩余生效时间
       spCharges: 0,       // DEW 充能数（构造末尾按武器初始化）
+      spChargeT: 0,       // DEW 下一次充能恢复的倒计时
       gunTimer: 0,
 
       // 单位是"组"（一次投放一组诱饵），不是单发
@@ -342,9 +343,21 @@ var Ent = (function () {
 
     // DEW 充能恢复
     var w = WEAPONS[a.special];
-    if (w && w.kind === 'dew' && a.spCharges < w.charges && a.spCd <= 0) {
-      a.spCharges++;
-      a.spCd = w.cd;
+    /* DEW 充能恢复。
+
+       原来这里用的条件是 `a.spCd <= 0`，但 GUS-2 是**自动拦截**、
+       不需要手动发射，spCd 从来没被设过 —— 恒为 0，于是条件恒真，
+       拦掉一枚导弹之后**下一帧就补满**。"充能 3 次、每 18 秒恢复一次"
+       因此形同虚设。
+
+       现在用独立的 spChargeT 计时：打掉一发就开始倒计时，
+       到点才 +1，而且只在没满的时候走动。 */
+    if (w && w.kind === 'dew' && a.spCharges < w.charges) {
+      a.spChargeT -= dt;
+      if (a.spChargeT <= 0) {
+        a.spCharges++;
+        a.spChargeT = w.recharge || 18;
+      }
     }
 
     // ---- 拖烟（受损） ----
@@ -720,6 +733,19 @@ var Ent = (function () {
     if (n > a.gunAmmo) n = a.gunAmmo;
     a.gunAmmo -= n;
 
+    /* 子弹寿命由**射程**算出，而不是写死 2.2 秒。
+
+       以前两者是脱节的：数据里写着 range 1600 / highRange 2600，
+       但子弹固定飞 2.2 秒，实际射程完全由 speed × 2.2 决定（约 2400 米）。
+       于是 CEL-3「18 公里以上有效射程翻倍」这条设定从未生效，
+       连它的基础射程 1600 也是假的 —— 那两个字段只有一个用处：
+       让 AI 判断该在多远开火。
+
+       现在 life = 射程 / 初速，并且 18 公里以上改用 highRange：
+       高空空气稀薄、弹道平直，同样的弹药确实能打得更远。 */
+    var gunRange = (a.pos.y > 18000 && w.highRange) ? w.highRange : (w.range || 1600);
+    var bulletLife = gunRange / Math.max(1, w.speed);
+
     for (var i = 0; i < n; i++) {
       var sp = M3.V(
         M3.rnd(-1, 1) * w.spread, M3.rnd(-1, 1) * w.spread, M3.rnd(-1, 1) * w.spread
@@ -731,7 +757,7 @@ var Ent = (function () {
         pos: muzzle,
         prev: M3.clone(muzzle),
         vel: M3.add(M3.mul(dir, w.speed), a.vel),
-        dmg: w.dmg, life: 2.2, owner: a
+        dmg: w.dmg, life: bulletLife, owner: a
       });
     }
 
