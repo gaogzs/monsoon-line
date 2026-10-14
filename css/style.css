@@ -414,6 +414,13 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
 .set-row .set-select:hover{ border-color:var(--amber); color:#fff; }
 .set-row .set-select:focus{ border-color:var(--green); }
 .set-row .set-select option{ background:#0d1620; color:#c8d8e4; }
+
+/* 主菜单左上角的版本戳：只为了让玩家（和开发时）确认部署到了哪一版 */
+.ver-stamp{ position:absolute; left:22px; top:18px; font-family:var(--mono);
+  font-size:11px; letter-spacing:.4px; color:#4a6070; line-height:1.6;
+  pointer-events:none; user-select:text; }
+.ver-stamp b{ color:#6f8fa3; font-weight:400; }
+.ver-stamp i{ color:#3d5261; font-style:normal; }
 .set-hint{ font-size:12px; color:var(--txt-d); line-height:1.9; padding:4px 0 2px; }
 
 /* ============================================================

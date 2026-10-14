@@ -15,6 +15,11 @@
 
 <!-- ============ 屏幕：标题 ============ -->
 <section id="scr-title" class="screen active">
+  <!-- 左上角版本戳：内容由 js/version.js 提供，每次提交前重新生成。
+       用途是确认当前部署的到底是哪一版 —— 浏览器缓存、Pages 重建延迟、
+       推送失败这些都不好肉眼判断，但时间戳变了就说明新 commit 上线了。 -->
+  <div id="verStamp" class="ver-stamp"></div>
+
   <div class="boot">
     <div class="bootline">&gt; TACNET 战术数据链 自检 ......... <span class="ok">PASS</span></div>
     <div class="bootline">&gt; 相干测风激光 / 惯性混合定轨 ..... <span class="ok">PASS</span></div>
@@ -201,6 +206,7 @@
 </div>
 
 <!-- ============ 脚本 ============ -->
+<script src="js/version.js"></script>
 <script src="js/math3d.js"></script>
 <script src="js/models.js"></script>
 <script src="js/planform.js"></script>

@@ -2224,8 +2224,33 @@ var Game = (function () {
   /* ============================================================
      初始化
      ============================================================ */
+  /* ============================================================
+     主菜单左上角的版本戳
+
+     内容来自 js/version.js —— 那个文件由 tools/stamp-version.js
+     从 git 记录生成，每次提交前重新生成一遍。
+
+     为什么需要它：浏览器缓存、GitHub Pages 的重建延迟、推送失败，
+     这三件事从画面上完全看不出来。而时间戳变了就说明新 commit
+     确实上线了。
+
+     文件不在时（比如开发中直接开 index.html、或者忘了跑生成脚本）
+     静默降级，不影响游戏本身。
+     ============================================================ */
+  function stampVersion() {
+    var el = document.getElementById('verStamp');
+    if (!el) return;
+    if (typeof BUILD_STAMP === 'undefined' || !BUILD_STAMP.time) {
+      el.innerHTML = 'BUILD <i>开发版</i>';
+      return;
+    }
+    el.innerHTML = 'BUILD <b>' + BUILD_STAMP.time + '</b>' +
+      '<br><i>' + BUILD_STAMP.hash + '　' + BUILD_STAMP.subject + '</i>';
+  }
+
   function init() {
     preflight();
+    stampVersion();
 
     // 设置必须在任何渲染/音频之前载入
     S = loadSettings();
