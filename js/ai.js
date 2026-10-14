@@ -52,8 +52,11 @@ var AI = (function () {
    */
   /* 鼠标的这些界限都按**屏幕归一化距离**定（1 = 屏幕边缘，
      屏幕角落约 1.41），所以与 FOV 无关。 */
-  var AIM_DEADZONE = 0.10;    // 中央 10% 内不转向
+  var AIM_DEADZONE = 0.05;    // 中央 5% 内进入回正
   var AIM_PUSH_MAG = 0.65;    // 径向幅度小于它才可能走推杆
+  // 死区里自动回正的强度上限（不是"不动"，是"轻轻扶正"）
+  var AIM_TRIM_ROLL = 0.35;
+  var AIM_TRIM_PITCH = 0.30;
 
   function steerTo(a, desired, out, st) {
     var fx = M3.dot(desired, a.fwd);
@@ -63,18 +66,36 @@ var AI = (function () {
     var off0 = Math.acos(M3.clamp(fx, -1, 1));
     var mag0 = M3.clamp(off0 * 2.3, 0, 1);
 
-    /* ---------- 中心死区 ----------
+    /* ---------- 中心死区：柔和自动回正 ----------
 
-       鼠标停在画面中央一小片区域时不触发任何转向，飞机保持当前姿态。
+       鼠标停在画面中央一小片区域时，不做机动转向，而是**缓慢地**
+       把飞机扶回稳定状态：
 
-       没有它的话，鼠标随手一碰就开始滚转或俯仰，"稳稳飞一段"变成了
-       需要一直微调的事。死区判定用**屏幕径向距离**，与 FOV 无关。 */
+         ① 滚转回正 —— 把世界正上方转到机翼上方（机翼恢复水平）
+         ② 俯仰对齐 —— 机头朝镜头正前方靠拢，也就是照当前视线直飞
+
+       早期版本这里直接给 0（完全不动），结果是飞机带着一个歪斜姿态
+       一直飞下去 —— 玩家松开鼠标想让飞机"稳下来"的预期落空。
+
+       力度刻意压得很低（ROLL/PITCH 上限约最大杆量的三分之一），
+       否则死区本身就成了一个自动改平按钮。
+
+       回正是绕机体轴做的，所以要先把"世界正上方"换算到机体坐标系里，
+       不能直接用世界坐标 —— 那样侧飞时会往奇怪的方向滚。 */
     var aimMag = (st && st.aimMag !== undefined) ? st.aimMag : null;
 
     if (aimMag !== null && aimMag < AIM_DEADZONE) {
-      if (st) st.rollLock = 0;            // 顺手解锁，免得出死区时带着旧锁存
-      out.roll = 0;
-      out.pitch = 0;
+      if (st) st.rollLock = 0;            // 解锁，免得出死区时带着旧锁存
+
+      // ① 世界正上方在机体 right / up 上的分量 → 需要滚多少才能摆正
+      var wx = M3.dot(M3.V(0, 1, 0), a.right);
+      var wy = M3.dot(M3.V(0, 1, 0), a.up);
+      var trimErr = Math.atan2(-wx, wy);
+
+      out.roll = M3.clamp(-trimErr * 1.3, -AIM_TRIM_ROLL, AIM_TRIM_ROLL);
+
+      // ② 镜头前方在机体 up 上的分量 → 决定抬头还是低头
+      out.pitch = M3.clamp(ux * 1.2, -AIM_TRIM_PITCH, AIM_TRIM_PITCH);
       out.yaw = 0;
       return out;
     }

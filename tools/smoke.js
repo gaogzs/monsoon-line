@@ -1130,16 +1130,21 @@ if (Ent && M3 && me && world) {
       return a.ctrl.roll === 0 && a.ctrl.pitch < -0.02;
     }
 
-    // 中心死区：中央一小片区域内必须完全不转向
-    function inDeadzone(mag) {
+    /* 中心死区：不是"僵住"，而是柔和的自动回正 ——
+       滚转慢慢摆回机翼水平，俯仰朝镜头前方收敛。
+       这里返回 ctrl，好同时检查方向与力度。 */
+    function deadzoneCtrl(mag, rollDeg) {
+      const r = (rollDeg || 0) * Math.PI / 180;
+      const fwd = M3.V(0, 0, 1);
+      const o = M3.orthonormalize(fwd, M3.rotAxis(M3.V(0, 1, 0), fwd, r));
+      const right = M3.norm(M3.cross(o.up, fwd));
       const a = {
-        fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
+        fwd: fwd, up: o.up, right: right,
         ctrl: { pitch: 0, roll: 0, yaw: 0 },
         rollLock: 0, aimX: 0, aimDown: mag, aimMag: mag
       };
-      const dir = M3.norm(M3.V(0, -mag * 0.3, 1));
-      AI.steerTo(a, dir, a.ctrl, a);
-      return a.ctrl.roll === 0 && a.ctrl.pitch === 0 && a.ctrl.yaw === 0;
+      AI.steerTo(a, M3.norm(M3.V(0, -mag * 0.3, 1)), a.ctrl, a);
+      return a.ctrl;
     }
 
     // 1. 屏幕下方 25%~65%：应当推杆俯下（阈值 0.25 / 0.65）
@@ -1150,11 +1155,37 @@ if (Ent && M3 && me && world) {
     for (const k of [0.75, 0.9]) {
       if (pushesDown(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处仍在推杆');
     }
-    // 1c. 中心死区
-    for (const m of [0, 0.04, 0.08]) {
-      if (!inDeadzone(m)) bad.push('鼠标在中心 ' + (m * 100) + '% 处仍然触发了转向');
+    /* 1c. 中心死区（半径 0.05）：柔和的自动回正
+
+       检查三件事：
+         · 死区内杆量必须受限（不能变成自动改平按钮）
+         · 倾斜时必须给出**回正方向**的滚转
+         · 死区外不能再回正 */
+    for (const m of [0, 0.02, 0.04]) {
+      const c = deadzoneCtrl(m, 0);
+      if (Math.abs(c.roll) > 0.36 || Math.abs(c.pitch) > 0.31) {
+        bad.push('死区内杆量过大（m=' + m + ' roll=' + c.roll.toFixed(2) +
+          ' pitch=' + c.pitch.toFixed(2) + '）');
+      }
     }
-    if (inDeadzone(0.25)) bad.push('鼠标偏到 25% 处仍然处于死区');
+    for (const d of [30, 90, 150]) {
+      const c = deadzoneCtrl(0.02, d);
+      if (!(c.roll > 0)) {
+        bad.push('滚转 ' + d + '° 时死区没有给出回正方向的杆量（' + c.roll.toFixed(2) + '）');
+      }
+    }
+    {
+      const c = deadzoneCtrl(0.02, 0);
+      if (c.roll !== 0) bad.push('机翼已水平时死区仍在滚转（' + c.roll.toFixed(2) + '）');
+    }
+    // 死区半径 0.05：0.06 应当已经出去
+    {
+      const c = deadzoneCtrl(0.06, 60);
+      if (Math.abs(c.roll) <= 0.36 && Math.abs(c.pitch) <= 0.31 &&
+        c.roll > 0 && c.pitch === 0) {
+        bad.push('鼠标在 6% 处仍然处于死区（半径应为 0.05）');
+      }
+    }
     // 2. 压到底部：必须走滚转仰起
     if (pushesDown(56, 0.95)) bad.push('鼠标压到屏幕底部仍在推杆');
     /* 2c. 大滚转角**不该**推杆。
