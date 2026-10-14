@@ -177,7 +177,7 @@ var AI = (function () {
 
        注意与 gain 的分工：
          gain（AIM_FULL_MAG = 0.35，平方）管"力气多大"
-         blend（AIM_BLEND_MAG = 0.45，smoothstep）管"力气怎么分" */
+         blend（AIM_BLEND_MAG = 0.225，smoothstep）管"力气怎么分" */
     var blend = 1;
     if (aimMag !== null) {
       var tb = M3.clamp(aimMag / AIM_BLEND_MAG, 0, 1);
