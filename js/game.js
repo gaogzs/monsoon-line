@@ -77,6 +77,9 @@ var Game = (function () {
   var keys = {}, mouse = { left: false, right: false, x: 0, y: 0 };
   var aimMode = true;              // true = 鼠标引导（指令增稳），false = 键盘直控
   var last = 0, camMode = 0;
+  /* 追尾镜头的两个平滑状态。camYawBase 是基准偏航（按最短角差平滑），
+     camPitchSmooth 是平滑后的基准俯仰。首帧惰性初始化。 */
+  var camYawBase = 0, camPitchSmooth = null;
 
   /* 单一油门轴：0..1 是常规推力区，1..1.25 是加力区。
      不再需要单独的加力/减速板按键。 */
@@ -1552,37 +1555,70 @@ var Game = (function () {
          极点附近逐帧抖动，参考轴就跟着反复横跳，画面来回侧翻。
          之前那套"混合参考"只能把跳变抹成旋转，抹不掉极点本身；
          把俯仰限住，镜头就永远不会到达那个位置。 */
-      /* ---------- 追尾镜头：跟随姿态，但不跟着抖 ----------
+      /* ---------- 追尾镜头：稳定的水平镜头 + 俯仰限位 ----------
 
-         三个约束要同时成立，少一个就不是这个手感：
-         · **不锁世界水平** —— 飞机滚转，画面跟着倾斜
-         · **跟着空翻**   —— 飞机翻过去，画面也翻过去
-         · **不跟着抖**   —— 姿态的细小抖动不该直接传到画面上
+         相机 up 恒为世界 up，所以地平线永远水平、画面不会跟着滚转乱转。
+         俯仰限制在 ±78°：飞机可以翻过正上方/正下方，镜头不跟，
+         到限位就停住。视线因此永远不会与世界 up 共线，正交基不会退化 ——
+         这也正是"极点卡动"那个老问题的根治办法。
 
-         做法是让镜头的机体基**平滑地追踪**飞机的机体基：
-         用球面插值（走最短弧，不会绕远路），时间常数取适中值。
+         限位附近最容易出的毛病是**来回抽动**。三件事必须一起做才能压住：
 
-         这是"刚性连死"和"锁世界 up"之间的那条路 ——
-         前者会跟着每一个抖动乱转，后者会把姿态信息整个丢掉。
+         ① 偏航按最短角差平滑
+            翻越顶点时水平投影会瞬间反向 180°，直接跟就是瞬移。
+         ② 俯仰也要平滑
+            相机 up 是世界 up，而正交化之后 up 的长度是 cos(pitch)：
+            俯仰越接近限位这个长度越小，同样的视线变化引起的 up 变化越大。
+            所以俯仰直接阶跃时地平线会明显发抖。
+         ③ 视线最后再钳一次
+            camPos 是插值量、天生滞后，若用滞后的位置反推方向，
+            视线会比基准朝向更陡，把限位绕过去。
 
-         关键细节：fwd 和 up 必须用**同一个**时间常数。
-         否则两者滞后不同步，会一个跟上了另一个还没跟上，
-         基就可能在极点附近接近共线，把正交化逼进退化分支。 */
-      camFwd = M3.slerpDir(camFwd, p.fwd, 1 - Math.exp(-8 * dt));
-      camUp = M3.slerpDir(camUp, p.up, 1 - Math.exp(-8 * dt));
+         时间常数的取舍：偏航 1.2（约一秒转完 180°，够快也不甩），
+         俯仰 9（俯仰是玩家直接控制的，太慢会显得操纵迟滞）。 */
+      var CAM_PITCH_LIM = 78 * Math.PI / 180;
+      var SIN_LIM = Math.sin(CAM_PITCH_LIM);
 
-      // slerp 之后两者不再严格垂直，正交化一次
-      var onb = M3.orthonormalize(camFwd, camUp);
-      camFwd = onb.fwd;
-      camUp = onb.up;
+      var hx = p.fwd.x, hz = p.fwd.z;
+      var hlen = Math.sqrt(hx * hx + hz * hz);
 
-      // 镜头位置也在机体基里 —— 所以倒飞时看到的是机腹，和 WT 一样
-      var offBody = M3.add(
-        M3.mul(camFwd, -S.camDist),
-        M3.mul(camUp, S.camHeight)
-      );
-      camPos = M3.lerpV(camPos, M3.add(p.pos, offBody), 1 - Math.exp(-14 * dt));
+      // ① 偏航：最短角差平滑。接近垂直时水平投影塌缩，此时沿用上一帧。
+      if (hlen > 0.12) {
+        var tYaw = Math.atan2(hx, hz);
+        var dYaw = tYaw - camYawBase;
+        while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+        while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+        camYawBase += dYaw * (1 - Math.exp(-1.2 * dt));
+        if (camYawBase > Math.PI) camYawBase -= Math.PI * 2;
+        if (camYawBase < -Math.PI) camYawBase += Math.PI * 2;
+      }
 
+      // ② 俯仰：先钳位，再平滑
+      var camPitchAng = Math.atan2(p.fwd.y, Math.max(hlen, 1e-4));
+      camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
+      if (camPitchSmooth === null) camPitchSmooth = camPitchAng;
+      camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-9 * dt));
+
+      var cpc = Math.cos(camPitchSmooth), cps = Math.sin(camPitchSmooth);
+      var camDir = M3.V(Math.sin(camYawBase) * cpc, cps, Math.cos(camYawBase) * cpc);
+
+      // ③ 视线钳位，保证 |y| 不超过限位
+      var fy2 = M3.clamp(camDir.y, -SIN_LIM, SIN_LIM);
+      var fh2 = camDir.x * camDir.x + camDir.z * camDir.z;
+      if (fh2 > 1e-8) {
+        var fhz = Math.sqrt(fh2);
+        var fsc = Math.sqrt(Math.max(0, 1 - fy2 * fy2)) / fhz;
+        camDir = M3.V(camDir.x * fsc, fy2, camDir.z * fsc);
+      }
+
+      /* 位置在**世界坐标**的后方（不是机体坐标系）——
+         这样滚转时镜头不会绕着飞机转圈，是"稳定"的另一半。 */
+      var off0 = M3.rotAxis(M3.mul(camDir, -S.camDist), M3.V(0, 1, 0), camYaw);
+      var want = M3.add(p.pos, M3.add(off0, M3.V(0, S.camHeight + camPitch * 70, 0)));
+      camPos = M3.lerpV(camPos, want, 1 - Math.exp(-7.5 * dt));
+
+      camFwd = camDir;
+      camUp = M3.V(0, 1, 0);
       Renderer.setCamera(camPos, camFwd, camUp, S.fov);
     }
 
@@ -1598,14 +1634,36 @@ var Game = (function () {
       var cp = M3.add(p.pos, M3.add(M3.mul(p.fwd, 3.4), M3.mul(p.up, 1.1)));
       Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);
     } else {
-      // 目标视角：从侧上方看玩家与目标
+      /* 目标视角：从**侧上方**看玩家与目标。
+
+         原来是正上方 90 米、垂直往下看 —— 视线与 up 完全共线，
+         正交基退化，画面随机翻滚，玩家会"找不到自己的飞机"。
+         侧向偏出去一点就永远不会共线。
+
+         没有目标时同理：只往机身后上方放，一旦飞机本身垂直，
+         p.pos − want2 也会变成垂直方向。所以也要带侧向分量。 */
       var t = p.target;
       if (t && t.alive) {
         var mid = M3.mul(M3.add(p.pos, t.pos), 0.5);
-        var cp2 = M3.add(mid, M3.V(0, 90, 0));
+        var span = Math.max(140, M3.dist(p.pos, t.pos));
+        // 玩家→目标的水平垂线方向
+        var along = M3.sub(t.pos, p.pos);
+        along.y = 0;
+        var al = Math.sqrt(along.x * along.x + along.z * along.z);
+        var side = al > 1e-4
+          ? M3.V(-along.z / al, 0, along.x / al)
+          : M3.V(1, 0, 0);
+        var cp2 = M3.add(mid, M3.add(
+          M3.mul(side, span * 0.40 + 40),
+          M3.V(0, Math.max(60, span * 0.26), 0)
+        ));
         Renderer.setCamera(cp2, M3.norm(M3.sub(mid, cp2)), M3.V(0, 1, 0), 55);
       } else {
-        var want2 = M3.add(p.pos, M3.add(M3.mul(p.fwd, -120), M3.V(0, 50, 0)));
+        // 侧后上方 —— 侧向分量保证视线不会与 up 共线
+        var want2 = M3.add(p.pos, M3.add(
+          M3.mul(p.fwd, -120),
+          M3.add(M3.mul(p.right, 55), M3.V(0, 50, 0))
+        ));
         Renderer.setCamera(want2, M3.norm(M3.sub(p.pos, want2)), M3.V(0, 1, 0), S.fov);
       }
     }
