@@ -1464,6 +1464,57 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 真实游戏里：鼠标略微朝正下方必须是推杆 ----
+
+     这条走的是完整链路（鼠标事件 → updateAim → steerTo → ctrl），
+     所以能抓到离线单测看不到的问题。
+
+     踩过一次坑：推杆一度和滚转共用 AIM_BLEND_MAG = 0.225 那条窄轴，
+     结果玩家"略微朝正下方"（屏幕纵向 15% 上下）时 pushW 只剩 0.16，
+     推杆几乎为零，看到的只有缓慢滚转。推杆现在有自己更宽的轴。 */
+  {
+    const G = sandbox.Game, R = sandbox.Renderer;
+    const bad = [];
+    G.startMission(0);
+    const pl = G.__player();
+    for (let f = 0; f < 120; f++) pump(1);        // 先稳定飞一会儿
+
+    const cvEl = sandbox.document.getElementById('cv');
+    function at(dy) {
+      cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2 + dy });
+      pump(1);
+      // 必须拷贝：pl.ctrl 是同一个对象，下次调用会把它改掉
+      return { pitch: pl.ctrl.pitch, roll: pl.ctrl.roll, yaw: pl.ctrl.yaw };
+    }
+
+    const near = at(40), mid = at(60), deep = at(90);
+
+    // ① 柔和朝正下方：推杆要够明显（俯仰角速度至少 3°/s，即 pitch ≤ -0.07）
+    if (near.pitch > -0.07) {
+      bad.push('鼠标略微朝正下方时推杆太弱（pitch=' + near.pitch.toFixed(3) +
+        '，角速度约 ' + (near.pitch * 44).toFixed(1) + '°/s）');
+    }
+    // ② 柔和推杆时不能带滚转
+    if (Math.abs(near.roll) > 0.06) {
+      bad.push('柔和推杆时带了滚转（roll=' + near.roll.toFixed(3) +
+        '）—— 那会让机头先侧着转，不像压机头');
+    }
+    // ③ 幅度再大仍应是推杆为主
+    if (deep.pitch > -0.06) {
+      bad.push('鼠标下移到 90px 时推杆消失了（pitch=' + deep.pitch.toFixed(3) + '）');
+    }
+    // ④ 滚转权重必须随幅度升上来
+    const wide = at(200);
+    if (Math.abs(wide.roll) < 0.6) {
+      bad.push('推到屏幕深处时滚转权重没有升起来（roll=' + wide.roll.toFixed(3) + '）');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('真实链路：略微朝正下方即推杆（pitch ' + near.pitch.toFixed(3) +
+      ' / ' + mid.pitch.toFixed(3) + ' / ' + deep.pitch.toFixed(3) +
+      '，柔和段 roll ' + near.roll.toFixed(3) + '）');
+  }
+
   /* ---- 诊断：AI 到底用不用机炮 ---- */
   {
     const Ent2 = sandbox.Ent, M3d = sandbox.M3, Wd = sandbox.WEAPONS;

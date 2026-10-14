@@ -56,6 +56,21 @@ var AI = (function () {
      而且是平方衰减 —— 中心附近掉得极快（见 steerTo 里的 gain）。 */
   var AIM_FULL_MAG = 0.35;
 
+  /* 推杆自己的幅度轴 —— 比滚转的柔和区**宽得多**。
+
+     为什么需要两条轴：滚转/偏航的"柔和"要的是细腻（稍微一动就给
+     一点点），所以 AIM_BLEND_MAG 取得很小(0.225)。但推杆是完全不同
+     的一件事 —— 玩家"略微朝正下方"想让机头压下去，那个"略微"通常
+     已经是屏幕纵向 15% 上下，用 0.225 的轴算出来 pushW 只剩 0.16，
+     等于没推。
+
+     实测（真实游戏，鼠标从中心往下移）：
+       dy=40px  aimMag=0.111  pitch=-0.045  roll=0.024
+       dy=60px  aimMag=0.167  pitch=-0.023  roll=0.157   ← 推杆已经快没了
+       dy=90px  aimMag=0.250  pitch= 0.000  roll=0.510
+     换成 0.5 之后同样位置 pushW 分别是 0.87 / 0.74 / 0.50。 */
+  var AIM_PUSH_AXIS = 0.5;
+
   /* "柔和转向"与"快速转向"之间的过渡轴。
 
      刻意取得很小（0.225，约合屏幕纵向 22%）：有意把鼠标稳在中心附近
@@ -214,9 +229,31 @@ var AI = (function () {
        深一点就会把一个"相对镜头正着飞"的飞机误判成不正。
 
        AI 没有镜头这一层，退回世界 up（它们的控制律本来就不经过镜头）。 */
+    /* 目标在机体横向平面里偏向哪一侧：+1 = 正上，0 = 正侧方，-1 = 正下。
+       方位判定（推杆锥）和俯仰段都要用，所以先算。 */
+    var lateral = Math.sqrt(rx * rx + ux * ux);
+    var up = lateral > 1e-4 ? M3.clamp(ux / lateral, -1, 1) : 1;
+
     var upright = (st && st.aimUpright !== undefined) ? st.aimUpright : a.up.y;
+
+    /* 推杆区是"正下方 ±60° 的锥"，用方位角判定。
+
+       up 是目标在机体横向平面里相对机体上方的位置：
+           up = -1  正下方
+           up =  0  正侧方
+       所以 up < -0.5 正好对应"正下方 ±60°以内"。
+
+       范围内：柔和时纯推杆（不带滚转），滚转权重随幅度逐渐升上来；
+       范围外：完全不推，交给滚转对齐。
+       这条边界是**离散**的，和滚转/偏航那种连续过渡不同 ——
+       按用户的模型，策略切换本来就是一个离散决定。 */
+    var downCone = (up < -0.5);
+
     var pushW = 0;
-    if (ux < -0.02 && upright > 0.7) pushW = 1 - blend;
+    if (downCone && upright > 0.7) {
+      var tp = M3.clamp(aimMag === null ? 1 : aimMag / AIM_PUSH_AXIS, 0, 1);
+      pushW = 1 - tp * tp * (3 - 2 * tp);      // smoothstep
+    }
 
     /* 走推杆的时候**不能同时滚转**。
 
@@ -239,10 +276,6 @@ var AI = (function () {
 
     /* ---------- ② 俯仰：对齐度越高，拉得越满 ---------- */
     var off = Math.acos(M3.clamp(fx, -1, 1));     // 机头与目标的夹角
-
-    // 目标在机体横向平面里偏向哪一侧：+1 = 正上，0 = 正侧方，-1 = 正下
-    var lateral = Math.sqrt(rx * rx + ux * ux);
-    var up = lateral > 1e-4 ? M3.clamp(ux / lateral, -1, 1) : 1;
 
     var mag = M3.clamp(off * 2.3, 0, 1);
     var pitchCmd;
