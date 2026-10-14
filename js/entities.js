@@ -36,9 +36,30 @@ var Ent = (function () {
   }
 
   /** 气动权限系数：动压低于约 22 kPa 开始下降 */
-  function ctrlFactor(y, speed) {
-    var k = qOf(y, speed) / 22000;
-    return M3.clamp(k, 0.13, 1.0);
+  /* 操控权限随动压变化：q = ½ρv²。
+
+     两个端点允许机型自己覆盖，这是把"高空强"具体化的唯一地方 ——
+     否则一架飞机在高空好不好使，其实只由"它飞得快不快"决定。
+
+       ctrlFull   满操控所需的动压。调低 = 高速时更早把操控拉满
+       ctrlFloor  低动压时的保底操控。调高 = 能量耗尽后仍能控制
+
+     默认 22000 / 0.13 是"普通机型"。D-14 与 F-9 各改写一端，
+     于是虽然都在 18 公里以上强，性格完全不同：
+
+       D-14   ctrlFloor 0.34
+              第三涵道在稀薄空气里仍给得出控制力矩（这是它 desc 里
+              本来就写了、但一直没落到物理上的设定）。
+              能量耗尽时别人掉到 0.13、它还在 0.34 —— 2.6 倍。
+              代价是结构只有 92、失速速度 122，硬碰硬不行。
+
+       F-9    ctrlFull 16500
+              高速区间里操控提前拉满；但 ctrlFloor 仍是默认的 0.13，
+              所以一旦被拖慢，它掉得比谁都狠。 */
+  function ctrlFactor(y, speed, ac) {
+    var k = qOf(y, speed) / ((ac && ac.ctrlFull) || 22000);
+    var lo = (ac && ac.ctrlFloor) || 0.13;
+    return M3.clamp(k, lo, 1.0);
   }
 
   /** 导弹转弯率的气动缩放 */
@@ -161,7 +182,7 @@ var Ent = (function () {
     var q = qOf(a.pos.y, a.speed);
     a.q = q / 1000;                        // kPa，供 HUD 显示
 
-    var ctrl = ctrlFactor(a.pos.y, a.speed);
+    var ctrl = ctrlFactor(a.pos.y, a.speed, a.ac);
     a.stall = a.speed < p.vStall;
     if (a.stall) ctrl *= 0.34;
 

@@ -1436,6 +1436,51 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
     else ok('挂架装填受储备弹数约束：打光不恢复、有弹才装填');
 
+  /* ---- 两架高空机的性格必须真的分开 ----
+
+     ctrl 只看动压，而同一高度下动压只跟空速有关 —— 不加干预的话，
+     "谁在高空更好使"就被"谁飞得快"单方面决定了：D-14 旗鱼号称
+     平流层之王，极速却比 F-9 慢 54 m/s，在 20 公里上反而不如它。
+     设定和数值脱节。所以把曲线的两端交给机型覆盖（ctrlFloor / ctrlFull）。 */
+  {
+    const E2 = sandbox.Ent, A2 = sandbox.AIRCRAFT;
+    const D14 = A2.find(a => a.id === 'c14'), F9 = A2.find(a => a.id === 'c9');
+    const bad = [];
+
+    if (!D14 || !F9) {
+      bad.push('找不到 D-14 或 F-9');
+    } else {
+      // 20 公里、200 m/s：能量耗尽 —— 旗鱼靠第三涵道保住控制
+      const slowD = E2.ctrlFactor(20000, 200, D14);
+      const slowF = E2.ctrlFactor(20000, 200, F9);
+      if (!(slowD > slowF * 2)) {
+        bad.push('能量耗尽时 D-14 没有明显强于 F-9（' + slowD.toFixed(2) +
+          ' vs ' + slowF.toFixed(2) + '）—— 第三涵道的设定没落到物理上');
+      }
+
+      // 20 公里、620 m/s：高速 —— 海燕的飞控提前拉满
+      const fastD = E2.ctrlFactor(20000, 620, D14);
+      const fastF = E2.ctrlFactor(20000, 620, F9);
+      if (!(fastF > fastD)) {
+        bad.push('高速时 F-9 没有强于 D-14（' + fastF.toFixed(2) +
+          ' vs ' + fastD.toFixed(2) + '）');
+      }
+      if (fastF < 0.99) {
+        bad.push('F-9 在极速下操控没有拉满（' + fastF.toFixed(2) + '）');
+      }
+
+      // 常规机型不受影响
+      const DB = A2.find(a => a.id === 'c11');
+      if (Math.abs(E2.ctrlFactor(20000, 200, DB) - 0.13) > 1e-6) {
+        bad.push('常规机型的低动压保底被动到了');
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('两架高空机性格分开：低速时 D-14 强（0.34 vs 0.13）、' +
+      '高速时 F-9 强（1.00 vs 0.77）');
+  }
+
   /* ---- 齐射：一次按键打出 w.salvo 枚，共用同一个冷却槽 ---- */
   {
     const Ent2 = sandbox.Ent, G2 = sandbox.Game, M3q = sandbox.M3;
