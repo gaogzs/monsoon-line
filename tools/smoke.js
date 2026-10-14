@@ -637,7 +637,7 @@ if (Ent && M3 && me && world) {
       Ent.breakLock(me, world);
       if (!m.target) lost++;
     }
-    const want = 1 - WEAPONS[wid].flare * 0.55;      // 与被测实现同一公式
+    const want = WEAPONS[wid].flare;      // flare 本身就是被干扰的概率
     const rate = lost / N;
     // 1500 次采样，σ≈1.1%，允许 ±4 个百分点
     if (Math.abs(rate - want) > 0.04) {
@@ -648,20 +648,55 @@ if (Ent && M3 && me && world) {
     }
   }
 
-  // 雷达制导不该吃干扰弹（设定如此）
+  /* ---- 雷达弹也吃干扰弹（箔丝），但比红外弹更难骗 ----
+     干扰弹是热焰弹与箔丝一起投放的：前者骗红外导引头，后者骗雷达。
+     早先的实现直接跳过了所有雷达弹，等于把箔丝当不存在。 */
   {
-    const m = Ent.makeMissile({
-      weapon: 'dl4', team: 1, pos: M3.V(me.pos.x, me.pos.y, me.pos.z - 900),
-      fwd: M3.V(0, 0, 1), speed: 320, target: me, owner: null
-    });
-    m.team = 1;
-    world.missiles.length = 0;
-    world.missiles.push(m);
-    me.flares = 80; me.flareCd = 0;
-    Ent.breakLock(me, world);
-    // target 还在 = 没被骗走 = 符合设定
-    if (m.target) ok('雷达制导不吃干扰弹（符合设定）');
-    else fail('雷达制导导弹被干扰弹骗走了 —— 与设定不符');
+    const N = 1200;
+    const runRate = (wid) => {
+      const pl = sandbox.Game.__player();
+      const w2 = sandbox.Game.__world();
+      let lost = 0;
+      for (let i = 0; i < N; i++) {
+        const mm = Ent.makeMissile({
+          weapon: wid, team: 1,
+          pos: M3.V(pl.pos.x, pl.pos.y, pl.pos.z - 900),
+          fwd: M3.V(0, 0, 1), speed: 320, target: pl, owner: null
+        });
+        mm.team = 1;
+        w2.missiles.length = 0;
+        w2.particles.length = 0;
+        w2.missiles.push(mm);
+        pl.flares = 80; pl.flareCd = 0;
+        Ent.breakLock(pl, w2);
+        if (!mm.target) lost++;
+      }
+      return lost / N;
+    };
+
+    const irRate = runRate('srm');       // 红外
+    const rdRate = runRate('mrm');       // 雷达
+    // flare 就是被干扰的概率，不需要再变换
+    const wantIR = WEAPONS.srm.flare;
+    const wantRD = WEAPONS.mrm.flare;
+
+    const bad = [];
+    if (Math.abs(irRate - wantIR) > 0.045) {
+      bad.push('红外弹 ' + (irRate * 100).toFixed(0) + '%，预期 ' + (wantIR * 100).toFixed(0) + '%');
+    }
+    if (Math.abs(rdRate - wantRD) > 0.045) {
+      bad.push('雷达弹 ' + (rdRate * 100).toFixed(0) + '%，预期 ' + (wantRD * 100).toFixed(0) + '%');
+    }
+    // 数据侧的一致性：抗干扰改型应当比基础弹更难骗
+    if (WEAPONS.trm.flare >= WEAPONS.srm.flare) {
+      bad.push('TOR-4（抗干扰改型）的 flare 不低于 TOR-2（基础弹），数据本身反了');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else {
+      ok('箔丝有效：雷达弹 ' + (rdRate * 100).toFixed(0) + '% 被干扰，' +
+        '红外弹 ' + (irRate * 100).toFixed(0) + '%');
+    }
   }
 
   /* ---- 飞控：前下方目标应当推杆俯冲 ---- */

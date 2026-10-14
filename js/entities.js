@@ -501,25 +501,39 @@ var Ent = (function () {
     }
     /* 箔丝（chaff）：淡白色的金属丝云，散得更开、下落更慢、停留更久。
        现代干扰弹是热焰弹与箔丝一起投放的 —— 前者骗红外，后者骗雷达，
-       所以视觉上也该是两种东西，而不是一团橙色火光。 */
-    for (i = 0; i < 9; i++) {
+       所以视觉上也该是两种东西，而不是一团橙色火光。
+
+       尺寸比热焰弹小得多：它是丝，不是火球。上一轮把热焰弹从 2.2 缩到
+       0.85 时漏掉了这里（1.25），结果丝团看着比火球还大。 */
+    for (i = 0; i < 14; i++) {
       var cd2 = randUnit();
       var v2 = M3.add(M3.mul(a.vel, 0.28), M3.mul(cd2, M3.rnd(14, 44)));
       v2 = M3.add(v2, M3.mul(a.up, -M3.rnd(24, 48)));
       spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -5.5)), v2,
-        M3.rnd(2.0, 3.2), 1.25, '#e6eef4', { drag: 1.15, grav: 0.10 });
+        M3.rnd(2.0, 3.2), 0.42, '#e6eef4', { drag: 1.15, grav: 0.10 });
     }
 
     var broke = 0;
     for (i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
       if (!m.alive || m.target !== a) continue;
-      if (m.w.seeker !== 'ir') continue;      // 雷达制导不吃干扰弹，这是设定
 
-      // flare 的语义是"抗干扰"，所以被骗概率 = 1 - flare·k。
-      // k 取 0.55 而不是 1：原值让 BIN-6 只有 65% 被骗，
-      // 玩家连放三四发都不奏效，体感就是"干扰弹没用"。
-      var chance = 1 - m.w.flare * 0.55;
+      /* 干扰弹是**热焰弹 + 箔丝**一起投放的：
+         前者骗红外导引头，后者骗雷达导引头 —— 两种都能被干扰。
+
+         早先这里写的是"雷达制导不吃干扰弹"，那句话是错的，
+         等于把箔丝当成了不存在的东西。
+
+         **flare 字段本身就是"被干扰的概率"**：越小越难骗。
+
+         这一点早先被我理解反了 —— 公式写成了 1 − flare·k，
+         等于把「抗干扰改型」TOR-4（flare 0.24，全表最低）
+         变成了最容易被骗的一枚。数据一直是对的，是公式错了。
+
+         雷达导引头普遍更难骗（多普勒滤波能滤掉静止的箔丝云），
+         而大型对地弹普遍更容易被骗（不装抗干扰设备）——
+         这两种差异都已经直接体现在各弹的 flare 值里，不需要再乘系数。 */
+      var chance = m.w.flare;
       if (Math.random() >= chance) continue;
 
       m.target = null;
