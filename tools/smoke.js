@@ -381,6 +381,22 @@ if (!badStore) ok('全部武器都有挂载属性');
   if (!bad) ok('全部可发射武器都有 speed / life');
 }
 
+// 冷却时间表要覆盖所有可发射武器 ——
+// 漏掉的话那件武器会保留 data.js 里写的原始 cd，
+// 而那个值可能是按旧语义（一次齐射打光）定的，会快得离谱
+{
+  const tbl = sandbox.STORE_COOLDOWN || {};
+  const missing = [];
+  for (const k in WEAPONS) {
+    const w = WEAPONS[k];
+    if (w.kind === 'gun' || w.passive) continue;
+    if (!w.fits || !w.fits.length) continue;
+    if (!(k in tbl)) missing.push(k + '(' + w.name + ')');
+  }
+  if (missing.length) fail('这些武器没写进 STORE_COOLDOWN：' + missing.join('、'));
+  else ok('冷却时间表覆盖全部可发射武器');
+}
+
 // 有制导方式的武器都该有导引品质（lead）
 // 注意：被动吊舱和 ECM/DEW 本来就不制导，不该要求它们有 lead
 {
@@ -636,19 +652,63 @@ if (Ent && M3 && me && world) {
       ok('只有一种挂载，跳过切枪测试');
     } else {
       const start = p.special;
-      p.cdPool[start] = 3.0;
-      p.spCd = 3.0;
+      const slots0 = p.slotCd[start];
+      slots0[0] = 3.0;
+      p.spCd = Math.min.apply(null, slots0);
 
       // 按满一圈 R 应当回到起点
       for (let i = 0; i < p.loadoutList.length; i++) {
         kd.forEach(fn => fn({ code: 'KeyR', preventDefault() {} }));
       }
+      // 注意检查的是槽数组，不是 spCd ——
+      // spCd 取"最快就绪的槽"，这里只给槽 0 上了冷却，所以它是 0 才是对的
+      const back = p.slotCd[start];
       if (p.special !== start) {
         fail('按 R 循环一圈后没有回到起始武器（' + start + ' → ' + p.special + '）');
-      } else if (p.spCd < 2.5) {
-        fail('切枪把装填时间清掉了（spCd=' + p.spCd.toFixed(2) + '）—— 那等于无冷却连射');
+      } else if (!back || back[0] < 2.5) {
+        fail('切枪把装填时间清掉了（槽0=' +
+          (back ? back[0].toFixed(2) : '无') + '）—— 那等于无冷却连射');
       } else {
-        ok('切枪不会跳过装填（回到 ' + start + ' 时仍有 ' + p.spCd.toFixed(1) + 's 冷却）');
+        ok('切枪不会跳过装填（回到 ' + start + ' 时槽0 仍剩 ' +
+          back[0].toFixed(1) + 's）');
+      }
+    }
+  }
+
+  /* ---- 发射槽：一次打一枚，各槽独立冷却 ---- */
+  {
+    const p = sandbox.Game.__player();
+    const e = p.loadoutList[0];
+    const slots = p.slotCd[e.wid];
+
+    // 槽数必须等于该武器占用的挂载点总数
+    if (!slots || slots.length !== e.points) {
+      fail(e.wid + ' 的发射槽有 ' + (slots ? slots.length : 0) +
+        ' 个，应该等于挂载点数 ' + e.points);
+    } else {
+      ok('发射槽数 = 挂载点数（' + e.wid + ' ' + slots.length + ' 个）');
+    }
+
+    // 找一个目标，然后连续按发射键 —— 每次应当只出 1 枚，
+    // 而且总共只能出"槽数"枚（之后全部在装填）
+    const foe = world.actors.find(a => a.team !== p.team && a.alive);
+    if (!foe) {
+      fail('世界里没有敌方目标，发射槽测试无法进行');
+    } else {
+      slots.forEach((v, i) => { slots[i] = 0; });
+      p.spAmmo = 99;
+      let fired = 0;
+      const N = slots.length + 2;
+      for (let i = 0; i < N; i++) {
+        const n0 = world.missiles.length;
+        world.fireMissile(p, foe);
+        if (world.missiles.length > n0) fired++;
+      }
+      if (fired !== slots.length) {
+        fail('连按 ' + N + ' 次打出了 ' + fired + ' 枚，应该正好 ' + slots.length +
+          ' 枚（每槽一枚，打满后要等装填）');
+      } else {
+        ok('连按出 ' + fired + ' 枚后全部槽进入装填，每次只出 1 枚');
       }
     }
   }

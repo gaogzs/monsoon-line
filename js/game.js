@@ -614,7 +614,7 @@ var Game = (function () {
         '<span class="pk-cnt">×' + cnt + '</span></div>' +
         '<div class="pk-role">' + (w.role || '—') + '</div>' +
         '<div class="pk-d">' + (w.desc || '') + '</div>' +
-        '<div class="pk-q">' + storeStatLine(w) + '</div>';
+        '<div class="pk-q">' + storeStatLine(w, n) + '</div>';
     }
 
     card.onclick = function () {
@@ -625,12 +625,13 @@ var Game = (function () {
     return card;
   }
 
-  /** 卡片底部的参数行 */
-  function storeStatLine(w) {
+  /** 卡片底部的参数行。n = 这一组的点数（也就是并行发射槽的数量） */
+  function storeStatLine(w, n) {
     var bits = [];
     if (w.passive) {
       bits.push('被动 · 不占扳机');
     } else {
+      if (n) bits.push(n + ' 个发射槽');
       var r = missileRange(w);
       if (r) bits.push('射程 ' + r.toFixed(1) + ' km');
       if (w.kind === 'dew' && w.interceptRange) {
@@ -837,7 +838,9 @@ var Game = (function () {
     a.spAmmo = a.ammoPool ? (a.ammoPool[e.wid] || 0) : 0;
     a.spSalvo = e.salvo;
     // 冷却也跟着切过去，每件武器各算各的
-    a.spCd = a.cdPool ? (a.cdPool[e.wid] || 0) : 0;
+    // spCd = 最快就绪的那个槽的剩余时间，供 HUD 与 AI 判断能不能打
+    var sl = a.slotCd ? a.slotCd[e.wid] : null;
+    a.spCd = sl ? Math.min.apply(null, sl) : 0;
   }
 
   function launch(actor, target, w) {
@@ -849,7 +852,9 @@ var Game = (function () {
       if (actor.spCd > 0) return false;
       actor.spActive = wp.duration;
       actor.spCd = wp.cd;
-      if (actor.cdPool) actor.cdPool[actor.special] = wp.cd;
+      if (actor.slotCd && actor.slotCd[actor.special]) {
+        actor.slotCd[actor.special][0] = wp.cd;
+      }
       SFX.laser();
       Radio.raw({ who: actor.isPlayer ? CALLSIGN.player : actor.name, cls: 'ally', tx: '<i>认知电子战吊舱开机 —— 敌方锁定距离 −40%</i>', gap: 0.6 });
       return true;
@@ -857,7 +862,20 @@ var Game = (function () {
     /* DEW 是自动系统，不能手动发射 */
     if (wp.kind === 'dew') return false;
 
-    if (actor.spAmmo <= 0 || actor.spCd > 0) return false;
+    if (actor.spAmmo <= 0) return false;
+
+    /* 找一个冷却完毕的发射槽。找不到就按不出去 ——
+       这就是"每个冷却单独计算"：连打几发之后要挨个等它们装填。 */
+    var slotIdx = -1;
+    var slotArr = actor.slotCd ? actor.slotCd[actor.special] : null;
+    if (slotArr) {
+      for (var si = 0; si < slotArr.length; si++) {
+        if (slotArr[si] <= 0) { slotIdx = si; break; }
+      }
+      if (slotIdx < 0) return false;
+    } else if (actor.spCd > 0) {
+      return false;                       // 没有槽表就退回旧的单冷却
+    }
 
     /* 交战规则：阵列空域内禁止 20 kg 以上战斗部 */
     if (actor.isPlayer && w.roeBlocked &&
@@ -867,36 +885,40 @@ var Game = (function () {
     }
     if (!target && wp.target !== 'ground' && wp.target !== 'ship') return false;
 
-    /* 齐射数 = 该武器占用的挂载点总数。
-       挂载点成对，所以这个数通常是偶数 —— 一次按下，两侧一起打出去。 */
-    var n = Math.max(1, actor.spSalvo || wp.salvo || 1);
-    n = Math.min(n, actor.spAmmo);
-    if (n <= 0) return false;
+    /* 一次按键只打 1 枚。
+       挂载点决定的是"能同时装填几发"（也就是 slotArr 的长度），
+       不是一次打几发 —— "齐射数"的含义就是：
+       连按几次能打出几枚，之后要挨个等它们装填。 */
+    var si2 = Math.max(0, slotIdx);
+    var side = (si2 % 2) ? 1 : -1;
+    var rank = Math.floor(si2 / 2);
+    var hp = M3.add(actor.pos, M3.add(
+      M3.mul(actor.fwd, 4),
+      M3.mul(actor.right, side * (2.4 + rank * 1.9))));
 
-    for (var i = 0; i < n; i++) {
-      // 按左右交替、由内向外错开挂架，避免全从同一个点飞出来
-      var side = (i % 2) ? 1 : -1;
-      var rank = Math.floor(i / 2);
-      var hp = M3.add(actor.pos, M3.add(
-        M3.mul(actor.fwd, 4),
-        M3.mul(actor.right, side * (2.4 + rank * 1.9))));
-      var m = Ent.makeMissile({
-        weapon: actor.special,
-        team: actor.team,
-        pos: hp,
-        fwd: actor.fwd,
-        speed: actor.speed + 70,
-        target: target || null,
-        owner: actor
-      });
-      w.missiles.push(m);
+    var m = Ent.makeMissile({
+      weapon: actor.special,
+      team: actor.team,
+      pos: hp,
+      fwd: actor.fwd,
+      speed: actor.speed + 70,
+      target: target || null,
+      owner: actor
+    });
+    w.missiles.push(m);
+
+    actor.spAmmo -= 1;
+    if (slotArr) {
+      slotArr[si2] = wp.cd;
+      // spCd 取"最快就绪的那个槽"，供 HUD 与 AI 判断还能不能再打
+      actor.spCd = Math.min.apply(null, slotArr);
+    } else {
+      actor.spCd = wp.cd;
     }
-    actor.spAmmo -= n;
-    actor.spCd = wp.cd;
-    if (actor.cdPool) actor.cdPool[actor.special] = wp.cd;
+
     if (actor.isPlayer) {
       if (actor.ammoPool) actor.ammoPool[actor.special] = actor.spAmmo;
-      w.shotsFired += n;
+      w.shotsFired += 1;
       SFX.missile();
     } else {
       var d = M3.dist(actor.pos, w.player.pos);
@@ -927,10 +949,18 @@ var Game = (function () {
       special: wl.length ? wl[0].wid : null
     });
 
-    // 挂载配置落到飞机上：武器列表 + 各自的弹药池 + 齐射数
+    // 挂载配置落到飞机上：武器列表 + 弹药池 + 每个挂载点一个发射槽
     p.loadoutList = wl;
     p.ammoPool = {};
     for (var wi = 0; wi < wl.length; wi++) p.ammoPool[wl[wi].wid] = wl[wi].ammo;
+
+    p.slotCd = {};
+    for (wi = 0; wi < wl.length; wi++) {
+      var sArr = [];
+      for (var sj = 0; sj < wl[wi].salvo; sj++) sArr.push(0);
+      p.slotCd[wl[wi].wid] = sArr;
+    }
+
     p.wpIdx = 0;
     p.spAmmo = wl.length ? wl[0].ammo : 0;
     p.spSalvo = wl.length ? wl[0].salvo : 1;
@@ -1082,7 +1112,7 @@ var Game = (function () {
     player.wpIdx = (player.wpIdx + 1) % player.loadoutList.length;
     syncWeapon(player);
     var w = WEAPONS[player.special];
-    // 注意不重置 spCd —— syncWeapon 已经从 cdPool 里取回这把武器自己的剩余
+    // 注意不重置 spCd —— syncWeapon 已经从 slotCd 取回这把武器最快就绪的槽
     player.spActive = 0;
     if (w.kind === 'dew') player.spCharges = w.charges;
     player.lockProgress = 0;

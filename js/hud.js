@@ -802,8 +802,17 @@ var HUD = (function () {
 
       if (cur) text(ctx, '>', x - 92, ry, AMBER, FB, 'left');
       text(ctx, e.w.name, x - 76, ry, col, FB, 'left');
-      text(ctx, String(ammo), x + 62, ry, col, FB, 'right');
-      if (e.salvo > 1) text(ctx, 'R' + e.salvo, x + 72, ry, DIM, FS, 'left');
+      text(ctx, String(ammo), x + 58, ry, col, FB, 'right');
+
+      /* 发射槽指示：● 就绪、○ 装填中。
+         一个槽 = 能立刻打出的一发；全部空心的意思就是
+         "现在按发射键没反应，得等"。 */
+      var sl = p.slotCd ? p.slotCd[e.wid] : null;
+      if (sl && sl.length) {
+        var dots = '';
+        for (var d = 0; d < sl.length; d++) dots += (sl[d] <= 0 ? '●' : '○');
+        text(ctx, dots, x + 70, ry, DIM, FS, 'left');
+      }
     }
 
     if (lst.length) {
@@ -881,14 +890,24 @@ var HUD = (function () {
     ctx.lineWidth = 1;
     ctx.strokeRect(bx, by, size, size);
 
-    // 每件武器各自的装填进度（按它自己的冷却时长归一化）
+    /* 每个挂载点一个发射槽，所以进度也要一个一个算。
+       这里给的是**就绪度**：0 = 刚打完（空壳），1 = 装填完毕（满）。
+
+       注意方向：冷却条要朝着"能打"的方向生长 ——
+       一上来是空的，然后从下往上填满。反过来（先满后慢慢空）
+       读起来像是"越打越有"，和实际状态正好相反。 */
     var cd = {};
-    var pool = p.cdPool || {};
+    var slots = p.slotCd || {};
     var lst = p.loadoutList || [];
     for (var i = 0; i < lst.length; i++) {
       var e = lst[i];
+      var arr = slots[e.wid] || [];
       var total = e.w.cd > 0 ? e.w.cd : 1;
-      cd[e.wid] = M3.clamp((pool[e.wid] || 0) / total, 0, 1);
+      var out = [];
+      for (var j = 0; j < e.salvo; j++) {
+        out.push(1 - M3.clamp((arr[j] || 0) / total, 0, 1));
+      }
+      cd[e.wid] = out;
     }
 
     PLANFORM.paint(ctx, bx, by, size, size, p.ac, p.loadout,

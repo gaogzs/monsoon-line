@@ -499,8 +499,8 @@ var PLANFORM = (function () {
       var grp = groups[gi];
       var st = groupStore(ac, grp, loadout);
       var isActive = (opts.active && grp.id === opts.active);
-      // 这种武器的冷却进度：1 = 刚打完，0 = 已就绪
-      var prog = (cd && st.wid && cd[st.wid] !== undefined) ? cd[st.wid] : 0;
+      // 这种武器每个挂载点一个槽，所以进度是一个数组
+      var cdArr = (cd && st.wid) ? cd[st.wid] : null;
 
       for (var pi = 0; pi < grp.pts.length; pi++) {
         var hp = grp.pts[pi];
@@ -514,24 +514,31 @@ var PLANFORM = (function () {
           continue;
         }
 
-        if (prog > 0.002) {
-          /* 冷却中：先铺一层暗绿轮廓表示"这个挂架空了"，
-             再用裁剪把亮绿从下往上填回来。
-             进度条就是这个弹体本身，不用另找地方放一条 —— 更省地方，
-             而且一眼就能看出是哪一组的弹在装填。 */
-          var Lc = (STORE_LEN[st.w.kind] || 3.0) * k;
+        /* ready = 就绪度：0 刚打完（空壳），1 装填完毕（满）。
+           没有进度信息时当作满的。 */
+        var ready = cdArr ? M3.clamp(
+          cdArr[pi] === undefined ? 1 : cdArr[pi], 0, 1) : 1;
+
+        if (ready < 0.998) {
+          /* 装填中：先铺一层暗绿轮廓表示"这个挂架空了"，
+             再用裁剪把亮绿**从下往上**填回来。
+             进度条就是这个弹体本身 —— 不用另找地方放一条，
+             而且一眼就能看出是哪一组的哪一发在装填。 */
           g.strokeStyle = 'rgba(79,224,138,0.20)';
           g.lineWidth = 1.3;
           drawStore(g, px, py, st.w.kind, k, { line: 1.3 });
 
-          g.save();
-          g.beginPath();
-          g.rect(px - k * 1.8, py + Lc / 2 - Lc * prog, k * 3.6, Lc * prog);
-          g.clip();
-          g.strokeStyle = STORE;
-          g.lineWidth = 1.4;
-          drawStore(g, px, py, st.w.kind, k, { line: 1.4 });
-          g.restore();
+          if (ready > 0.002) {
+            var Lc = (STORE_LEN[st.w.kind] || 3.0) * k;
+            g.save();
+            g.beginPath();
+            g.rect(px - k * 1.8, py + Lc / 2 - Lc * ready, k * 3.6, Lc * ready);
+            g.clip();
+            g.strokeStyle = STORE;
+            g.lineWidth = 1.4;
+            drawStore(g, px, py, st.w.kind, k, { line: 1.4 });
+            g.restore();
+          }
         } else {
           g.strokeStyle = isActive ? AMBER : STORE;
           g.lineWidth = isActive ? 2 : 1.3;

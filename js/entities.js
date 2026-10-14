@@ -102,7 +102,11 @@ var Ent = (function () {
       special: spWid,
       spAmmo: spWid ? WEAPONS[spWid].ammo : 0,
       spCd: 0,
-      cdPool: {},         // 每件武器各自的冷却剩余
+      /* 并行发射槽：{ 武器 id: [槽1剩余, 槽2剩余, ...] }
+         槽数 = 该武器占用的挂载点数。
+         按一次发射键打 1 枚，占用一个冷却完毕的槽；
+         所有槽都在装填时按不出去。这就是"齐射数"的真正含义。 */
+      slotCd: {},
       spActive: 0,        // ECM 剩余生效时间
       spCharges: 0,       // DEW 充能数（构造末尾按武器初始化）
       gunTimer: 0,
@@ -249,8 +253,11 @@ var Ent = (function () {
     if (a.spCd > 0) a.spCd -= dt;
     // 每件武器分开计时。否则按 R 切一下挂载就等于跳过装填了 ——
     // 那会让"打一发就换枪"变成无冷却连射。
-    for (var ck in a.cdPool) {
-      if (a.cdPool[ck] > 0) a.cdPool[ck] = Math.max(0, a.cdPool[ck] - dt);
+    for (var ck in a.slotCd) {
+      var slots = a.slotCd[ck];
+      for (var si = 0; si < slots.length; si++) {
+        if (slots[si] > 0) slots[si] = Math.max(0, slots[si] - dt);
+      }
     }
     if (a.spActive > 0) a.spActive -= dt;
     if (a.flareCd > 0) a.flareCd -= dt;
