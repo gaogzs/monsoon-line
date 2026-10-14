@@ -430,19 +430,29 @@ var HUD = (function () {
 
     var R = 24000;                         // 投影用的远距离（在 far 之内）
 
-    for (var d = -75; d <= 75; d += 5) {
+    /* 只标 ±40°。
+
+       以前是 ±75°，结果刻线从屏幕顶端一直铺到底端 —— 这个刻度是用来
+       判断"现在是抬头还是低头"的，超出 ±40° 的部分既读不出来、
+       又把画面切得七零八落。范围收到这里之后，垂直方向只占中间约
+       三分之二，四周留出干净的视野给目标与警告。 */
+    var LIM = 40;
+
+    for (var d = -LIM; d <= LIM; d += 5) {
       var ang = d * Math.PI / 180;
       var ca = Math.cos(ang), sa = Math.sin(ang);
       var dir = M3.V(horiz.x * ca, sa, horiz.z * ca);
 
       var s = M3.project(cam, M3.add(p.pos, M3.mul(dir, R)));
-      if (!s || s.y < -40 || s.y > H + 40) continue;
+      if (!s) continue;
+      // 上下各留 8% 的边距，别顶到屏幕边缘
+      if (s.y < H * 0.08 || s.y > H * 0.92) continue;
 
       var zero = (d === 0);
       var ad = Math.abs(d);
       var halfW = zero
-        ? W * 0.19
-        : Math.max(W * 0.030, W * 0.115 - ad * W * 0.0011);
+        ? W * 0.135
+        : Math.max(W * 0.022, W * 0.082 - ad * W * 0.0013);
 
       ctx.strokeStyle = zero
         ? 'rgba(79,224,138,0.40)'
@@ -450,7 +460,7 @@ var HUD = (function () {
       ctx.lineWidth = zero ? 1.6 : 1;
 
       // 中央留缺口，免得压住机头参考与速度矢量
-      var gapw = zero ? 0 : W * 0.028;
+      var gapw = zero ? 0 : W * 0.022;
       ctx.beginPath();
       if (gapw > 0) {
         ctx.moveTo(cx - halfW, s.y); ctx.lineTo(cx - gapw, s.y);
