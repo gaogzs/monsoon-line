@@ -430,6 +430,38 @@ var AI = (function () {
     }
   }
 
+  /* ---------- 实用升限：性能不够就别硬追 ----------
+
+     极高空空气稀薄，动压 q = ½ρv² 掉到几千时，操控权限只剩百分之十几。
+     实测把玩家钉在 20500 米 40 秒，追击的敌机会停在这样的状态：
+
+         ROK-27   17785 m   188 m/s   q=5793   ctrlFactor 0.26
+         VAC-14   17162 m   157 m/s   q=4061   ctrlFactor 0.18
+
+     它们没失速，但也没能上去 —— 就悬在半空慢慢挪，咬不住人也甩不掉。
+     原来的 AI 只知道"y > 19000 就别抬太高（压到 0.35）"，可它并不知道
+     "再上去就没有机动能力了"，所以会一路硬顶。
+
+     现在按机型给一条实用升限（ac.ceiling，见 data.js）：
+       接近升限（差 1200 米）→ 不许再抬头
+       已经超过           → 主动压回来
+
+     于是敌人会留在自己还有机动能力的高度层周旋，等对方自己下来 ——
+     这比让它僵在 18 公里更像"识趣的对手"。 */
+  function clampCeiling(a, dir) {
+    if (!dir) return dir;
+    var ceil = (a.ac && a.ac.ceiling) || 16000;
+    if (a.pos.y > ceil && dir.y > -0.08) {
+      // 已经超了：主动压回来
+      return M3.norm(M3.V(dir.x, -0.22, dir.z));
+    }
+    if (a.pos.y > ceil - 1200 && dir.y > 0.08) {
+      // 接近升限：不许再抬头
+      return M3.norm(M3.V(dir.x, 0.08, dir.z));
+    }
+    return dir;
+  }
+
   function update(a, dt, world) {
     if (!a.alive || !a.ai) return;
     // 航线型单位完全不走下面那套
@@ -562,6 +594,11 @@ var AI = (function () {
     }
 
     if (!desired) desired = a.fwd;
+
+    /* 所有分支都汇到这里，所以升限钳制放在这一处就够了 ——
+       无论是追击、规避还是编队，都不会为了追人钻到没有机动能力的高度。 */
+    desired = clampCeiling(a, desired);
+
     steerTo(a, desired, ctrl, a);
 
     // 硬性保护：撞地前强行拉起

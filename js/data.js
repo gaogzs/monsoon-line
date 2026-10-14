@@ -51,6 +51,8 @@ var AIRCRAFT = [
     name: 'DB-11',
     nick: 'Frigatebird',
     cn: '军舰鸟',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 18000,
     role: '舰载多用途战斗机',
     faction: '上游公约',
     planformType: '可变后掠翼',
@@ -90,6 +92,8 @@ var AIRCRAFT = [
     name: 'D-14',
     nick: 'Sailfish',
     cn: '旗鱼',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 21000,
     role: '平流层制空战斗机',
     faction: '上游公约',
     planformType: '菱形翼',
@@ -123,6 +127,8 @@ var AIRCRAFT = [
     name: 'G-6',
     nick: 'Booby',
     cn: '鲣鸟',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 12000,
     role: '近距空中支援攻击机',
     faction: '上游公约',
     planformType: '平直翼',
@@ -157,6 +163,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'c9',
     name: 'F-9', nick: 'Petrel', cn: '海燕',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 21000,
     role: '高空高速截击机',
     faction: '上游公约',
     planformType: '三角翼',
@@ -185,6 +193,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'c21',
     name: 'D-21', nick: 'Skua', cn: '贼鸥',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 19000,
     role: '多用途隐形战斗机',
     faction: '上游公约',
     planformType: '无尾菱形翼',
@@ -213,6 +223,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'c33',
     name: 'D-33', nick: 'Albatross', cn: '信天翁',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 17000,
     role: '高机动格斗机',
     faction: '上游公约',
     planformType: '前掠翼',
@@ -250,6 +262,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'ucav',
     name: 'KA-7', nick: 'Folded Wing', cn: '折翼',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 16000,
     role: '无人僚机',
     faction: '上游公约',
     planformType: '飞翼',
@@ -285,6 +299,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'm27',
     name: 'ROK-27', nick: 'Schist', cn: '片岩',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 15000,
     role: '多用途战斗机',
     faction: '下游同盟',
     planformType: '后掠翼',
@@ -318,6 +334,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'gal31',
     name: 'GAL-31', nick: 'Basalt', cn: '玄武岩',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 19000,
     role: '重型截击机',
     faction: '下游同盟',
     planformType: '双三角翼',
@@ -350,6 +368,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'vac14',
     name: 'VAC-14', nick: 'Sandstone', cn: '砂岩',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 13000,
     role: '轻型攻击机',
     faction: '下游同盟',
     planformType: '平直翼',
@@ -384,6 +404,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'rok40',
     name: 'ROK-40', nick: 'Boulder', cn: '巨砾',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 16000,
     role: '重型轰炸机',
     faction: '下游同盟',
     planformType: '平直翼',
@@ -418,6 +440,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     // 商品名体系：系列名取自逻辑语（xamsi 海），后面跟世代号 ——
     // 就像 Mirage III 那样，名字本身就是牌子，不带军标前缀
     name: 'XAMSI Mk.2', nick: 'Tideline', cn: '潮线',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 16000,
     role: '轻型拦截机',
     faction: '分水群岛国',
     planformType: '平直翼',
@@ -449,6 +473,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
   {
     id: 'spray',
     name: 'DJACU Mk.1', nick: 'Spray', cn: '浪花',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 10000,
     role: '海上巡逻机',
     faction: '分水群岛国',
     planformType: '高展弦比直翼',
@@ -478,6 +504,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     id: 'a2',
     // 管理局是技术机构，它的飞机不挂军标，只有自己的批次名
     name: 'MERLI', nick: 'Datum', cn: '水准',
+    // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
+    ceiling: 21000,
     role: '高空勤务机',
     faction: '调节场管理局',
     planformType: '高展弦比直翼',

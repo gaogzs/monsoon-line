@@ -1655,6 +1655,50 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
   }
 
+  /* ---- 诊断：AI 追到极高空会不会卡住 ---- */
+  {
+    const G = sandbox.Game, M3d = sandbox.M3, q = sandbox.Ent;
+    const bad = [];
+    G.startMission(0);
+    const pl = G.__player();
+    const w = G.__world();
+
+    // 把玩家钉在极高空，逼 AI 上来
+    for (let f = 0; f < 2400; f++) {          // 40 秒
+      pl.pos.y = 20500;
+      pl.vel.y = 0;
+      pl.speed = 260;
+      pump(1);
+    }
+
+    const rows = w.actors.filter(a => a.team === 1 && a.alive).map(a => {
+      const rho = q.airDensity(a.pos.y);
+      const qq = 0.5 * rho * a.speed * a.speed;
+      return {
+        n: a.name, y: Math.round(a.pos.y), v: Math.round(a.speed),
+        q: Math.round(qq), stall: a.stall
+      };
+    });
+
+    /* 断言：追击的敌机必须留在自己还有机动能力的高度。
+
+       玩家钉在 20500 米，而敌人按各自的实用升限（ac.ceiling）行事 ——
+       不该跟上来悬在半空。踩过的坑：只有"y > 19000 就压住爬升角"时，
+       ROK-27 会停到 17785 米 / 188 m/s / q=5793（ctrlFactor 只剩 0.26），
+       咬不住人也甩不掉。加了升限之后它们回到 15 公里、306 m/s。 */
+    const lowQ = rows.filter(r => r.q < 8000 || r.stall);
+    if (lowQ.length) {
+      bad.push('有敌机停在动压过低的高度（操控权限会很差）：' +
+        lowQ.map(r => r.n + ' ' + r.y + 'm ' + r.v + 'm/s q=' + r.q).join(' | '));
+    }
+
+    ok('诊断 玩家钉在 20500m 40 秒后，敌机状态：' +
+      (rows.length ? rows.map(r => r.n + ' ' + r.y + 'm ' + r.v + 'm/s q=' +
+        r.q + (r.stall ? ' 失速' : '')).join(' | ') : '（无存活敌机）'));
+
+    if (bad.length) bad.forEach(fail);
+  }
+
   /* ---- 诊断：AI 到底用不用机炮 ---- */
   {
     const Ent2 = sandbox.Ent, M3d = sandbox.M3, Wd = sandbox.WEAPONS;
