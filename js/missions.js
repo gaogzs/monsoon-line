@@ -26,11 +26,11 @@ function spawnEnemy(w, o) {
   a.radius = 8;
 
   /* 名字与呼号是两件事：
-       name  —— 机型（M-27 片岩）
+       name  —— 机型（RO-27 片岩）
        label —— 呼号（枯河 DRYRIVER），没有就留空
      之前把两者混成一个字符串，于是 HUD 上冒出了"测绘机 3"这种东西 ——
      那个既不是呼号也不是型号，纯粹是把内部编号漏了出来。 */
-  a.name = 'M-27 片岩';
+  a.name = 'RO-27 片岩';
   a.label = o.callsign || null;
   AI.attach(a, { role: 'enemy', skill: o.skill === undefined ? 0.55 : o.skill });
   a.ai.cmd = o.behavior || 'pursue';
@@ -100,7 +100,7 @@ MISSIONS.push({
     '注意：本空域高度 7000 m 以上，动压充足，正常交战'
   ],
   threats: [
-    'M-27「片岩」截击机 ×5（侦察构型，自卫为主）',
+    'RO-27「片岩」截击机 ×5（侦察构型，自卫为主）',
     'BIN-6「燧火」红外格斗弹',
     '无地面防空威胁'
   ],
@@ -230,7 +230,7 @@ MISSIONS.push({
   ],
   threats: [
     'BAD-9「高墙」远程防空导弹（4 个阵地，射程 9 km）',
-    'M-27「片岩」截击机（任务中段出现）',
+    'RO-27「片岩」截击机（任务中段出现）',
     '地形：海面，无地形遮蔽可用'
   ],
   intel: `云底 <b>900 m</b> · 云顶 4200 m · 中继平台高度 <b>4000 m</b><br>
@@ -400,7 +400,7 @@ MISSIONS.push({
   ],
   threats: [
     '「灰烬」级播撒机 ×6（大型、低速、结构脆弱但数量多）',
-    'M-27 护航编队',
+    'RO-27 护航编队',
     'DRYWELL —— 下游第 4 战术联队指挥官'
   ],
   intel: `高度 <b>19 500 m</b> · 密度 0.076 kg/m³ · 温度 −57 ℃<br>

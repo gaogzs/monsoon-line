@@ -598,25 +598,29 @@ if (Ent && M3 && me && world) {
   {
     const RAFSI = ['CEL', 'TOR', 'SUT', 'GIR', 'CLA', 'SPO', 'GUT', 'PEJ',
       'GUS', 'ZUN', 'DAR', 'BIN', 'BAD', 'CAV', 'DIL'];
+    // 机型用两字母 rafsi，武器用三字母 —— 长度本身就是区分
+    const RAFSI2 = ['BL', 'GA', 'GU', 'FA', 'MI', 'SU', 'RO', 'XA', 'ME'];
     const bad = [];
 
     sandbox.AIRCRAFT.forEach(a => {
-      const m = a.name.match(/^([A-Z])-(\d+)$/);
-      if (!m) bad.push('机型 ' + a.name + ' 不是「单字母-序号」格式');
-      else if (RAFSI.indexOf(m[1]) >= 0) bad.push('机型 ' + a.name + ' 撞上了逻辑语词根');
+      const m = a.name.match(/^([A-Z]{2})-(\d+)$/);
+      if (!m) bad.push('机型 ' + a.name + ' 不是「两字母 rafsi - 序号」格式');
+      else if (RAFSI2.indexOf(m[1]) < 0) {
+        bad.push('机型 ' + a.name + ' 的前缀 ' + m[1] + ' 不在机型 rafsi 表里');
+      }
     });
 
     for (const k in WEAPONS) {
       const w = WEAPONS[k];
-      const m = w.name.match(/^([A-Z]+)-(\d+)$/);
-      if (!m) { bad.push('武器 ' + w.name + ' 编号格式异常'); continue; }
+      const m = w.name.match(/^([A-Z]{3})-(\d+)$/);
+      if (!m) { bad.push('武器 ' + w.name + ' 不是「三字母 rafsi - 序号」格式'); continue; }
       if (RAFSI.indexOf(m[1]) < 0) {
         bad.push('武器 ' + w.name + ' 的前缀 ' + m[1] + ' 不是逻辑语词根');
       }
     }
 
     if (bad.length) bad.slice(0, 5).forEach(fail);
-    else ok('命名体系一致：机型单字母、武器一律逻辑语三字母词根');
+    else ok('命名体系一致：机型两字母 rafsi、武器三字母 rafsi');
   }
 
   /* ---- 挂载的机体能力门槛 ---- */
