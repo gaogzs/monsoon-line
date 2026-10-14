@@ -788,35 +788,13 @@ var Game = (function () {
     function MX(wx) { return cx + wx / R * (W * 0.45); }
     function MY(wz) { return cy - wz / R * (H * 0.62); }
 
-    /* 陆块：每个任务自己定义（见 missions.js 的 land 字段）。
-       以前这里是两个写死比例的椭圆，注释写着"示意" ——
-       于是三关长得一模一样，还会让人以为关卡是围着它们摆的。 */
-    var lands = m.land || [];
-    for (i = 0; i < lands.length; i++) {
-      var lg = lands[i];
-      var sx = (lg.rx / R) * (W * 0.45);
-      var sy = (lg.rz / R) * (H * 0.62);
-      var lx = MX(lg.x), ly = MY(lg.z);
+    /* 这里不再画陆地。
 
-      g.fillStyle = 'rgba(40,60,72,0.55)';
-      g.strokeStyle = 'rgba(74,110,130,0.60)';
-      g.lineWidth = 1.1;
-      g.beginPath();
-      // 屏幕 y 轴朝下，所以世界里的正向旋转要取负
-      g.ellipse(lx, ly, sx, sy, -lg.rot, 0, Math.PI * 2);
-      g.fill(); g.stroke();
-
-      // 叠两块暗色，看起来像地形起伏而不是一块纯色斑
-      g.fillStyle = 'rgba(24,38,48,0.45)';
-      g.beginPath();
-      g.ellipse(lx - sx * 0.26, ly + sy * 0.20, sx * 0.42, sy * 0.36,
-        -lg.rot + 0.4, 0, Math.PI * 2);
-      g.fill();
-      g.beginPath();
-      g.ellipse(lx + sx * 0.30, ly - sy * 0.16, sx * 0.33, sy * 0.29,
-        -lg.rot - 0.3, 0, Math.PI * 2);
-      g.fill();
-    }
+       整个战役都发生在**纯海域**上：战斗画面里没有任何地形，
+       所有"地面"目标其实都是海上平台。在简报地图上画岛，
+       等于承诺了一片战场上根本不存在的地形 —— 玩家飞到那儿
+       会发现海面上什么都没有。地图只画海面与任务标记，
+       反而和实际看到的东西一致。 */
 
     var cols = { base: '#4fe08a', enemy: '#ff4d4d', relay: '#ffb03a', sam: '#ff8b2a', site: '#45d6ff' };
 
@@ -1165,7 +1143,7 @@ var Game = (function () {
     for (i = 0; i < cands.length; i++) if (cands[i] === cur) at = i;
     var next = cands[(at + 1) % cands.length];
 
-    // 优先选距离最近的几架飞机，避免把地面目标排在前
+    // 优先选距离最近的几架飞机，避免把海上目标排在前
     if (at < 0) {
       var best = null, bd = 1e12;
       for (i = 0; i < cands.length; i++) {
@@ -1951,7 +1929,7 @@ var Game = (function () {
       m3: '「干井。那是我祖母的村子。一九六九年，它连着十九个月没下雨。」'
     };
     document.getElementById('dQuote').textContent = win ? quotes[mission.id] || '' :
-      '任务失败。下游的空情图仍然完整，第 7 号控制站仍在他们的签名下运行。';
+      '任务失败。下游的空情图仍然完整，第 7 号控制平台仍在他们的签名下运行。';
 
     var nb = document.getElementById('btnNext');
     nb.disabled = !win || missionIdx >= MISSIONS.length - 1;

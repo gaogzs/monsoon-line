@@ -596,7 +596,7 @@ var WEAPONS = {
     dmg: 260, ammo: 2, cd: 3.20, salvo: 1, flare: 0.68, prox: 30,
     target: 'ship', bigTarget: true,
     desc: '为浮空平台设计的串联战斗部：先撕气囊、再打吊舱。' +
-      '打战斗机和地面目标都是浪费。',
+      '打战斗机和海上目标都是浪费。',
     stat: { dmg: 0.76, spd: 0.42, trn: 0.42, rng: 0.58, ecm: 0.34 }
   },
 
@@ -790,7 +790,7 @@ var WEAPONS = {
     turn: 0.62, seeker: 'radar', lockCone: 45 * Math.PI / 180, lockDist: 8000,
     dmg: 175, ammo: 10, cd: 1.7, salvo: 1, flare: 0.80, prox: 30,
     target: 'ground',
-    desc: `防区外空地导弹，攻顶弹道。对固定地面目标一击必毁。
+    desc: `防区外空地导弹，攻顶弹道。对固定海上目标一击必毁。
       <b>靠近调节单元时被交战规则禁用。</b>`,
     stat: { dmg: 0.82, spd: 0.52, trn: 0.18, rng: 0.85, ecm: 0.82 }
   },
@@ -1286,7 +1286,7 @@ var VOICES = {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: '全体，这里是 SEXTANT。数据链已上传。', gap: 1.0 },
       { who: 'VESPER-2', cls: 'ally', tx: "<b>收到</b>。数据链清楚。", gap: 0.9 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '第 7 号地面站的遥测断了两天。我们要知道为什么。', gap: 1.3 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '第 7 号控制平台的遥测断了两天。我们要知道为什么。', gap: 1.3 },
       { who: 'VESPER-2', cls: 'ally', tx: 'VESPER 2 就位。无线电检查，清楚响亮。', gap: 1.0 },
       { who: 'VESPER-3', cls: 'ally', tx: 'VESPER 3 就位。……这天空闻起来不对。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '闭嘴，3 号。雷达上有回波，方位 030，正在越线。', gap: 1.6 },
@@ -1309,7 +1309,7 @@ var VOICES = {
     ],
     win: [
       { who: 'VESPER-2', cls: 'ally', tx: '最后一个跑了。……他没往南飞。', gap: 1.4 },
-      { who: 'VESPER-3', cls: 'ally', tx: '他往主岛去了。往第 7 号站。', gap: 1.4 },
+      { who: 'VESPER-3', cls: 'ally', tx: '他往主平台去了。往第 7 号站。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '记录到了。全体返航，油量优先。', gap: 1.3 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>VESPER 1，这一仗赢得很好 —— 但我们的问题一个都没解决。</b>', gap: 0.6 }
     ],
@@ -1336,7 +1336,7 @@ var VOICES = {
       { who: 'SEXTANT', cls: 'cmd', tx: '下游在铁砧海域上摆了三个浮空中继平台。它们一直在看我们。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>云底 900 米。</b>我建议你们走低一点。', gap: 1.3 },
       { who: 'VESPER-2', cls: 'ally', tx: '走低一点。他说得好像我们有选择。', gap: 1.1 },
-      { who: 'VESPER-3', cls: 'ally', tx: '岛上还有两个地面站。中继平台负责把它们的信号传回南边。', gap: 1.4 },
+      { who: 'VESPER-3', cls: 'ally', tx: '岛上还有两个控制平台。中继平台负责把它们的信号传回南边。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '那就把链条打断。祝你好运。', gap: 0.8 }
     ],
     spotted: [

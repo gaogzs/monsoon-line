@@ -45,7 +45,7 @@ monsoon-line/
 | # | 模块 | 职责 | 依赖 |
 |---|---|---|---|
 | 1 | `math3d.js` → `M3` | 向量、罗德里格斯旋转、相机、投影、裁剪、射线求交 | — |
-| 2 | `models.js` → `MODELS` | 低多边形几何（机体、地面目标） | M3 |
+| 2 | `models.js` → `MODELS` | 低多边形几何（机体、海上目标） | M3 |
 | 3 | `planform.js` → `PLANFORM` | 机库俯视识别图数据与绘制 | WEAPONS |
 | 4 | `codex.js` → `CODEX` | 游戏内资料库文本 | — |
 | 5 | `data.js` → `CALLSIGN` `AIRCRAFT` `WEAPONS` `VOICES` | 静态数据表 | — |

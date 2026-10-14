@@ -384,7 +384,7 @@ var MODELS = (function () {
 
   /* ============================================================
      「高原」级浮空中继平台 —— 下游空情图的节点（M2 目标）
-     长 82 m，把群岛地面站的信号中继回南边。本身几乎无武装，
+     长 82 m，把分水海域各平台的中继信号传回南边。本身几乎无武装，
      但前上方那块中继阵面是整条链路上最容易被机炮咬掉的一环
      ============================================================ */
   M.relay = (function () {
@@ -463,8 +463,42 @@ var MODELS = (function () {
     // 搜索雷达
     b.tube(V(0, 3.0, -4.0), V(0, 5.4, -4.0), 0.16, 0.14, 6, C.rod);
     b.wing(V(0, 5.4, -4.0), V(1.4, 6.4, -4.9), V(-1.4, 6.4, -4.9), V(0, 5.4, -5.6), C.metal);
-    return done(b, { span: 9, len: 9, ground: true, radius: 5 });
+    seaBase(b, 14, 14);                     // 防空浮台
+    return done(b, { span: 9, len: 9, ground: true, radius: 5, sea: true });
   })();
+
+  /* ============================================================
+     海上平台底座
+
+     整个战役发生在**纯海域**上 —— 战斗画面里没有任何陆地。
+     所以所有"地面"目标其实都浮在海面上：一片略高于水面的甲板，
+     下面一排浮筒，四角配系泊桩。
+
+     甲板特意做得比构件底座略低，这样各个设施看起来是"建在平台上"
+     而不是"从水里长出来"。
+     ============================================================ */
+  function seaBase(b, w, d) {
+    // 甲板（顶面在 y=0 附近，构件自然坐在上面）
+    b.box(0, -1.1, 0, w, 1.8, d, C.metal, C.dark);
+    // 甲板边缘的护栏
+    var i, n = 4;
+    for (i = 0; i < n; i++) {
+      var t = (i - (n - 1) / 2) / Math.max(1, (n - 1) / 2);
+      b.box(t * w * 0.30, 0.2, d * 0.50, 1.2, 0.9, 0.5, C.grey2);
+      b.box(t * w * 0.30, 0.2, -d * 0.50, 1.2, 0.9, 0.5, C.grey2);
+    }
+    // 浮筒：两排，压在甲板下面
+    for (i = 0; i < 3; i++) {
+      var u = (i - 1) * w * 0.30;
+      b.tube(V(u, -2.6, d * 0.32), V(u, -2.6, -d * 0.32),
+        Math.max(0.8, w * 0.07), Math.max(0.8, w * 0.07), 6, C.grey2, C.grey);
+    }
+    // 四角系泊桩
+    b.tube(V(w * 0.44, -2.0, d * 0.44), V(w * 0.44, 4.4, d * 0.44), 0.4, 0.32, 6, C.rod);
+    b.tube(V(-w * 0.44, -2.0, d * 0.44), V(-w * 0.44, 4.4, d * 0.44), 0.4, 0.32, 6, C.rod);
+    b.tube(V(w * 0.44, -2.0, -d * 0.44), V(w * 0.44, 4.4, -d * 0.44), 0.4, 0.32, 6, C.rod);
+    b.tube(V(-w * 0.44, -2.0, -d * 0.44), V(-w * 0.44, 4.4, -d * 0.44), 0.4, 0.32, 6, C.rod);
+  }
 
   /** 早期预警雷达站（大型固定目标） */
   M.radar = (function () {
@@ -477,7 +511,8 @@ var MODELS = (function () {
     b.wing(V(0, 27, -7), V(9, 33, -7), V(9, 27, -7), V(0, 21, 0), C.metal);
     b.wingM(V(0, 21, 0), V(9, 27, 0), V(9, 33, -7), V(0, 27, -7), C.metal);
     b.box(0, 1.5, 9, 4, 3, 4, C.sand2);
-    return done(b, { span: 18, len: 18, ground: true, radius: 8 });
+    seaBase(b, 22, 22);                     // 浮在海面上的测控平台
+    return done(b, { span: 18, len: 18, ground: true, radius: 8, sea: true });
   })();
 
   /** 燃油 / 弹药补给库 */
@@ -490,7 +525,8 @@ var MODELS = (function () {
       b.box(x, 3.6, 0, 6.6, 0.5, 16.2, C.metal);
     }
     b.box(-16, 2.0, 0, 6, 4, 10, C.sand2, C.sand);
-    return done(b, { span: 40, len: 24, ground: true, radius: 12 });
+    seaBase(b, 46, 30);                     // 储油驳船
+    return done(b, { span: 40, len: 24, ground: true, radius: 12, sea: true });
   })();
 
   /** 指挥 / 通信中枢 */
@@ -504,10 +540,11 @@ var MODELS = (function () {
     b.wing(V(-5, 16, 4), V(-11, 16, 4), V(-11, 12, 4), V(-5, 12, 4), C.metal);
     // 卫星天线罩
     b.tube(V(0, 24, -4), V(0, 27, -4), 2.4, 0.4, 10, C.white);
-    return done(b, { span: 22, len: 18, ground: true, radius: 9 });
+    seaBase(b, 26, 22);                     // 通信指挥平台
+    return done(b, { span: 22, len: 18, ground: true, radius: 9, sea: true });
   })();
 
-  /** 第 7 号地面控制站（地标级设施，任务背景中不可摧毁） */
+  /** 第 7 号控制平台（地标级浮式设施，任务背景中不可摧毁） */
   M.station = (function () {
     var b = new MB();
     b.box(0, 2, 0, 88, 8, 88, C.dark, C.grey2);          // 基座
@@ -523,7 +560,16 @@ var MODELS = (function () {
       sz = (i < 2) ? 26 : -26;
       b.box(sx, 26, sz, 8, 52, 8, C.metal, C.grey);
     }
-    return done(b, { span: 88, len: 88, ground: true, radius: 56 });
+    // 地标级设施：一座 96 米的巨型浮式平台，四角下锚
+    seaBase(b, 96, 96);
+    var k, ang;
+    for (k = 0; k < 4; k++) {
+      ang = k * Math.PI / 2 + Math.PI / 4;
+      b.tube(V(Math.cos(ang) * 40, -6, Math.sin(ang) * 40),
+        V(Math.cos(ang) * 40, -22, Math.sin(ang) * 40),
+        1.6, 1.6, 6, C.dark, C.black);
+    }
+    return done(b, { span: 88, len: 88, ground: true, radius: 56, sea: true });
   })();
 
   /* ---------- 导弹 / 炸弹小模型 ---------- */
