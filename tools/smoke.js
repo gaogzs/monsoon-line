@@ -1826,6 +1826,58 @@ if (Ent && M3 && me && world) {
     else ok('对空/对地弹药的 target 字段自洽（发射前的匹配检查据此拒绝错误目标）');
   }
 
+  /* ---- CLA-9 已并入 CLA-17，不该再出现 ----
+
+     原来有两枚固体冲压远距弹，但它们是同一件武器的强弱两档：
+     CLA-9 在射程（12500 vs 9200）、速度（1150 vs 1060）、载弹量
+     （2 发/点 vs 1 发/点）上全面领先，CLA-17 只在过载和伤害上略胜
+     —— 这不是取舍。而且编号还倒挂：CLA-9 才叫「-B」（改进型），
+     编号却比"原型" CLA-17 更小。
+
+     合并后要保证：旧键彻底消失、旧名字不再出现在任何地方，
+     而且合并后的 CLA-17 确实拿到了 CLA-9 的射程与速度。 */
+  {
+    const W9 = sandbox.WEAPONS, bad = [];
+
+    if (W9.ram) {
+      bad.push('ram（CLA-9）应该已经并入 v17，但 WEAPONS 里还有它');
+    }
+    ['ram', 'v17'].forEach(k => {
+      const w = W9[k];
+      if (!w) return;
+      if (/CLA-9|长杆-B|LONGROD/.test(w.name + w.cn)) {
+        bad.push(k + ' 的显示名里还有 CLA-9 / 长杆-B 的痕迹：' + w.name + ' ' + w.cn);
+      }
+    });
+
+    const v17 = W9.v17;
+    if (v17) {
+      if (v17.lockDist < 12000) {
+        bad.push('CLA-17 合并后应该继承 CLA-9 的射程（12500），现在是 ' + v17.lockDist);
+      }
+      if (v17.speed < 1100) {
+        bad.push('CLA-17 合并后应该继承 CLA-9 的速度（1150），现在是 ' + v17.speed);
+      }
+      if (v17.perPoint !== 1) {
+        bad.push('CLA-17 的每点弹数应该是 1（重型远距弹），现在是 ' + v17.perPoint);
+      }
+    } else {
+      bad.push('找不到 v17（CLA-17）');
+    }
+
+    // 和 SPO-9 的分工：一个低空强、一个高空专用，两个特性都不能丢
+    if (W9.hva && !W9.hva.highAltImmune) {
+      bad.push('SPO-9 丢了 highAltImmune —— 那是它和 CLA-17 唯一的分工依据');
+    }
+    if (v17 && !v17.scramjet) {
+      bad.push('CLA-17 丢了 scramjet');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('CLA-9 已并入 CLA-17（12500 m / 1150 m/s），' +
+      '与高空专用的 SPO-9 分工明确');
+  }
+
   /* ---- "有没有发动机"和"有没有导引头"是两个正交的维度 ----
 
      我一度把它们当成一回事，按 unguided 去判断烟迹，结果正好反了：

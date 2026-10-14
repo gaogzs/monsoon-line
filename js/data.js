@@ -660,17 +660,29 @@ var WEAPONS = {
     stat: { dmg: 0.62, spd: 0.68, trn: 0.48, rng: 0.80, ecm: 0.18 }
   },
 
-  ram: {
-    id: 'ram', name: 'CLA-9', cn: '长杆-B · LONGROD-B', kind: 'aam',
-    model: 'missile',
-    speed: 1150, boost: 160, life: 10.0, vsLife: 24.0,
-    turn: 0.92, seeker: 'radar', lockCone: 22 * Math.PI / 180, lockDist: 12500,
-    dmg: 58, ammo: 2, cd: 1.04, salvo: 1, flare: 0.72, prox: 30,
-    target: 'air', highAltScale: true, scramjet: true, nezer: true,
-    desc: '冲压发动机远距弹的改进型。不可逃逸区是全家族最大的，' +
-      '但 18 km 以上缺氧，动力段会从 10 秒掉到 2.4 秒 —— 高空它反而不好用。',
-    stat: { dmg: 0.70, spd: 0.92, trn: 0.30, rng: 0.96, ecm: 0.14 }
-  },
+  /* ---- CLA-9「长杆-B · LONGROD-B」已并入 CLA-17「长杆」----
+
+     原来有两枚固体冲压远距拦截弹，但它们是同一件武器的强弱两档，
+     而不是两种武器：
+
+                       CLA-9        CLA-17
+       锁定距离        12500         9200
+       速度             1150         1060
+       每点弹数            2            1
+       过载 / 伤害   0.92 / 58    1.02 / 62
+
+     CLA-9 在射程、速度、载弹量上全面领先，CLA-17 只在过载、伤害上
+     各略胜一点 —— 玩家没有任何理由去选后者，这不是取舍。
+     而且编号还倒挂着：CLA-9 才叫「-B」（改进型），编号却比"原型"
+     CLA-17 更小；英文名也对不上（LONGROD-B 对 LANCE）。
+
+     合并成 CLA-17「长杆 · LANCE」一枚，数值取两者之长。
+     它和真正的高空专用弹 SPO-9 仍然分工明确：
+
+       CLA-17   18 km 以下最难甩掉（12500 m / 1150 m/s），但上空动力段骤减
+       SPO-9    高空专用（highAltImmune，过载不随空气变稀而衰减）
+
+     ============================================================ */
 
   vlar: {
     id: 'vlar', name: 'DAR-12', cn: '极远 · OUTREACH', kind: 'aam',
@@ -940,15 +952,19 @@ var WEAPONS = {
     stat: { dmg: 0.50, spd: 0.60, trn: 0.76, rng: 0.32, ecm: 0.40 }
   },
   v17: {
+    /* 数值是 CLA-9 与 CLA-17 合并后的结果：射程、速度、抗干扰取 CLA-9，
+       过载取两者之间，其余保持原型。 */
     id: 'v17', name: 'CLA-17', cn: '长杆 · LANCE', kind: 'aam',
     model: 'missile',
-    speed: 1060, boost: 150, life: 10.0, vsLife: 30.0,
-    turn: 1.02, seeker: 'radar', lockCone: 25 * Math.PI / 180, lockDist: 9200,
-    dmg: 62, ammo: 8, cd: 0.42, salvo: 1, flare: 0.78, prox: 30,
-    target: 'air', nezer: true, highAltScale: true, scramjet: true,
-    desc: `固体燃料冲压发动机。海平面动力段长达 <b>10 秒</b>，总寿命 30 秒。
+    speed: 1150, boost: 160, life: 10.0, vsLife: 30.0,
+    turn: 1.00, seeker: 'radar', lockCone: 24 * Math.PI / 180, lockDist: 12500,
+    dmg: 62, ammo: 8, cd: 0.88, salvo: 1, flare: 0.72, prox: 30,
+    target: 'air', nezer: true, scramjet: true,
+    desc: `固体燃料冲压发动机远距弹。海平面动力段长达 <b>10 秒</b>、
+      总寿命 30 秒，不可逃逸区是全家族最大的。
       <br><span class="rd">18 公里以上因空气稀薄缺氧，自动降级为火箭模式 ——
-      动力段从 10 秒掉到 2.4 秒。</span>在高空，它不再是一件杀手锏。`,
+      动力段从 10 秒掉到 2.4 秒。</span>
+      <b>低空它是最难甩掉的一枚；到了高空，就不再是杀手锏。</b>`,
     stat: { dmg: 0.68, spd: 1.0, trn: 0.30, rng: 1.0, ecm: 0.80 }
   },
   v22: {
@@ -1165,7 +1181,7 @@ var STORE_ATTR = {
   mrm:  { fits: ['light', 'heavy', 'belly'], perPoint: 4, mass: 195 },
   v17:  { fits: ['heavy'],                 perPoint: 1,  mass: 285 },
   arm:  { fits: ['heavy'],                 perPoint: 2,  mass: 310 },
-  ram:  { fits: ['heavy'],                 perPoint: 2,  mass: 340 },
+  /* ram（CLA-9）已并入 v17 */
   vlar: { fits: ['heavy'],                 perPoint: 1,  mass: 720 },
   hva:  { fits: ['heavy'],                 perPoint: 1,  mass: 560 },
 
@@ -1264,7 +1280,7 @@ var STORE_ROLE = {
   mrm:  '中距拦截 · 主动雷达',
   arm:  '中距重弹 · 反大型目标',
   v17:  '远距拦截 · 冲压',
-  ram:  '远距拦截 · 冲压改进',
+
   vlar: '超远距 · 打大目标',
 
   /* 对地与反大型 */
@@ -1412,7 +1428,7 @@ var STORE_COOLDOWN = {
   /* 空空 —— 单发 5 到 30 秒，重弹仍然一场打不了几次 */
   srm: 4.8, trm: 5.6, hos: 5.2, qsr: 7.6, wasp: 8.4,
   v9: 6, v11: 9.2,
-  v17: 20, mrm: 15, arm: 18, ram: 24, vlar: 32,
+  v17: 22, mrm: 15, arm: 18, vlar: 32,
   swm: 4.4, hva: 26,
 
   /* 对地与反大型 */
@@ -1458,8 +1474,8 @@ function loadoutPenalty(lf) {
 
 var MISSILE_LEAD = {
   srm: 0.38, trm: 0.48, hos: 0.30, qsr: 0.42, wasp: 0.55,
-  v9: 0.52, v11: 0.62, mrm: 0.78, v17: 0.82, arm: 0.72,
-  ram: 0.86, vlar: 0.90,
+  v9: 0.52, v11: 0.62, mrm: 0.78, v17: 0.86, arm: 0.72,
+  vlar: 0.90,
   asl: 0.65, asl2: 0.70, sat: 0.68,
   v25: 0.66, v22: 0.74, v30: 0.48,
   dl4: 0.74, dl6: 0.48, dl9: 0.80,
