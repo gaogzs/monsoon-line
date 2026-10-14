@@ -109,7 +109,13 @@ var SFX = (function () {
     gunSrc.buffer = noiseBuf; gunSrc.loop = true;
 
     gunLfo = ctx.createOscillator(); gunLfo.type = 'square'; gunLfo.frequency.value = 64;
-    gunLfoG = ctx.createGain(); gunLfoG.gain.value = 0.075;
+    /* LFO 深度**必须从 0 开始**。
+
+       AudioParam 的最终值 = 基础值 + 所有连入信号之和，所以 gunG.gain = 0
+       并不代表无声 —— 只要 LFO 还在推，噪声源就会一直漏出来。
+       这里原来给的是 0.075，于是从页面启动起就有一路常驻的"突突"底噪；
+       gun() 只在开火时才会把它设回去，而主菜单根本不会调 gun()。 */
+    gunLfoG = ctx.createGain(); gunLfoG.gain.value = 0.0;
     gunLfo.connect(gunLfoG); gunLfoG.connect(gunG.gain);
 
     gunSrc.connect(gunF); gunF.connect(gunG); gunG.connect(master);
@@ -121,7 +127,13 @@ var SFX = (function () {
     warnG = ctx.createGain(); warnG.gain.value = 0.0;
     warnOsc = ctx.createOscillator(); warnOsc.type = 'square'; warnOsc.frequency.value = 1150;
     warnLfo = ctx.createOscillator(); warnLfo.type = 'square'; warnLfo.frequency.value = 7;
-    warnLfoG = ctx.createGain(); warnLfoG.gain.value = 0.055;
+    /* 同上：深度从 0 开始，否则主菜单上就会一直响。
+
+       这是"点一下页面就能听到的那个高频持续音"的真正来源：
+       warnOsc 是 1150 Hz 方波，warnLfoG 把它以 7 Hz 通断，
+       而 warning(false) 开头有 `if (on === warnOn) return;` ——
+       warnOn 初值就是 false，于是这个函数**永远不会**把初始深度清掉。 */
+    warnLfoG = ctx.createGain(); warnLfoG.gain.value = 0.0;
     warnLfo.connect(warnLfoG); warnLfoG.connect(warnG.gain);
     warnOsc.connect(warnG); warnG.connect(master);
     warnOsc.start(); warnLfo.start();
