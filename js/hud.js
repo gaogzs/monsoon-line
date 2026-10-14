@@ -10,9 +10,34 @@ var HUD = (function () {
 
   var GREEN = '#4fe08a', AMBER = '#ffb03a', CY = '#45d6ff', RED = '#ff4d4d';
   var DIM = 'rgba(79,224,138,0.42)';
-  var F = 'bold 12px Consolas,monospace';
-  var FB = 'bold 15px Consolas,monospace';
-  var FS = 'bold 11px Consolas,monospace';
+
+  /* ---------- HUD 缩放 ----------
+     两条规则，缺一不可：
+
+     ① 位置一律从"元素所在的那条屏幕边"往内算（而不是从屏幕中心算），
+        否则缩放一变，贴边的元素就会朝反方向跑。
+     ② 那个间距本身再夹一个屏幕比例上限，
+        这样把缩放拉到最大时，元素只会在靠边的地方变粗，不会涨出可视区。
+
+     字号也一起缩放 —— 否则调大之后框变大了字没变，反而更难读。 */
+  var HUDK = 1;
+  var F = '', FB = '', FS = '';
+
+  function applyScale(k) {
+    HUDK = M3.clamp(k, 0.6, 1.8);
+    F = 'bold ' + (12 * HUDK).toFixed(1) + 'px Consolas,monospace';
+    FB = 'bold ' + (15 * HUDK).toFixed(1) + 'px Consolas,monospace';
+    FS = 'bold ' + (11 * HUDK).toFixed(1) + 'px Consolas,monospace';
+  }
+  applyScale(1);
+
+  /** 长度按缩放折算 */
+  function U(v) { return v * HUDK; }
+
+  /** 距边的间距：随缩放增大，但不超过屏幕的 limit 比例 */
+  function gap(base, size, limit) {
+    return Math.min(base * HUDK, size * limit);
+  }
 
   /* ============================================================
      主入口
@@ -24,6 +49,8 @@ var HUD = (function () {
     var W = Renderer.W, H = Renderer.H;
     var cam = Renderer.getCam();
     if (!cam || !p) return;
+
+    applyScale(S && S.hudScale !== undefined ? S.hudScale / 100 : 1);
 
     ctx.save();
     ctx.lineCap = 'butt';
@@ -37,6 +64,8 @@ var HUD = (function () {
     drawRadar(ctx, W, H, p, world);
     drawThreatRing(ctx, W, H, p, world);
     drawTargets(ctx, W, H, cam, p, world);
+    drawIncomingMissiles(ctx, W, H, cam, p, world);
+    drawStores(ctx, W, H, p);
     drawWeaponPanel(ctx, W, H, p);
     drawTargetBearing(ctx, W, H, p, p.target);
     drawWarnings(ctx, W, H, p, world);
@@ -55,9 +84,9 @@ var HUD = (function () {
     if (S && S.compass === false) return;
 
     var cx = W / 2;
-    var top = 8;
-    var bandH = 26;
-    var halfW = Math.min(300, W * 0.24);
+    var top = U(8);
+    var bandH = U(26);
+    var halfW = Math.min(U(300), W * 0.24);
     var spanDeg = 100;                       // 指南针显示的总方位范围
     var degPerPx = spanDeg / (halfW * 2);
 
@@ -181,25 +210,29 @@ var HUD = (function () {
      速度带 / 高度带 / Q 表
      ============================================================ */
   function drawTapes(ctx, W, H, p, S) {
-    var cy = H / 2, hgt = 260;
+    var cy = H / 2;
+    // 带子长度跟着缩放走，但最多占屏幕高的 32%
+    var hgt = Math.min(U(260), H * 0.32);
     var top = cy - hgt / 2;
 
     /* ---------- 左：空速 ----------
-       带子向屏幕中心收拢了一些：贴在最边上时，视线要来回甩很远，
-       而中间那块才是真正需要盯的区域。 */
-    var x = 132;
+       距左边界的间距随缩放增大，但不超过屏宽的 15% ——
+       这样把 HUD 调到最大时带子只会变粗，不会跑出左边界。
+       位置从左边算起，而不是从屏幕中心算，也是同一个道理。 */
+    var m = gap(132, W, 0.15);
+    var x = m;
     tape(ctx, x, top, hgt, p.speed, 50, 200, 1, 'M/S', CY, 0.85);
     text(ctx, (p.speed * 3.6).toFixed(0), x - 46, cy + 5, '#eaf4fb', FB, 'right');
     text(ctx, (p.speed * 1.9438).toFixed(0) + ' KT', x - 46, cy + 21, DIM, FS, 'right');
 
     /* ---------- 右：高度 ---------- */
-    var x2 = W - 132;
+    var x2 = W - m;
     tape(ctx, x2, top, hgt, p.pos.y, 1000, 5000, -1, 'M', GREEN, 0.021);
     text(ctx, p.pos.y.toFixed(0), x2 + 46, cy + 5, '#eaf4fb', FB, 'left');
     text(ctx, (p.pos.y * 3.28084).toFixed(0) + ' FT', x2 + 46, cy + 21, DIM, FS, 'left');
 
     /* ---------- 右下：动压 Q（本作核心仪表） ---------- */
-    var qx = W - 132, qy = top + hgt + 58;
+    var qx = W - m, qy = top + hgt + U(58);
     var q = p.q;
     var qCol = q < 12 ? RED : (q < 20 ? AMBER : GREEN);
     ctx.strokeStyle = DIM; ctx.lineWidth = 1;
@@ -223,7 +256,7 @@ var HUD = (function () {
     }
 
     /* ---------- 左下：油门 ---------- */
-    var tx = 60, ty = H - 150;
+    var tx = U(60), ty = H - U(150);
     text(ctx, 'THR', tx, ty - 8, DIM, FS, 'center');
     ctx.strokeStyle = DIM; ctx.lineWidth = 1;
     ctx.strokeRect(tx - 7, ty, 14, 108);
@@ -236,6 +269,11 @@ var HUD = (function () {
     ctx.fillRect(tx - 8, ty + 106 - 104 * 0.8, 16, 1.5);
     if (p.brake) text(ctx, 'BRK', tx, ty + 124, CY, FS, 'center');
     else if (p.ab) text(ctx, 'A/B', tx, ty + 124, AMBER, FS, 'center');
+    // 高 G：正在拉过载时给个明确的提示，掉速才不至于莫名其妙
+    if (p.hiG) {
+      var gcol = Math.sin(performance.now() * 0.02) > 0 ? RED : AMBER;
+      text(ctx, 'HI-G', tx, ty - 12, gcol, FB, 'center');
+    }
   }
 
   function tape(ctx, x, top, hgt, val, minor, major, side, label, col, scale) {
@@ -276,7 +314,9 @@ var HUD = (function () {
      雷达（机头朝上）
      ============================================================ */
   function drawRadar(ctx, W, H, p, world) {
-    var R = 104, cx = 128, cy = H - 138;
+    // 雷达从"左下角"定位，半径受屏幕尺寸与缩放双重限制
+    var R = Math.min(U(104), Math.min(W, H) * 0.13);
+    var cx = R + U(28), cy = H - R - U(32);
     var range = 12000;
 
     ctx.save();
@@ -367,7 +407,9 @@ var HUD = (function () {
      威胁环（RWR）
      ============================================================ */
   function drawThreatRing(ctx, W, H, p, world) {
-    var R = 70, cx = W - 128, cy = H - 108;
+    // RWR 从"右下角"定位
+    var R = Math.min(U(70), Math.min(W, H) * 0.09);
+    var cx = W - R - U(28), cy = H - R - U(28);
     ctx.strokeStyle = 'rgba(255,176,58,0.25)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.55, 0, Math.PI * 2); ctx.stroke();
@@ -470,8 +512,13 @@ var HUD = (function () {
     var nez = computeNEZ(p, t);
     var inNez = dist < nez;
 
-    ctx.strokeStyle = inNez ? RED : GREEN;
-    ctx.lineWidth = 2;
+    /* 锁定框一律用红色。
+       红框的含义是"这是个敌人"，它不该因为进没进 NEZ 就换一个颜色 ——
+       锁着的目标突然从绿变红（或者反过来）读起来像是换了目标，
+       而不是"情况变了"。NEZ 用额外的修饰来表达，见下。 */
+    ctx.strokeStyle = RED;
+    ctx.lineWidth = inNez ? 2.7 : 2;
+
     // 四角括号
     var c = 9;
     var x0 = s.x - w, y0 = s.y - h, x1 = s.x + w, y1 = s.y + h;
@@ -482,6 +529,25 @@ var HUD = (function () {
     ctx.moveTo(x0 + c, y1); ctx.lineTo(x0, y1); ctx.lineTo(x0, y1 - c);
     ctx.stroke();
 
+    /* NEZ 修饰：四角内侧再叠一层更短的括号，外面套一圈细环。
+       这两样都是在原有红框上"加东西"，框本身没变。 */
+    if (inNez) {
+      var c2 = 6, k2 = 9;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0 + c + k2); ctx.lineTo(x0, y0 + c); ctx.lineTo(x0 + c2, y0 + c);
+      ctx.moveTo(x1 - c2, y0 + c); ctx.lineTo(x1, y0 + c); ctx.lineTo(x1, y0 + c + k2);
+      ctx.moveTo(x1, y1 - c - k2); ctx.lineTo(x1, y1 - c); ctx.lineTo(x1 - c2, y1 - c);
+      ctx.moveTo(x0 + c2, y1 - c); ctx.lineTo(x0, y1 - c); ctx.lineTo(x0, y1 - c - k2);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(255,77,77,0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, Math.max(w, h) + 9, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     // 目标速度矢量线
     if (t.kind === 'air' && t.fwd) {
       ctx.strokeStyle = 'rgba(79,224,138,0.7)'; ctx.lineWidth = 1.4;
@@ -490,29 +556,41 @@ var HUD = (function () {
       ctx.stroke();
     }
 
-    // 数据块
+    /* 数据块。行高统一由 ly 递推 —— 之前每一行都写死 y 偏移，
+       中间插一行就得手工挪后面所有的数字。 */
     var tx = s.x + w + 8, ty = s.y - h;
-    ctx.font = FS;
     var label = t.label || (t.name || '目标');
-    var col = inNez ? RED : GREEN;
+    // 数据块同样保持红色，NEZ 的状态交给框上的修饰去说
+    var col = RED;
+
     text(ctx, label, tx, ty + 10, col, 'bold 12px Consolas,monospace', 'left');
-    text(ctx, (dist / 1000).toFixed(2) + ' KM', tx, ty + 24, DIM, FS, 'left');
+    var ly = ty + 24;
+
+    // 机型代号 —— 效仿皇牌空战，红框旁边直接写清那是什么飞机
+    if (t.ac) {
+      text(ctx, t.ac.name + ' ' + t.ac.nick, tx, ly, col, FS, 'left');
+      ly += 14;
+    }
+
+    text(ctx, (dist / 1000).toFixed(2) + ' KM', tx, ly, DIM, FS, 'left');
+    ly += 14;
+
     if (t.kind === 'air') {
       var dh = t.pos.y - p.pos.y;
-      text(ctx, (dh >= 0 ? '+' : '') + dh.toFixed(0) + ' M',
-        tx, ty + 38, DIM, FS, 'left');
+      text(ctx, (dh >= 0 ? '+' : '') + dh.toFixed(0) + ' M', tx, ly, DIM, FS, 'left');
+      ly += 14;
       // 目标动压
       if (t.q !== undefined) {
-        text(ctx, 'Q ' + t.q.toFixed(0), tx, ty + 52,
-          t.q < 12 ? AMBER : DIM, FS, 'left');
+        text(ctx, 'Q ' + t.q.toFixed(0), tx, ly, t.q < 12 ? AMBER : DIM, FS, 'left');
+        ly += 14;
       }
     } else {
-      text(ctx, t.ttype === 'air' ? '浮空平台' : '地面设施', tx, ty + 38, DIM, FS, 'left');
+      text(ctx, t.ttype === 'air' ? '浮空平台' : '地面设施', tx, ly, DIM, FS, 'left');
+      ly += 14;
     }
 
     if (inNez) {
-      text(ctx, 'NEZ', tx, ty + (t.kind === 'air' ? 66 : 52), RED,
-        'bold 12px Consolas,monospace', 'left');
+      text(ctx, 'NEZ', tx, ly, RED, 'bold 12px Consolas,monospace', 'left');
     }
 
     // 锁定进度环
@@ -550,14 +628,19 @@ var HUD = (function () {
     var py = M3.clamp(s.y, m, H - m);
     var ang = Math.atan2(py - cy, px - cx);
 
-    var col = t.kind === 'target' ? 'rgba(143,163,178,0.7)'
-      : (isLock ? GREEN : 'rgba(255,77,77,0.65)');
+    /* 屏幕外的箭头同样只分"是不是敌人"，锁定的用实心红 + 更大的箭头，
+       未锁定的用半透明红 —— 和屏内的框保持同一套颜色语义。 */
+    var col = t.kind === 'target'
+      ? 'rgba(143,163,178,0.7)'
+      : (isLock ? RED : 'rgba(255,77,77,0.55)');
+    var sz = isLock ? 11 : 9;
+
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(ang);
     ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.moveTo(9, 0); ctx.lineTo(-5, 6); ctx.lineTo(-5, -6);
+    ctx.moveTo(sz, 0); ctx.lineTo(-sz * 0.55, sz * 0.66); ctx.lineTo(-sz * 0.55, -sz * 0.66);
     ctx.closePath(); ctx.fill();
     ctx.restore();
 
@@ -568,7 +651,8 @@ var HUD = (function () {
      武器 / 弹药面板
      ============================================================ */
   function drawWeaponPanel(ctx, W, H, p) {
-    var x = W / 2, y = H - 74;
+    // 底部中央，间距从下边界算起并夹上限
+    var x = W / 2, y = H - gap(74, H, 0.11);
 
     ctx.textAlign = 'center';
 
@@ -576,8 +660,8 @@ var HUD = (function () {
     var gCol = p.gunAmmo > 0 ? GREEN : RED;
     text(ctx, 'GUN  ' + p.gunAmmo, x - 172, y, gCol, FB, 'center');
 
-    // 干扰弹
-    text(ctx, 'FLARE ' + p.flares, x + 172, y, p.flares > 0 ? GREEN : RED, FB, 'center');
+    // 干扰弹（热焰弹 + 箔丝，单位是"组"）
+    text(ctx, 'DECOY ' + p.flares, x + 172, y, p.flares > 0 ? GREEN : RED, FB, 'center');
 
     /* ---- 挂载武器纵列表 ----
        一行一种武器，当前选中的用 ">" 指出来。
@@ -614,7 +698,7 @@ var HUD = (function () {
 
     // 结构完整度
     var hpK = p.hp / p.maxHp;
-    var hw = 190;
+    var hw = U(190);
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.fillRect(x - hw / 2, y + 24, hw, 6);
     ctx.fillStyle = hpK > 0.6 ? GREEN : (hpK > 0.3 ? AMBER : RED);
@@ -626,7 +710,7 @@ var HUD = (function () {
      告警
      ============================================================ */
   function drawWarnings(ctx, W, H, p, world) {
-    var y = 110;
+    var y = U(110);
     var bl = Math.sin(performance.now() * 0.014) > 0;
 
     if (p.stall && bl) {
@@ -649,6 +733,110 @@ var HUD = (function () {
   /* ============================================================
      任务目标
      ============================================================ */
+  /* ============================================================
+     挂载状态图（右下角）
+     和机库右上角那张用的是同一份绘制代码（PLANFORM.paint 的紧凑模式）——
+     所以挂载点位置、武器外形在两边永远是一致的。
+
+     装填进度直接画在弹体上：打完之后弹体先暗下去，
+     再让亮绿从下往上把它填回来。这样不用另找地方放进度条，
+     而且一眼就能看出是哪一组的弹在装填。
+     ============================================================ */
+  function drawStores(ctx, W, H, p) {
+    if (!p.ac || !p.ac.hardpointGroups || !p.ac.hardpointGroups.length) return;
+    if (!p.loadout) return;
+
+    var size = Math.min(U(168), Math.min(W, H) * 0.20);
+    var m = gap(16, W, 0.025);
+    var bx = W - size - m;
+    // 让开右下角的 RWR 环
+    var by = H - size - m - Math.min(U(180), H * 0.26);
+
+    ctx.fillStyle = 'rgba(6,14,20,0.38)';
+    ctx.fillRect(bx, by, size, size);
+    ctx.strokeStyle = 'rgba(79,224,138,0.18)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, size, size);
+
+    // 每件武器各自的装填进度（按它自己的冷却时长归一化）
+    var cd = {};
+    var pool = p.cdPool || {};
+    var lst = p.loadoutList || [];
+    for (var i = 0; i < lst.length; i++) {
+      var e = lst[i];
+      var total = e.w.cd > 0 ? e.w.cd : 1;
+      cd[e.wid] = M3.clamp((pool[e.wid] || 0) / total, 0, 1);
+    }
+
+    PLANFORM.paint(ctx, bx, by, size, size, p.ac, p.loadout,
+      { compact: true, cd: cd });
+
+    text(ctx, 'STORES', bx + size / 2, by - 5, DIM, FS, 'center');
+  }
+
+  /* ============================================================
+     来袭导弹
+     导弹是唯一能真正杀死玩家的东西，而它在屏幕上只是一个很小的亮点，
+     钻进云里就彻底看不见了。所以每一枚盯着本机的导弹都要标出来：
+     屏幕内画红色菱形 + 距离，屏幕外画边缘箭头。
+     ============================================================ */
+  function drawIncomingMissiles(ctx, W, H, cam, p, world) {
+    if (!world || !world.missiles || !world.missiles.length) return;
+    var bl = Math.sin(performance.now() * 0.02) > -0.3;
+
+    for (var i = 0; i < world.missiles.length; i++) {
+      var m = world.missiles[i];
+      if (!m.alive || m.target !== p) continue;
+
+      var dist = M3.dist(m.pos, p.pos);
+      var s = M3.project(cam, m.pos);
+
+      if (s && s.x > 16 && s.x < W - 16 && s.y > 16 && s.y < H - 16) {
+        var r = 11;
+        ctx.strokeStyle = RED;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y - r);
+        ctx.lineTo(s.x + r, s.y);
+        ctx.lineTo(s.x, s.y + r);
+        ctx.lineTo(s.x - r, s.y);
+        ctx.closePath();
+        ctx.stroke();
+
+        text(ctx, dist < 1000 ? Math.round(dist) + 'M' : (dist / 1000).toFixed(1) + 'KM',
+          s.x, s.y + r + 13, RED, FS, 'center');
+        continue;
+      }
+
+      // 屏幕外：贴到边缘画一个指向它的箭头
+      var c = M3.toCam(cam, m.pos);
+      var ang = Math.atan2(-c.y, c.x);
+      var dx = Math.cos(ang), dy = Math.sin(ang);
+      var pad = 58;
+      var kx = Math.abs(dx) < 1e-6 ? 1e9 : (W / 2 - pad) / Math.abs(dx);
+      var ky = Math.abs(dy) < 1e-6 ? 1e9 : (H / 2 - pad) / Math.abs(dy);
+      var kk = Math.min(kx, ky);
+      var ex = W / 2 + dx * kk;
+      var ey = H / 2 + dy * kk;
+
+      ctx.save();
+      ctx.translate(ex, ey);
+      ctx.rotate(ang);
+      ctx.fillStyle = bl ? RED : 'rgba(255,77,77,0.42)';
+      ctx.beginPath();
+      ctx.moveTo(14, 0);
+      ctx.lineTo(-9, -9);
+      ctx.lineTo(-4, 0);
+      ctx.lineTo(-9, 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      text(ctx, (dist / 1000).toFixed(1) + 'KM',
+        ex - dx * 24, ey - dy * 24 + 4, RED, FS, 'center');
+    }
+  }
+
   /* ============================================================
      目标方位尺
      锁定目标跑出视野时，屏幕边缘那个小箭头太容易错过 ——
@@ -736,19 +924,52 @@ var HUD = (function () {
   function drawObjective(ctx, W, H, world) {
     if (!world.objective) return;
     // 让开顶部的指南针
-    text(ctx, world.objective, W / 2, 92, 'rgba(79,224,138,0.85)',
-      'bold 14px Consolas,monospace', 'center');
+    text(ctx, world.objective, W / 2, U(92), 'rgba(79,224,138,0.85)',
+      'bold ' + (14 * HUDK).toFixed(1) + 'px Consolas,monospace', 'center');
     if (world.objectiveSub) {
-      text(ctx, world.objectiveSub, W / 2, 110, DIM, FS, 'center');
+      text(ctx, world.objectiveSub, W / 2, U(110), DIM, FS, 'center');
     }
   }
 
   /* ---------- 小工具 ---------- */
+
+  /** 这个颜色是不是亮到会在天空或云上糊掉 */
+  var _lightCol = {};
+  function isLightCol(col) {
+    if (typeof col !== 'string') return false;
+    if (_lightCol[col] !== undefined) return _lightCol[col];
+    var r = 0, g = 0, b = 0, m;
+    if ((m = /^#([0-9a-f]{6})$/i.exec(col))) {
+      r = parseInt(m[1].slice(0, 2), 16);
+      g = parseInt(m[1].slice(2, 4), 16);
+      b = parseInt(m[1].slice(4, 6), 16);
+    } else if ((m = /^rgba?\(([^)]+)\)/i.exec(col))) {
+      var p = m[1].split(',');
+      r = parseFloat(p[0]); g = parseFloat(p[1]); b = parseFloat(p[2]);
+    } else {
+      _lightCol[col] = false;
+      return false;
+    }
+    _lightCol[col] = (r * 0.299 + g * 0.587 + b * 0.114) > 165;
+    return _lightCol[col];
+  }
+
   function text(ctx, t, x, y, col, font, align) {
-    ctx.fillStyle = col;
     ctx.font = font || F;
     ctx.textAlign = align || 'left';
     ctx.textBaseline = 'alphabetic';
+
+    /* 亮色的"浮空"读数（速度、高度、方位）在云上或亮天空里会糊掉。
+       描一圈黑边就能压住任何背景，比给每处都加底板省事得多。 */
+    if (isLightCol(col)) {
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.strokeStyle = 'rgba(0,0,0,0.62)';
+      ctx.strokeText(t, x, y);
+    }
+
+    ctx.fillStyle = col;
     ctx.fillText(t, x, y);
     ctx.textAlign = 'left';
   }

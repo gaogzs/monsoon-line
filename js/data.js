@@ -54,7 +54,7 @@ var AIRCRAFT = [
     role: '舰载多用途战斗机',
     maker: '上游公约 · 北岸航空',
     stats: { spd: 0.68, mob: 0.72, stl: 0.55, fire: 0.70, dur: 0.62, rng: 0.76 },
-    phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.60, roll: 3.0, yaw: 0.30, hp: 130 },
+    phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.76, roll: 3.0, yaw: 0.30, hp: 130 },
     gun: 'k3',
     variableSweep: true,
     maxLoad: 6500,          // 最大挂载重量 kg，超过只会拖慢自己
@@ -69,7 +69,7 @@ var AIRCRAFT = [
       { id: 'C', label: '翼下外侧', kind: 'light', pts: [{ x: 5.6, y: -2.4 }, { x: -5.6, y: -2.4 }] },
       { id: 'D', label: '翼根', kind: 'light', pts: [{ x: 1.95, y: -1.8 }, { x: -1.95, y: -1.8 }] }
     ],
-    defaultLoadout: { A: 'srm', B: 'v11', C: 'v9', D: null },
+    defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' },
     desc: `
 <p>上游公约的舰载主力。变后掠翼是为了同时满足两件互相矛盾的事：
 在 <b>280 米</b>长的浮岛平台上起降，以及在 15 公里以上维持超音速巡航。</p>
@@ -89,7 +89,7 @@ var AIRCRAFT = [
     role: '平流层制空战斗机',
     maker: '上游公约 · 高空试验局',
     stats: { spd: 0.96, mob: 0.84, stl: 0.86, fire: 0.54, dur: 0.32, rng: 0.48 },
-    phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.63, roll: 3.4, yaw: 0.28, hp: 92 },
+    phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.80, roll: 3.4, yaw: 0.28, hp: 92 },
     gun: 'k3',
     maxLoad: 4800,
 
@@ -99,7 +99,7 @@ var AIRCRAFT = [
       { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 4.2, y: -4.2 }, { x: -4.2, y: -4.2 }] },
       { id: 'C', label: '机腹', kind: 'belly', pts: [{ x: 0.95, y: -4.2 }, { x: -0.95, y: -4.2 }] }
     ],
-    defaultLoadout: { A: 'v17', B: 'v9', C: 'e4' },
+    defaultLoadout: { A: 'mrm', B: 'hos', C: 'ecm2' },
     desc: `
 <p>整个上游公约空军只有 <b>31 架</b>。它的存在理由只有一个：<b>两万米</b>。</p>
 <p>翼载压到 <b>240 kg/m²</b>，配上第三涵道在 20 公里高度仍能给出的推力，
@@ -119,7 +119,7 @@ var AIRCRAFT = [
     role: '近距空中支援攻击机',
     maker: '上游公约 · 铁砧重工',
     stats: { spd: 0.34, mob: 0.44, stl: 0.30, fire: 0.98, dur: 0.98, rng: 0.60 },
-    phys: { vMax: 380, vMil: 320, vStall: 88, accel: 18, decel: 44, pitch: 0.50, roll: 2.2, yaw: 0.34, hp: 250 },
+    phys: { vMax: 380, vMil: 320, vStall: 88, accel: 18, decel: 44, pitch: 0.62, roll: 2.2, yaw: 0.34, hp: 250 },
     gun: 'k7',
     maxLoad: 7200,
 
@@ -129,8 +129,7 @@ var AIRCRAFT = [
       { id: 'B', label: '翼下中', kind: 'light', pts: [{ x: 6.2, y: -1.0 }, { x: -6.2, y: -1.0 }] },
       { id: 'C', label: '翼下外侧', kind: 'light', pts: [{ x: 7.8, y: -1.05 }, { x: -7.8, y: -1.05 }] }
     ],
-    // 集束弹只适配重挂点，翼下中那个通用挂架挂不下它
-    defaultLoadout: { A: 'v25', B: 'srm', C: 'l2' },
+    defaultLoadout: { A: 'asl', B: 'rkt', C: 'hdp' },
     desc: `
 <p>鲣鸟是一种以将近 <b>100 公里时速</b>俯冲入水的海鸟。
 上游公约的命名委员会在这件事上没花什么心思。</p>
@@ -169,7 +168,7 @@ var WEAPONS = {
     id: 'srm', name: 'TOR-2', cn: '短矢 · BOLT', kind: 'aam',
     model: 'missile',
     speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
-    turn: 2.40, seeker: 'ir', lockCone: 45 * Math.PI / 180, lockDist: 4200,
+    turn: 1.75, seeker: 'ir', lockCone: 45 * Math.PI / 180, lockDist: 4200,
     dmg: 30, ammo: 8, cd: 0.55, salvo: 1, flare: 0.38, prox: 20,
     target: 'air', highAltScale: true,
     desc: `基础短程红外弹。转弯率 2.4 rad/s，抗干扰一般，锁定锥 45°。
@@ -177,12 +176,243 @@ var WEAPONS = {
     stat: { dmg: 0.34, spd: 0.50, trn: 0.68, rng: 0.36, ecm: 0.30 }
   },
 
+  /* ---------- 空空导弹家族 ----------
+     编号前缀取自逻辑语词根，中文代号是给玩家看的那一层。
+     参数之间刻意留出取舍：射程远的转弯差，机动好的打不远，
+     抗干扰强的弹头小。没有一发通吃的弹。 */
+
+  trm: {
+    id: 'trm', name: 'TOR-4', cn: '短哨 · WHISTLE', kind: 'aam',
+    model: 'missile',
+    speed: 820, boost: 210, life: 5.0, vsLife: 13.0,
+    turn: 1.95, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4800,
+    dmg: 32, ammo: 6, cd: 0.70, salvo: 1, flare: 0.24, prox: 20,
+    target: 'air', highAltScale: true,
+    desc: '短哨是基础弹的抗干扰改型：换了双色导引头，flare 从 0.38 降到 0.24，' +
+      '代价是单价上去了、单挂点只能带 6 发。',
+    stat: { dmg: 0.36, spd: 0.56, trn: 0.72, rng: 0.42, ecm: 0.58 }
+  },
+
+  hos: {
+    id: 'hos', name: 'TOR-6', cn: '环刃 · RINGBLADE', kind: 'aam',
+    model: 'missile',
+    speed: 700, boost: 240, life: 4.0, vsLife: 11.0,
+    turn: 2.60, seeker: 'ir', lockCone: 88 * Math.PI / 180, lockDist: 3200,
+    dmg: 28, ammo: 4, cd: 0.60, salvo: 1, flare: 0.42, prox: 18,
+    target: 'air', highAltScale: true, hobs: true,
+    desc: '环刃的导引头能在 88° 离轴角上锁定 —— 机头都不用转过去就能打。' +
+      '转弯率是全家族最高的，但射程和抗干扰都垫底。',
+    stat: { dmg: 0.32, spd: 0.42, trn: 0.95, rng: 0.24, ecm: 0.24 }
+  },
+
+  mrm: {
+    id: 'mrm', name: 'BIN-4', cn: '中继 · RELAY', kind: 'aam',
+    model: 'missile',
+    speed: 900, boost: 200, life: 8.0, vsLife: 20.0,
+    turn: 1.45, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 8600,
+    dmg: 40, ammo: 4, cd: 3.20, salvo: 1, flare: 0.30, prox: 26,
+    target: 'air', highAltScale: true, reAcquire: true,
+    desc: '主动雷达中距弹。不吃干扰弹 —— 对付它只能靠机动和地形。' +
+      '锁定需要时间，打完就得脱离，否则对方会用同样的东西回敬你。',
+    stat: { dmg: 0.48, spd: 0.70, trn: 0.52, rng: 0.72, ecm: 0.20 }
+  },
+
+  arm: {
+    id: 'arm', name: 'BIN-8', cn: '追云 · CLOUDHUNT', kind: 'aam',
+    model: 'missile',
+    speed: 880, boost: 190, life: 7.5, vsLife: 18.0,
+    turn: 1.35, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 9500,
+    dmg: 52, ammo: 2, cd: 4.60, salvo: 1, flare: 0.35, prox: 28,
+    target: 'air', highAltScale: true, antiRadar: true,
+    desc: '反辐射型。对开机状态的敌方雷达与预警机伤害翻倍，' +
+      '但锁定锥特别窄 —— 对方一关雷达就得重新找。',
+    stat: { dmg: 0.62, spd: 0.68, trn: 0.48, rng: 0.80, ecm: 0.18 }
+  },
+
+  ram: {
+    id: 'ram', name: 'CLA-9', cn: '长杆-B · LONGROD-B', kind: 'aam',
+    model: 'missile',
+    speed: 1150, boost: 160, life: 10.0, vsLife: 24.0,
+    turn: 0.92, seeker: 'radar', lockCone: 22 * Math.PI / 180, lockDist: 12500,
+    dmg: 58, ammo: 2, cd: 5.20, salvo: 1, flare: 0.72, prox: 30,
+    target: 'air', highAltScale: true, scramjet: true, nezer: true,
+    desc: '冲压发动机远距弹的改进型。不可逃逸区是全家族最大的，' +
+      '但 18 km 以上缺氧，动力段会从 10 秒掉到 2.4 秒 —— 高空它反而不好用。',
+    stat: { dmg: 0.70, spd: 0.92, trn: 0.30, rng: 0.96, ecm: 0.14 }
+  },
+
+  vlar: {
+    id: 'vlar', name: 'DAR-12', cn: '极远 · OUTREACH', kind: 'aam',
+    model: 'missile',
+    speed: 980, boost: 150, life: 12.0, vsLife: 30.0,
+    turn: 0.78, seeker: 'radar', lockCone: 18 * Math.PI / 180, lockDist: 16000,
+    dmg: 66, ammo: 1, cd: 7.50, salvo: 1, flare: 0.66, prox: 34,
+    target: 'air', highAltScale: true, bigTarget: true,
+    desc: '一发就占满一个重挂点。它存在的意义是把预警机和浮空平台' +
+      '从护航圈里拽下来 —— 打战斗机是浪费。',
+    stat: { dmg: 0.82, spd: 0.78, trn: 0.24, rng: 1.00, ecm: 0.16 }
+  },
+
+  qsr: {
+    id: 'qsr', name: 'GIR-5', cn: '群刺 · QUILLS', kind: 'aam',
+    model: 'missile',
+    speed: 740, boost: 190, life: 4.2, vsLife: 11.0,
+    turn: 1.70, seeker: 'ir', lockCone: 52 * Math.PI / 180, lockDist: 4000,
+    dmg: 24, ammo: 12, cd: 1.40, salvo: 3, flare: 0.40, prox: 16,
+    target: 'air', highAltScale: true,
+    desc: '三联装发射巢，一个挂点就是三枚。单发威力最小，' +
+      '但一次齐射能铺开一片 —— 用来逼对方放弃进攻航线比用来击落更有效。',
+    stat: { dmg: 0.26, spd: 0.46, trn: 0.64, rng: 0.34, ecm: 0.22 }
+  },
+
+  wasp: {
+    id: 'wasp', name: 'SUT-7', cn: '蜂刺 · WASP', kind: 'aam',
+    model: 'missile',
+    speed: 860, boost: 260, life: 4.8, vsLife: 12.0,
+    turn: 2.15, seeker: 'ir', lockCone: 58 * Math.PI / 180, lockDist: 5200,
+    dmg: 38, ammo: 3, cd: 1.90, salvo: 1, flare: 0.36, prox: 22,
+    target: 'air', highAltScale: true, reAcquire: true,
+    desc: '锥刺的轻量版：推力更猛、加速更快，进不可逃逸区比谁都快。' +
+      '代价是动力段短，追不上掉头就跑的目标。',
+    stat: { dmg: 0.44, spd: 0.62, trn: 0.78, rng: 0.50, ecm: 0.26 }
+  },
+
+  /* ---------- 对地与反大型 ---------- */
+
+  asl: {
+    id: 'asl', name: 'GUT-9', cn: '滑翔锤 · GLIDEHAMMER', kind: 'agm',
+    model: 'missile',
+    speed: 320, boost: 90, life: 14.0, vsLife: 26.0,
+    turn: 0.55, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 6000,
+    dmg: 150, ammo: 4, cd: 2.40, salvo: 1, flare: 0.55, prox: 26,
+    target: 'ground',
+    desc: '无动力滑翔制导炸弹。轻、便宜、能多带 —— 一个重挂点塞得下四枚。' +
+      '缺点是扔出去之后就只能等，目标挪了就打空。',
+    stat: { dmg: 0.52, spd: 0.20, trn: 0.30, rng: 0.48, ecm: 0.60 }
+  },
+
+  asl2: {
+    id: 'asl2', name: 'GUT-12', cn: '重锤-B · SLEDGE-B', kind: 'agm',
+    model: 'missile',
+    speed: 480, boost: 140, life: 10.0, vsLife: 22.0,
+    turn: 0.90, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 9000,
+    dmg: 340, ammo: 2, cd: 3.60, salvo: 1, flare: 0.75, prox: 34,
+    target: 'ground',
+    desc: '重型侵彻战斗部，专门对付加固机堡和指挥所。' +
+      '一发就能解决一座控制站，但一个挂点只带得下两枚。',
+    stat: { dmg: 0.90, spd: 0.36, trn: 0.34, rng: 0.62, ecm: 0.30 }
+  },
+
+  sat: {
+    id: 'sat', name: 'SPO-6', cn: '云裂 · CLOUDBREAK', kind: 'asm',
+    model: 'missile',
+    speed: 540, boost: 130, life: 9.0, vsLife: 20.0,
+    turn: 1.05, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 8200,
+    dmg: 260, ammo: 2, cd: 3.20, salvo: 1, flare: 0.68, prox: 30,
+    target: 'ship', bigTarget: true,
+    desc: '为浮空平台设计的串联战斗部：先撕气囊、再打吊舱。' +
+      '打战斗机和地面目标都是浪费。',
+    stat: { dmg: 0.76, spd: 0.42, trn: 0.42, rng: 0.58, ecm: 0.34 }
+  },
+
+  rkt: {
+    id: 'rkt', name: 'PEJ-6', cn: '撒星 · STARSCATTER', kind: 'bomb',
+    model: 'missile',
+    speed: 620, boost: 0, life: 3.0, vsLife: 3.0,
+    turn: 0.0, seeker: 'none', lockCone: 0, lockDist: 0,
+    dmg: 22, ammo: 28, cd: 1.10, salvo: 7, flare: 1.0, prox: 14,
+    target: 'ground', unguided: true,
+    desc: '无制导火箭巢。一个挂点就是一片弹雨，覆盖而不瞄准 ——' +
+      '对付软目标群最划算，但精度完全靠飞机对准。',
+    stat: { dmg: 0.22, spd: 0.34, trn: 0.10, rng: 0.16, ecm: 1.00 }
+  },
+
+  clb: {
+    id: 'clb', name: 'PEJ-9', cn: '碎玉 · SHARDRIFT', kind: 'bomb',
+    model: 'missile',
+    speed: 300, boost: 60, life: 12.0, vsLife: 24.0,
+    turn: 0.42, seeker: 'ir', lockCone: 36 * Math.PI / 180, lockDist: 5000,
+    dmg: 118, ammo: 2, cd: 3.00, salvo: 1, flare: 0.80, prox: 34,
+    target: 'ground', cluster: true,
+    desc: '子母弹。抛撒覆盖一整片阵地，对分散的软目标效率极高，' +
+      '但打不动加固目标 —— 破片啃不开机堡。',
+    stat: { dmg: 0.44, spd: 0.18, trn: 0.26, rng: 0.42, ecm: 0.66 }
+  },
+
+  /* ---------- 被动吊舱 ----------
+     这几件不发射任何东西，装上去就一直在起作用。
+     它们让"少带一枚弹"变成一个真实的取舍，而不只是纯损失。 */
+
+  ecm2: {
+    id: 'ecm2', name: 'ZUN-8', cn: '静默 · HUSH', kind: 'ecm',
+    model: 'missile',
+    speed: 0, boost: 0, life: 0, vsLife: 0,
+    turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
+    dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
+    target: 'none', passive: true,
+    lockResist: 0.40,
+    desc: '拖曳式诱饵。敌方对你的锁定距离缩短 40%，且不需要手动开启 ——' +
+      '代价是这个挂点永远空着。',
+    stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.92 }
+  },
+
+  dec: {
+    id: 'dec', name: 'ZUN-12', cn: '雾障 · FOGSCREEN', kind: 'ecm',
+    model: 'missile',
+    speed: 0, boost: 0, life: 0, vsLife: 0,
+    turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
+    dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
+    target: 'none', passive: true,
+    flareBonus: 40,
+    desc: '额外挂载 40 组干扰弹的储存舱。想要"按住 V 一直丢"的话，' +
+      '这个东西比多带两枚弹有用。',
+    stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.74 }
+  },
+
+  oep: {
+    id: 'oep', name: 'GUS-6', cn: '明瞳 · CLEAREYE', kind: 'ecm',
+    model: 'missile',
+    speed: 0, boost: 0, life: 0, vsLife: 0,
+    turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
+    dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
+    target: 'none', passive: true,
+    lockRangeBonus: 0.45,
+    desc: '光电瞄准吊舱。你的锁定距离增加 45%，而且被动测距不会被 RWR 发现。',
+    stat: { dmg: 0, spd: 0, trn: 0, rng: 0.90, ecm: 0.40 }
+  },
+
+  irp: {
+    id: 'irp', name: 'GUS-9', cn: '夜枭 · NIGHTOWL', kind: 'ecm',
+    model: 'missile',
+    speed: 0, boost: 0, life: 0, vsLife: 0,
+    turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
+    dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
+    target: 'none', passive: true,
+    lockRangeBonus: 0.25, lockResist: 0.15,
+    desc: '红外搜索与跟踪。锁定距离 +25%，同时略降对方对你的锁定距离 ——' +
+      '"你不开雷达，我也不开"，这是高空静默交战的常规配置。',
+    stat: { dmg: 0, spd: 0, trn: 0, rng: 0.62, ecm: 0.58 }
+  },
+
+  hdp: {
+    id: 'hdp', name: 'BAD-3', cn: '护盾 · AEGIS', kind: 'ecm',
+    model: 'missile',
+    speed: 0, boost: 0, life: 0, vsLife: 0,
+    turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
+    dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
+    target: 'none', passive: true,
+    armorBonus: 0.22,
+    desc: '附加装甲与灭火抑爆组件，全向减伤 22%。' +
+      '它不能让你赢，只能让你活着回来。',
+    stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.50 }
+  },
+
   /* ---------- 上游公约特殊武器 ---------- */
   v11: {
     id: 'v11', name: 'SUT-11', cn: '锥刺 · STING', kind: 'aam',
     model: 'missile',
     speed: 790, boost: 280, life: 5.0, vsLife: 11.0,
-    turn: 3.40, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4600,
+    turn: 2.45, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4600,
     dmg: 56, ammo: 16, cd: 1.15, salvo: 1, flare: 0.35, prox: 26,
     target: 'air', reAcquire: true, highAltScale: true,
     desc: `高机动缠斗弹。转弯率 <b>3.4 rad/s</b>（约 60G），
@@ -194,7 +424,7 @@ var WEAPONS = {
     id: 'v9', name: 'GIR-9', cn: '蜂群 · SWARM', kind: 'aam',
     model: 'missile',
     speed: 830, boost: 200, life: 4.0, vsLife: 9.0,
-    turn: 2.60, seeker: 'ir', lockCone: 75 * Math.PI / 180, lockDist: 3800,
+    turn: 1.90, seeker: 'ir', lockCone: 75 * Math.PI / 180, lockDist: 3800,
     dmg: 44, ammo: 44, cd: 0.80, salvo: 2, flare: 0.50, prox: 22,
     target: 'air', hobs: true, highAltScale: true,
     desc: `大离轴角格斗弹，锁定锥 <b>±75°</b> —— 目标甚至不需要在你前方。
@@ -277,7 +507,7 @@ var WEAPONS = {
   dl4: {
     id: 'dl4', name: 'DAR-4', cn: '砾石 · GRAVEL', kind: 'aam', model: 'missile',
     speed: 880, boost: 210, life: 6.5, vsLife: 16.0,
-    turn: 1.70, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 7200,
+    turn: 1.25, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 7200,
     dmg: 30, ammo: 8, cd: 3.4, salvo: 1, flare: 0.45, prox: 28,
     target: 'air', highAltScale: true,
     // 下游专用弹：fits 为空表示玩家挂不上它
@@ -287,7 +517,7 @@ var WEAPONS = {
   dl6: {
     id: 'dl6', name: 'BIN-6', cn: '燧火 · FLINTFIRE', kind: 'aam', model: 'missile',
     speed: 780, boost: 190, life: 4.5, vsLife: 10.0,
-    turn: 2.90, seeker: 'ir', lockCone: 60 * Math.PI / 180, lockDist: 3600,
+    turn: 2.05, seeker: 'ir', lockCone: 60 * Math.PI / 180, lockDist: 3600,
     dmg: 26, ammo: 6, cd: 2.2, salvo: 1, flare: 0.35, prox: 24,
     target: 'air', highAltScale: true,
     fits: [], perPoint: 0, mass: 0,
@@ -296,7 +526,7 @@ var WEAPONS = {
   dl9: {
     id: 'dl9', name: 'BAD-9', cn: '高墙 · RAMPART', kind: 'aam', model: 'missile',
     speed: 940, boost: 320, life: 9.0, vsLife: 22.0,
-    turn: 2.10, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 9000,
+    turn: 1.50, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 9000,
     dmg: 48, ammo: 4, cd: 7.0, salvo: 1, flare: 0.60, prox: 34,
     target: 'air', highAltScale: true,
     fits: [], perPoint: 0, mass: 0,
@@ -318,21 +548,70 @@ var WEAPONS = {
      mass     单件重量 kg，用来算挂载对机动性的拖累
    ============================================================ */
 var STORE_ATTR = {
-  srm: { fits: ['tip', 'light', 'heavy'], perPoint: 4, mass: 95 },
-  v9:  { fits: ['tip', 'light', 'heavy'], perPoint: 2, mass: 110 },
-  v11: { fits: ['light', 'heavy'],        perPoint: 2, mass: 135 },
-  v17: { fits: ['heavy'],                 perPoint: 1, mass: 285 },
-  v22: { fits: ['heavy'],                 perPoint: 1, mass: 640 },
-  v25: { fits: ['heavy', 'belly'],        perPoint: 2, mass: 330 },
-  v30: { fits: ['heavy', 'belly'],        perPoint: 1, mass: 295 },
-  e4:  { fits: ['light', 'belly'],        perPoint: 1, mass: 215 },
-  l2:  { fits: ['light', 'belly'],        perPoint: 1, mass: 190 }
+  /* 空空 */
+  srm:  { fits: ['tip', 'light', 'heavy'], perPoint: 8,  mass: 95 },
+  trm:  { fits: ['tip', 'light', 'heavy'], perPoint: 6,  mass: 105 },
+  hos:  { fits: ['tip', 'light', 'heavy'], perPoint: 4,  mass: 100 },
+  qsr:  { fits: ['tip', 'light', 'heavy'], perPoint: 12, mass: 92 },
+  wasp: { fits: ['tip', 'light', 'heavy'], perPoint: 3,  mass: 145 },
+  v9:   { fits: ['tip', 'light', 'heavy'], perPoint: 2,  mass: 110 },
+  v11:  { fits: ['light', 'heavy'],        perPoint: 2,  mass: 135 },
+  mrm:  { fits: ['light', 'heavy'],        perPoint: 4,  mass: 195 },
+  v17:  { fits: ['heavy'],                 perPoint: 1,  mass: 285 },
+  arm:  { fits: ['heavy'],                 perPoint: 2,  mass: 310 },
+  ram:  { fits: ['heavy'],                 perPoint: 2,  mass: 340 },
+  vlar: { fits: ['heavy'],                 perPoint: 1,  mass: 720 },
+
+  /* 对地与反大型 */
+  v25:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 330 },
+  asl:  { fits: ['light', 'heavy'],        perPoint: 4,  mass: 240 },
+  asl2: { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 520 },
+  sat:  { fits: ['heavy'],                 perPoint: 2,  mass: 410 },
+  v22:  { fits: ['heavy'],                 perPoint: 1,  mass: 640 },
+  v30:  { fits: ['heavy', 'belly'],        perPoint: 1,  mass: 295 },
+  clb:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 350 },
+  rkt:  { fits: ['light', 'heavy'],        perPoint: 28, mass: 280 },
+
+  /* 吊舱（主动） */
+  e4:   { fits: ['light', 'belly'],        perPoint: 1,  mass: 215 },
+  l2:   { fits: ['light', 'belly'],        perPoint: 1,  mass: 190 },
+
+  /* 吊舱（被动）—— 装上就一直在起作用 */
+  ecm2: { fits: ['tip', 'light', 'belly'], perPoint: 1,  mass: 240 },
+  dec:  { fits: ['light', 'belly'],        perPoint: 1,  mass: 210 },
+  oep:  { fits: ['light', 'belly'],        perPoint: 1,  mass: 175 },
+  irp:  { fits: ['tip', 'light', 'belly'], perPoint: 1,  mass: 160 },
+  hdp:  { fits: ['light', 'belly'],        perPoint: 1,  mass: 320 }
 };
 
 (function () {
   for (var k in STORE_ATTR) {
     if (!Object.prototype.hasOwnProperty.call(WEAPONS, k)) continue;
     for (var f in STORE_ATTR[k]) WEAPONS[k][f] = STORE_ATTR[k][f];
+  }
+})();
+
+/* ============================================================
+   导引品质
+   lead = 0   纯追踪 —— 傻追着目标当前的位置，目标一拐弯就甩掉
+   lead = 1   完全预测 —— 飞向解算出来的最优拦截点
+
+   这比转弯率更能体现"这枚弹聪不聪明"：一枚转弯率一般但预测准的弹，
+   打机动目标反而比一枚只会死咬尾巴的灵活弹更管用。
+   基础弹（TOR-2）刻意做得很笨，改进型的钱基本都花在这里。
+   ============================================================ */
+var MISSILE_LEAD = {
+  srm: 0.38, trm: 0.48, hos: 0.30, qsr: 0.42, wasp: 0.55,
+  v9: 0.52, v11: 0.62, mrm: 0.78, v17: 0.82, arm: 0.72,
+  ram: 0.86, vlar: 0.90,
+  asl: 0.65, asl2: 0.70, sat: 0.68, rkt: 0.0, clb: 0.50,
+  v25: 0.66, v22: 0.74, v30: 0.48,
+  dl4: 0.74, dl6: 0.48, dl9: 0.80
+};
+
+(function () {
+  for (var k in MISSILE_LEAD) {
+    if (Object.prototype.hasOwnProperty.call(WEAPONS, k)) WEAPONS[k].lead = MISSILE_LEAD[k];
   }
 })();
 

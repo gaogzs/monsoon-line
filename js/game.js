@@ -81,6 +81,10 @@ var Game = (function () {
   /* 单一油门轴：0..1 是常规推力区，1..1.25 是加力区。
      不再需要单独的加力/减速板按键。 */
   var THR_MAX = 1.25;
+
+  /* 高 G 机动：转向率放大倍率，以及每秒付出的速度代价（m/s²） */
+  var HIG_MAX = 1.90;
+  var HIG_BLEED = 82;
   var camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0), camPos = M3.V(0, 0, 0);
   var camYaw = 0, camPitch = 0;
   var banner = { t: 0, title: '', sub: '', col: '' };
@@ -122,6 +126,7 @@ var Game = (function () {
     camDist: 52,
     camHeight: 13,
     hudOpacity: 100,
+    hudScale: 100,
     compass: true,
     targetMarkers: true
   };
@@ -151,6 +156,7 @@ var Game = (function () {
     {
       title: '显示',
       items: [
+        { k: 'hudScale', label: 'HUD 缩放', type: 'range', min: 70, max: 160, unit: '%' },
         { k: 'hudOpacity', label: 'HUD 透明度', type: 'range', min: 25, max: 100, unit: '%' },
         { k: 'compass', label: '顶部指南针', type: 'toggle' },
         { k: 'targetMarkers', label: '目标方位标记', type: 'toggle' }
@@ -283,9 +289,10 @@ var Game = (function () {
     ['鼠标右键 / Enter', '发射特殊武器'],
     ['F / Tab', '切换目标'],
     ['R', '切换挂载'],
-    ['V', '释放干扰弹'],
+    ['V', '投放干扰弹 —— 热焰弹与箔丝同时撒出，按住连续投放'],
     ['C', '切换视角（追尾 / 座舱 / 目标）'],
     ['1 / 2 / 3', '僚机指令：散开 / 集火 / 掩护'],
+    ['G', '高 G 机动 —— 大幅转向时按住，拉出额外过载，代价是掉速'],
     ['H', '暂停（暂停后可实时调整设置）']
   ];
 
@@ -434,6 +441,9 @@ var Game = (function () {
       var wid = lo ? lo[g.id] : null;
       if (!wid || !WEAPONS[wid]) continue;
       var w = WEAPONS[wid];
+      // 被动吊舱不进武器纵列表 —— 它没有扳机可扣。
+      // 它提供的加成由 passiveEffects() 单独汇总。
+      if (w.passive) continue;
       var e = map[wid];
       if (!e) {
         e = map[wid] = { wid: wid, w: w, points: 0, ammo: 0, salvo: 0 };
@@ -455,6 +465,31 @@ var Game = (function () {
     var out = [];
     for (i = 0; i < order.length; i++) out.push(map[order[i]]);
     return out;
+  }
+
+  /**
+   * 汇总被动吊舱的效果。
+   * 这类挂载不发射任何东西，装上就一直在起作用 ——
+   * 它们让"少带一枚弹"变成一个真实的取舍，而不只是纯损失。
+   */
+  function passiveEffects(ac, lo) {
+    var e = { lockResist: 0, armor: 0, lockRange: 1, flareBonus: 0 };
+    var groups = ac.hardpointGroups || [];
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i];
+      var wid = lo ? lo[g.id] : null;
+      if (!wid || !WEAPONS[wid]) continue;
+      var w = WEAPONS[wid];
+      if (!w.passive) continue;
+      var n = g.pts.length;
+      if (w.lockResist) e.lockResist = Math.max(e.lockResist, w.lockResist);
+      if (w.armorBonus) e.armor += w.armorBonus * n;
+      if (w.lockRangeBonus) e.lockRange += w.lockRangeBonus * n;
+      if (w.flareBonus) e.flareBonus += w.flareBonus * n;
+    }
+    e.armor = Math.min(e.armor, 0.55);
+    e.lockRange = Math.min(e.lockRange, 1.9);
+    return e;
   }
 
   /** 挂载总重量（kg） */
@@ -700,10 +735,13 @@ var Game = (function () {
       })(i);
     }
     var e = CODEX[codexSel];
+    // 条目可以给静态 html，也可以给 build() 现场生成 ——
+    // 图鉴那几条必须动态生成，否则改了武器数据文档就对不上了
+    var body = typeof e.build === 'function' ? e.build() : (e.html || '');
     document.getElementById('codexBody').innerHTML =
       '<div class="cx-title">' + e.title + '</div>' +
       '<div class="cx-sub">' + e.sub + '</div>' +
-      '<div class="cx-text">' + e.html + '</div>';
+      '<div class="cx-text">' + body + '</div>';
   }
 
   /* ============================================================
@@ -725,6 +763,21 @@ var Game = (function () {
     return w;
   }
 
+  /** 把 wpIdx 指向的那一组同步到 special / spAmmo / spSalvo / spCd */
+  function syncWeapon(a) {
+    if (!a || !a.loadoutList || !a.loadoutList.length) {
+      if (a) { a.special = null; a.spAmmo = 0; a.spSalvo = 1; a.spCd = 0; }
+      return;
+    }
+    if (a.wpIdx >= a.loadoutList.length) a.wpIdx = 0;
+    var e = a.loadoutList[a.wpIdx];
+    a.special = e.wid;
+    a.spAmmo = a.ammoPool ? (a.ammoPool[e.wid] || 0) : 0;
+    a.spSalvo = e.salvo;
+    // 冷却也跟着切过去，每件武器各算各的
+    a.spCd = a.cdPool ? (a.cdPool[e.wid] || 0) : 0;
+  }
+
   function launch(actor, target, w) {
     var wp = WEAPONS[actor.special];
     if (!wp) return false;
@@ -734,6 +787,7 @@ var Game = (function () {
       if (actor.spCd > 0) return false;
       actor.spActive = wp.duration;
       actor.spCd = wp.cd;
+      if (actor.cdPool) actor.cdPool[actor.special] = wp.cd;
       SFX.laser();
       Radio.raw({ who: actor.isPlayer ? CALLSIGN.player : actor.name, cls: 'ally', tx: '<i>认知电子战吊舱开机 —— 敌方锁定距离 −40%</i>', gap: 0.6 });
       return true;
@@ -777,6 +831,7 @@ var Game = (function () {
     }
     actor.spAmmo -= n;
     actor.spCd = wp.cd;
+    if (actor.cdPool) actor.cdPool[actor.special] = wp.cd;
     if (actor.isPlayer) {
       if (actor.ammoPool) actor.ammoPool[actor.special] = actor.spAmmo;
       w.shotsFired += n;
@@ -820,6 +875,16 @@ var Game = (function () {
     // 挂载重量：拖累机动性，空挂架能换回一点
     p.loadFactor = loadK;
 
+    // 被动吊舱的效果（不占扳机，装上就生效）
+    var pe = passiveEffects(ac, lo);
+    p.armor = pe.armor;              // 全向减伤
+    p.lockResist = pe.lockResist;    // 缩短敌方对我的锁定距离
+    p.lockRangeK = pe.lockRange;     // 放大我的锁定距离
+    p.flares += pe.flareBonus;
+
+    // 原始配置留着 —— HUD 的挂载状态图要按它来画
+    p.loadout = lo;
+
     p.name = CALLSIGN.player;
     p.label = CALLSIGN.player;
     world.player = p;
@@ -862,7 +927,7 @@ var Game = (function () {
         if (e.code === 'KeyM') toggleAimMode();
         if (e.code === 'KeyF' || e.code === 'Tab') cycleTarget();
         if (e.code === 'KeyR') cycleSpecial();
-        if (e.code === 'KeyV') Ent.breakLock(player, world);
+        // V 改成按住连发，见 controlPlayer()
         if (e.code === 'Enter') fireSpecial();
         if (e.code === 'Digit1' && player) setWingCmd('spread');
         if (e.code === 'Digit2' && player) setWingCmd('focus');
@@ -955,7 +1020,7 @@ var Game = (function () {
     player.wpIdx = (player.wpIdx + 1) % player.loadoutList.length;
     syncWeapon(player);
     var w = WEAPONS[player.special];
-    player.spCd = 0;
+    // 注意不重置 spCd —— syncWeapon 已经从 cdPool 里取回这把武器自己的剩余
     player.spActive = 0;
     if (w.kind === 'dew') player.spCharges = w.charges;
     player.lockProgress = 0;
@@ -1063,6 +1128,12 @@ var Game = (function () {
     if (!player.alive) return;
     var c = player.ctrl;
 
+    /* 干扰弹：按住 V 连续投放，一次一组。
+       "组"才是战术单位 —— 真实中也是按一个程序打出去，
+       而不是一发一发抠。投放节奏由 breakLock 里的 flareCd 控制，
+       所以按住不放会自动按间隔连发，松手就停。 */
+    if (keys.KeyV) Ent.breakLock(player, world);
+
     if (aimMode) {
       // 鼠标引导：飞控把机头指向瞄准点，但照样受动压与失速限制
       updateMouseAim();
@@ -1086,6 +1157,23 @@ var Game = (function () {
     if (thrIn) player.throttle += thrIn * dt * 0.62;
     if (keys.KeyX) player.throttle = THR_MAX;
     if (keys.KeyZ) player.throttle = 0;
+
+    /* ---- 高 G 机动 ----
+       只有在"确实在使劲转"的时候才允许触发 —— 鼠标只偏一点点时
+       按住 G 不会有任何效果，否则它会变成一个无脑常开的加速器。
+       代价是动能：拉高 G 掉速极快，用完之后就没法再机动了。 */
+    var demand = Math.abs(c.pitch) + Math.abs(c.roll);
+    var canG = player.speed > player.phys.vStall * 1.30;
+    var wantG = !!keys.KeyG && demand > 0.55 && canG;
+
+    if (wantG) {
+      player.gLoad = M3.smooth(player.gLoad || 1, HIG_MAX, 9, dt);
+      player.speed = Math.max(player.phys.vStall * 0.92,
+        player.speed - HIG_BLEED * dt);
+    } else {
+      player.gLoad = M3.smooth(player.gLoad || 1, 1, 6, dt);
+    }
+    player.hiG = wantG;
 
     player.throttle = M3.clamp(player.throttle, 0, THR_MAX);
     player.ab = player.throttle > 1.0;
@@ -1118,6 +1206,10 @@ var Game = (function () {
     var cone = w.lockCone;
     if (player.pos.y > 18000) cone *= 0.78;
     var lockDist = w.lockDist;
+    // 光电 / 红外搜索吊舱提供的锁定距离加成
+    if (player.lockRangeK) lockDist *= player.lockRangeK;
+    // ECM 吊舱开机时敌方对我的锁定被压缩（这一条作用在我锁别人上时是无效的，
+    // 真正的用处见 ai.js 里 AI 锁玩家的判定）
     if (player.spActive > 0) lockDist *= (1 - (w.lockReduce || 0));
 
     var ok = false;
@@ -1219,7 +1311,8 @@ var Game = (function () {
 
       var d = M3.dist(t.pos, player.pos);
       var w = WEAPONS[t.weapon];
-      if (d > w.lockDist) continue;
+      // 玩家的被动吊舱会压缩敌方对他的锁定距离
+      if (d > w.lockDist * (1 - (player.lockResist || 0))) continue;
 
       // 低空突防可以躲开对空雷达；但贴得太近仍会被目视发现
       var lowExposed = t.ground && player.pos.y < (world.dangerAltitude || 1500) && d < 5200;

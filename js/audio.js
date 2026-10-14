@@ -19,7 +19,10 @@ var SFX = (function () {
   var gunOn = false;
 
   /* ---------- 持续音节点 ---------- */
-  var engA = null, engB = null, engF = null, engG = null, engLfo = null, engLfoG = null;
+  /* 喷气发动机的声源分三层：宽带喷流噪声、压气机啸叫、低频轰鸣 */
+  var engSrc = null, jetF = null, jetG = null;
+  var whineF = null, whineG = null, subG = null;
+  var engA = null, engB = null, engG = null, engLfo = null, engLfoG = null;
   var gunSrc = null, gunF = null, gunG = null, gunLfo = null, gunLfoG = null;
   var warnOsc = null, warnG = null, warnLfo = null, warnLfoG = null;
   var warnOn = false;
@@ -55,23 +58,45 @@ var SFX = (function () {
   function T() { return ctx.currentTime; }
 
   /* ---------- 引擎：锯齿 + 方波 → 低通 ---------- */
+  /* ---------- 发动机：喷气式 ----------
+     活塞机靠低频周期性脉动发声（锯齿波 + 方波 + 低通），喷气机不是。
+     它的声音由三部分组成：
+
+       ① 宽带喷流噪声 —— 主体
+       ② 压气机啸叫   —— 高频窄带，转速越高越尖
+       ③ 低频轰鸣     —— 很轻，只提供厚度
+
+     早先版本用 74 Hz 锯齿 + 37 Hz 方波，那是螺旋桨的频谱。 */
   function buildEngine() {
     engG = ctx.createGain(); engG.gain.value = 0.0;
-    engF = ctx.createBiquadFilter();
-    engF.type = 'lowpass'; engF.frequency.value = 700; engF.Q.value = 3.0;
 
-    engA = ctx.createOscillator(); engA.type = 'sawtooth'; engA.frequency.value = 74;
-    engB = ctx.createOscillator(); engB.type = 'square'; engB.frequency.value = 37;
-    var gB = ctx.createGain(); gB.gain.value = 0.45;
+    // ① 喷流噪声（主体）
+    engSrc = ctx.createBufferSource();
+    engSrc.buffer = noiseBuf; engSrc.loop = true;
+    jetF = ctx.createBiquadFilter();
+    jetF.type = 'bandpass'; jetF.frequency.value = 850; jetF.Q.value = 0.5;
+    jetG = ctx.createGain(); jetG.gain.value = 1.0;
+    engSrc.connect(jetF); jetF.connect(jetG); jetG.connect(engG);
 
-    engLfo = ctx.createOscillator(); engLfo.type = 'sine'; engLfo.frequency.value = 17;
-    engLfoG = ctx.createGain(); engLfoG.gain.value = 6;
-    engLfo.connect(engLfoG); engLfoG.connect(engA.frequency);
+    // ② 压气机啸叫
+    engA = ctx.createOscillator(); engA.type = 'sawtooth'; engA.frequency.value = 1750;
+    whineF = ctx.createBiquadFilter();
+    whineF.type = 'bandpass'; whineF.frequency.value = 2800; whineF.Q.value = 7.0;
+    whineG = ctx.createGain(); whineG.gain.value = 0.0;
+    engA.connect(whineF); whineF.connect(whineG); whineG.connect(engG);
 
-    engA.connect(engF);
-    engB.connect(gB); gB.connect(engF);
-    engF.connect(engG); engG.connect(master);
-    engA.start(); engB.start(); engLfo.start();
+    // ③ 低频轰鸣
+    engB = ctx.createOscillator(); engB.type = 'triangle'; engB.frequency.value = 62;
+    subG = ctx.createGain(); subG.gain.value = 0.0;
+    engB.connect(subG); subG.connect(engG);
+
+    // ④ 让喷流噪声的中心频率轻微游走，免得听起来像纯白噪
+    engLfo = ctx.createOscillator(); engLfo.type = 'sine'; engLfo.frequency.value = 23;
+    engLfoG = ctx.createGain(); engLfoG.gain.value = 110;
+    engLfo.connect(engLfoG); engLfoG.connect(jetF.frequency);
+
+    engG.connect(master);
+    engSrc.start(); engA.start(); engB.start(); engLfo.start();
   }
 
   /* ---------- 机炮：带通噪声 + 65Hz 方波调制 ---------- */
@@ -190,11 +215,23 @@ var SFX = (function () {
     engine: function (throttle, ab, alive) {
       if (!ready) return;
       var t = T();
-      var base = 52 + throttle * 62 + (ab ? 22 : 0);
-      engA.frequency.setTargetAtTime(base, t, 0.09);
-      engB.frequency.setTargetAtTime(base * 0.5, t, 0.09);
-      engF.frequency.setTargetAtTime(560 + throttle * 1500 + (ab ? 500 : 0), t, 0.10);
-      engLfo.frequency.setTargetAtTime(12 + throttle * 16, t, 0.2);
+
+      // 喷流噪声：中心频率随油门升高、加力时再往上顶一截
+      jetF.frequency.setTargetAtTime(760 + throttle * 1500 + (ab ? 700 : 0), t, 0.15);
+      jetF.Q.setTargetAtTime(0.5 + throttle * 0.5, t, 0.15);
+
+      // 压气机啸叫：转速越高越尖、越响
+      engA.frequency.setTargetAtTime(1450 + throttle * 2700 + (ab ? 950 : 0), t, 0.14);
+      whineF.frequency.setTargetAtTime(2600 + throttle * 1700, t, 0.14);
+      whineG.gain.setTargetAtTime(
+        alive ? (0.09 + throttle * 0.16 + (ab ? 0.10 : 0)) : 0, t, 0.15);
+
+      // 低频轰鸣只负责厚度，音量压得很低
+      subG.gain.setTargetAtTime(
+        alive ? (0.13 + throttle * 0.13 + (ab ? 0.06 : 0)) : 0, t, 0.18);
+      engB.frequency.setTargetAtTime(56 + throttle * 26, t, 0.2);
+      engLfo.frequency.setTargetAtTime(17 + throttle * 19, t, 0.2);
+
       var vol = alive ? (0.030 + throttle * 0.075 + (ab ? 0.030 : 0)) * volEngine : 0;
       engG.gain.setTargetAtTime(vol, t, 0.12);
     },

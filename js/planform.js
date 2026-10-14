@@ -289,12 +289,26 @@ var PLANFORM = (function () {
     };
   }
 
-  function draw(cv, ac, loadout, activeGroup) {
-    if (!cv) return;
+  /**
+   * 把识别图画进任意 2D 上下文里的一个矩形区域。
+   *
+   * 机库的大图和战斗 HUD 右下角的小图走的是同一份代码 ——
+   * 分成两份写的话，两边一定会慢慢长得不一样。
+   *
+   * opts.active   当前高亮的挂载点组
+   * opts.cd       { 武器 id: 0..1 }，1 = 刚打完，0 = 已就绪
+   * opts.compact  紧凑模式：省掉标注与尺寸线（HUD 用）
+   */
+  function paint(g, bx, by, bw, bh, ac, loadout, opts) {
+    opts = opts || {};
     var pf = P[ac.model];
     var groups = groupsOf(ac);
-    var g = cv.getContext('2d');
-    var W = cv.width, H = cv.height;
+    var compact = !!opts.compact;
+    var cd = opts.cd || null;
+    var W = bw, H = bh;
+
+    g.save();
+    g.translate(bx, by);
 
     /* ---- 配色：与界面同一套军用航电色 ---- */
     var INK = '#8fa8b8';          // 主轮廓
@@ -304,31 +318,19 @@ var PLANFORM = (function () {
     var CY = '#45d6ff';
     var STORE = '#4fe08a';
 
-    g.clearRect(0, 0, W, H);
-
-    // 底
-    g.fillStyle = '#070d12';
-    g.fillRect(0, 0, W, H);
-
-    /* ---- 网格底纹（技术图纸感） ---- */
-    var grid = 22;
-    g.strokeStyle = 'rgba(69,214,255,0.055)';
-    g.lineWidth = 1;
-    g.beginPath();
-    for (var gx = 0; gx <= W; gx += grid) { g.moveTo(gx + .5, 0); g.lineTo(gx + .5, H); }
-    for (var gy = 0; gy <= H; gy += grid) { g.moveTo(0, gy + .5); g.lineTo(W, gy + .5); }
-    g.stroke();
-
     if (!pf) {
       g.fillStyle = 'rgba(143,168,184,0.5)';
       g.font = '13px Consolas,monospace';
       g.textAlign = 'center';
-      g.fillText('NO PLANFORM DATA', W / 2, H / 2);
+      g.fillText('NO DATA', W / 2, H / 2);
+      g.restore();
       return;
     }
 
-    /* ---- 缩放：左右都留出标注栏 ---- */
-    var padL = 132, padR = 132, padY = 44;
+    /* ---- 缩放：大图左右留标注栏，小图只留一点边距 ---- */
+    var padL = compact ? 10 : 132;
+    var padR = compact ? 10 : 132;
+    var padY = compact ? 10 : 44;
     var k = Math.min((W - padL - padR) / pf.span, (H - padY * 2) / pf.len);
     var cx = padL + (W - padL - padR) / 2, cy = H / 2;
 
@@ -369,21 +371,44 @@ var PLANFORM = (function () {
     for (var gi = 0; gi < groups.length; gi++) {
       var grp = groups[gi];
       var st = groupStore(ac, grp, loadout);
-      var isActive = (activeGroup && grp.id === activeGroup);
+      var isActive = (opts.active && grp.id === opts.active);
+      // 这种武器的冷却进度：1 = 刚打完，0 = 已就绪
+      var prog = (cd && st.wid && cd[st.wid] !== undefined) ? cd[st.wid] : 0;
 
       for (var pi = 0; pi < grp.pts.length; pi++) {
         var hp = grp.pts[pi];
         var px = TX(hp.x), py = TY(hp.y);
 
-        if (st.w) {
-          g.strokeStyle = isActive ? AMBER : STORE;
-          g.lineWidth = isActive ? 2 : 1.3;
-          drawStore(g, px, py, st.w.kind, k, { line: isActive ? 2 : 1.3 });
-        } else {
+        if (!st.w) {
           // 空置：只留一个方框标记
           g.strokeStyle = isActive ? AMBER : 'rgba(79,224,138,0.40)';
           g.lineWidth = 1.2;
           g.strokeRect(px - 3.5, py - 3.5, 7, 7);
+          continue;
+        }
+
+        if (prog > 0.002) {
+          /* 冷却中：先铺一层暗绿轮廓表示"这个挂架空了"，
+             再用裁剪把亮绿从下往上填回来。
+             进度条就是这个弹体本身，不用另找地方放一条 —— 更省地方，
+             而且一眼就能看出是哪一组的弹在装填。 */
+          var Lc = (STORE_LEN[st.w.kind] || 3.0) * k;
+          g.strokeStyle = 'rgba(79,224,138,0.20)';
+          g.lineWidth = 1.3;
+          drawStore(g, px, py, st.w.kind, k, { line: 1.3 });
+
+          g.save();
+          g.beginPath();
+          g.rect(px - k * 1.8, py + Lc / 2 - Lc * prog, k * 3.6, Lc * prog);
+          g.clip();
+          g.strokeStyle = STORE;
+          g.lineWidth = 1.4;
+          drawStore(g, px, py, st.w.kind, k, { line: 1.4 });
+          g.restore();
+        } else {
+          g.strokeStyle = isActive ? AMBER : STORE;
+          g.lineWidth = isActive ? 2 : 1.3;
+          drawStore(g, px, py, st.w.kind, k, { line: isActive ? 2 : 1.3 });
         }
       }
     }
@@ -448,12 +473,12 @@ var PLANFORM = (function () {
        从每组挂载点引一条折线到右侧标注栏，上写组号、下写型号。
        识别图的惯例画法，也让"哪根挂架对应哪一行"一目了然。
        只标右翼那一侧，左边镜像只画挂载本身，免得糊成一团。 */
-    if (groups.length) {
+    if (groups.length && !compact) {
       g.font = '10px Consolas,monospace';
       for (var gi2 = 0; gi2 < groups.length; gi2++) {
         var grp2 = groups[gi2];
         var st2 = groupStore(ac, grp2, loadout);
-        var isAct = (activeGroup && grp2.id === activeGroup);
+        var isAct = (opts.active && grp2.id === opts.active);
 
         /* 左右分栏：偶数索引标右侧、奇数索引标左侧。
            全堆在一侧会四线交叉穿过机身，糊成一团。 */
@@ -507,7 +532,8 @@ var PLANFORM = (function () {
       g.stroke();
     }
 
-    /* ---- 尺寸标注 ---- */
+    /* ---- 尺寸标注（只有大图才画，小图放不下也没必要） ---- */
+    if (!compact) {
     g.strokeStyle = 'rgba(143,168,184,0.45)';
     g.lineWidth = 1;
     g.font = '11px Consolas,monospace';
@@ -537,15 +563,44 @@ var PLANFORM = (function () {
     g.fillText('机长 ' + pf.len.toFixed(1) + ' m', 0, 0);
     g.restore();
 
+    }   // end if (!compact) —— 尺寸标注
+
     /* ---- 方向提示 ---- */
-    g.fillStyle = 'rgba(143,168,184,0.5)';
-    g.font = '10px Consolas,monospace';
-    g.textAlign = 'right';
-    g.fillText('俯视 / TOP VIEW', W - 12, H - 12);
-    g.textAlign = 'left';
-    g.fillStyle = AMBER;
-    g.fillText('▲ NOSE', 12, H - 12);
+    if (!compact) {
+      g.fillStyle = 'rgba(143,168,184,0.5)';
+      g.font = '10px Consolas,monospace';
+      g.textAlign = 'right';
+      g.fillText('俯视 / TOP VIEW', W - 12, H - 12);
+      g.textAlign = 'left';
+      g.fillStyle = AMBER;
+      g.fillText('▲ NOSE', 12, H - 12);
+    }
+
+    g.restore();
   }
 
-  return { planes: P, draw: draw };
+  /** 机库里的完整识别图：铺满整个 canvas */
+  function draw(cv, ac, loadout, activeGroup, cd) {
+    if (!cv) return;
+    var g = cv.getContext('2d');
+    var W = cv.width, H = cv.height;
+
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = '#070d12';
+    g.fillRect(0, 0, W, H);
+
+    // 网格底纹（技术图纸感）
+    g.save();
+    g.strokeStyle = 'rgba(69,214,255,0.055)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (var gx = 0; gx <= W; gx += 22) { g.moveTo(gx + .5, 0); g.lineTo(gx + .5, H); }
+    for (var gy = 0; gy <= H; gy += 22) { g.moveTo(0, gy + .5); g.lineTo(W, gy + .5); }
+    g.stroke();
+    g.restore();
+
+    paint(g, 0, 0, W, H, ac, loadout, { active: activeGroup, cd: cd });
+  }
+
+  return { planes: P, draw: draw, paint: paint };
 })();

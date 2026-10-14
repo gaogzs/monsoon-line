@@ -55,6 +55,26 @@ var AI = (function () {
     var rx = M3.dot(desired, a.right);
     var ux = M3.dot(desired, a.up);
 
+    var off0 = Math.acos(M3.clamp(fx, -1, 1));
+    var mag0 = M3.clamp(off0 * 2.3, 0, 1);
+
+    /* ---------- 情况 A：目标在机头斜前方偏下 → 直接推杆俯冲 ----------
+       这一支是必须的。如果前下方的目标也走"滚转对齐再拉杆"那套，
+       算出来的滚转角会接近 ±π，于是玩家把鼠标轻轻往下推一点，
+       飞机会先滚半圈、然后开始抬头 —— 完全不是"俯下"。
+
+       判据用 ux 而不是归一化后的 up：up 在小离轴角时几乎总是 ±1，
+       拿它当阈值基本永远命中不了。 */
+    if (fx > 0.25 && ux < -0.05) {
+      var down = M3.clamp(-ux, 0, 1);
+      // 小幅滚转把目标摆到"正下方"，而不是正上方
+      var sideErr = Math.atan2(rx, -ux);
+      out.roll = M3.clamp(-sideErr * 2.0, -1, 1) * 0.5;
+      out.pitch = -mag0 * (0.55 + 0.45 * Math.sqrt(down));
+      out.yaw = 0;
+      return out;
+    }
+
     /* ---------- ① 滚转：消掉目标的侧向分量 ---------- */
     // 使目标落到"正上方"所需的滚转角
     var rollErr = Math.atan2(-rx, ux);            // ∈ [-π, π]
@@ -268,7 +288,9 @@ var AI = (function () {
         if (a.pos.y > 18000) cone *= 0.8;
         // 越高越难锁定（动压不足）
         var lockK = 1 - Math.min(0.25, Math.max(0, (a.pos.y - 15000) / 40000));
-        var okDist = dist < spW.lockDist * lockK;
+        // 目标带了拖曳诱饵 / 拖曳式干扰舱，锁定距离就得打折
+        var resist = (t && t.lockResist) ? (1 - t.lockResist) : 1;
+        var okDist = dist < spW.lockDist * lockK * resist;
         var okAng = off < cone * 0.85;
         var minR = spW.nezer ? 1400 : 700;
         if (okDist && okAng && dist > minR && Math.random() < 0.35 + s.skill * 0.45) {

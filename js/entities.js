@@ -102,11 +102,13 @@ var Ent = (function () {
       special: spWid,
       spAmmo: spWid ? WEAPONS[spWid].ammo : 0,
       spCd: 0,
+      cdPool: {},         // 每件武器各自的冷却剩余
       spActive: 0,        // ECM 剩余生效时间
       spCharges: 0,       // DEW 充能数（构造末尾按武器初始化）
       gunTimer: 0,
 
-      flares: o.flares === undefined ? 8 : o.flares,
+      // 单位是"组"（一次投放一组诱饵），不是单发
+      flares: o.flares === undefined ? 80 : o.flares,
       flareCd: 0,
 
       target: null,
@@ -151,8 +153,13 @@ var Ent = (function () {
     var rIn = M3.clamp(a.ctrl.roll, -1, 1);
     var yIn = M3.clamp(a.ctrl.yaw, -1, 1);
 
-    var dPitch = p.pitch * ctrl * dt;
-    var dRoll = p.roll * M3.clamp(ctrl * 1.8, 0.28, 1) * dt;
+    /* 高 G 过载倍率。主要由 game.js 的 controlPlayer() 驱动，
+       但任何设置了 a.gLoad 的实体都会受影响（AI 目前不设，所以是 1）。
+       俯仰放大得比滚转多 —— 拉杆才是真正产生过载的那个动作。 */
+    var gl = (a.gLoad === undefined) ? 1 : M3.clamp(a.gLoad, 1, 2.3);
+
+    var dPitch = p.pitch * ctrl * dt * gl;
+    var dRoll = p.roll * M3.clamp(ctrl * 1.8, 0.28, 1) * dt * (1 + (gl - 1) * 0.45);
     var dYaw = p.yaw * ctrl * dt;
 
     if (pIn) {                                   // 抬头为正 → 绕 right 转负角
@@ -240,6 +247,11 @@ var Ent = (function () {
 
     // ---- 冷却 ----
     if (a.spCd > 0) a.spCd -= dt;
+    // 每件武器分开计时。否则按 R 切一下挂载就等于跳过装填了 ——
+    // 那会让"打一发就换枪"变成无冷却连射。
+    for (var ck in a.cdPool) {
+      if (a.cdPool[ck] > 0) a.cdPool[ck] = Math.max(0, a.cdPool[ck] - dt);
+    }
     if (a.spActive > 0) a.spActive -= dt;
     if (a.flareCd > 0) a.flareCd -= dt;
     if (a.gunHeat > 0) a.gunHeat -= dt;
@@ -339,7 +351,15 @@ var Ent = (function () {
       // 命中点预测（一阶提前量）
       var tGo = dist / Math.max(60, m.speed);
       var tvel = t.vel || M3.V(0, 0, 0);
-      var aim = M3.add(t.pos, M3.mul(tvel, tGo * 0.82));
+
+      /* 导引品质（w.lead）：
+         0 = 纯追踪，傻追着目标当前的位置，目标一横向机动就跟丢；
+         1 = 完全预测，飞向解算出来的最优拦截点。
+
+         这个系数比转弯率更能体现"这枚弹聪不聪明"：一枚转弯率一般
+         但预测准的弹，打机动目标反而比一枚只会死咬尾巴的灵活弹更有效。 */
+      var lead = (w.lead === undefined) ? 0.6 : w.lead;
+      var aim = M3.add(t.pos, M3.mul(tvel, tGo * lead));
       var desired = M3.norm(M3.sub(aim, m.pos));
 
       // 视场限制：目标偏出 ±75° 视为丢失
@@ -355,6 +375,15 @@ var Ent = (function () {
         m.right = M3.cross(m.up, m.fwd);
         var Bo = M3.orthonormalize(m.fwd, m.up);
         m.fwd = Bo.fwd; m.up = Bo.up; m.right = Bo.right;
+
+        /* 转弯消耗动能。
+           没有这一条，导弹的动力段之外照样能满过载无限机动，
+           玩家的桶滚和 3/9 线规避全都没有意义 —— 因为对手不累。
+           现在它必须为每一次急转付出速度。 */
+        var want = M3.angleBetween(m.fwd, desired);
+        var used = Math.min(want, maxTurn) / Math.max(1e-5, dt);   // 实际转弯率 rad/s
+        var load = M3.clamp(used / 3.0, 0, 1);
+        m.speed = Math.max(170, m.speed - load * 62 * dt);
       }
 
       // 近炸
@@ -372,6 +401,8 @@ var Ent = (function () {
         for (var i = 0; i < world.actors.length; i++) {
           var e = world.actors[i];
           if (!e.alive || e.team === m.team) continue;
+          // 刚刚用干扰弹骗过它的那架不再重锁 —— 但别的目标照锁不误
+          if (e === m.spoofed) continue;
           var d2 = M3.dist2(e.pos, m.pos);
           if (d2 < bd && d2 < 2600 * 2600) { bd = d2; best = e; }
         }
@@ -427,29 +458,48 @@ var Ent = (function () {
   /** 干扰弹：尝试把追踪本机的红外弹骗走 */
   function breakLock(a, world) {
     if (a.flares <= 0 || a.flareCd > 0) return false;
-    a.flares--;
-    a.flareCd = 1.6;
+    a.flares--;                      // 单位是"组"，一次投放一组诱饵
+    // 间隔很短：玩家按住 V 会连着丢，由他自己决定丢几组，
+    // 而不是被一个长冷却卡住（原来 1.6 s，等于一次交战只能放一发）
+    a.flareCd = 0.12;
     SFX.flare();
 
     var i;
+    // 热焰弹：橙黄色，烧得亮、掉得快
     for (i = 0; i < 6; i++) {
       var dir = randUnit();
       var v = M3.add(M3.mul(a.vel, 0.35), M3.mul(dir, M3.rnd(35, 85)));
       spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -6)), v,
         M3.rnd(1.4, 2.4), 2.2, '#ffd070', { grow: true, drag: 0.5, grav: 0.6 });
     }
+    /* 箔丝（chaff）：淡白色的金属丝云，散得更开、下落更慢、停留更久。
+       现代干扰弹是热焰弹与箔丝一起投放的 —— 前者骗红外，后者骗雷达，
+       所以视觉上也该是两种东西，而不是一团橙色火光。 */
+    for (i = 0; i < 9; i++) {
+      var cd2 = randUnit();
+      var v2 = M3.add(M3.mul(a.vel, 0.44), M3.mul(cd2, M3.rnd(18, 52)));
+      spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -5.5)), v2,
+        M3.rnd(2.4, 4.0), 3.2, '#e6eef4', { drag: 1.15, grav: 0.10 });
+    }
 
     var broke = 0;
     for (i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
       if (!m.alive || m.target !== a) continue;
-      if (m.w.seeker !== 'ir') continue;
-      if (Math.random() > m.w.flare) {
-        m.target = null;
-        m.seekerOn = false;
-        m.lostTime = 1;
-        broke++;
-      }
+      if (m.w.seeker !== 'ir') continue;      // 雷达制导不吃干扰弹，这是设定
+
+      // flare 的语义是"抗干扰"，所以被骗概率 = 1 - flare·k。
+      // k 取 0.55 而不是 1：原值让 BIN-6 只有 65% 被骗，
+      // 玩家连放三四发都不奏效，体感就是"干扰弹没用"。
+      var chance = 1 - m.w.flare * 0.55;
+      if (Math.random() >= chance) continue;
+
+      m.target = null;
+      m.seekerOn = false;
+      m.lostTime = 1;
+      m.reDone = true;      // 关键：否则带 reAcquire 的弹会立刻把我们锁回来
+      m.spoofed = a;        // 记住是谁骗的，重捕获时要避开它
+      broke++;
     }
     return true;
   }
@@ -560,6 +610,8 @@ var Ent = (function () {
      ============================================================ */
   function damage(ent, amt, world, source) {
     if (!ent.alive) return false;
+    // 附加装甲吊舱（BAD-3 护盾）的全向减伤。只有玩家会带，上限 60%。
+    if (ent.armor) amt *= (1 - M3.clamp(ent.armor, 0, 0.6));
     ent.hp -= amt;
     if (ent.hp <= 0) {
       kill(ent, world, false, source);

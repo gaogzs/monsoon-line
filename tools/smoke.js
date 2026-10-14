@@ -355,6 +355,19 @@ for (const k in WEAPONS) {
 }
 if (!badStore) ok('全部武器都有挂载属性');
 
+// 有制导方式的武器都该有导引品质（lead）
+// 注意：被动吊舱和 ECM/DEW 本来就不制导，不该要求它们有 lead
+{
+  let bad = 0;
+  for (const k in WEAPONS) {
+    const w = WEAPONS[k];
+    if (w.kind === 'gun' || w.passive) continue;
+    if (w.seeker === 'none') continue;
+    if (w.lead === undefined) { fail('武器 ' + k + ' 有导引方式但没有导引品质 lead'); bad++; }
+  }
+  if (!bad) ok('全部制导武器都有导引品质字段');
+}
+
 // 每个挂载点组都得有武器挂得上，且成对
 let badGroup = 0;
 for (const ac of AIRCRAFT) {
@@ -400,14 +413,182 @@ try {
 }
 
 // 检查世界确实动起来了
+const world = sandbox.Game.__world ? sandbox.Game.__world() : null;
 try {
-  const world = sandbox.Game.__world ? sandbox.Game.__world() : null;
   if (world) {
     ok('世界状态：飞行器 ' + world.actors.length +
       ' · 导弹 ' + world.missiles.length +
       ' · 粒子 ' + world.particles.length);
   }
 } catch (e) { /* 调试接口可选 */ }
+
+/* ============================================================
+   干扰与导弹机动性
+   —— 这两件事直接影响"躲不躲得掉"，必须能客观测出来，
+      而不是靠手感争论
+   ============================================================ */
+console.log('\n== 干扰与机动 ==');
+
+const Ent = sandbox.Ent, M3 = sandbox.M3;
+const me = sandbox.Game.__player();
+
+if (Ent && M3 && me && world) {
+  // 红外弹面对干扰弹的失锁率
+  // 采样数要够：400 次时 σ≈2.2%，6 个百分点的容差偶尔会被涨落撞破
+  const N = 1500;
+  for (const wid of ['dl6', 'v9']) {
+    let lost = 0;
+    for (let i = 0; i < N; i++) {
+      const m = Ent.makeMissile({
+        weapon: wid, team: 1, pos: M3.V(me.pos.x, me.pos.y, me.pos.z - 900),
+        fwd: M3.V(0, 0, 1), speed: 320, target: me, owner: null
+      });
+      m.team = 1;
+      world.missiles.length = 0;
+      world.particles.length = 0;      // 别让粒子堆到几千个
+      world.missiles.push(m);
+      me.flares = 80; me.flareCd = 0;
+      Ent.breakLock(me, world);
+      if (!m.target) lost++;
+    }
+    const want = 1 - WEAPONS[wid].flare * 0.55;      // 与被测实现同一公式
+    const rate = lost / N;
+    // 1500 次采样，σ≈1.1%，允许 ±4 个百分点
+    if (Math.abs(rate - want) > 0.04) {
+      fail(wid + ' 干扰成功率 ' + (rate * 100).toFixed(0) +
+        '%，但按 flare=' + WEAPONS[wid].flare + ' 应该是 ' + (want * 100).toFixed(0) + '%');
+    } else {
+      ok(wid + ' 干扰成功率 ' + (rate * 100).toFixed(0) + '%（预期 ' + (want * 100).toFixed(0) + '%）');
+    }
+  }
+
+  // 雷达制导不该吃干扰弹（设定如此）
+  {
+    const m = Ent.makeMissile({
+      weapon: 'dl4', team: 1, pos: M3.V(me.pos.x, me.pos.y, me.pos.z - 900),
+      fwd: M3.V(0, 0, 1), speed: 320, target: me, owner: null
+    });
+    m.team = 1;
+    world.missiles.length = 0;
+    world.missiles.push(m);
+    me.flares = 80; me.flareCd = 0;
+    Ent.breakLock(me, world);
+    // target 还在 = 没被骗走 = 符合设定
+    if (m.target) ok('雷达制导不吃干扰弹（符合设定）');
+    else fail('雷达制导导弹被干扰弹骗走了 —— 与设定不符');
+  }
+
+  /* ---- 飞控：前下方目标应当推杆俯冲 ---- */
+  {
+    const AI = sandbox.AI;
+    const a = {
+      fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0)
+    };
+    const out = { pitch: 0, roll: 0, yaw: 0 };
+
+    // 目标：机头前方、略微偏下
+    const d1 = M3.norm(M3.V(0, -0.15, 0.99));
+    AI.steerTo(a, d1, out, null);
+    if (out.pitch >= -0.05) {
+      fail('前下方的目标没有让飞机俯下（pitch=' + out.pitch.toFixed(3) + '）');
+    } else if (Math.abs(out.roll) > 0.35) {
+      fail('轻微下压触发了大幅滚转（roll=' + out.roll.toFixed(3) +
+        '）—— 会变成滚筒，而不是俯冲');
+    } else {
+      ok('前下方目标 → 推杆俯冲（pitch=' + out.pitch.toFixed(2) +
+        ' roll=' + out.roll.toFixed(2) + '）');
+    }
+
+    // 目标：正前方偏上，仍应拉杆
+    const d2 = M3.norm(M3.V(0, 0.4, 0.92));
+    AI.steerTo(a, d2, out, null);
+    if (out.pitch <= 0.05) fail('前上方的目标没有让飞机抬头（pitch=' + out.pitch.toFixed(3) + '）');
+    else ok('前上方目标 → 拉杆抬头（pitch=' + out.pitch.toFixed(2) + '）');
+
+    // 目标：正左方，应当滚转
+    const d3 = M3.norm(M3.V(-1, 0, 0));
+    AI.steerTo(a, d3, out, null);
+    if (Math.abs(out.roll) < 0.4) fail('正侧方目标没有触发滚转（roll=' + out.roll.toFixed(3) + '）');
+    else ok('正侧方目标 → 滚转对齐（roll=' + out.roll.toFixed(2) + '）');
+  }
+
+  /* ---- 资料库：动态生成的图鉴必须能跑 ---- */
+  {
+    const C = sandbox.CODEX || [];
+    const dyn = C.filter(e => typeof e.build === 'function');
+    if (!dyn.length) {
+      fail('资料库里没有动态生成的条目（装备图鉴）');
+    } else {
+      let bad = 0;
+      for (const e of dyn) {
+        try {
+          const h = e.build();
+          if (!h || h.length < 200) {
+            fail('图鉴「' + e.title + '」生成的内容只有 ' + (h ? h.length : 0) + ' 字符');
+            bad++;
+          }
+        } catch (err) {
+          fail('图鉴「' + e.title + '」抛异常 —— ' + err.message);
+          bad++;
+        }
+      }
+      if (!bad) ok('资料库动态条目全部可生成（' + dyn.length + ' 条）');
+    }
+  }
+
+  // 切换挂载：既不能崩，也不能靠切枪跳过装填
+  {
+    const p = sandbox.Game.__player();
+    const kd = docListeners['keydown'] || [];
+    if (!kd.length) {
+      fail('没有捕获到 keydown 监听器，切枪测试无法进行');
+    } else if (!p.loadoutList || p.loadoutList.length < 2) {
+      ok('只有一种挂载，跳过切枪测试');
+    } else {
+      const start = p.special;
+      p.cdPool[start] = 3.0;
+      p.spCd = 3.0;
+
+      // 按满一圈 R 应当回到起点
+      for (let i = 0; i < p.loadoutList.length; i++) {
+        kd.forEach(fn => fn({ code: 'KeyR', preventDefault() {} }));
+      }
+      if (p.special !== start) {
+        fail('按 R 循环一圈后没有回到起始武器（' + start + ' → ' + p.special + '）');
+      } else if (p.spCd < 2.5) {
+        fail('切枪把装填时间清掉了（spCd=' + p.spCd.toFixed(2) + '）—— 那等于无冷却连射');
+      } else {
+        ok('切枪不会跳过装填（回到 ' + start + ' 时仍有 ' + p.spCd.toFixed(1) + 's 冷却）');
+      }
+    }
+  }
+
+  // 导弹急转应当掉速
+  {
+    const m = Ent.makeMissile({
+      weapon: 'dl6', team: 1, pos: M3.V(0, 5000, 0),
+      fwd: M3.V(0, 0, 1), speed: 900, target: null, owner: null
+    });
+    // 必须落在"超过动力段但还没到寿命"的窗口里：
+    // age 超过 life 会被直接回收，那就什么都测不到了
+    m.age = WEAPONS.dl6.life + 2;
+    const speed0 = m.speed;
+    // 假世界要带齐 stepMissile 会用到的容器
+    const fake = {
+      actors: [{ alive: true, team: 0, pos: M3.V(0, 5000, 60), vel: M3.V(0, 0, 0) }],
+      particles: [], missiles: [], bullets: []
+    };
+    m.target = fake.actors[0];
+    // 把目标放在正侧方，逼它满过载转弯
+    fake.actors[0].pos = M3.V(400, 5000, 0);
+    for (let i = 0; i < 30; i++) Ent.stepMissile(m, 1 / 60, fake);
+    const drop = speed0 - m.speed;
+    if (drop < 15) fail('导弹急转只掉了 ' + drop.toFixed(1) + ' m/s，等于不耗能量');
+    else ok('导弹急转 0.5 s 掉速 ' + drop.toFixed(0) + ' m/s（会为机动付出代价）');
+  }
+} else {
+  fail('拿不到 Ent / world，跳过干扰测试');
+}
 
 /* ============================================================
    结果

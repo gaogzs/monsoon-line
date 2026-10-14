@@ -566,3 +566,134 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 而是"大家签字用的语言" —— 它负责让文件不出错，不负责让人互相理解。</span></p>`
   }
 ];
+
+/* ============================================================
+   装备图鉴
+   —— 内容由 build() 现场从 AIRCRAFT / WEAPONS / STORE_ATTR 生成，
+   所以改了武器数据这里会自动跟上，不会出现"文档说 A、实际是 B"。
+   注意 codex.js 在 data.js 之前加载，所以 build() 里引用那些表
+   必须等到被调用时才求值 —— 这正是把它们写成函数的原因。
+   ============================================================ */
+
+/** 把挂点类型翻译成人话 */
+function _hpKind(k) {
+  return ({ tip: '翼尖', light: '通用', heavy: '重挂', belly: '机腹' })[k] || k;
+}
+
+/** 导引方式描述。导引品质（lead）是这版新加的，直接摆出来对比 */
+function _seekerLabel(w) {
+  if (w.passive) return '被动';
+  if (w.seeker === 'none') return '无制导';
+  var s = (w.seeker === 'ir') ? '红外' : '雷达';
+  if (w.lead !== undefined) s += ' · 预测 ' + Math.round(w.lead * 100) + '%';
+  return s;
+}
+
+CODEX.push({
+  cat: '图鉴 / INVENTORY',
+  id: 'inv1',
+  title: '机型图鉴',
+  sub: '敌我双方的机体。数据直接读自 data.js',
+  build: function () {
+    var h = '<p class="cx-note">上游公约的三种机体都可以驾驶；' +
+      '下游同盟没有独立的机体工业，他们把缴获和走私来的同型机' +
+      '做了高空化改装 —— 所以你会在天上遇到"自己人开的飞机"。</p>';
+
+    h += '<table class="cx-table"><tr><th>型号</th><th>定位</th>' +
+      '<th>最大速度</th><th>俯仰率</th><th>结构</th><th>挂点</th><th>后掠翼</th></tr>';
+    for (var i = 0; i < AIRCRAFT.length; i++) {
+      var a = AIRCRAFT[i];
+      var pts = 0, grps = a.hardpointGroups || [];
+      for (var g = 0; g < grps.length; g++) pts += grps[g].pts.length;
+      h += '<tr>' +
+        '<td><b>' + a.name + '</b><br><span class="d">' + a.cn + '</span></td>' +
+        '<td>' + a.role + '</td>' +
+        '<td>' + a.phys.vMax + ' m/s</td>' +
+        '<td>' + a.phys.pitch.toFixed(2) + ' rad/s</td>' +
+        '<td>' + a.phys.hp + '</td>' +
+        '<td>' + pts + ' 点 / ' + grps.length + ' 组</td>' +
+        '<td>' + (a.variableSweep ? '可变' : '固定') + '</td>' +
+        '</tr>';
+    }
+    h += '</table>';
+
+    h += '<h4>挂点分布</h4><table class="cx-table">' +
+      '<tr><th>机型</th><th>组号</th><th>位置</th><th>类型</th><th>点数</th></tr>';
+    for (i = 0; i < AIRCRAFT.length; i++) {
+      a = AIRCRAFT[i];
+      grps = a.hardpointGroups || [];
+      for (g = 0; g < grps.length; g++) {
+        h += '<tr><td>' + (g === 0 ? '<b>' + a.name + '</b>' : '') + '</td>' +
+          '<td>' + grps[g].id + '</td>' +
+          '<td>' + grps[g].label + '</td>' +
+          '<td>' + _hpKind(grps[g].kind) + '</td>' +
+          '<td>' + grps[g].pts.length + '</td></tr>';
+      }
+    }
+    h += '</table>';
+    return h;
+  }
+});
+
+CODEX.push({
+  cat: '图鉴 / INVENTORY',
+  id: 'inv2',
+  title: '挂载图鉴',
+  sub: '所有挂得上飞机的东西，含被动吊舱',
+  build: function () {
+    var h = '<p class="cx-note">"单点"是一个挂载点能带的发数；' +
+      '同一种武器挂到多个组上，弹药与齐射数会一起累加。' +
+      '<br>被动吊舱不占扳机，装上就一直在起作用 —— ' +
+      '它们让"少带一枚弹"变成真实的取舍。</p>';
+
+    var cats = [
+      { t: '空空导弹', k: 'aam' },
+      { t: '反大型 / 反舰', k: 'asm' },
+      { t: '空地导弹', k: 'agm' },
+      { t: '炸弹与火箭', k: 'bomb' },
+      { t: '吊舱', k: 'ecm' }
+    ];
+
+    for (var ci = 0; ci < cats.length; ci++) {
+      var rows = '';
+      for (var id in WEAPONS) {
+        if (!Object.prototype.hasOwnProperty.call(WEAPONS, id)) continue;
+        var w = WEAPONS[id];
+        if (w.kind !== cats[ci].k) continue;
+        if (!w.fits || !w.fits.length) continue;      // 敌方专用不列
+
+        var fits = [];
+        for (var fi = 0; fi < w.fits.length; fi++) fits.push(_hpKind(w.fits[fi]));
+
+        rows += '<tr>' +
+          '<td><b>' + w.name + '</b></td>' +
+          '<td>' + w.cn + '</td>' +
+          '<td>' + (w.passive ? '—' : '×' + w.perPoint) + '</td>' +
+          '<td>' + w.mass + '</td>' +
+          '<td>' + fits.join(' / ') + '</td>' +
+          '<td>' + _seekerLabel(w) + '</td>' +
+          '<td>' + (w.cd ? w.cd.toFixed(1) + 's' : '—') + '</td>' +
+          '</tr>';
+      }
+      if (!rows) continue;
+      h += '<h4>' + cats[ci].t + '</h4>' +
+        '<table class="cx-table"><tr><th>编号</th><th>代号</th>' +
+        '<th>单点</th><th>kg</th><th>可挂</th><th>导引</th><th>冷却</th></tr>' +
+        rows + '</table>';
+    }
+
+    h += '<h4>敌方装备</h4><p class="cx-note">下游同盟的制式武器，' +
+      '上游拿不到，只能靠缴获逆向 —— 所以资料库里只有参数没有实物。</p>' +
+      '<table class="cx-table"><tr><th>编号</th><th>代号</th><th>导引</th><th>备注</th></tr>';
+    for (id in WEAPONS) {
+      if (!Object.prototype.hasOwnProperty.call(WEAPONS, id)) continue;
+      w = WEAPONS[id];
+      if (w.fits && w.fits.length) continue;          // 只列敌方专用
+      if (w.kind === 'gun') continue;
+      h += '<tr><td><b>' + w.name + '</b></td><td>' + w.cn + '</td>' +
+        '<td>' + _seekerLabel(w) + '</td><td>' + (w.desc || '') + '</td></tr>';
+    }
+    h += '</table>';
+    return h;
+  }
+});
