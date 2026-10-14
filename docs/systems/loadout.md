@@ -117,6 +117,28 @@ actor.spAmmo -= n;
 
 ---
 
+## 被动吊舱
+
+`STORE_ATTR` 里有 5 件 `passive: true` 的吊舱。它们**不占扳机**——
+装上就一直在起作用，也不会出现在 HUD 的武器纵列表里。
+
+| 字段 | 效果 |
+|---|---|
+| `lockResist` | 敌方对你的锁定距离 ×(1−x) |
+| `armorBonus` | 全向减伤（可叠加，上限 55%） |
+| `lockRangeBonus` | 你的锁定距离 ×(1+x) |
+| `flareBonus` | 额外干扰弹组数（乘挂载点数） |
+
+汇总由 `passiveEffects(ac, lo)` 完成，在 `startMission()` 里落到
+`p.armor` / `p.lockResist` / `p.lockRangeK` / `p.flares` 上。
+
+**为什么要有被动挂载**：它们让"少带一枚弹"变成真实的取舍，
+而不是纯损失。带满弹的飞机更重更笨，而一件吊舱换来的可能是
+整场交战的锁定优势，或者一次活下来的机会。
+
+**两条路径不要混**：`resolveLoadout()` 会 `continue` 掉 `passive` 武器
+（它们没有扳机可扣），被动效果必须走 `passiveEffects()` 单独汇总。
+
 ## 重量惩罚
 
 ```js
