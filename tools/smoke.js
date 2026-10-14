@@ -1118,18 +1118,15 @@ if (Ent && M3 && me && world) {
       const cy = -(k * (H / 2)) / focal;
       const dir = M3.norm(M3.V(0, cy, 1));
 
-      // 阈值随 FOV 换算 —— 与 game.js 的 updateAim 同一套公式
-      const tanHalf = Math.tan(FOV * Math.PI / 360);
-      const at = kk => { const c = -kk * tanHalf; return c / Math.sqrt(1 + c * c); };
-
       const a = {
         fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
         ctrl: { pitch: 0, roll: 0, yaw: 0 },
         rollLock: undefined,
-        uxShallow: at(0.12), uxDeep: at(0.62)
+        fovHalf: FOV * Math.PI / 360              // 与 game.js 的 updateAim 一致
       };
       AI.steerTo(a, dir, a.ctrl, a);
-      return a.ctrl.pitch < -0.05 && Math.abs(a.ctrl.roll) <= 0.55;
+      // 推杆分支：roll 恒为 0，pitch 为负
+      return a.ctrl.roll === 0 && a.ctrl.pitch < -0.02;
     }
 
     // 1. 屏幕下方 25%~65%：应当推杆俯下（阈值 0.25 / 0.65）
@@ -1167,7 +1164,7 @@ if (Ent && M3 && me && world) {
     // 3. 换 FOV 结果必须一致（这是解耦的关键）
     for (const FOV of [38, 56, 100]) {
       /* 关键：同一屏幕位置在三档 FOV 下必须给同样的分支。
-         阈值是从屏幕位置反推的，所以这里应当完全一致。 */
+         "幅度不大"是相对半个 FOV 判的，所以两边的缩放一致。 */
       const mid = pushesDown(FOV, 0.5), bottom = pushesDown(FOV, 0.95);
       if (mid !== pushesDown(56, 0.5)) {
         bad.push('FOV ' + FOV + ' 下屏幕中部（50%）的分支与 FOV 56 不一致');
@@ -1175,6 +1172,9 @@ if (Ent && M3 && me && world) {
       if (bottom !== pushesDown(56, 0.95)) {
         bad.push('FOV ' + FOV + ' 下屏幕底部（95%）的分支与 FOV 56 不一致');
       }
+      // 屏幕中部必须推杆、底部必须交给默认逻辑
+      if (!mid) bad.push('FOV ' + FOV + ' 下屏幕中部没有推杆');
+      if (bottom) bad.push('FOV ' + FOV + ' 下屏幕底部仍在推杆');
     }
 
     if (bad.length) bad.forEach(fail);
