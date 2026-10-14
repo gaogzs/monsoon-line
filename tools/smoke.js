@@ -705,7 +705,7 @@ if (Ent && M3 && me && world) {
     }
   }
 
-  /* ---- 飞控：前下方目标应当推杆俯冲 ---- */
+  /* ---- 飞控：中心附近的前下方目标应当推杆 ---- */
   {
     const AI = sandbox.AI;
     const a = {
@@ -713,17 +713,24 @@ if (Ent && M3 && me && world) {
     };
     const out = { pitch: 0, roll: 0, yaw: 0 };
 
-    // 目标：机头前方、略微偏下
+    /* 目标：机头前方、略微偏下。**鼠标停在中心附近** ——
+       推杆与滚转仰起现在是靠鼠标幅度插值的，只有幅度小的时候
+       才走推杆。 */
     const d1 = M3.norm(M3.V(0, -0.15, 0.99));
-    AI.steerTo(a, d1, out, null);
-    if (out.pitch >= -0.05) {
-      fail('前下方的目标没有让飞机俯下（pitch=' + out.pitch.toFixed(3) + '）');
-    } else if (Math.abs(out.roll) > 0.35) {
-      fail('轻微下压触发了大幅滚转（roll=' + out.roll.toFixed(3) +
+    const near = {
+      fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
+      rollLock: 0, aimX: 0, aimDown: 0.15, aimMag: 0.15
+    };
+    const o1 = { pitch: 0, roll: 0, yaw: 0 };
+    AI.steerTo(near, d1, o1, near);
+    if (o1.pitch >= -0.005) {
+      fail('中心附近 + 前下方没有推杆（pitch=' + o1.pitch.toFixed(3) + '）');
+    } else if (Math.abs(o1.roll) > 0.20) {
+      fail('轻微下压触发了大幅滚转（roll=' + o1.roll.toFixed(3) +
         '）—— 会变成滚筒，而不是俯冲');
     } else {
-      ok('前下方目标 → 推杆俯冲（pitch=' + out.pitch.toFixed(2) +
-        ' roll=' + out.roll.toFixed(2) + '）');
+      ok('中心附近 + 前下方 → 推杆（pitch=' + o1.pitch.toFixed(2) +
+        ' roll=' + o1.roll.toFixed(2) + '）');
     }
 
     // 目标：正前方偏上，仍应拉杆
@@ -1093,140 +1100,82 @@ if (Ent && M3 && me && world) {
     else ok('无人僚机行为正确：授权开火、长机阵亡后盘旋、编队不脱队');
   }
 
-  /* ---- 鼠标压到屏幕下方 → 改用滚转仰起 ----
-     这个行为踩过一次坑：原判据是目标方向的 ux 阈值（-0.62），
-     但鼠标能指到的最大下方角度只有**半个 FOV** ——
-     FOV 56° 时归一化后 ux 最小只有 -0.47，永远够不到，
-     所以"移到屏幕底部还是俯下"。
+  /* ---- 鼠标幅度 → 转向方式：全程插值，没有切换点 ----
 
-     现在按鼠标在屏幕上的归一化位置判断，与 FOV 无关，
-     这条断言就是锁住那个解耦。 */
+     同一个鼠标幅度轴（blend）同时管三件事：
+       滚转占比   0 → 1
+       偏航补足   1 → 0
+       推杆权重   1 → 0（只在目标落在机体下方时有意义）
+
+     于是三种动作串成一条连续的谱：
+       中心附近 → 推杆俯下 / 少量滚转 + 偏航
+       离开中心 → 滚转半圈（倒飞）→ 仰起，偏航归零
+
+     这条断言锁的就是"谱"是连续的 —— 中间任何一点都不能突变。 */
   {
     const M3 = sandbox.M3, AI = sandbox.AI;
     const bad = [];
 
-    /* 给定 FOV 与鼠标纵向位置（0 = 屏幕中心，1 = 底边），
-       返回是否走了"推杆俯下"分支。
-
-       判据不能只看 ctrl.roll —— 推杆分支自己也会输出一点滚转修正
-       （把目标摆到正下方）。所以用它的特征组合：
-       pitch 明显为负，且 roll 只是小幅修正（系数 0.5 封顶）。
-       走通用滚转对齐时 rollErr 接近 ±π，roll 会饱和到 ±1。 */
-    function pushesDown(FOV, k) {
+    /* 给定 FOV 与鼠标纵向位置 k（0 = 屏幕中心，1 = 底边），返回 ctrl。
+       dir 由屏幕位置算出；aimMag 直接取 k（正下方时径向距离就等于 k）。 */
+    function ctrlAt(FOV, k, rollDeg) {
       const H = 720;
       const focal = (H / 2) / Math.tan(FOV / 2 * Math.PI / 180);
       const cy = -(k * (H / 2)) / focal;
       const dir = M3.norm(M3.V(0, cy, 1));
 
+      const r = (rollDeg || 0) * Math.PI / 180;
+      const fwd = M3.V(0, 0, 1);
+      const o = M3.orthonormalize(fwd, M3.rotAxis(M3.V(0, 1, 0), fwd, r));
       const a = {
-        fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
+        fwd: fwd, up: o.up, right: M3.norm(M3.cross(o.up, fwd)),
         ctrl: { pitch: 0, roll: 0, yaw: 0 },
-        rollLock: undefined,
-        // 幅度改用屏幕位置判定，与 FOV 无关
-        aimX: 0, aimDown: k, aimMag: Math.abs(k)
+        rollLock: 0, aimX: 0, aimDown: k, aimMag: k
       };
-      AI.steerTo(a, dir, a.ctrl, a);
-      // 推杆分支：roll 恒为 0，pitch 为负
-      return a.ctrl.roll === 0 && a.ctrl.pitch < -0.02;
-    }
-
-    /* 用**固定的目标方向**、只改屏幕半径，来看整体缩杆倍率。
-       方向必须固定，否则比较的就是两个不同的分支了。 */
-    function ctrlAtMag(mag) {
-      const a = {
-        fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
-        ctrl: { pitch: 0, roll: 0, yaw: 0 },
-        rollLock: 0, aimX: mag, aimDown: 0, aimMag: mag
-      };
-      const dir = M3.norm(M3.V(0.5, 0, 0.866));    // 固定：右前方 30°
       AI.steerTo(a, dir, a.ctrl, a);
       return a.ctrl;
     }
 
-    // 1. 屏幕下方 25%~65%：应当推杆俯下（阈值 0.25 / 0.65）
-    for (const k of [0.3, 0.45, 0.6]) {
-      if (!pushesDown(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处没有推杆');
+    // ① 中心附近：推杆方向（pitch 为负），滚转很小
+    for (const k of [0.10, 0.15]) {
+      const c = ctrlAt(56, k);
+      if (!(c.pitch < 0 && Math.abs(c.roll) < 0.20)) {
+        bad.push('中心附近（' + (k * 100) + '%）目标在下方时没有推杆（pitch=' +
+          c.pitch.toFixed(3) + ' roll=' + c.roll.toFixed(3) + '）');
+      }
     }
-    // 1b. 超过 65% 应当交给滚转
-    for (const k of [0.75, 0.9]) {
-      if (pushesDown(56, k)) bad.push('鼠标在 ' + (k * 100) + '% 处仍在推杆');
-    }
-    /* 1c. 靠近中心时整体缩杆（**没有死区**）
 
-       倍率是平方衰减，满杆点 AIM_FULL_MAG = 0.35：
-           半径 0.35  → 1.00
-           半径 0.175 → 0.25
-           半径 0.05  → 0.02
-       中心处必须趋近于 0（而不是被硬切断）。 */
+    // ② 离开中心：滚转占领，不再推杆
+    for (const k of [0.5, 0.6, 0.9]) {
+      const c = ctrlAt(56, k);
+      if (!(Math.abs(c.roll) > 0.5 && c.pitch >= -0.02)) {
+        bad.push('离开中心后（' + (k * 100) + '%）没有转为滚转仰起（pitch=' +
+          c.pitch.toFixed(3) + ' roll=' + c.roll.toFixed(3) + '）');
+      }
+    }
+
+    // ③ 全程连续：滚转单调增、俯仰不出现跳变
     {
-      const full = ctrlAtMag(0.35);
-      const base = Math.abs(full.roll) + Math.abs(full.pitch);
-      if (base < 0.05) {
-        bad.push('满杆点处杆量几乎为 0（' + base.toFixed(3) + '），缩杆把正常输入也压掉了');
+      let prevRoll = -1, mono = true, maxJump = 0, prevPitch = null;
+      for (let k = 0.05; k <= 0.9 + 1e-9; k += 0.05) {
+        const c = ctrlAt(56, k);
+        if (Math.abs(c.roll) < prevRoll - 1e-6) mono = false;
+        prevRoll = Math.abs(c.roll);
+        if (prevPitch !== null) {
+          maxJump = Math.max(maxJump, Math.abs(c.pitch - prevPitch));
+        }
+        prevPitch = c.pitch;
       }
-
-      const center = ctrlAtMag(0.005);
-      if (Math.abs(center.roll) + Math.abs(center.pitch) > base * 0.02) {
-        bad.push('画面中心处杆量没有趋近于 0（' +
-          (Math.abs(center.roll) + Math.abs(center.pitch)).toFixed(4) + '）');
+      if (!mono) bad.push('滚转占比随鼠标幅度不是单调上升 —— 中间有切换感');
+      if (maxJump > 0.06) {
+        bad.push('俯仰杆量在相邻采样点之间跳变过大（' + maxJump.toFixed(3) + '）');
       }
-
-      // 半径减半 → 杆量约剩四分之一（平方衰减）
-      const half = ctrlAtMag(0.175);
-      const ratio = (Math.abs(half.roll) + Math.abs(half.pitch)) / base;
-      if (ratio > 0.35 || ratio < 0.15) {
-        bad.push('半径减半时杆量倍率应为约 0.25，实测 ' + ratio.toFixed(3));
-      }
-
-      // 超过满杆点不再增长
-      const over = ctrlAtMag(0.9);
-      if (Math.abs(over.roll) > base + 1e-6) {
-        bad.push('超过满杆点后杆量仍在增长');
-      }
-    }
-    // 2. 压到底部：必须走滚转仰起
-    if (pushesDown(56, 0.95)) bad.push('鼠标压到屏幕底部仍在推杆');
-    /* 2c. 大滚转角**不该**推杆。
-
-       "推杆"是绕机体 right 轴转。左滚 90° 侧飞时 right 轴指向世界上下，
-       绕它转等于在水平面里打转，不是俯冲 —— 那时该走滚转。 */
-    {
-      const H = 720, FOV = 56;
-      const focal = (H / 2) / Math.tan(FOV / 2 * Math.PI / 180);
-      const k = 0.45;
-      const cy = -(k * (H / 2)) / focal;
-      const dir = M3.norm(M3.V(0, cy, 1));
-      const a = {
-        fwd: M3.V(-1, 0, 0), up: M3.V(0, 0, 1), right: M3.V(0, 1, 0),   // 左滚 90°
-        ctrl: { pitch: 0, roll: 0, yaw: 0 },
-        rollLock: undefined, aimX: 0, aimDown: k
-      };
-      AI.steerTo(a, dir, a.ctrl, a);
-      if (a.ctrl.pitch < -0.02 && Math.abs(a.ctrl.roll) < 0.35) {
-        bad.push('左滚 90° 时鼠标在屏幕下方仍然推杆 —— ' +
-          '那时绕 right 轴转是水平转向，不是俯冲');
-      }
-    }
-
-    // 3. 换 FOV 结果必须一致（这是解耦的关键）
-    for (const FOV of [38, 56, 100]) {
-      /* 关键：同一屏幕位置在三档 FOV 下必须给同样的分支。
-         "幅度不大"是相对半个 FOV 判的，所以两边的缩放一致。 */
-      const mid = pushesDown(FOV, 0.5), bottom = pushesDown(FOV, 0.95);
-      if (mid !== pushesDown(56, 0.5)) {
-        bad.push('FOV ' + FOV + ' 下屏幕中部（50%）的分支与 FOV 56 不一致');
-      }
-      if (bottom !== pushesDown(56, 0.95)) {
-        bad.push('FOV ' + FOV + ' 下屏幕底部（95%）的分支与 FOV 56 不一致');
-      }
-      // 屏幕中部必须推杆、底部必须交给默认逻辑
-      if (!mid) bad.push('FOV ' + FOV + ' 下屏幕中部没有推杆');
-      if (bottom) bad.push('FOV ' + FOV + ' 下屏幕底部仍在推杆');
     }
 
     if (bad.length) bad.forEach(fail);
-    else ok('鼠标压到屏幕下方改用滚转仰起（三种 FOV 下一致）');
+    else ok('鼠标幅度 → 转向方式全程插值：中心推杆、离开中心转为滚转仰起');
   }
+
 
   /* ---- 两组挂架挂同一种武器：槽下标不能撞 ----
      slotCd 是按**武器**建的（长度 = 该武器占用的挂点总数），
