@@ -1560,6 +1560,60 @@ var Game = (function () {
   /* ============================================================
      更新
      ============================================================ */
+  /* ============================================================
+     看门狗
+
+     有飞机在空中"钉住"过 —— 位置完全不动，但速度读数还是正常的。
+     根因没定位到，所以这里先放一道兜底：任何一架飞机静止超过
+     1.5 秒，就把它的姿态与速度重置回可飞状态，并在控制台留记录。
+
+     为什么值得兜底：玩家没法分辨"这架飞机卡住了"和"我打不着它"，
+     一架悬在空中的敌机会让整场战斗都显得坏了。
+     为什么留 console：万一真被触发，那条记录（含当时的速度、
+     姿态、操控输入）就是下次定位根因的起点。
+
+     注意任务结束后 update() 不再运行，所以不会把"结算时的静止"
+     误判成卡死。
+     ============================================================ */
+  var WD_LIMIT = 1.5;
+
+  function watchdog(dt) {
+    if (!world) return;
+    for (var i = 0; i < world.actors.length; i++) {
+      var a = world.actors[i];
+      if (!a.alive) { a.wdStill = 0; continue; }
+
+      var moved = a.wdPrev
+        ? Math.abs(a.pos.x - a.wdPrev.x) + Math.abs(a.pos.y - a.wdPrev.y) +
+          Math.abs(a.pos.z - a.wdPrev.z)
+        : 1e9;
+      if (!a.wdPrev) a.wdPrev = { x: 0, y: 0, z: 0 };
+      a.wdPrev.x = a.pos.x; a.wdPrev.y = a.pos.y; a.wdPrev.z = a.pos.z;
+
+      if (moved < 0.02) a.wdStill = (a.wdStill || 0) + dt;
+      else a.wdStill = 0;
+
+      if (a.wdStill > WD_LIMIT) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[季风线] 看门狗触发：' + (a.name || a.id) +
+            ' 静止 ' + a.wdStill.toFixed(1) + 's' +
+            ' | speed=' + a.speed +
+            ' | fwd=' + JSON.stringify(a.fwd) +
+            ' | ctrl=' + JSON.stringify(a.ctrl) +
+            ' | pos=' + JSON.stringify(a.pos) +
+            ' | hp=' + a.hp + '/' + a.maxHp);
+        }
+        a.fwd = M3.V(0, 0, 1);
+        a.up = M3.V(0, 1, 0);
+        a.right = M3.V(1, 0, 0);
+        a.speed = Math.max(a.phys.vStall * 1.4, 180);
+        a.vel = M3.mul(a.fwd, a.speed);
+        a.stall = false;
+        a.wdStill = 0;
+      }
+    }
+  }
+
   function update(dt) {
     world.time += dt;
     Radio.update(dt);
@@ -1580,6 +1634,8 @@ var Game = (function () {
       Ent.stepAircraft(a, dt, world);
       if (!a.isPlayer) updateDEW(dt, a);
     }
+
+    watchdog(dt);
 
     // 导弹
     for (i = 0; i < world.missiles.length; i++) Ent.stepMissile(world.missiles[i], dt, world);
