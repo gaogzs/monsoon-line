@@ -495,13 +495,41 @@ var HUD = (function () {
       if (isLock) {
         drawLockBox(ctx, s, t, p, dist, world);
       } else {
-        // 未锁定：小方框
-        var sz = t.kind === 'target' ? 8 : 11;
-        ctx.strokeStyle = t.kind === 'target' ? 'rgba(143,163,178,0.75)' : 'rgba(255,77,77,0.6)';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(s.x - sz, s.y - sz, sz * 2, sz * 2);
+        drawPlainMark(ctx, s, t, dist);
       }
     }
+  }
+
+  /* ============================================================
+     未锁定的目标标记
+     红框旁边照样写清"谁在开、开的是什么" —— 一眼扫过去也要能
+     判断该先打谁。标签只在较近时才画，否则满屏都是字。
+     ============================================================ */
+  function drawPlainMark(ctx, s, t, dist) {
+    var isGnd = t.kind === 'target';
+    var sz = isGnd ? 8 : 11;
+    var col = isGnd ? 'rgba(143,163,178,0.75)' : 'rgba(255,77,77,0.68)';
+
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(s.x - sz, s.y - sz, sz * 2, sz * 2);
+
+    if (dist > 12000) return;      // 太远的只留框
+
+    // 地面设施只有名字，没有呼号也没有机型
+    if (isGnd) {
+      text(ctx, t.label || t.name || '地面设施',
+        s.x + sz + 7, s.y - sz + 8, col, FS, 'left');
+      return;
+    }
+
+    // 空中目标：第一行呼号（认人），第二行机型（认机）
+    var line1 = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.nick) : (t.name || ''));
+    var line2 = t.label && t.ac ? (t.ac.name + ' ' + t.ac.nick) : null;
+
+    var tx = s.x + sz + 7, ty = s.y - sz + 8;
+    text(ctx, line1, tx, ty, col, FS, 'left');
+    if (line2) text(ctx, line2, tx, ty + 13, 'rgba(185,200,212,0.62)', FS, 'left');
   }
 
   function drawLockBox(ctx, s, t, p, dist, world) {
@@ -512,12 +540,15 @@ var HUD = (function () {
     var nez = computeNEZ(p, t);
     var inNez = dist < nez;
 
-    /* 锁定框一律用红色。
-       红框的含义是"这是个敌人"，它不该因为进没进 NEZ 就换一个颜色 ——
-       锁着的目标突然从绿变红（或者反过来）读起来像是换了目标，
-       而不是"情况变了"。NEZ 用额外的修饰来表达，见下。 */
-    ctx.strokeStyle = RED;
-    ctx.lineWidth = inNez ? 2.7 : 2;
+    /* 用颜色区分"锁上了但还打不着"和"已经进了不可逃逸区"：
+
+         橙色 = 锁定了，但还在 NEZ 之外
+         红色 = 进了 NEZ，发射就有意义
+
+       **不要用绿色**。绿色在 HUD 里的语义是"友军 / 正常状态"，
+       拿它标一个敌人，玩家会下意识以为那是友机 —— 这比颜色突变更糟。 */
+    ctx.strokeStyle = inNez ? RED : AMBER;
+    ctx.lineWidth = inNez ? 2.4 : 2;
 
     // 四角括号
     var c = 9;
@@ -528,25 +559,6 @@ var HUD = (function () {
     ctx.moveTo(x1, y1 - c); ctx.lineTo(x1, y1); ctx.lineTo(x1 - c, y1);
     ctx.moveTo(x0 + c, y1); ctx.lineTo(x0, y1); ctx.lineTo(x0, y1 - c);
     ctx.stroke();
-
-    /* NEZ 修饰：四角内侧再叠一层更短的括号，外面套一圈细环。
-       这两样都是在原有红框上"加东西"，框本身没变。 */
-    if (inNez) {
-      var c2 = 6, k2 = 9;
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      ctx.moveTo(x0, y0 + c + k2); ctx.lineTo(x0, y0 + c); ctx.lineTo(x0 + c2, y0 + c);
-      ctx.moveTo(x1 - c2, y0 + c); ctx.lineTo(x1, y0 + c); ctx.lineTo(x1, y0 + c + k2);
-      ctx.moveTo(x1, y1 - c - k2); ctx.lineTo(x1, y1 - c); ctx.lineTo(x1 - c2, y1 - c);
-      ctx.moveTo(x0 + c2, y1 - c); ctx.lineTo(x0, y1 - c); ctx.lineTo(x0, y1 - c - k2);
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(255,77,77,0.55)';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, Math.max(w, h) + 9, 0, Math.PI * 2);
-      ctx.stroke();
-    }
 
     // 目标速度矢量线
     if (t.kind === 'air' && t.fwd) {
@@ -560,8 +572,8 @@ var HUD = (function () {
        中间插一行就得手工挪后面所有的数字。 */
     var tx = s.x + w + 8, ty = s.y - h;
     var label = t.label || (t.name || '目标');
-    // 数据块同样保持红色，NEZ 的状态交给框上的修饰去说
-    var col = RED;
+    // 数据块的颜色跟着框走，保持一致
+    var col = inNez ? RED : AMBER;
 
     text(ctx, label, tx, ty + 10, col, 'bold 12px Consolas,monospace', 'left');
     var ly = ty + 24;
@@ -628,11 +640,12 @@ var HUD = (function () {
     var py = M3.clamp(s.y, m, H - m);
     var ang = Math.atan2(py - cy, px - cx);
 
-    /* 屏幕外的箭头同样只分"是不是敌人"，锁定的用实心红 + 更大的箭头，
-       未锁定的用半透明红 —— 和屏内的框保持同一套颜色语义。 */
+    /* 屏幕外的箭头沿用同一套语义：
+       未锁定的敌人是半透明红，锁定的是琥珀色（够不着），
+       进了 NEZ 才会变红 —— 但屏外不显示 NEZ 状态，统一用琥珀。 */
     var col = t.kind === 'target'
       ? 'rgba(143,163,178,0.7)'
-      : (isLock ? RED : 'rgba(255,77,77,0.55)');
+      : (isLock ? AMBER : 'rgba(255,77,77,0.5)');
     var sz = isLock ? 11 : 9;
 
     ctx.save();

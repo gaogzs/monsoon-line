@@ -329,6 +329,8 @@ var Game = (function () {
     var list = document.getElementById('acList');
     list.innerHTML = '';
     for (var i = 0; i < AIRCRAFT.length; i++) {
+      // 敌方制式机不进机库（但资料库里能查到）
+      if (AIRCRAFT[i].enemyOnly) continue;
       (function (idx) {
         var ac = AIRCRAFT[idx];
         var d = document.createElement('div');
@@ -1791,6 +1793,9 @@ var Game = (function () {
         if (!gg.pts || gg.pts.length < 2) {
           problems.push('机型 ' + ac.id + ' 的挂载点组 ' + gg.id + ' 不是成对的');
         }
+        // 敌方机型挂的是下游弹，那些弹的 fits 是空的，
+        // 所以"有没有武器挂得上"这一条只对可驾驶机型成立
+        if (ac.enemyOnly) continue;
         var ok = false;
         for (var wk in WEAPONS) {
           var ww = WEAPONS[wk];
@@ -1812,7 +1817,10 @@ var Game = (function () {
         }
       }
       if (!ac.phys || !ac.phys.vMax) problems.push('机型 ' + ac.id + ' 缺少飞行性能参数');
-      if (!PLANFORM.planes[ac.model]) problems.push('机型 ' + ac.id + ' 缺少俯视识别图数据');
+      // 敌方制式机不进机库，也就用不到俯视识别图
+      if (!ac.enemyOnly && !PLANFORM.planes[ac.model]) {
+        problems.push('机型 ' + ac.id + ' 缺少俯视识别图数据');
+      }
     }
 
     var needModels = ['c11', 'c14', 's6', 'm27', 'ucav', 'sower', 'relay', 'cell',

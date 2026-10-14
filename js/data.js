@@ -133,12 +133,44 @@ var AIRCRAFT = [
     desc: `
 <p>鲣鸟是一种以将近 <b>100 公里时速</b>俯冲入水的海鸟。
 上游公约的命名委员会在这件事上没花什么心思。</p>
-<p>一门 30mm 四管炮、一只 <b>1350 发</b>弹箱、和一口厚达 <b>38 毫米</b>的钛合金浴缸。
+<p>一门 30mm 四管炮、一只 <b>14000 发</b>弹箱、和一口厚达 <b>38 毫米</b>的钛合金浴缸。
 这个设计逻辑从一百年前就没变过：把飞行员裹在装甲里，
 然后让他飞到防空炮火正中间去。</p>
 <p>两台自适应循环发动机塞在翼根，第三涵道的冷气流优先供给那口浴缸和弹药舱 ——
 S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。</p>
 <p><b>特点：</b>唯一能把机炮当主武器用的飞机。用它打空战是自杀，用它舔地是艺术。</p>`
+  }
+,
+
+  /* ============================================================
+     下游同盟的制式机（不可驾驶）
+
+     以前它只作为模型键 m27 存在，AIRCRAFT 表里查不到 ——
+     于是 makeAircraft() 会静默回退到 AIRCRAFT[0]，
+     HUD 上把 M-27 标成"C-11 军舰鸟"。
+     现在它有正式条目：enemyOnly 让它不出现在机库，
+     但资料库和 HUD 都能正确引用它。
+     ============================================================ */
+  {
+    id: 'm27',
+    name: 'M-27', nick: '片岩', cn: 'SCHIST',
+    role: '多用途战斗机',
+    maker: '下游同盟 · 第二航空工厂',
+    enemyOnly: true,
+    model: 'm27',
+    desc: `下游同盟能拿出的最好的东西。飞行性能大致相当于十年前的 C-11，
+      火控和电子设备还要更旧一代，但产量是上游的三倍 ——
+      他们用数量补质量，而且从来不缺愿意坐进去的人。`,
+    stats: { spd: 0.62, mob: 0.58, stl: 0.18, fire: 0.68, dur: 0.55, rng: 0.52 },
+    phys: { vMax: 505, vMil: 398, vStall: 118, accel: 25, decel: 38, pitch: 0.58, roll: 2.7, yaw: 0.30, hp: 120 },
+    gun: 'k7',
+    maxLoad: 4000,
+    // 挂点只用于资料库展示；下游弹的 fits 为空，所以 defaultLoadout 留空
+    hardpointGroups: [
+      { id: 'A', label: '翼下内侧', kind: 'heavy', pts: [{ x: 2.9, y: -1.0 }, { x: -2.9, y: -1.0 }] },
+      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.2, y: -1.6 }, { x: -5.2, y: -1.6 }] }
+    ],
+    defaultLoadout: {}
   }
 ];
 
@@ -600,6 +632,44 @@ var STORE_ATTR = {
    打机动目标反而比一枚只会死咬尾巴的灵活弹更管用。
    基础弹（TOR-2）刻意做得很笨，改进型的钱基本都花在这里。
    ============================================================ */
+/* ============================================================
+   呼号池
+   —— 下游同盟的飞行员用"已经没有可靠降雨的村庄名"当呼号。
+   这不是浪漫，是编制上的一种记录方式：这些人来自地图上还标着、
+   但实际上已经养不活人的地方。
+
+   上游公约用的是星名（长庚、参宿……），对照之下就是两种世界。
+   详见设定集 8.7 节。
+   ============================================================ */
+var CS_DOWNSTREAM = [
+  { cn: '枯河', en: 'DRYRIVER' },
+  { cn: '石桥', en: 'STONEBRIDGE' },
+  { cn: '空井', en: 'EMPTYWELL' },
+  { cn: '灰塘', en: 'ASHPOND' },
+  { cn: '断渠', en: 'BROKENCHANNEL' },
+  { cn: '白碱', en: 'WHITEALKALI' },
+  { cn: '老槐', en: 'OLDLOCUST' },
+  { cn: '塌堰', en: 'COLLAPSEDWEIR' },
+  { cn: '焦田', en: 'SCORCHEDFIELD' },
+  { cn: '哑钟', en: 'SILENTBELL' },
+  { cn: '砂岗', en: 'SANDCREST' },
+  { cn: '干渠', en: 'DRYCHANNEL' },
+  { cn: '裂谷', en: 'RIFTVALLEY' },
+  { cn: '秃岭', en: 'BALDRIDGE' },
+  { cn: '沉塘', en: 'SUNKENPOND' },
+  { cn: '断桥', en: 'BROKENSPAN' },
+  { cn: '浅滩', en: 'SHALLOWFORD' },
+  { cn: '飞沙', en: 'DRIFTSAND' },
+  { cn: '赤土', en: 'REDCLAY' },
+  { cn: '远雷', en: 'FARTHUNDER' }
+];
+
+/** 取第 i 个下游呼号，格式为 "枯河 DRYRIVER" */
+function downstreamCallsign(i) {
+  var c = CS_DOWNSTREAM[i % CS_DOWNSTREAM.length];
+  return c.cn + ' ' + c.en;
+}
+
 var MISSILE_LEAD = {
   srm: 0.38, trm: 0.48, hos: 0.30, qsr: 0.42, wasp: 0.55,
   v9: 0.52, v11: 0.62, mrm: 0.78, v17: 0.82, arm: 0.72,
@@ -696,8 +766,8 @@ var VOICES = {
     ],
     ambush: [
       { who: 'VESPER-3', cls: 'ally', tx: '<b>右转脱离！右转脱离！</b>', gap: 0.9 },
-      { who: 'FLINT-2', cls: 'enemy', tx: '这里是燧石 2。目标发现我们了。', gap: 1.1 },
-      { who: 'FLINT-1', cls: 'enemy', tx: '那就别躲了。全体，攻击。', gap: 0.9 }
+      { who: '枯河', cls: 'enemy', tx: '这里是枯河。目标发现我们了。', gap: 1.1 },
+      { who: '石桥', cls: 'enemy', tx: '那就别躲了。全体，攻击。', gap: 0.9 }
     ],
     win: [
       { who: 'SEXTANT', cls: 'cmd', tx: '空域清空。干得好，VESPER。', gap: 1.4 },
@@ -725,10 +795,10 @@ var VOICES = {
     aceAppears: [
       { who: 'SEXTANT', cls: 'cmd', tx: '等等。有个回波，就在你们上面。单机。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '……识别出来了。是干井。', gap: 1.3 },
-      { who: 'DRYWELL', cls: 'enemy', tx: '所以这就是他们派来的人。', gap: 1.4 },
-      { who: 'DRYWELL', cls: 'enemy', tx: '三架飞机，一堆机炮，一个已经赢了十六年的联盟。', gap: 1.6 },
-      { who: 'DRYWELL', cls: 'enemy', tx: '你们知道最让我难受的是什么吗。', gap: 1.4 },
-      { who: 'DRYWELL', cls: 'enemy', tx: '<b>你们不是坏人。你们只是从来没有抬头看过那条线。</b>', gap: 1.2 }
+      { who: '干井', cls: 'enemy', tx: '所以这就是他们派来的人。', gap: 1.4 },
+      { who: '干井', cls: 'enemy', tx: '三架飞机，一堆机炮，一个已经赢了十六年的联盟。', gap: 1.6 },
+      { who: '干井', cls: 'enemy', tx: '你们知道最让我难受的是什么吗。', gap: 1.4 },
+      { who: '干井', cls: 'enemy', tx: '<b>你们不是坏人。你们只是从来没有抬头看过那条线。</b>', gap: 1.2 }
     ],
     bossHit: [
       { who: 'VESPER-2', cls: 'ally', tx: '他在掉高度！动压撑不住了！', gap: 1.0 }
@@ -738,10 +808,10 @@ var VOICES = {
       { who: 'SEXTANT', cls: 'cmd', tx: '别跟下去！你们在下面打不过他！', gap: 1.0 }
     ],
     aceKill: [
-      { who: 'DRYWELL', cls: 'enemy', tx: '…………', gap: 1.4 },
-      { who: 'DRYWELL', cls: 'enemy', tx: '干井。那是我祖母的村子。', gap: 1.6 },
-      { who: 'DRYWELL', cls: 'enemy', tx: '一九六九年，它连着十九个月没下雨。', gap: 1.7 },
-      { who: 'DRYWELL', cls: 'enemy', tx: '那年你们那边发了一份公告，标题是《一个可以复制的成功》。', gap: 1.8 },
+      { who: '干井', cls: 'enemy', tx: '…………', gap: 1.4 },
+      { who: '干井', cls: 'enemy', tx: '干井。那是我祖母的村子。', gap: 1.6 },
+      { who: '干井', cls: 'enemy', tx: '一九六九年，它连着十九个月没下雨。', gap: 1.7 },
+      { who: '干井', cls: 'enemy', tx: '那年你们那边发了一份公告，标题是《一个可以复制的成功》。', gap: 1.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '……他弹射了。重复，他弹射了。', gap: 1.5 },
       { who: 'VESPER-3', cls: 'ally', tx: '让他走。', gap: 1.0 },
       { who: 'VESPER-3', cls: 'ally', tx: '他说的那句话，我一句都不想反驳。', gap: 1.0 }

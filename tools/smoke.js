@@ -512,6 +512,34 @@ if (Ent && M3 && me && world) {
     else ok('正侧方目标 → 滚转对齐（roll=' + out.roll.toFixed(2) + '）');
   }
 
+  /* ---- 敌机的呼号与型号不能混为一谈 ---- */
+  {
+    let bad = 0, withCall = 0, noCall = 0;
+    for (const a of world.actors) {
+      if (a.team === 0) continue;
+
+      // 呼号必须是人或编制的名字，格式为"中文 + 英文代号"
+      if (a.label) {
+        withCall++;
+        if (!/[A-Z]{3,}/.test(a.label)) {
+          fail('敌机呼号格式可疑：' + a.label);
+          bad++;
+        }
+      } else {
+        noCall++;
+      }
+
+      // name 是型号。出现" xxx 3"这种尾巴就说明内部下标漏出来了
+      if (/\s\d+$/.test(a.name)) {
+        fail('敌机名字像是内部编号：' + a.name);
+        bad++;
+      }
+    }
+    if (!bad) {
+      ok('敌机命名正常（有呼号 ' + withCall + ' · 无呼号 ' + noCall + '）');
+    }
+  }
+
   /* ---- 资料库：动态生成的图鉴必须能跑 ---- */
   {
     const C = sandbox.CODEX || [];

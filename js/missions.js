@@ -25,8 +25,13 @@ function spawnEnemy(w, o) {
   a.hp = 120;
   a.radius = 8;
 
-  a.name = o.name || ('M-27 ' + (o.slot || '燧石'));
-  a.label = a.name;
+  /* 名字与呼号是两件事：
+       name  —— 机型（M-27 片岩）
+       label —— 呼号（枯河 DRYRIVER），没有就留空
+     之前把两者混成一个字符串，于是 HUD 上冒出了"测绘机 3"这种东西 ——
+     那个既不是呼号也不是型号，纯粹是把内部编号漏了出来。 */
+  a.name = 'M-27 片岩';
+  a.label = o.callsign || null;
   AI.attach(a, { role: 'enemy', skill: o.skill === undefined ? 0.55 : o.skill });
   a.ai.cmd = o.behavior || 'pursue';
   a.behavior = o.behavior || 'pursue';
@@ -95,7 +100,7 @@ MISSIONS.push({
     '注意：本空域高度 7000 m 以上，动压充足，正常交战'
   ],
   threats: [
-    'M-27「燧石」重型截击机 ×5（侦察构型，自卫为主）',
+    'M-27「片岩」截击机 ×5（侦察构型，自卫为主）',
     'BIN-6「燧火」红外格斗弹',
     '无地面防空威胁'
   ],
@@ -129,7 +134,7 @@ MISSIONS.push({
         special: 'dl6',
         skill: 0.32,
         behavior: 'recon',
-        name: '测绘机 ' + (i + 1)
+        callsign: downstreamCallsign(i)
       });
       e.recon = true;
       e.flee = false;
@@ -225,7 +230,7 @@ MISSIONS.push({
   ],
   threats: [
     'BAD-9「高墙」远程防空导弹（4 个阵地，射程 9 km）',
-    'M-27「燧石」截击机（任务中段出现）',
+    'M-27「片岩」截击机（任务中段出现）',
     '地形：海面，无地形遮蔽可用'
   ],
   intel: `云底 <b>900 m</b> · 云顶 4200 m · 中继平台高度 <b>4000 m</b><br>
@@ -335,7 +340,7 @@ MISSIONS.push({
           fwd: M3.V(0, 0, -1), speed: 340,
           special: (k % 2) ? 'dl4' : 'dl6',
           skill: k === 0 ? 0.72 : 0.5,
-          name: '燧石 ' + (k + 1)
+          callsign: downstreamCallsign(5 + k)
         });
         e.wave = 2;
       }
@@ -449,7 +454,7 @@ MISSIONS.push({
         fwd: M3.V(0, 0, -1), speed: 210,
         special: 'dl6', skill: 0.25,
         behavior: 'recon',
-        name: '「灰烬」播撒机 ' + (i + 1)
+        callsign: downstreamCallsign(9 + i)
       });
       s.recon = true;
       s.model = 'sower';
@@ -465,7 +470,7 @@ MISSIONS.push({
       spawnEnemy(w, {
         x: -3000 + i * 6000, y: 19800, z: 11500,
         fwd: M3.V(0, 0, -1), speed: 380,
-        special: 'dl6', skill: 0.6, name: '燧石护航 ' + (i + 1)
+        special: 'dl6', skill: 0.6, callsign: downstreamCallsign(15 + i)
       });
     }
 
@@ -514,7 +519,7 @@ MISSIONS.push({
       var ace = spawnEnemy(w, {
         x: 500, y: 21000, z: 13800,
         fwd: M3.V(0, 0, -1), speed: 470,
-        special: 'dl4', skill: 0.96, name: 'DRYWELL'
+        special: 'dl4', skill: 0.96, callsign: '干井 DRYWELL'
       });
       ace.isAce = true;
       ace.phys = { vMax: 540, vMil: 430, vStall: 118, accel: 30, decel: 36, pitch: 0.66, roll: 3.2, yaw: 0.30, hp: 165 };
