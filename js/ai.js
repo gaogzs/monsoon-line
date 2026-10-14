@@ -38,26 +38,59 @@ var AI = (function () {
   }
 
   /**
-   * 把"想要去的方向"翻译成操纵输入。
-   * 返回 {pitch, roll, yaw}，其中 pitch>0 抬头、roll>0 右滚。
+   * 把"想要去的方向"翻译成操纵输入 —— 最少时间转向。
+   *
+   * 真实飞控与战雷式鼠标瞄准都是这个逻辑，分两步：
+   *   ① 先滚转，把目标滚进机体的俯仰平面（让它出现在"正上"方向）
+   *   ② 滚转一对齐，立刻全力拉杆做最大过载转向
+   *
+   * 反过来做（边滚边死拉杆）会让升力矢量指向斜下方，
+   * 飞机一边转一边掉高度，还转不快。
+   *
+   * 返回 {pitch, roll, yaw}，pitch>0 抬头、roll>0 右滚。
+   * st 可选，提供一个带 rollLock 字段的对象用于滚转方向锁存。
    */
-  function steerTo(a, desired, out) {
+  function steerTo(a, desired, out, st) {
     var fx = M3.dot(desired, a.fwd);
     var rx = M3.dot(desired, a.right);
     var ux = M3.dot(desired, a.up);
 
-    // 需要的滚转角：使目标的侧向分量消失
-    var rollErr = Math.atan2(-rx, ux);
-    var rollCmd = M3.clamp(-rollErr * 2.2, -1, 1);
+    /* ---------- ① 滚转：消掉目标的侧向分量 ---------- */
+    // 使目标落到"正上方"所需的滚转角
+    var rollErr = Math.atan2(-rx, ux);            // ∈ [-π, π]
 
-    // 滚转未对齐时先别死拉杆，否则会产生螺旋下降
-    var align = 1 - Math.min(1, Math.abs(rollErr) / 2.0);
-    var off = Math.acos(M3.clamp(fx, -1, 1));
-    var pitchCmd = M3.clamp(off * 1.9, 0, 1) * (0.30 + 0.70 * align);
+    // 目标接近正下方时 rx 会左右抖，导致满左滚/满右滚来回跳。
+    // 用一次锁存钉住转向，等转过半圈再解锁。
+    if (st) {
+      if (Math.abs(rollErr) > 2.55) {
+        if (!st.rollLock) st.rollLock = (rollErr >= 0) ? 1 : -1;
+        rollErr = st.rollLock * 3.14;
+      } else {
+        st.rollLock = 0;
+      }
+    }
+    var rollCmd = M3.clamp(-rollErr * 2.8, -1, 1);
 
-    // 目标在正后方时给一点方向舵帮助机头偏转
+    /* ---------- ② 俯仰：对齐度越高，拉得越满 ---------- */
+    var off = Math.acos(M3.clamp(fx, -1, 1));     // 机头与目标的夹角
+
+    // 目标在机体横向平面里偏向哪一侧：+1 = 正上，0 = 正侧方，-1 = 正下
+    var lateral = Math.sqrt(rx * rx + ux * ux);
+    var up = lateral > 1e-4 ? M3.clamp(ux / lateral, -1, 1) : 1;
+
+    var mag = M3.clamp(off * 2.3, 0, 1);
+    var pitchCmd;
+    if (up >= 0) {
+      // 已在上半平面：拉杆量随对齐度迅速升满
+      pitchCmd = mag * (0.55 + 0.45 * Math.sqrt(up));
+    } else {
+      // 还在下半平面：交给滚转去解决，只保留很小的杆量维持姿态
+      pitchCmd = mag * 0.18 * (1 + up);
+    }
+
+    /* ---------- 方向舵：只在目标贴近正后方时帮一把 ---------- */
     var yawCmd = 0;
-    if (fx < -0.5) yawCmd = M3.clamp(rx * 1.6, -1, 1);
+    if (fx < -0.45) yawCmd = M3.clamp(rx * 1.8, -1, 1);
 
     out.pitch = pitchCmd;
     out.roll = rollCmd;
@@ -187,12 +220,12 @@ var AI = (function () {
     }
 
     if (!desired) desired = a.fwd;
-    steerTo(a, desired, ctrl);
+    steerTo(a, desired, ctrl, a);
 
     // 硬性保护：撞地前强行拉起
     if (a.pos.y < 420 && a.fwd.y < 0.05) {
       desired = M3.norm(M3.V(a.fwd.x, 0.5, a.fwd.z));
-      steerTo(a, desired, ctrl);
+      steerTo(a, desired, ctrl, a);
       throttle = 1; ab = true;
     }
 

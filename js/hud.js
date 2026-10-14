@@ -17,7 +17,9 @@ var HUD = (function () {
   /* ============================================================
      主入口
      ============================================================ */
-  function draw(world, p, dt) {
+  var CARD = ['N', 'E', 'S', 'W'];
+
+  function draw(world, p, dt, S) {
     var ctx = Renderer.ctx;
     var W = Renderer.W, H = Renderer.H;
     var cam = Renderer.getCam();
@@ -25,9 +27,13 @@ var HUD = (function () {
 
     ctx.save();
     ctx.lineCap = 'butt';
+    if (S && S.hudOpacity !== undefined) {
+      ctx.globalAlpha = M3.clamp(S.hudOpacity / 100, 0.15, 1);
+    }
 
+    drawCompass(ctx, W, H, p, world, S);
     drawBoresight(ctx, W, H, p);
-    drawTapes(ctx, W, H, p);
+    drawTapes(ctx, W, H, p, S);
     drawRadar(ctx, W, H, p, world);
     drawThreatRing(ctx, W, H, p, world);
     drawTargets(ctx, W, H, cam, p, world);
@@ -36,6 +42,99 @@ var HUD = (function () {
     drawObjective(ctx, W, H, world);
 
     ctx.restore();
+  }
+
+  /* ============================================================
+     顶部指南针
+     没有它，单色海面上根本判断不出自己在往哪转。
+     顺带把任务目标的方位也标上去 —— 否则在开阔空域找浮空平台
+     只能靠雷达盲猜。
+     ============================================================ */
+  function drawCompass(ctx, W, H, p, world, S) {
+    if (S && S.compass === false) return;
+
+    var cx = W / 2;
+    var top = 8;
+    var bandH = 26;
+    var halfW = Math.min(300, W * 0.24);
+    var spanDeg = 100;                       // 指南针显示的总方位范围
+    var degPerPx = spanDeg / (halfW * 2);
+
+    // 水平分量过小时（接近垂直姿态）航向没有意义，直接用上一帧的近似值
+    var hl = Math.sqrt(p.fwd.x * p.fwd.x + p.fwd.z * p.fwd.z);
+    var hdg = p.heading === undefined ? 0 : p.heading;
+    if (hl > 0.03) {
+      hdg = Math.atan2(p.fwd.x / hl, p.fwd.z / hl) * 180 / Math.PI;
+    }
+    hdg = ((hdg % 360) + 360) % 360;
+    p.heading = hdg;
+
+    // 背板
+    ctx.fillStyle = 'rgba(6,14,20,0.5)';
+    ctx.fillRect(cx - halfW - 10, top, (halfW + 10) * 2, bandH + 16);
+    ctx.strokeStyle = 'rgba(79,224,138,0.22)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - halfW - 10, top, (halfW + 10) * 2, bandH + 16);
+
+    // 刻度：每 5° 一个短刻，每 10° 标注
+    var a0 = hdg - spanDeg / 2, a1 = hdg + spanDeg / 2;
+    for (var d = Math.ceil(a0 / 5) * 5; d <= a1; d += 5) {
+      var x = cx + (d - hdg) / degPerPx;
+      var dd = ((d % 360) + 360) % 360;
+      var isCard = (dd % 90 === 0);
+      var isMaj = (dd % 10 === 0);
+      if (!isMaj && Math.abs(x - cx) > halfW) continue;
+
+      ctx.strokeStyle = isCard ? GREEN : (isMaj ? 'rgba(79,224,138,0.65)' : 'rgba(79,224,138,0.30)');
+      ctx.lineWidth = isCard ? 1.8 : 1;
+      ctx.beginPath();
+      ctx.moveTo(x, top + bandH);
+      ctx.lineTo(x, top + bandH - (isMaj ? 11 : 6));
+      ctx.stroke();
+
+      if (isMaj) {
+        text(ctx, isCard ? CARD[dd / 90] : String(dd), x, top + 13,
+          isCard ? GREEN : DIM, isCard ? 'bold 13px Consolas,monospace' : FS, 'center');
+      }
+    }
+
+    // 任务目标方位标记
+    var marks = [];
+    if (world && (!S || S.targetMarkers !== false)) {
+      if (world.targets) {
+        for (var i = 0; i < world.targets.length; i++) {
+          if (world.targets[i].alive) marks.push(world.targets[i]);
+        }
+      }
+    }
+    for (i = 0; i < marks.length; i++) {
+      var t = marks[i];
+      var dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z;
+      var th = Math.atan2(dx, dz) * 180 / Math.PI;
+      var diff = M3.wrapPi((th - hdg) * Math.PI / 180) * 180 / Math.PI;
+      if (Math.abs(diff) > spanDeg / 2) continue;
+      var mx = cx + diff / degPerPx;
+      var col = (t.team === 2) ? '#8fa3b2' : (t.ttype === 'air' ? AMBER : '#a8bccb');
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(mx, top + bandH + 7);
+      ctx.lineTo(mx - 5, top + bandH + 15);
+      ctx.lineTo(mx + 5, top + bandH + 15);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 中心指针 + 航向读数
+    ctx.fillStyle = AMBER;
+    ctx.beginPath();
+    ctx.moveTo(cx, top + bandH + 1);
+    ctx.lineTo(cx - 6, top - 7);
+    ctx.lineTo(cx + 6, top - 7);
+    ctx.closePath();
+    ctx.fill();
+
+    text(ctx, ('00' + Math.round(hdg % 360)).slice(-3), cx, top + bandH + 30,
+      AMBER, 'bold 13px Consolas,monospace', 'center');
   }
 
   /* ============================================================
@@ -80,24 +179,26 @@ var HUD = (function () {
   /* ============================================================
      速度带 / 高度带 / Q 表
      ============================================================ */
-  function drawTapes(ctx, W, H, p) {
+  function drawTapes(ctx, W, H, p, S) {
     var cy = H / 2, hgt = 260;
     var top = cy - hgt / 2;
 
-    /* ---------- 左：空速 ---------- */
-    var x = 78;
+    /* ---------- 左：空速 ----------
+       带子向屏幕中心收拢了一些：贴在最边上时，视线要来回甩很远，
+       而中间那块才是真正需要盯的区域。 */
+    var x = 132;
     tape(ctx, x, top, hgt, p.speed, 50, 200, 1, 'M/S', CY, 0.85);
     text(ctx, (p.speed * 3.6).toFixed(0), x - 46, cy + 5, '#eaf4fb', FB, 'right');
     text(ctx, (p.speed * 1.9438).toFixed(0) + ' KT', x - 46, cy + 21, DIM, FS, 'right');
 
     /* ---------- 右：高度 ---------- */
-    var x2 = W - 78;
+    var x2 = W - 132;
     tape(ctx, x2, top, hgt, p.pos.y, 1000, 5000, -1, 'M', GREEN, 0.021);
     text(ctx, p.pos.y.toFixed(0), x2 + 46, cy + 5, '#eaf4fb', FB, 'left');
     text(ctx, (p.pos.y * 3.28084).toFixed(0) + ' FT', x2 + 46, cy + 21, DIM, FS, 'left');
 
     /* ---------- 右下：动压 Q（本作核心仪表） ---------- */
-    var qx = W - 78, qy = top + hgt + 58;
+    var qx = W - 132, qy = top + hgt + 58;
     var q = p.q;
     var qCol = q < 12 ? RED : (q < 20 ? AMBER : GREEN);
     ctx.strokeStyle = DIM; ctx.lineWidth = 1;
@@ -527,10 +628,11 @@ var HUD = (function () {
      ============================================================ */
   function drawObjective(ctx, W, H, world) {
     if (!world.objective) return;
-    text(ctx, world.objective, W / 2, 34, 'rgba(79,224,138,0.85)',
+    // 让开顶部的指南针
+    text(ctx, world.objective, W / 2, 92, 'rgba(79,224,138,0.85)',
       'bold 14px Consolas,monospace', 'center');
     if (world.objectiveSub) {
-      text(ctx, world.objectiveSub, W / 2, 54, DIM, FS, 'center');
+      text(ctx, world.objectiveSub, W / 2, 110, DIM, FS, 'center');
     }
   }
 

@@ -249,7 +249,7 @@ table.score tr.hi td:last-child{ color:var(--amber); font-weight:700; }
    操作说明
    ============================================================ */
 .help-wrap{ flex:1 1 auto; display:grid; grid-template-columns:1fr 1fr; gap:34px;
-  padding:26px 44px; overflow-y:auto; }
+  padding:26px 44px; overflow-y:auto; min-height:0; }
 .help-col h3{ font-family:var(--mono); font-size:13px; color:var(--amber); letter-spacing:3px;
   margin:6px 0 12px; border-bottom:1px solid var(--line); padding-bottom:6px; }
 .khelp{ font-size:13px; line-height:1.95; color:#8fa3b2; margin:0 0 12px;
@@ -303,6 +303,74 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
 .pause-box h2{ font-family:var(--mono); font-size:40px; letter-spacing:10px; color:var(--amber);
   margin-bottom:8px; }
 .pause-box .menu{ margin-top:24px; }
+
+/* ============================================================
+   设置面板 —— 独立设置页与暂停菜单内的设置页共用同一套控件
+   由 game.js 的 buildSettingsInto() 动态生成
+   ============================================================ */
+.set-wrap{ flex:1 1 auto; overflow-y:auto; min-height:0; padding:22px 34px; }
+.set-wrap.in-overlay{ flex:none; max-height:50vh; padding:4px 2px; }
+.set-col{ max-width:680px; }
+.set-group{ font-family:var(--mono); font-size:12px; color:var(--amber); letter-spacing:3px;
+  border-bottom:1px solid var(--line); padding-bottom:6px; margin:20px 0 10px; }
+.set-group:first-child{ margin-top:0; }
+.set-row{ display:grid; grid-template-columns:132px 1fr 64px; gap:14px; align-items:center;
+  padding:6px 0; }
+.set-row > label{ font-size:13px; color:#8fa3b2; }
+.set-row .set-val{ font-family:var(--mono); font-size:12px; color:var(--cy); text-align:right; }
+.set-row input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:4px;
+  background:#12202b; border:1px solid var(--line); outline:none; cursor:pointer; }
+.set-row input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none;
+  width:13px; height:18px; background:var(--amber); border:1px solid #ffd489; cursor:pointer; }
+.set-row input[type=range]::-moz-range-thumb{ width:13px; height:18px; background:var(--amber);
+  border:1px solid #ffd489; border-radius:0; cursor:pointer; }
+.set-row .set-toggle{ font-family:var(--mono); font-size:12px; letter-spacing:1px; padding:5px 12px;
+  cursor:pointer; background:#13202b; border:1px solid var(--line2); color:var(--txt-d);
+  grid-column:2 / span 2; justify-self:start; }
+.set-row .set-toggle:hover{ color:#fff; border-color:var(--amber); }
+.set-row .set-toggle.on{ background:#1a2b1f; border-color:var(--green); color:var(--green); }
+.set-hint{ font-size:12px; color:var(--txt-d); line-height:1.9; padding:4px 0 2px; }
+
+/* ============================================================
+   暂停菜单（带子页签）
+   ============================================================ */
+.pause-box.wide{ width:min(760px,92vw); padding:24px 32px 20px; }
+.pause-box.wide h2{ font-size:30px; letter-spacing:9px; margin-bottom:14px; }
+.pause-tabs{ display:flex; gap:8px; justify-content:center; margin-bottom:18px;
+  border-bottom:1px solid var(--line); padding-bottom:12px; }
+.ptab{ font-family:var(--mono); font-size:12px; letter-spacing:1px; padding:7px 16px; cursor:pointer;
+  background:transparent; border:1px solid var(--line2); color:var(--txt-d); transition:.13s; }
+.ptab:hover{ color:#fff; border-color:var(--amber); }
+.ptab.on{ background:#1a2836; border-color:var(--amber); color:var(--amber); }
+.pane{ display:none; text-align:left; }
+.pane.on{ display:block; }
+.pane .dsub{ text-align:center; margin-bottom:16px; }
+.pane .menu{ justify-content:center; }
+
+/* 暂停菜单里的迷你操作说明 */
+.minihelp{ font-size:12.5px; line-height:1.85; color:#8fa3b2; max-height:46vh; overflow-y:auto;
+  padding-right:6px; }
+.minihelp table{ width:100%; border-collapse:collapse; }
+.minihelp td{ padding:4px 8px; vertical-align:top; }
+.minihelp td:first-child{ width:130px; white-space:nowrap; color:#cfe0ec; }
+.minihelp h4{ font-family:var(--mono); font-size:12px; color:var(--amber); letter-spacing:2px;
+  margin:14px 0 6px; }
+.minihelp h4:first-child{ margin-top:0; }
+
+/* ============================================================
+   简报页的任务选择
+   ============================================================ */
+.msn-list{ display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+.msn-item{ flex:1 1 190px; padding:10px 14px; cursor:pointer; border:1px solid var(--line);
+  background:linear-gradient(180deg,#0c141b,#080d12); transition:.13s; }
+.msn-item:hover{ border-color:var(--line2); background:#101a23; }
+.msn-item.sel{ border-color:var(--amber); background:linear-gradient(180deg,#1a2836,#0d161e);
+  box-shadow:inset 0 0 22px rgba(255,176,58,.1); }
+.msn-item .no{ font-family:var(--mono); font-size:10.5px; color:var(--txt-d); letter-spacing:2px; }
+.msn-item .nm{ font-size:15px; color:#dbe8f2; margin-top:3px; }
+.msn-item.sel .nm{ color:var(--amber); }
+.msn-item .st{ font-size:11px; color:var(--txt-d); margin-top:4px; }
+.msn-item .st.done{ color:var(--green); }
 
 /* 滚动条 */
 ::-webkit-scrollbar{ width:9px; height:9px; }

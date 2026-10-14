@@ -99,17 +99,33 @@ var Renderer = (function () {
   /* ============================================================
      天空 + 地面
      ============================================================ */
+  /* 云：按高度分为五层，覆盖 500 – 21000 m。
+     单层云在座舱视角里是看不见的 —— 玩家在 7600 m 巡航时，
+     1500 m 的积云俯角超过 40°，落在 58° 视场之外。
+     所以每一段飞行高度附近都必须有云，它们才是可靠的姿态参照。 */
+  var CLOUD_LAYERS = [
+    { y0: 500, y1: 2600, s0: 500, s1: 1500, a0: 0.30, a1: 0.52, n: 22 },    // 低层积云
+    { y0: 3200, y1: 6200, s0: 600, s1: 1900, a0: 0.24, a1: 0.44, n: 20 },   // 中层
+    { y0: 6800, y1: 10200, s0: 700, s1: 2300, a0: 0.20, a1: 0.38, n: 18 },  // 中高层
+    { y0: 10800, y1: 15200, s0: 800, s1: 2600, a0: 0.15, a1: 0.30, n: 16 }, // 高层
+    { y0: 15800, y1: 21400, s0: 900, s1: 3000, a0: 0.11, a1: 0.24, n: 14 }  // 平流层薄云
+  ];
   var cloudSeeds = [];
   (function () {
-    for (var i = 0; i < 46; i++) {
-      cloudSeeds.push({
-        ox: M3.rnd(-2600, 2600), oz: M3.rnd(-2600, 2600),
-        y: M3.rnd(700, 2600), s: M3.rnd(320, 1100),
-        a: M3.rnd(0.05, 0.17)
-      });
+    for (var L = 0; L < CLOUD_LAYERS.length; L++) {
+      var lay = CLOUD_LAYERS[L];
+      for (var i = 0; i < lay.n; i++) {
+        cloudSeeds.push({
+          ox: M3.rnd(-3400, 3400), oz: M3.rnd(-3400, 3400),
+          y: M3.rnd(lay.y0, lay.y1),
+          s: M3.rnd(lay.s0, lay.s1),
+          a: M3.rnd(lay.a0, lay.a1),
+          sq: M3.rnd(0.26, 0.44)
+        });
+      }
     }
   })();
-  var CLOUD_CELL = 5200;
+  var CLOUD_CELL = 6400;
 
   function horizonY() {
     var d = M3.V(cam.fwd.x, 0, cam.fwd.z);
@@ -155,9 +171,13 @@ var Renderer = (function () {
     return hy;
   }
 
+  var CLOUD_FAR = 16000;
+
   function drawClouds() {
     var bx = Math.round(cam.pos.x / CLOUD_CELL) * CLOUD_CELL;
     var bz = Math.round(cam.pos.z / CLOUD_CELL) * CLOUD_CELL;
+    var FAR2 = CLOUD_FAR * CLOUD_FAR;
+
     ctx.save();
     for (var i = 0; i < cloudSeeds.length; i++) {
       var s = cloudSeeds[i];
@@ -167,17 +187,46 @@ var Renderer = (function () {
           var pz = bz + az * CLOUD_CELL + s.oz;
           var dx = px - cam.pos.x, dz = pz - cam.pos.z;
           var dh = dx * dx + dz * dz;
-          if (dh > 7000 * 7000) continue;
+          if (dh > FAR2) continue;
+
           var p = M3.project(cam, M3.V(px, s.y, pz));
           if (!p) continue;
+
           var rr = cam.focal * s.s / p.z;
-          if (rr < 12 || rr > H * 4) continue;
-          var fade = 1 - Math.sqrt(dh) / 7000;
-          ctx.globalAlpha = s.a * fade * 0.9;
-          ctx.fillStyle = '#dfe9ee';
+          if (rr < 6 || rr > H * 8) continue;
+
+          // 近处的云几乎不透明，远处融进天空
+          var fade = 1 - Math.sqrt(dh) / CLOUD_FAR;
+          fade = fade * fade * (3 - 2 * fade);          // smoothstep
+          var al = s.a * (0.45 + 0.55 * fade);
+
+          // 越接近掠过云层的视线，云的投影越扁
+          var graze = Math.abs(p.y - cam.cy) / Math.max(1, H * 0.5);
+          var sq = s.sq * (0.55 + 0.75 * Math.min(1, graze));
+
+          ctx.globalAlpha = M3.clamp(al, 0, 0.8);
+
+          ctx.fillStyle = '#e8f0f5';
           ctx.beginPath();
-          ctx.ellipse(p.x, p.y, rr, rr * 0.34, 0, 0, Math.PI * 2);
+          ctx.ellipse(p.x, p.y, rr, rr * sq, 0, 0, Math.PI * 2);
           ctx.fill();
+
+          // 给稍大的云一点体积：顶部受光、底部压暗
+          if (rr > 26) {
+            ctx.globalAlpha = M3.clamp(al * 0.55, 0, 0.42);
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(p.x - rr * 0.10, p.y - rr * sq * 0.42,
+              rr * 0.66, rr * sq * 0.52, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.globalAlpha = M3.clamp(al * 0.30, 0, 0.24);
+            ctx.fillStyle = '#8ea3b4';
+            ctx.beginPath();
+            ctx.ellipse(p.x + rr * 0.06, p.y + rr * sq * 0.52,
+              rr * 0.72, rr * sq * 0.40, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
     }

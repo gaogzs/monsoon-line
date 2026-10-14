@@ -9,6 +9,12 @@ var SFX = (function () {
   var muted = false;
   var ready = false;
 
+  /* 音量（0..1）。主音量作用在总线上，引擎与音效各自再缩放一次。
+     引擎是持续音，最容易变成"底噪"，所以默认压得比较低。 */
+  var volMaster = 0.45;
+  var volEngine = 0.45;
+  var volSfx = 0.85;
+
   /* ---------- 持续音节点 ---------- */
   var engA = null, engB = null, engF = null, engG = null, engLfo = null, engLfoG = null;
   var gunSrc = null, gunF = null, gunG = null, gunLfo = null, gunLfoG = null;
@@ -32,7 +38,7 @@ var SFX = (function () {
       if (!AC) return;
       ctx = new AC();
       master = ctx.createGain();
-      master.gain.value = 0.45;
+      master.gain.value = volMaster;
       master.connect(ctx.destination);
       noiseBuf = makeNoise(2.0);
       buildEngine();
@@ -106,6 +112,7 @@ var SFX = (function () {
     f.type = type || 'lowpass';
     f.frequency.setValueAtTime(Math.max(40, f0), t);
     f.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+    vol *= volSfx;
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
@@ -122,6 +129,7 @@ var SFX = (function () {
     o.type = type || 'sine';
     o.frequency.setValueAtTime(Math.max(20, f0), t);
     o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    vol *= volSfx;
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
@@ -137,6 +145,7 @@ var SFX = (function () {
     var o = ctx.createOscillator();
     o.type = type || 'square';
     o.frequency.value = freq;
+    vol *= volSfx;
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
@@ -155,9 +164,20 @@ var SFX = (function () {
 
     setMuted: function (m) {
       muted = m;
-      if (ready) master.gain.value = m ? 0 : 0.45;
+      if (ready) master.gain.value = m ? 0 : volMaster;
     },
     isMuted: function () { return muted; },
+
+    /** 音量设置（0..1）：主音量 / 引擎 / 音效 */
+    setVolumes: function (m, e, s) {
+      volMaster = M3.clamp(m, 0, 1);
+      volEngine = M3.clamp(e, 0, 1);
+      volSfx = M3.clamp(s, 0, 1);
+      if (ready) master.gain.value = muted ? 0 : volMaster;
+    },
+    getVolumes: function () {
+      return { master: volMaster, engine: volEngine, sfx: volSfx };
+    },
 
     /** 每帧：油门 0..1，加力，是否开加力视觉 */
     engine: function (throttle, ab, alive) {
@@ -168,14 +188,14 @@ var SFX = (function () {
       engB.frequency.setTargetAtTime(base * 0.5, t, 0.09);
       engF.frequency.setTargetAtTime(560 + throttle * 1500 + (ab ? 500 : 0), t, 0.10);
       engLfo.frequency.setTargetAtTime(12 + throttle * 16, t, 0.2);
-      var vol = alive ? (0.030 + throttle * 0.075 + (ab ? 0.030 : 0)) : 0;
+      var vol = alive ? (0.030 + throttle * 0.075 + (ab ? 0.030 : 0)) * volEngine : 0;
       engG.gain.setTargetAtTime(vol, t, 0.12);
     },
 
     /** 机炮持续音开关 */
     gun: function (on) {
       if (!ready) return;
-      gunG.gain.setTargetAtTime(on ? 0.115 : 0.0, T(), 0.012);
+      gunG.gain.setTargetAtTime(on ? 0.115 * volSfx : 0.0, T(), 0.012);
     },
 
     /** 导弹告警开/关 */
@@ -183,7 +203,7 @@ var SFX = (function () {
       if (!ready) return;
       if (on === warnOn) return;
       warnOn = on;
-      warnG.gain.setTargetAtTime(on ? 0.075 : 0.0, T(), 0.03);
+      warnG.gain.setTargetAtTime(on ? 0.075 * volSfx : 0.0, T(), 0.03);
     },
 
     /** 雷达锁定：递增哔声 */

@@ -34,8 +34,10 @@
   </div>
 
   <div class="menu">
-    <button class="btn primary" data-go="hangar">开始任务</button>
+    <button class="btn primary" data-go="brief">开始任务</button>
+    <button class="btn" data-go="hangar">机库 / HANGAR</button>
     <button class="btn" data-go="codex">资料库 / CODEX</button>
+    <button class="btn" data-go="settings">设置</button>
     <button class="btn" data-go="help">操作说明</button>
   </div>
   <div class="foot">点击任意处启用音频 · 建议全屏 (F11)</div>
@@ -64,8 +66,8 @@
   </div>
 
   <footer class="bar bottom">
-    <button class="btn" data-go="title">返回</button>
-    <button class="btn primary" id="btnToBrief">任务简报 &gt;</button>
+    <button class="btn" data-go="brief">返回简报</button>
+    <button class="btn primary" id="btnLaunch">出击 / LAUNCH</button>
   </footer>
 </section>
 
@@ -78,6 +80,7 @@
 
   <div class="brief-wrap">
     <div class="brief-main">
+      <div class="msn-list" id="msnList"></div>
       <div class="msn-no" id="bNo">OPERATION 01</div>
       <h2 id="bName">—</h2>
       <div class="msn-loc" id="bLoc">—</div>
@@ -99,8 +102,8 @@
   </div>
 
   <footer class="bar bottom">
-    <button class="btn" data-go="hangar">返回机库</button>
-    <button class="btn primary" id="btnLaunch">出击 / LAUNCH</button>
+    <button class="btn" data-go="title">返回主菜单</button>
+    <button class="btn primary" data-go="hangar">下一步：按任务选择机体 &gt;</button>
   </footer>
 </section>
 
@@ -122,6 +125,19 @@
   </div>
 </section>
 
+<!-- ============ 屏幕：设置 ============ -->
+<section id="scr-settings" class="screen">
+  <header class="bar">
+    <span class="bar-t">设 置 / SETTINGS</span>
+    <span class="bar-r">改动即时生效 · 自动保存</span>
+  </header>
+  <div class="set-wrap" id="setWrap"></div>
+  <footer class="bar bottom">
+    <button class="btn" id="setReset">恢复默认</button>
+    <button class="btn primary" id="setClose">返回</button>
+  </footer>
+</section>
+
 <!-- ============ 屏幕：资料库 ============ -->
 <section id="scr-codex" class="screen">
   <header class="bar"><span class="bar-t">资 料 库 / CODEX</span><span class="bar-r">机密等级 · 公开发布版</span></header>
@@ -135,59 +151,38 @@
 <!-- ============ 屏幕：操作 ============ -->
 <section id="scr-help" class="screen">
   <header class="bar"><span class="bar-t">飞 行 手 册 / FLIGHT MANUAL</span><span class="bar-r">C 系列 · S 系列通用</span></header>
-  <div class="help-wrap">
-    <div class="help-col">
-      <h3>鼠标引导（默认）</h3>
-      <p class="khelp">移动鼠标 = 给出"我想让机头指向哪里"。飞控自动解算滚转、俯仰与协调转弯，
-        你只管指方向。<b>瞄准环会随动压变小而张开 —— 空气越稀薄，飞控越使不上劲。</b></p>
-      <p class="khelp">想回到硬核手感？按 <kbd>M</kbd> 切到直接操纵，用键盘直控舵面。</p>
-      <h3>基础操纵</h3>
-      <table class="keymap">
-        <tr><td><kbd>鼠标</kbd></td><td>引导机头指向（默认模式）</td></tr>
-        <tr><td><kbd>M</kbd></td><td>切换 鼠标引导 / 键盘直控</td></tr>
-        <tr><td><kbd>W</kbd>/<kbd>S</kbd></td><td>俯仰 —— 拉杆抬头 / 推杆低头（Pitch）</td></tr>
-        <tr><td><kbd>A</kbd>/<kbd>D</kbd></td><td>滚转 —— 左右压杆（Roll）</td></tr>
-        <tr><td><kbd>Q</kbd>/<kbd>E</kbd></td><td>方向舵 —— 侧滑偏航（Yaw）</td></tr>
-        <tr><td><kbd>Shift</kbd>/<kbd>Ctrl</kbd></td><td>油门增大 / 减小（Throttle）</td></tr>
-        <tr><td><kbd>Z</kbd> <kbd>X</kbd></td><td>减速板 / 加力燃烧室（AB）</td></tr>
-        <tr><td><kbd>↑↓←→</kbd></td><td>自由视角（松开自动回中）</td></tr>
-        <tr><td><kbd>C</kbd></td><td>切换视角：追尾 / 座舱 / 导弹</td></tr>
-      </table>
-    </div>
-    <div class="help-col">
-      <h3>武器</h3>
-      <table class="keymap">
-        <tr><td><kbd>鼠标左键</kbd> / <kbd>空格</kbd></td><td>机炮（GUN）</td></tr>
-        <tr><td><kbd>鼠标右键</kbd> / <kbd>回车</kbd></td><td>发射特殊武器</td></tr>
-        <tr><td><kbd>F</kbd> / <kbd>Tab</kbd></td><td>切换目标（多目标时）</td></tr>
-        <tr><td><kbd>R</kbd></td><td>切换挂载（三种特殊武器间循环）</td></tr>
-        <tr><td><kbd>V</kbd></td><td>释放干扰弹（FLARE）</td></tr>
-        <tr><td><kbd>H</kbd></td><td>暂停 / 显示帮助</td></tr>
-      </table>
-      <h3>交战要诀</h3>
-      <ul class="tips">
-        <li><b>NEZ 不可逃逸区</b>：导弹在 <span id="tip1">2km</span> 内发射，敌机极难摆脱。</li>
-        <li><b>迎头 vs 尾追</b>：迎头发射命中率更高，但 RWR 会提前告警。</li>
-        <li><b>能量机动</b>：爬升掉速、俯冲增速。低速时舵效下降，谨防失速。</li>
-        <li><b>导弹规避</b>：把来袭导弹放在 3/9 线（正横），持续桶滚消耗其能量。</li>
-        <li><b>注意地面</b>：低于 <span class="red">200m</span> 会触发地形告警，撞地即任务失败。</li>
-        <li><b>动压 Q</b>：18 公里以上的空气密度只有海平面的 <b>12%</b>。动压低于
-            <span class="red">12 kPa</span> 时舵面开始失效、导弹可用过载崩塌 ——
-            但机炮的弹道反而更平直、射程更远。<b>高空不是靠机动赢的，是靠能量和准头赢的。</b></li>
-      </ul>
-    </div>
-  </div>
+  <div class="help-wrap" id="helpBody"></div>
   <footer class="bar bottom"><button class="btn" data-go="title">返回</button></footer>
 </section>
 
 <!-- ============ 暂停 ============ -->
 <div id="pause" class="overlay">
-  <div class="pause-box">
+  <div class="pause-box wide">
     <h2>PAUSED</h2>
-    <div class="dsub">任务暂停 · 按 <kbd>H</kbd> 继续</div>
-    <div class="menu">
-      <button class="btn primary" id="btnResume">继续</button>
-      <button class="btn" id="btnAbort">放弃任务</button>
+
+    <div class="pause-tabs">
+      <button class="ptab on" data-ptab="main">暂停</button>
+      <button class="ptab" data-ptab="settings">设置</button>
+      <button class="ptab" data-ptab="help">操作说明</button>
+    </div>
+
+    <div class="pane on" id="pane-main">
+      <div class="dsub">任务暂停 · 按 <kbd>H</kbd> 继续 · 设置改动即时生效</div>
+      <div class="menu">
+        <button class="btn primary" id="btnResume">继续</button>
+        <button class="btn" id="btnAbort">放弃任务</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-settings">
+      <div class="set-wrap in-overlay" id="pauseSettings"></div>
+      <div class="menu" style="margin-top:14px">
+        <button class="btn" id="pauseSetReset">恢复默认</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-help">
+      <div class="minihelp" id="pauseHelp"></div>
     </div>
   </div>
 </div>

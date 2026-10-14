@@ -76,6 +76,7 @@ var Game = (function () {
   var banner = { t: 0, title: '', sub: '', col: '' };
   var hits = [];
   var stats = null;
+  var cleared = {};        // 本次会话内已完成的任务
   var MAX_HP_ACE = 0;
 
   /* ============================================================
@@ -94,6 +95,214 @@ var Game = (function () {
   function hideAll() {
     var all = document.querySelectorAll('.screen');
     for (var i = 0; i < all.length; i++) all[i].classList.remove('active');
+  }
+
+  /* ============================================================
+     设置
+     —— 独立设置页与暂停菜单内的设置页共用同一套定义与生成器
+     ============================================================ */
+  var SET_KEY = 'monsoonline.settings.v1';
+
+  var DEFAULTS = {
+    volMaster: 45,
+    volEngine: 45,
+    volSfx: 85,
+    muted: false,
+    fov: 56,
+    camDist: 74,
+    camHeight: 22,
+    hudOpacity: 100,
+    compass: true,
+    targetMarkers: true
+  };
+
+  var S = {};
+
+  var SET_GROUPS = [
+    {
+      title: '音频',
+      hint: '引擎是持续音，最容易变成底噪。嫌吵就把它单独压低，或者直接归零。',
+      items: [
+        { k: 'volMaster', label: '主音量', type: 'range', min: 0, max: 100, unit: '%' },
+        { k: 'volEngine', label: '引擎音', type: 'range', min: 0, max: 100, unit: '%' },
+        { k: 'volSfx', label: '音效', type: 'range', min: 0, max: 100, unit: '%' },
+        { k: 'muted', label: '全部静音', type: 'toggle' }
+      ]
+    },
+    {
+      title: '视角',
+      hint: '暂停时调整可以实时看到画面变化 —— 不用退出去再进来。',
+      items: [
+        { k: 'fov', label: '视场角 FOV', type: 'range', min: 38, max: 100, unit: '°' },
+        { k: 'camDist', label: '镜头距离', type: 'range', min: 28, max: 200, unit: ' m' },
+        { k: 'camHeight', label: '镜头高度', type: 'range', min: -10, max: 70, unit: ' m' }
+      ]
+    },
+    {
+      title: '显示',
+      items: [
+        { k: 'hudOpacity', label: 'HUD 透明度', type: 'range', min: 25, max: 100, unit: '%' },
+        { k: 'compass', label: '顶部指南针', type: 'toggle' },
+        { k: 'targetMarkers', label: '目标方位标记', type: 'toggle' }
+      ]
+    }
+  ];
+
+  function loadSettings() {
+    var o = {}, k;
+    for (k in DEFAULTS) if (Object.prototype.hasOwnProperty.call(DEFAULTS, k)) o[k] = DEFAULTS[k];
+    try {
+      var raw = window.localStorage.getItem(SET_KEY);
+      if (raw) {
+        var saved = JSON.parse(raw);
+        for (k in saved) {
+          if (Object.prototype.hasOwnProperty.call(DEFAULTS, k)) o[k] = saved[k];
+        }
+      }
+    } catch (e) { /* 无痕模式或禁用存储时静默降级 */ }
+    return o;
+  }
+
+  function saveSettings() {
+    try { window.localStorage.setItem(SET_KEY, JSON.stringify(S)); } catch (e) {}
+  }
+
+  function applyAudioSettings() {
+    if (typeof SFX.setVolumes !== 'function') return;
+    SFX.setVolumes(S.volMaster / 100, S.volEngine / 100, S.volSfx / 100);
+    SFX.setMuted(!!S.muted);
+  }
+
+  function onSettingChanged(key) {
+    saveSettings();
+    if (key === 'volMaster' || key === 'volEngine' || key === 'volSfx' || key === 'muted') {
+      applyAudioSettings();
+    }
+    // 视角与显示类不需要额外动作：渲染每帧直接读 S
+  }
+
+  function makeSetRow(item) {
+    var row = document.createElement('div');
+    row.className = 'set-row';
+
+    var lab = document.createElement('label');
+    lab.textContent = item.label;
+    row.appendChild(lab);
+
+    if (item.type === 'range') {
+      var inp = document.createElement('input');
+      inp.type = 'range';
+      inp.min = item.min; inp.max = item.max; inp.step = item.step || 1;
+      inp.value = S[item.k];
+
+      var val = document.createElement('span');
+      val.className = 'set-val';
+      val.textContent = inp.value + (item.unit || '');
+
+      inp.addEventListener('input', function () {
+        S[item.k] = parseFloat(inp.value);
+        val.textContent = inp.value + (item.unit || '');
+        onSettingChanged(item.k);
+      });
+
+      row.appendChild(inp);
+      row.appendChild(val);
+    } else {
+      var btn = document.createElement('button');
+      btn.className = 'set-toggle' + (S[item.k] ? ' on' : '');
+      btn.textContent = S[item.k] ? '已开启' : '已关闭';
+      btn.addEventListener('click', function () {
+        S[item.k] = !S[item.k];
+        btn.className = 'set-toggle' + (S[item.k] ? ' on' : '');
+        btn.textContent = S[item.k] ? '已开启' : '已关闭';
+        onSettingChanged(item.k);
+      });
+      row.appendChild(btn);
+      row.appendChild(document.createElement('span'));
+    }
+    return row;
+  }
+
+  /** 把整套设置控件渲染进任意容器（设置页 / 暂停菜单） */
+  function buildSettingsInto(container) {
+    if (!container) return;
+    container.innerHTML = '';
+    var col = document.createElement('div');
+    col.className = 'set-col';
+
+    for (var g = 0; g < SET_GROUPS.length; g++) {
+      var grp = SET_GROUPS[g];
+      var h = document.createElement('div');
+      h.className = 'set-group';
+      h.textContent = grp.title;
+      col.appendChild(h);
+
+      for (var i = 0; i < grp.items.length; i++) {
+        col.appendChild(makeSetRow(grp.items[i]));
+      }
+      if (grp.hint) {
+        var hint = document.createElement('div');
+        hint.className = 'set-hint';
+        hint.textContent = grp.hint;
+        col.appendChild(hint);
+      }
+    }
+    container.appendChild(col);
+  }
+
+  function resetSettings() {
+    var k;
+    for (k in DEFAULTS) if (Object.prototype.hasOwnProperty.call(DEFAULTS, k)) S[k] = DEFAULTS[k];
+    saveSettings();
+    applyAudioSettings();
+    buildSettingsInto(document.getElementById('setWrap'));
+    buildSettingsInto(document.getElementById('pauseSettings'));
+  }
+
+  /* ---------- 操作说明（独立页与暂停菜单共用同一份内容） ---------- */
+  var KEYMAP = [
+    ['鼠标移动', '引导机头指向（默认模式）'],
+    ['M', '切换 鼠标引导 / 键盘直控'],
+    ['W / S', '拉杆抬头 / 推杆低头'],
+    ['A / D', '左滚 / 右滚'],
+    ['Q / E', '方向舵'],
+    ['Shift / Ctrl', '油门增 / 减'],
+    ['X / Z', '加力燃烧室 / 减速板'],
+    ['↑ ↓ ← →', '自由视角（松开自动回中）'],
+    ['鼠标左键 / Space', '机炮'],
+    ['鼠标右键 / Enter', '发射特殊武器'],
+    ['F / Tab', '切换目标'],
+    ['R', '切换挂载'],
+    ['V', '释放干扰弹'],
+    ['C', '切换视角（追尾 / 座舱 / 目标）'],
+    ['1 / 2 / 3', '僚机指令：散开 / 集火 / 掩护'],
+    ['H', '暂停（暂停后可实时调整设置）']
+  ];
+
+  var TIPS = [
+    'NEZ 不可逃逸区：锁定框收成<b>红色实环</b>时发射，敌机极难摆脱。',
+    '能量机动：爬升掉速、俯冲增速。低速时舵效下降，谨防失速。',
+    '导弹规避：把来袭导弹放在 3/9 线（正横），持续桶滚消耗其能量。',
+    '动压 Q：18 km 以上的空气密度只有海平面的 12%。低于 <b>12 kPa</b> 时舵面开始失效、导弹过载崩塌 —— 但机炮的弹道反而更平直。',
+    '交战规则：阵列空域内 20 kg 以上战斗部被禁用，重武器会自动锁定。',
+    '注意地面：低于 200 m 触发地形告警，撞地即任务失败。'
+  ];
+
+  /** 操作说明。forPause=true 输出单栏（暂停菜单），否则输出双栏（独立手册页） */
+  function buildHelpHTML(forPause) {
+    var i, rows = '', tips = '';
+    for (i = 0; i < KEYMAP.length; i++) {
+      rows += '<tr><td><kbd>' + KEYMAP[i][0] + '</kbd></td><td>' + KEYMAP[i][1] + '</td></tr>';
+    }
+    for (i = 0; i < TIPS.length; i++) {
+      tips += '<li>' + TIPS[i] + '</li>';
+    }
+    if (forPause) {
+      return '<h4>基础操纵</h4><table>' + rows + '</table>' +
+        '<h4>交战要诀</h4><ul class="tips">' + tips + '</ul>';
+    }
+    return '<div class="help-col"><h3>基础操纵</h3><table class="keymap">' + rows + '</table></div>' +
+      '<div class="help-col"><h3>交战要诀</h3><ul class="tips">' + tips + '</ul></div>';
   }
 
   /* ============================================================
@@ -193,8 +402,34 @@ var Game = (function () {
   /* ============================================================
      简报
      ============================================================ */
+  /** 简报页顶部的任务选择器 —— 先看简报，再据此挑机体 */
+  function buildMissionList() {
+    var list = document.getElementById('msnList');
+    if (!list) return;
+    list.innerHTML = '';
+    for (var i = 0; i < MISSIONS.length; i++) {
+      (function (idx) {
+        var mm = MISSIONS[idx];
+        var d = document.createElement('div');
+        d.className = 'msn-item' + (idx === missionIdx ? ' sel' : '');
+        d.innerHTML = '<div class="no">' + mm.no + '</div>' +
+          '<div class="nm">' + mm.name + '</div>' +
+          '<div class="st' + (cleared[idx] ? ' done' : '') + '">' +
+          (cleared[idx] ? '已完成' : mm.en) + '</div>';
+        d.addEventListener('click', function () {
+          if (idx === missionIdx) return;
+          missionIdx = idx;
+          SFX.unlock(); SFX.click();
+          buildBrief();
+        });
+        list.appendChild(d);
+      })(i);
+    }
+  }
+
   function buildBrief() {
     var m = MISSIONS[missionIdx];
+    buildMissionList();
     document.getElementById('bNo').textContent = m.no + '   //   ' + m.en;
     document.getElementById('bName').textContent = m.name;
     document.getElementById('bLoc').textContent = m.loc;
@@ -557,8 +792,34 @@ var Game = (function () {
   function togglePause() {
     paused = !paused;
     document.getElementById('pause').classList.toggle('on', paused);
-    if (paused) SFX.silence();
+    if (paused) {
+      SFX.silence();
+      SFX.warning(false);
+      SFX.gun(false);
+      // 暂停时把设置与操作说明都渲染好，玩家可以一边调一边看画面变化
+      switchPauseTab('main');
+      buildSettingsInto(document.getElementById('pauseSettings'));
+      document.getElementById('pauseHelp').innerHTML = buildHelpHTML(true);
+    }
     SFX.click();
+  }
+
+  /** 切换暂停菜单的页签：main / settings / help */
+  function switchPauseTab(name) {
+    var tabs = document.querySelectorAll('[data-ptab]');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('on', tabs[i].getAttribute('data-ptab') === name);
+    }
+    var panes = ['main', 'settings', 'help'];
+    for (i = 0; i < panes.length; i++) {
+      var el = document.getElementById('pane-' + panes[i]);
+      if (el) el.classList.toggle('on', panes[i] === name);
+    }
+  }
+
+  function buildHelpPage() {
+    var body = document.getElementById('helpBody');
+    if (body) body.innerHTML = buildHelpHTML(false);
   }
 
   /* ============================================================
@@ -583,7 +844,8 @@ var Game = (function () {
       cam.fwd.z + cam.right.z * cx + cam.up.z * cy
     ));
 
-    AI.steerTo(player, dir, player.ctrl);
+    // 传 player 自身作为锁存容器（提供 rollLock 字段）
+    AI.steerTo(player, dir, player.ctrl, player);
     player.aimDir = dir;
   }
 
@@ -826,31 +1088,29 @@ var Game = (function () {
 
     if (camMode === 0) {
       // 追尾：不跟随滚转，地平线永远水平
-      var off0 = M3.rotAxis(M3.mul(p.fwd, -96), M3.V(0, 1, 0), camYaw);
-      var want = M3.add(p.pos, M3.add(off0, M3.V(0, 27 + camPitch * 70, 0)));
+      var off0 = M3.rotAxis(M3.mul(p.fwd, -S.camDist), M3.V(0, 1, 0), camYaw);
+      var want = M3.add(p.pos, M3.add(off0, M3.V(0, S.camHeight + camPitch * 70, 0)));
       var k = 1 - Math.exp(-7.5 * dt);
       camPos = M3.lerpV(camPos, want, k);
-      var look = M3.add(p.pos, M3.mul(p.fwd, 60));
+      var look = M3.add(p.pos, M3.mul(p.fwd, S.camDist * 0.62));
       camFwd = M3.lerpV(camFwd, M3.norm(M3.sub(look, camPos)), 1 - Math.exp(-8.5 * dt));
       camFwd = M3.norm(camFwd);
       camUp = M3.V(0, 1, 0);
-      // 回正：相机 up 固定世界 Y，但用 forward 微调避免退化
-      Renderer.setCamera(camPos, camFwd, camUp, 58);
+      Renderer.setCamera(camPos, camFwd, camUp, S.fov);
     } else if (camMode === 1) {
       // 座舱：跟随滚转
       var cp = M3.add(p.pos, M3.add(M3.mul(p.fwd, 3.4), M3.mul(p.up, 1.1)));
-      Renderer.setCamera(cp, p.fwd, p.up, 62);
+      Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);
     } else {
       // 目标视角：从侧上方看玩家与目标
       var t = p.target;
       if (t && t.alive) {
         var mid = M3.mul(M3.add(p.pos, t.pos), 0.5);
-        var off = M3.V(0, 90, 0);
-        var cp2 = M3.add(mid, off);
+        var cp2 = M3.add(mid, M3.V(0, 90, 0));
         Renderer.setCamera(cp2, M3.norm(M3.sub(mid, cp2)), M3.V(0, 1, 0), 55);
       } else {
         var want2 = M3.add(p.pos, M3.add(M3.mul(p.fwd, -120), M3.V(0, 50, 0)));
-        Renderer.setCamera(want2, M3.norm(M3.sub(p.pos, want2)), M3.V(0, 1, 0), 58);
+        Renderer.setCamera(want2, M3.norm(M3.sub(p.pos, want2)), M3.V(0, 1, 0), S.fov);
       }
     }
   }
@@ -996,7 +1256,7 @@ var Game = (function () {
     Renderer.end();
 
     // HUD
-    HUD.draw(world, player, 0);
+    HUD.draw(world, player, 0, S);
 
     // 横幅与提示
     var ctx = Renderer.ctx;
@@ -1065,6 +1325,7 @@ var Game = (function () {
      结算
      ============================================================ */
   function finish(win) {
+    if (win) cleared[missionIdx] = true;
     SFX.silence();
     state = 'debrief';
     SFX[win ? 'fanfare' : 'fail']();
@@ -1234,37 +1495,55 @@ var Game = (function () {
      ============================================================ */
   function init() {
     preflight();
+
+    // 设置必须在任何渲染/音频之前载入
+    S = loadSettings();
+    applyAudioSettings();
+
     cv = document.getElementById('cv');
     Renderer.init(cv);
     bindInput();
 
-    // 导航按钮
+    // 导航按钮。注意这里不再用兜底 else ——
+    // 早先的写法会让任何一个拼错的 data-go 值都悄悄跳回标题页，
+    // 出问题时完全看不出是哪里错了。
     var btns = document.querySelectorAll('[data-go]');
     for (var i = 0; i < btns.length; i++) {
       btns[i].addEventListener('click', function () {
         SFX.unlock(); SFX.click();
         var go = this.getAttribute('data-go');
         if (go === 'hangar') { buildHangar(); show('hangar'); }
+        else if (go === 'brief') { buildBrief(); show('brief'); }
         else if (go === 'codex') { buildCodex(); show('codex'); }
-        else if (go === 'help') { show('help'); }
-        else show('title');
+        else if (go === 'settings') { buildSettingsInto(document.getElementById('setWrap')); show('settings'); }
+        else if (go === 'help') { buildHelpPage(); show('help'); }
+        else if (go === 'title') { show('title'); }
       });
     }
 
-    document.getElementById('btnToBrief').onclick = function () {
-      SFX.unlock(); SFX.click(); buildBrief(); show('brief');
-    };
+    // 暂停菜单的三个页签
+    var ptabs = document.querySelectorAll('[data-ptab]');
+    for (var p = 0; p < ptabs.length; p++) {
+      ptabs[p].addEventListener('click', function () {
+        switchPauseTab(this.getAttribute('data-ptab'));
+        SFX.click();
+      });
+    }
+
     document.getElementById('btnLaunch').onclick = function () {
       SFX.unlock(); SFX.confirm(); startMission(missionIdx);
     };
     document.getElementById('btnNext').onclick = function () {
       SFX.unlock(); SFX.click();
       missionIdx = Math.min(MISSIONS.length - 1, missionIdx + 1);
-      buildHangar(); buildBrief(); show('brief');
+      buildBrief(); show('brief');
     };
     document.getElementById('btnRetry').onclick = function () {
       SFX.unlock(); SFX.click(); startMission(missionIdx);
     };
+    document.getElementById('setClose').onclick = function () { SFX.click(); show('title'); };
+    document.getElementById('setReset').onclick = function () { SFX.click(); resetSettings(); };
+    document.getElementById('pauseSetReset').onclick = function () { SFX.click(); resetSettings(); };
     document.getElementById('btnResume').onclick = function () { togglePause(); };
     document.getElementById('btnAbort').onclick = function () {
       SFX.click();
