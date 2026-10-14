@@ -64,7 +64,7 @@ var AI = (function () {
        AIM_FULL_MAG(0.35) 管"力气多大"—— 靠近中心整体缩杆，平方衰减
        AIM_BLEND_MAG(0.45) 管"力气怎么分"—— 滚转占比，smoothstep 过渡
      两者分开，因为"想省力"和"想转得猛"不是一回事。 */
-  var AIM_BLEND_MAG = 0.45;
+  var AIM_BLEND_MAG = 0.225;
 
   /* ============================================================
      关于三个"方向"，这里必须分清楚，否则很容易写出看着对、
@@ -218,7 +218,14 @@ var AI = (function () {
     var pushW = 0;
     if (ux < -0.02 && upright > 0.7) pushW = 1 - blend;
 
-    var rollCmd = M3.clamp(-rollErr * 2.8, -1, 1) * blend;
+    /* 走推杆的时候**不能同时滚转**。
+
+       目标落在机体正下方时 rollErr 会给出 ±π（要滚 180° 才能把它
+       转到机体上方），所以一边推杆一边还在缓慢滚转 —— 手感就是
+       "鼠标往下推，飞机却先侧着慢慢转"，完全不是压机头。
+
+       乘 (1 - pushW)：推杆权重越高，滚转越少；纯推杆时滚转为 0。 */
+    var rollCmd = M3.clamp(-rollErr * 2.8, -1, 1) * blend * (1 - pushW);
 
     // 还没被滚转消掉的侧向分量，用偏航补上
     var yawErr = Math.atan2(rx, fx);
@@ -251,12 +258,18 @@ var AI = (function () {
        pushW = 1 → 纯推杆；pushW = 0 → 完全不推，交给滚转后仰起。
        两者共用同一个 blend，所以从中心往外推鼠标时，
        动作会自己从"压杆"平滑过渡到"滚半圈再拉"。 */
-    if (pushW > 0.01) {
-      var pushAmt = mag0 * (0.55 + 0.45 * Math.sqrt(M3.clamp(-ux, 0, 1)));
-      pitchCmd = pitchCmd * (1 - pushW) - pushAmt * pushW;
-    }
+    if (pushW > 0.01) pitchCmd = pitchCmd * (1 - pushW);
 
+    /* 推杆那一份**不乘 gain**。
+
+       gain 是"靠近中心整体缩杆"，用来防止小幅鼠标造成大动作；
+       但推杆本身就已经是柔和动作，再压一遍就彻底看不见了 ——
+       实测乘完只剩 -0.009，角速度 0.4°/s，和不动没区别。
+       所以滚转/偏航照旧缩杆，推杆单独给足。 */
     out.pitch = pitchCmd * gain;
+    if (pushW > 0.01) {
+      out.pitch -= mag0 * (0.55 + 0.45 * Math.sqrt(M3.clamp(-ux, 0, 1))) * pushW;
+    }
     out.roll = rollCmd * gain;
     out.yaw = yawCmd * gain;
     return out;
