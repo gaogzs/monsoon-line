@@ -1946,6 +1946,72 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
   }
 
+  /* ---- HUD：敌方标记一律红色，且锁定大框不取代基础框 ----
+
+     两个都是"看起来只是配色，其实是可读性"的问题：
+       ① 地面设施原来用灰蓝，和 HUD 里说明文字的灰是同一色系，
+          读起来像中立物，玩家会以为浮台不能打。
+       ② 锁定大框原来会**取代**基础小框和标签 —— 一锁定，目标的
+          身份和距离就消失了，而那正是最需要它们的时刻。 */
+  {
+    const G7 = sandbox.Game, R3 = sandbox.Renderer;
+    const bad = [];
+    G7.startMission(1);
+    const pl = G7.__player();
+    const w = G7.__world();
+    for (let f = 0; f < 30; f++) pump(1);
+
+    const ctx = R3.ctx;
+    const box = [];                       // 捕获所有矩形的颜色
+    const origStroke = ctx.strokeRect;
+    ctx.strokeRect = function (x, y, ww, hh) {
+      box.push({ style: String(this.strokeStyle), w: Math.round(ww), h: Math.round(hh) });
+      return origStroke.call(this, x, y, ww, hh);
+    };
+
+    // 先不锁定，看地面设施的框是什么颜色
+    pl.target = null;
+    pump(1);
+    const plain = box.slice();
+    box.length = 0;
+
+    // 再锁定一个地面设施，看是否两种框同时出现
+    const site = w.targets.find(t => t.alive && t.team === 1);
+    if (site) {
+      pl.target = site;
+      pump(1);
+    }
+    const locked = box.slice();
+    ctx.strokeRect = origStroke;
+
+    // ① 未锁定的地面设施不该是灰的
+    const GREY = /143,\s*163,\s*178/;
+    const greyMarks = plain.filter(b => GREY.test(b.style));
+    if (greyMarks.length) {
+      bad.push('地面上还有 ' + greyMarks.length + ' 处灰蓝色标记（' +
+        greyMarks[0].style + '）—— 敌方设施该是红的');
+    } else {
+      const red = plain.filter(b => /255,\s*77,\s*77/.test(b.style));
+      ok('敌方地面标记已改为红色（本帧红色矩形 ' + red.length + ' 个）');
+    }
+
+    // ② 锁定时基础框（小）与锁定大框（大）必须同时存在
+    if (site) {
+      const small = locked.filter(b => b.w <= 20);
+      const big = locked.filter(b => b.w >= 40);
+      if (!small.length) {
+        bad.push('锁定后基础小框消失了 —— 目标的身份和距离读不到了');
+      } else if (!big.length) {
+        bad.push('锁定后没有出现锁定大框');
+      } else {
+        ok('锁定大框出现时，基础框仍在（小框 ' + small.length +
+          ' 个 / 大框 ' + big.length + ' 个）');
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+  }
+
   /* ---- 激光制导：载机必须保持照射 ----
 
      PEJ-30 的 desc 写着"需要俯冲投放并在命中前保持照射"。

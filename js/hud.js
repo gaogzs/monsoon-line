@@ -688,9 +688,17 @@ var HUD = (function () {
         continue;
       }
 
-      if (isAlly) drawAllyMark(ctx, s, t, dist);
-      else if (isLock) drawLockBox(ctx, s, t, p, dist, world);
-      else drawPlainMark(ctx, s, t, dist);
+      if (isAlly) {
+        drawAllyMark(ctx, s, t, dist);
+      } else {
+        /* 先画基础框（红色小框 + 名称/距离），锁定时再把大框叠上去。
+
+           以前是**二选一**：一旦锁定，目标原本的小框和标签就整个消失，
+           只剩一个空心大框。玩家会突然"看不见"这个目标的身份和距离 ——
+           而这恰恰是他最需要这些信息的时刻。 */
+        drawPlainMark(ctx, s, t, dist);
+        if (isLock) drawLockBox(ctx, s, t, p, dist, world);
+      }
     }
   }
 
@@ -734,7 +742,16 @@ var HUD = (function () {
   function drawPlainMark(ctx, s, t, dist) {
     var isGnd = t.kind === 'target';
     var sz = isGnd ? 8 : 11;
-    var col = isGnd ? 'rgba(143,163,178,0.75)' : 'rgba(255,77,77,0.68)';
+
+    /* 敌方一律红色，不分空地。
+
+       地面目标原来用灰蓝 rgba(143,163,178) —— 那是 HUD 里"一般说明文字、
+       距离数字"用的同一个色系，读起来像中立物体，玩家会以为浮台不能打。
+       它们确实是敌方设施，就该和敌机同色。
+
+       尺寸仍然保留差别（地面设施画小一点）：那是**识别**用的，
+       告诉你"这是个固定设施"，不是用来区分敌我的。 */
+    var col = 'rgba(255,77,77,0.68)';
 
     ctx.strokeStyle = col;
     ctx.lineWidth = 1.2;
@@ -879,15 +896,13 @@ var HUD = (function () {
     var py = M3.clamp(s.y, m, H - m);
     var ang = Math.atan2(py - cy, px - cx);
 
-    /* 屏幕外的箭头沿用同一套语义：
-       未锁定的敌人是半透明红，锁定的是琥珀色（够不着），
-       进了 NEZ 才会变红 —— 但屏外不显示 NEZ 状态，统一用琥珀。
-       友军则是绿色，与框内的四角标记同一套颜色。 */
-    var col = isAlly
-      ? 'rgba(79,224,138,0.52)'
-      : (t.kind === 'target'
-        ? 'rgba(143,163,178,0.7)'
-        : (isLock ? AMBER : 'rgba(255,77,77,0.5)'));
+    /* 屏幕外的箭头沿用同一套敌我语义：**友军绿、敌人红**。
+
+       以前这里地面目标用灰蓝、锁定状态用琥珀 —— 屏外本来就看不到
+       NEZ 状态，用琥珀表示"够不着"没有意义，反而让同一种色系
+       承担了三种含义（说明文字、中立物、锁定）。现在只剩两种：
+       绿色是我的，红色是别人的。 */
+    var col = isAlly ? 'rgba(79,224,138,0.52)' : 'rgba(255,77,77,0.55)';
     var sz = isLock ? 11 : (isAlly ? 8 : 9);
 
     ctx.save();
