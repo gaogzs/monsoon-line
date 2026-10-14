@@ -1087,6 +1087,40 @@ if (Ent && M3 && me && world) {
     else ok('无人僚机行为正确：授权开火、长机阵亡后盘旋、编队不脱队');
   }
 
+  /* ---- 诊断：AI 到底用不用机炮 ---- */
+  {
+    const Ent2 = sandbox.Ent, M3d = sandbox.M3, Wd = sandbox.WEAPONS;
+    let aiFire = 0, plFire = 0;
+    let hasTarget = 0, inRange = 0, inCone = 0, flag = 0;
+    const orig = Ent2.fireGun;
+    Ent2.fireGun = function (a, w) {
+      if (a.team === 1) aiFire++; else plFire++;
+      return orig(a, w);
+    };
+
+    sandbox.Game.startMission(0);
+    const w2 = sandbox.Game.__world();
+    for (let f = 0; f < 1800; f++) {          // 30 秒
+      pump(1);
+      for (const a of w2.actors) {
+        if (a.team !== 1 || !a.alive || !a.ai) continue;
+        const t = a.ai.target;
+        if (!t || !t.alive) continue;
+        hasTarget++;
+        const d = M3d.dist(a.pos, t.pos);
+        const off = M3d.angleBetween(a.fwd, M3d.norm(M3d.sub(t.pos, a.pos)));
+        const gw = Wd[a.gun];
+        const gr = (a.pos.y > 18000 ? gw.highRange : gw.range);
+        if (d < gr) inRange++;
+        if (d < gr * 0.9 && off < 0.118) inCone++;
+        if (a.firingGun) flag++;
+      }
+    }
+    Ent2.fireGun = orig;
+    ok('诊断 有目标 ' + hasTarget + ' · 进射程 ' + inRange +
+      ' · 进锥 ' + inCone + ' · 标志位 ' + flag + ' · 实开火 ' + aiFire);
+  }
+
   /* ---- 命名体系（设定集 8.1）----
      装备编号一律取逻辑语三字母词根，机型用「单字母 + 序号」。
      两份表分开，所以 C-11（飞机）和 CEL-3（机炮）不会混。

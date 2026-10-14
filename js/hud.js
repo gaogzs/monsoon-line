@@ -92,6 +92,7 @@ var HUD = (function () {
     drawRadar(ctx, W, H, p, world);
     drawThreatRing(ctx, W, H, p, world);
     drawTargets(ctx, W, H, cam, p, world);
+    drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
     drawIncomingMissiles(ctx, W, H, cam, p, world);
     drawStores(ctx, W, H, p);
     drawWeaponPanel(ctx, W, H, p);
@@ -608,6 +609,53 @@ var HUD = (function () {
     } else if (any) {
       text(ctx, '▲ 被照射', cx, cy - R - 12, AMBER, FS, 'center');
     }
+  }
+
+  /* ============================================================
+     机炮提前量准星
+
+     弹丸有飞行时间，打移动目标必须往前带 —— 这一点是真实的，
+     但不该让玩家在座舱里心算三角函数。所以把"该瞄哪里"直接画出来。
+
+     算法和 AI 用的 leadTo() 完全一致：目标位置 + 目标速度 × 弹丸飞行时间。
+     只是这里不自动瞄准，而是把它标出来，玩家自己把机头摆上去 ——
+     保留了手动瞄准的手感，去掉了心算提前量的负担。
+
+     超出机炮有效射程就不画：那时该换导弹，画着反而误导。
+     ============================================================ */
+  function drawLeadReticle(ctx, W, H, cam, p) {
+    var t = p.target;
+    if (!t || !t.alive) return;
+    if (!p.ac) return;
+
+    var gunW = WEAPONS[p.gun];
+    if (!gunW || gunW.kind !== 'gun') return;
+
+    var dist = M3.dist(t.pos, p.pos);
+    var gunRange = (p.pos.y > 18000 ? gunW.highRange : gunW.range) * 0.95;
+    if (dist > gunRange) return;
+
+    var tv = t.vel || M3.V(0, 0, 0);
+    var tGo = dist / gunW.speed;
+    var aim = M3.add(t.pos, M3.mul(tv, tGo));
+
+    var s = M3.project(cam, aim);
+    if (!s) return;
+
+    // 距离越近圈越小，暗示"该更精确了"
+    var r = 8 + M3.clamp(dist / 1800, 0, 1) * 5;
+
+    ctx.strokeStyle = 'rgba(255,228,150,0.70)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 圆心小点：真正的瞄准点
+    ctx.fillStyle = 'rgba(255,244,200,0.92)';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   /* ============================================================

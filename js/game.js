@@ -1992,17 +1992,27 @@ var Game = (function () {
       var head = M3.project(cam, b.pos);
       if (!head) continue;
 
-      /* 曳光长度取固定的一小段，而不是"上一帧的位置"。
-         后者在高射速下会让弹丸一个接一个地首尾相接，
-         整条弹道连成一根粗面条 —— 现在每颗弹是一个独立的短划。 */
+      /* 曳光长度**按距离自适应**，让屏幕上的角长度保持恒定。
+
+         原来固定 13 米（也与"上一帧位置"解耦，避免高射速下弹丸首尾
+         相接连成一根面条）。近处刚好，但到 1500 米外投影只有 0.5° ——
+         看起来就是一颗缓慢移动的小点，玩家会以为"弹速很慢"。
+         实际上 30mm 的炮口初速是 1020 m/s，一点都不慢。
+
+         尾迹取 dist × 0.045，对应屏幕上约 2.6° 的角长度，
+         从 300 米到 2000 米都一样显眼。上限 90 米防止近处拉成面条。 */
       var dirv = M3.norm(b.vel);
-      var tail = M3.project(cam, M3.sub(b.pos, M3.mul(dirv, 13)));
+      var bDist = M3.dist(b.pos, cam.pos);
+      var trailLen = Math.min(90, Math.max(13, bDist * 0.045));
+      var tail = M3.project(cam, M3.sub(b.pos, M3.mul(dirv, trailLen)));
       if (!tail) tail = head;
 
       var mine = player && b.team === player.team;
 
-      ctx.strokeStyle = mine ? 'rgba(255,228,150,0.90)' : 'rgba(255,148,88,0.82)';
-      ctx.lineWidth = mine ? 1.05 : 0.85;
+      // 远弹略粗，抵消透视缩细
+      var wMul = 1 + Math.min(1, bDist / 1600) * 0.8;
+      ctx.strokeStyle = mine ? 'rgba(255,228,150,0.92)' : 'rgba(255,148,88,0.85)';
+      ctx.lineWidth = (mine ? 1.35 : 1.15) * wMul;
       ctx.beginPath();
       ctx.moveTo(tail.x, tail.y);
       ctx.lineTo(head.x, head.y);
@@ -2010,7 +2020,7 @@ var Game = (function () {
 
       ctx.fillStyle = mine ? 'rgba(255,250,215,1)' : 'rgba(255,196,150,1)';
       ctx.beginPath();
-      ctx.arc(head.x, head.y, mine ? 1.0 : 0.8, 0, Math.PI * 2);
+      ctx.arc(head.x, head.y, (mine ? 1.25 : 1.0) * wMul, 0, Math.PI * 2);
       ctx.fill();
     }
 
