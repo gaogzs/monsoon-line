@@ -383,7 +383,14 @@ var Ent = (function () {
       up: M3.V(0, 1, 0),
       right: M3.V(1, 0, 0),
       speed: o.speed || 120,
-      vel: M3.V(0, 0, 0),
+      /* 无动力弹的初速**必须在这里给**。
+
+         有发动机的弹每帧都会用 vel = fwd × speed 重算速度，所以初始
+         零向量无所谓。无动力弹的速度却完全靠 vel 自己累积 ——
+         初值给 0 的话它是"从空中静止开始往下掉"，扔出去的动能全丢了。 */
+      vel: w.ballistic
+        ? M3.mul(M3.norm(o.fwd), o.speed || 120)
+        : M3.V(0, 0, 0),
       target: o.target || null,
       age: 0,
       life: w.vsLife,
@@ -407,16 +414,40 @@ var Ent = (function () {
     if (m.age > m.life) { killMissile(m, world, false); return; }
 
     // ---- 动力段 ----
-    var powered = m.age < effectiveLife(w, m.pos.y);
-    if (powered) {
-      m.speed = Math.min(m.speed + w.boost * dt, w.speed * (1 + Math.max(0, (12000 - m.pos.y) / 60000)));
+    if (w.ballistic) {
+      /* 无动力弹：出膛之后只剩重力和阻力。
+
+         以前它们和导弹走同一条路（speed 恒定、vel = fwd × speed），
+         所以炸弹是"贴着机头平飞出去"的 —— 不加速也不下坠，
+         完全不像扔出去的东西。现在它是一条真正的抛物线：
+         初速来自载机，之后每一次下坠都由重力累积。 */
+      m.vel.y -= G * dt;
+      var sp0 = M3.len(m.vel);
+      if (sp0 > 1) {
+        // 阻力与动压同量级：低空稠密掉速快，高空稀薄掉得慢
+        var dragK = 0.00006 * airDensity(m.pos.y) * sp0;
+        m.vel = M3.mul(m.vel, Math.max(0.2, 1 - dragK * dt));
+      }
+      m.speed = M3.len(m.vel);
     } else {
-      m.speed = Math.max(m.speed - 140 * dt, 170);
+      var powered = m.age < effectiveLife(w, m.pos.y);
+      if (powered) {
+        m.speed = Math.min(m.speed + w.boost * dt, w.speed * (1 + Math.max(0, (12000 - m.pos.y) / 60000)));
+      } else {
+        m.speed = Math.max(m.speed - 140 * dt, 170);
+      }
     }
 
     // ---- 导引 ----
     var t = m.target;
     if (t && (!t.alive || t.dead)) { t = null; }
+
+    if (w.unguided) {
+      /* 无制导：不找目标，也不做任何修正 ——
+         出膛那一刻的指向就是它的一生。有 target 引用也当没有。 */
+      m.target = null;
+      t = null;
+    }
 
     if (t && m.seekerOn) {
       var toT = M3.sub(t.pos, m.pos);
@@ -496,12 +527,24 @@ var Ent = (function () {
     }
 
     // ---- 位置 ----
-    m.vel = M3.mul(m.fwd, m.speed);
+    if (!w.ballistic) m.vel = M3.mul(m.fwd, m.speed);
     m.pos = M3.add(m.pos, M3.mul(m.vel, dt));
+
+    if (w.ballistic) {
+      // 弹体顺着弹道走 —— 自由落体的炸弹是"跟着速度矢量"的，不是昂着头的
+      var sp2 = M3.len(m.vel);
+      if (sp2 > 1) {
+        var Bb = M3.orthonormalize(M3.mul(m.vel, 1 / sp2), m.up);
+        m.fwd = Bb.fwd; m.up = Bb.up; m.right = Bb.right;
+      }
+    }
 
     if (m.pos.y <= 0) { killMissile(m, world, false); return; }
 
-    // ---- 尾迹 ----
+    /* ---- 尾迹：只有带发动机的才拉烟 ----
+       无动力弹没有排气，飞过去应该什么也不留下。 */
+    if (w.unguided) return;
+
     m.trailTimer -= dt;
     if (m.trailTimer <= 0) {
       m.trailTimer = 0.012;

@@ -1205,30 +1205,49 @@ var Game = (function () {
 
   function cycleTarget() {
     if (!world || !player) return;
-    var cands = [];
+
+    /* 候选按**当前武器的目标类别**分成两组。
+
+       带对空弹时按 F/Tab 该在飞机之间循环，带对地弹时该在海面目标
+       之间循环 —— 否则会出现"锁到一个浮台、切到对空弹打不出去，
+       还要再按好几下才转回飞机"。地上和天上的东西本来就该分开选。 */
+    var w = WEAPONS[player.special];
+    var wantAir = !w || w.target === 'air';
+
+    var air = [], surf = [];
     for (var i = 0; i < world.actors.length; i++) {
       var a = world.actors[i];
-      if (a.alive && a.team !== player.team) cands.push(a);
+      if (a.alive && a.team !== player.team) air.push(a);
     }
     for (i = 0; i < world.targets.length; i++) {
       // 只把真正的敌方目标纳入锁定循环；中立的调节单元不可被选为目标
-      if (world.targets[i].alive && world.targets[i].team === 1) cands.push(world.targets[i]);
+      var tg = world.targets[i];
+      if (tg.alive && tg.team === 1) surf.push(tg);
     }
+
+    /* 当前武器能打的那一类**排在前面**，另一类接在后面。
+
+       注意是 concat 而不是二选一：两类都要能锁到。
+       否则带对空弹时按 F 永远转不到海面目标 —— 而机炮打浮台、
+       或者临时切弹打地面，本来都是正常用法。
+       排前面的那类先循环，符合"我现在拿着什么弹"的直觉。 */
+    var cands = wantAir ? air.concat(surf) : surf.concat(air);
     if (!cands.length) return;
+
     var cur = player.target, at = -1;
     for (i = 0; i < cands.length; i++) if (cands[i] === cur) at = i;
     var next = cands[(at + 1) % cands.length];
 
-    // 优先选距离最近的几架飞机，避免把海上目标排在前
+    // 没有当前目标时，选这一类里最近的
     if (at < 0) {
       var best = null, bd = 1e12;
       for (i = 0; i < cands.length; i++) {
         var d = M3.dist2(cands[i].pos, player.pos);
-        var wgt = cands[i].kind === 'air' ? d : d * 4;
-        if (wgt < bd) { bd = wgt; best = cands[i]; }
+        if (d < bd) { bd = d; best = cands[i]; }
       }
       next = best;
     }
+
     player.target = next;
     player.lockProgress = 0;
     SFX.lockTone(false);
@@ -1264,6 +1283,28 @@ var Game = (function () {
     SFX.confirm();
   }
 
+  /* 这件武器能不能打这个目标。
+
+     可以就打回 null，否则返回一句给玩家看的话。
+
+     为什么要专门做这件事：以前只有"有没有目标"的检查，于是带着
+     对空弹锁住一个海面浮台，按下发射键——**弹照样打出去了**，
+     然后从浮台旁边直接飞过去。玩家不会觉得"我用错了弹"，
+     只会觉得"这游戏的导弹坏了"。 */
+  function targetMismatch(w, t) {
+    if (!w || !t) return null;
+    var surface = (t.kind === 'target');       // 海上平台 / 地面设施
+    if (w.target === 'air' && surface) {
+      return w.name + '「' + w.cn + '」是<b>对空弹</b>，打不了海面设施。' +
+        '按 <b>R</b> 换成对地挂载。';
+    }
+    if ((w.target === 'ground' || w.target === 'ship') && !surface) {
+      return w.name + '「' + w.cn + '」是<b>对面弹</b>，锁的是飞机。' +
+        '按 <b>F</b> 换个目标。';
+    }
+    return null;
+  }
+
   function fireSpecial() {
     if (state !== 'playing' || !player || !player.alive) return;
     var w = WEAPONS[player.special];
@@ -1278,6 +1319,16 @@ var Game = (function () {
     }
     if (player.spAmmo <= 0) { SFX.loseLock(); return; }
     if (player.spCd > 0) { SFX.loseLock(); return; }
+
+    /* 目标类型对不上：明确说清为什么打不出去，而不是静默失败。
+       这一条必须在扣弹与冷却之前 —— 打错的代价不该是白等一个冷却。 */
+    var mism = targetMismatch(w, player.target);
+    if (mism) {
+      Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: mism, gap: 0.7 });
+      SFX.fail();
+      return;
+    }
+
     if (player.lockProgress < 1 && w.seeker === 'radar') { SFX.loseLock(); return; }
     if (launch(player, player.target, world)) {
       Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: w.seeker === 'radar' ? '<b>Fox 3</b>' : '<b>Fox 2</b>', gap: 0.4 });
@@ -1495,11 +1546,27 @@ var Game = (function () {
     // 真正的用处见 ai.js 里 AI 锁玩家的判定）
     if (player.spActive > 0) lockDist *= (1 - (w.lockReduce || 0));
 
+    /* ---------- 对空与对面是两套完全不同的判据 ----------
+
+       对空弹靠**导引头**：受视场锥角限制，目标偏出锥外就丢，
+       而且丢失之后进度会掉。所以判据是"距离 + 离轴角"。
+
+       对面弹靠**火控投放解算**：飞机不必把机头对准浮台 ——
+       火控要算的是"这一下能不能扔到"。所以判据是"距离 + 俯角"，
+       没有锥角这回事。
+
+       以前这两个分支的代码一模一样（都是 dist < lockDist && off < cone），
+       等于拿导引头的逻辑去锁海面：玩家得把机头死死指着浮台，
+       稍微偏一点就"丢锁" —— 而对地武器本来就不是那么用的。 */
     var ok = false;
-    if (w.target === 'ground' || w.target === 'ship') {
+    if (w.target === 'air') {
       ok = dist < lockDist && off < cone;
     } else {
-      ok = dist < lockDist && off < cone;
+      /* 投放包线：水平距离够近，并且目标在机头下方。
+         dir 是指向目标的世界方向，dir.y 直接就是它的高低 ——
+         dir.y 为正表示目标在机头上方，那是仰投，不该给解。 */
+      var dep = -dir.y;                       // 目标低于机头的程度（sin）
+      ok = dist < lockDist * 1.35 && dep > -0.10;
     }
 
     var rate = 1 / (w.nezer ? 1.5 : (w.seeker === 'ir' ? 0.55 : 1.1));
@@ -1520,10 +1587,26 @@ var Game = (function () {
      命中检测
      ============================================================ */
   function resolveBullets(dt) {
-    var i, j, b;
-    for (i = 0; i < world.bullets.length; i++) {
-      b = world.bullets[i];
-      if (!b.alive) continue;
+    var i;
+
+    for (i = 0; i < world.bullets.length; i++) scanShot(world.bullets[i], dt);
+
+    /* 无制导弹也走这里。
+
+       它们没有导引头、不会自己找目标 —— 出膛之后唯一能"命中"的方式
+       就是撞上去。所以必须和子弹一样做线段-球相交，
+       否则炸弹扔到浮台头顶会直接穿过去，一点血都不掉。 */
+    for (i = 0; i < world.missiles.length; i++) {
+      var mm = world.missiles[i];
+      if (mm.alive && mm.w && mm.w.unguided) scanShot(mm, dt);
+    }
+  }
+
+  /* 一发弹体（子弹或无制导弹）的命中检测。逻辑完全一样：
+     只用"上一帧位置 → 当前位置"这条线段去和球求交。 */
+  function scanShot(b, dt) {
+      if (!b.alive) return;
+      var j;
       var prev = M3.sub(b.pos, M3.mul(b.vel, dt));
       var dir = M3.norm(b.vel);
       var segLen = M3.len(M3.mul(b.vel, dt));
@@ -1542,7 +1625,7 @@ var Game = (function () {
           break;
         }
       }
-      if (!b.alive) continue;
+      if (!b.alive) return;
 
       // 对目标物
       for (j = 0; j < world.targets.length; j++) {
@@ -1559,7 +1642,6 @@ var Game = (function () {
         }
       }
       if (b.pos.y <= 0) b.alive = false;
-    }
   }
 
   function hitTarget(tg, dmg, source) {

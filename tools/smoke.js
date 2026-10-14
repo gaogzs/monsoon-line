@@ -548,7 +548,9 @@ if (!badStore) ok('全部武器都有挂载属性');
   for (const k in WEAPONS) {
     const w = WEAPONS[k];
     if (w.kind === 'gun' || w.passive) continue;
-    if (w.seeker === 'none') continue;
+    /* 无制导弹没有导引头，也就不该有导引品质 —— 它们的 seeker 字段
+       已经整个删掉了，所以要按 unguided 判断，不能只看 seeker === 'none'。 */
+    if (w.unguided || w.seeker === 'none') continue;
     if (w.lead === undefined) { fail('武器 ' + k + ' 有导引方式但没有导引品质 lead'); bad++; }
   }
   if (!bad) ok('全部制导武器都有导引品质字段');
@@ -1738,6 +1740,168 @@ if (Ent && M3 && me && world) {
       }
     }
 
+    if (bad.length) bad.forEach(fail);
+  }
+
+  /* ---- 无制导弹必须是"真·无动力" ----
+     它们身上不该留任何描述"弹怎么找目标"的字段，
+     而且飞出去之后必须真的受重力 —— 以前 vel = fwd × speed，
+     炸弹是贴着机头平飞的，不加速也不下坠。 */
+  {
+    const W4 = sandbox.WEAPONS, E4 = sandbox.Ent, M3e = sandbox.M3;
+    const bad = [];
+    const GUIDS = ['seeker', 'turn', 'lead', 'flare', 'lockCone', 'lockDist',
+      'boost', 'reAcquire', 'highAltScale', 'antiRadar', 'hobs'];
+
+    ['rkt', 'clb'].forEach(id => {
+      const w = W4[id];
+      if (!w) { bad.push('找不到 ' + id); return; }
+      const left = GUIDS.filter(k => w[k] !== undefined);
+      if (left.length) {
+        bad.push(w.name + ' 还留着制导/干扰类字段：' + left.join(', '));
+      }
+      if (!w.unguided) bad.push(w.name + ' 没有 unguided 标记');
+      if (!w.ballistic) bad.push(w.name + ' 没有 ballistic 标记');
+    });
+
+    // 激光制导炸弹反过来：该有制导，但不该有发动机与导引头
+    {
+      const w = W4.v30;
+      if (w.turn === undefined) bad.push('PEJ-30 是激光制导，不该没有 turn');
+      if (w.boost !== undefined) bad.push('PEJ-30 是滑翔弹，不该有 boost');
+      if (w.flare !== undefined) bad.push('PEJ-30 靠照射制导，不该有 flare');
+    }
+
+    /* 弹道测试：水平投放，看它会不会掉高度。
+       以前 vel 恒等于 fwd × speed，y 是永远不变的。 */
+    {
+      const m = E4.makeMissile({
+        weapon: 'clb', team: 0,
+        pos: M3e.V(0, 800, 0), fwd: M3e.V(0, 0, 1), speed: 250
+      });
+      const y0 = m.pos.y;
+      const world0 = { particles: [], actors: [], targets: [] };
+      for (let i = 0; i < 60; i++) E4.stepMissile(m, 1 / 60, world0);
+      const drop = y0 - m.pos.y;
+      if (drop < 2) {
+        bad.push('无制导弹投出去 1 秒只掉了 ' + drop.toFixed(2) +
+          ' 米 —— 没有重力，它还是在平飞');
+      } else {
+        ok('无制导弹受重力：水平投放 1 秒下坠 ' + drop.toFixed(1) + ' 米');
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+  }
+
+  /* ---- 武器打错目标时必须拒绝发射并说明原因 ---- */
+  {
+    const W5 = sandbox.WEAPONS;
+    const bad = [];
+    // targetMismatch 是内部函数，用行为等价的方式验证数据侧：
+    // 对空弹的 target 必须是 air，对地弹必须是 ground/ship
+    const airIds = ['v11', 'mrm', 'arm', 'qsr'];
+    const gndIds = ['rkt', 'clb', 'v30', 'asl'];
+    airIds.forEach(id => {
+      const w = W5[id];
+      if (w && w.target !== 'air') bad.push(w.name + ' 是对空弹，target 却是 ' + w.target);
+    });
+    gndIds.forEach(id => {
+      const w = W5[id];
+      if (w && w.target === 'air') bad.push(w.name + ' 是对地弹，target 却是 air');
+    });
+    if (bad.length) bad.forEach(fail);
+    else ok('对空/对地弹药的 target 字段自洽（发射前的匹配检查据此拒绝错误目标）');
+  }
+
+  /* ---- 端到端：打错目标会被拒绝，打对了能命中 ---- */
+  {
+    const G3 = sandbox.Game, M3f = sandbox.M3, E5 = sandbox.Ent;
+    const bad = [];
+    G3.startMission(1);
+    const pl = G3.__player();
+    const w = G3.__world();
+    for (let f = 0; f < 30; f++) pump(1);
+
+    pl.spCd = 0;
+    pl.lockProgress = 1;
+    pl.locked = true;
+
+    // ① 带对空弹锁一个海面浮台 → 必须打不出去
+    const site = w.targets.find(t => t.alive && t.team === 1 && t.kind === 'target');
+    if (site) {
+      pl.special = 'qsr';                    // GIR-5，对空
+      pl.spAmmo = 20;
+      pl.slotCd.qsr = [0];
+      pl.target = site;
+      const n0 = w.missiles.length;
+      const enter = docListeners['keydown'] || [];
+      enter.forEach(fn => fn({ code: 'Enter', preventDefault() {} }));
+      const fired = w.missiles.length - n0;
+      if (fired !== 0) {
+        bad.push('带对空弹（GIR-5）锁海面设施竟然打出了 ' + fired + ' 枚 —— ' +
+          '应该拒绝发射并说明原因');
+      } else {
+        ok('带对空弹打海面设施被正确拒绝（0 枚出膛）');
+      }
+    } else {
+      bad.push('第二关找不到可锁的敌方海面设施');
+    }
+
+    // ② 无制导炸弹必须能撞上设施
+    {
+      const t2 = w.targets.find(t => t.alive && t.team === 1);
+      if (t2) {
+        const m = E5.makeMissile({
+          weapon: 'clb', team: 0,
+          pos: M3f.V(t2.pos.x, t2.pos.y + 60, t2.pos.z - 300),
+          fwd: M3f.norm(M3f.V(0, -0.18, 1)), speed: 300, owner: pl
+        });
+        m.target = null;                       // 无制导：不跟目标
+        w.missiles.push(m);
+        const hp0 = t2.hp;
+        for (let f = 0; f < 180; f++) {
+          pump(1);
+          if (!m.alive) break;
+        }
+        if (t2.hp >= hp0) {
+          bad.push('无制导炸弹从目标上空飞过没有造成任何伤害（hp ' + hp0 +
+            ' → ' + t2.hp + '）—— 命中判定没接上');
+        } else {
+          ok('无制导炸弹命中设施：hp ' + hp0 + ' → ' + t2.hp);
+        }
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+  }
+
+  /* ---- 诊断：第二关的地面目标能不能被锁定 ---- */
+  {
+    const G = sandbox.Game, M3d = sandbox.M3;
+    const bad = [];
+    G.startMission(1);                       // 任务 2
+    const pl = G.__player();
+    const w = G.__world();
+    for (let f = 0; f < 30; f++) pump(1);
+
+    const kd = docListeners['keydown'] || [];
+    const out = [];
+    // 连按 F 走一圈，看锁定结果落在谁身上
+    for (let n = 0; n < 14; n++) {
+      kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} }));
+      pump(1);
+      const t = pl.target;
+      out.push(t ? (t.kind === 'air' ? '空中' : '地面:' + (t.model || '?')) : '无');
+    }
+
+    const groundTargets = w.targets.filter(t => t.alive).length;
+    ok('诊断 M2 目标 世界里有 ' + groundTargets + ' 个地面目标；连按 F 得到：' +
+      out.join(' → '));
+
+    if (!out.some(s => s.indexOf('地面') === 0)) {
+      bad.push('连按 14 次 F 都没能锁到任何地面目标 —— 它们只能显示成灰框');
+    }
     if (bad.length) bad.forEach(fail);
   }
 

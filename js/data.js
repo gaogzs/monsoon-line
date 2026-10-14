@@ -738,27 +738,44 @@ var WEAPONS = {
     stat: { dmg: 0.76, spd: 0.42, trn: 0.42, rng: 0.58, ecm: 0.34 }
   },
 
+  /* ---- 无制导弹药：没有导引头，没有可用过载，不受干扰 ----
+
+     这一类武器身上**不该出现**下面这些字段。它们描述的是"弹怎么找目标"，
+     而无制导弹根本不找目标 —— 留着只会让人以为它有什么追踪能力：
+
+         seeker   导引头类型
+         turn     可用过载
+         lead     提前量预测质量
+         flare    被干扰概率（干扰弹骗的是导引头，无制导的骗不了）
+         lockCone / lockDist   锁定锥角与距离
+         boost    发动机推力（它们没有发动机）
+
+     取而代之的是一个 unguided: true，交给 stepMissile 决定走弹道而不是导引。
+     真正决定它们打不打得到的只有三件事：初速、重力、以及投放时的机头指向。 */
   rkt: {
     id: 'rkt', name: 'PEJ-6', cn: '撒星 · STARSCATTER', kind: 'bomb',
-    model: 'missile',
-    speed: 620, boost: 0, life: 3.0, vsLife: 3.0,
-    turn: 0.0, seeker: 'none', lockCone: 0, lockDist: 0,
-    dmg: 22, ammo: 28, cd: 1.10, salvo: 7, flare: 1.0, prox: 14,
-    target: 'ground', unguided: true,
+    model: 'bomb',
+    speed: 620, life: 3.0, vsLife: 3.0,
+    dmg: 22, ammo: 28, cd: 1.10, salvo: 7, prox: 14,
+    target: 'ground', unguided: true, ballistic: true,
     desc: '无制导火箭巢。一个挂点就是一片弹雨，覆盖而不瞄准 ——' +
-      '对付软目标群最划算，但精度完全靠飞机对准。',
+      '对付软目标群最划算，但精度完全靠飞机对准。' +
+      '<b>打出去之后它只认重力。</b>',
     stat: { dmg: 0.22, spd: 0.34, trn: 0.10, rng: 0.16, ecm: 1.00 }
   },
 
   clb: {
+    /* 子母弹本来是自由落体抛撒，之前却挂着 seeker: 'ir'（红外导引头）、
+       turn: 0.42、boost: 60 —— 也就是说它在游戏里是一枚会自己追人的
+       红外弹。整组制导属性都删掉了。 */
     id: 'clb', name: 'PEJ-9', cn: '碎玉 · SHARDRIFT', kind: 'bomb',
-    model: 'missile',
-    speed: 300, boost: 60, life: 12.0, vsLife: 24.0,
-    turn: 0.42, seeker: 'ir', lockCone: 36 * Math.PI / 180, lockDist: 5000,
-    dmg: 118, ammo: 2, cd: 3.00, salvo: 1, flare: 0.80, prox: 34,
-    target: 'ground', cluster: true,
+    model: 'bomb',
+    speed: 300, life: 12.0, vsLife: 24.0,
+    dmg: 118, ammo: 2, cd: 3.00, salvo: 1, prox: 34,
+    target: 'ground', cluster: true, unguided: true, ballistic: true,
     desc: '子母弹。抛撒覆盖一整片阵地，对分散的软目标效率极高，' +
-      '但打不动加固目标 —— 破片啃不开机堡。',
+      '但打不动加固目标 —— 破片啃不开机堡。' +
+      '<b>自由落体，抛撒之后没有任何制导。</b>',
     stat: { dmg: 0.44, spd: 0.18, trn: 0.26, rng: 0.42, ecm: 0.66 }
   },
 
@@ -935,12 +952,16 @@ var WEAPONS = {
   v30: {
     id: 'v30', name: 'PEJ-30', cn: '铁蒺藜 · CALTROP', kind: 'bomb',
     model: 'bomb',
-    // 无动力滑翔：投放后靠载机初速前进。早期的 speed/life 是 0/99，
-    // 意味着这东西在游戏里根本不往前走
-    speed: 280, boost: 0, life: 12.0, vsLife: 24.0,
-    turn: 0.20, seeker: 'none', lockCone: 60 * Math.PI / 180, lockDist: 2400,
-    dmg: 210, ammo: 6, cd: 1.2, salvo: 1, flare: 1.0, prox: 42,
-    target: 'ground', cluster: true, unguided: true,
+    /* 无动力**但**有制导：激光制导炸弹。
+
+       所以这里保留 turn（它会顺着照射点修正），但删掉 boost ——
+       没有发动机。删掉 seeker：它没有导引头，靠的是载机或僚机的
+       激光照射，被干扰弹骗不到。也删掉 flare。
+       原来的 unguided: true 是错的，它明明写着"命中前保持照射"。 */
+    speed: 280, life: 12.0, vsLife: 24.0,
+    turn: 0.20, lockCone: 60 * Math.PI / 180, lockDist: 2400,
+    dmg: 210, ammo: 6, cd: 1.2, salvo: 1, prox: 42,
+    target: 'ground', cluster: true, ballistic: true,
     desc: `激光制导集束炸弹，抛撒 <b>72 枚</b>子弹药，覆盖半径 80 米。
       需要俯冲投放并在命中前保持照射。<b>交战规则禁用区同样锁定。</b>`,
     stat: { dmg: 0.90, spd: 0.10, trn: 0.08, rng: 0.20, ecm: 1.0 }
@@ -1402,7 +1423,7 @@ var MISSILE_LEAD = {
   srm: 0.38, trm: 0.48, hos: 0.30, qsr: 0.42, wasp: 0.55,
   v9: 0.52, v11: 0.62, mrm: 0.78, v17: 0.82, arm: 0.72,
   ram: 0.86, vlar: 0.90,
-  asl: 0.65, asl2: 0.70, sat: 0.68, rkt: 0.0, clb: 0.50,
+  asl: 0.65, asl2: 0.70, sat: 0.68,
   v25: 0.66, v22: 0.74, v30: 0.48,
   dl4: 0.74, dl6: 0.48, dl9: 0.80,
   swm: 0.44, hva: 0.80, lcm: 0.62,
@@ -1412,7 +1433,12 @@ var MISSILE_LEAD = {
 
 (function () {
   for (var k in MISSILE_LEAD) {
-    if (Object.prototype.hasOwnProperty.call(WEAPONS, k)) WEAPONS[k].lead = MISSILE_LEAD[k];
+    if (!Object.prototype.hasOwnProperty.call(WEAPONS, k)) continue;
+    /* lead 是"导引头的预测品质"，无制导弹没有导引头。
+       表里原来给 rkt 写了 0.0、给 clb 写了 0.50 —— 留一个 0 在那儿
+       反而会让人以为"它能追踪一点点"。 */
+    if (WEAPONS[k].unguided) continue;
+    WEAPONS[k].lead = MISSILE_LEAD[k];
   }
 })();
 

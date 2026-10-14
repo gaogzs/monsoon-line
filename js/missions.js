@@ -364,9 +364,15 @@ MISSIONS.push({
     /* ---- 我方前进基地：这一关唯一"必须保护"的东西 ----
        一座 96 米级的浮式平台，也是玩家在这片海域的落脚点。
        下游派了两架轰炸机来把它从海图上抹掉。 */
+    /* team: 0 —— 这是**我方**设施。
+
+       makeTarget 的 team 默认值是 1（敌方），而 cycleTarget 只把
+       team === 1 的设施纳入锁定循环。不显式写 team 的话，玩家的
+       锁定循环里会出现自己的基地，而且因为 value 最小、距离最近，
+       它还会排在很前面 —— 一按 F 就先锁上自家基地。 */
     var baseT = spawnTarget(w, {
       ttype: 'ground', model: 'station', label: '前进基地 PROGRESS',
-      x: 0, y: 0, z: -2400,
+      x: 0, y: 0, z: -2400, team: 0,
       hp: 900, radius: 56, ground: true, value: 0
     });
     w.baseTarget = baseT;
