@@ -87,6 +87,9 @@ var Game = (function () {
   var HIG_BLEED = 82;
   var camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0), camPos = M3.V(0, 0, 0);
   var camYaw = 0, camPitch = 0;
+  /* 追尾镜头的基准朝向。它不直接等于机头方向 —— 见 updateCamera 里的说明：
+     俯仰被限制在 ±78°，而且偏航要按最短角差平滑，否则翻过顶点时会瞬移。 */
+  var camYawBase = 0;           // 追尾镜头的基准偏航（已按最短角差平滑）
   var banner = { t: 0, title: '', sub: '', col: '' };
   var hits = [];
   var stats = null;
@@ -1531,36 +1534,67 @@ var Game = (function () {
     if (!keys.ArrowUp && !keys.ArrowDown) camPitch = M3.smooth(camPitch, 0, 2.2, dt);
 
     if (camMode === 0) {
-      // 追尾：不跟随滚转，地平线永远水平
-      var off0 = M3.rotAxis(M3.mul(p.fwd, -S.camDist), M3.V(0, 1, 0), camYaw);
+      /* 追尾：不跟随滚转，地平线永远水平。
+
+         **镜头俯仰限制在 ±78°，飞机可以翻过去，镜头不跟。**
+         空翻照样能做 —— 只是到了限位之后镜头停住，
+         玩家会看到机身从视野上方（或下方）翻出去。
+
+         为什么必须限：镜头的"上"参考只有在它与视线不共线时才有定义。
+         机头压到正上/正下时视线本身是垂直的，世界 up 与它共线，
+         正交基退化，退化保护只能临时换一根参考轴 —— 而 |f.y| 在
+         极点附近逐帧抖动，参考轴就跟着反复横跳，画面来回侧翻。
+         之前那套"混合参考"只能把跳变抹成旋转，抹不掉极点本身；
+         把俯仰限住，镜头就永远不会到达那个位置。 */
+      var CAM_PITCH_LIM = 78 * Math.PI / 180;
+
+      /* 只平滑**偏航角**，俯仰始终钳在限位内。
+
+         两点都试过，都有坑：
+         · 直接跟水平投影 —— 翻过顶点时它会瞬间反向 180°，镜头瞬移。
+         · 对"受限朝向"做球面插值 —— 最短弧在两个 78°/66° 的方向之间
+           会从 84° 高处拱过去，正好穿过极点，反而把退化保护重新引出来。
+
+         所以偏航单独按最短角差慢慢转：镜头会以限位仰角缓缓转过 180°，
+         全程不碰极点。俯仰则永远被钳住，不存在"拱过去"的可能。 */
+      var hx = p.fwd.x, hz = p.fwd.z;
+      var hlen = Math.sqrt(hx * hx + hz * hz);
+      if (hlen > 0.12) {
+        var tYaw = Math.atan2(hx, hz);
+        var dYaw = tYaw - camYawBase;
+        while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+        while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+        // 转速不能太快：翻越顶点时要转 180°，而每帧的转角直接决定
+        // 画面"上"方向的变化率。1.2 对应约一秒转完，肉眼是平滑的。
+        camYawBase += dYaw * (1 - Math.exp(-1.2 * dt));
+        if (camYawBase > Math.PI) camYawBase -= Math.PI * 2;
+        if (camYawBase < -Math.PI) camYawBase += Math.PI * 2;
+      }
+
+      var camPitchAng = Math.atan2(p.fwd.y, Math.max(hlen, 1e-4));
+      camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
+      var cpc = Math.cos(camPitchAng), cps = Math.sin(camPitchAng);
+      var camDir = M3.V(Math.sin(camYawBase) * cpc, cps, Math.cos(camYawBase) * cpc);
+
+      var off0 = M3.rotAxis(M3.mul(camDir, -S.camDist), M3.V(0, 1, 0), camYaw);
       var want = M3.add(p.pos, M3.add(off0, M3.V(0, S.camHeight + camPitch * 70, 0)));
       var k = 1 - Math.exp(-7.5 * dt);
       camPos = M3.lerpV(camPos, want, k);
       // 观察点前移：镜头距离很小的时候，如果还盯着机身本身，
       // 飞机的下沉角会大到跑出视场。给一个下限让视线稳定在前方。
-      var look = M3.add(p.pos, M3.mul(p.fwd, Math.max(30, S.camDist * 1.45)));
+      var look = M3.add(p.pos, M3.mul(camDir, Math.max(30, S.camDist * 1.45)));
       camFwd = M3.lerpV(camFwd, M3.norm(M3.sub(look, camPos)), 1 - Math.exp(-8.5 * dt));
       camFwd = M3.norm(camFwd);
 
-      /* 相机 up 的参考轴。
+      /* 相机 up：既然俯仰已经被限在 ±78°，视线就不可能垂直，
+         世界 up 与它永远不共线，直接用世界 up 即可 ——
+         地平线保持水平，镜头也不跟随滚转。
 
-         平时用世界 up：地平线永远水平，也不会跟着滚转。
-         但机头逼近正上/正下时，视线本身也是垂直的，世界 up 与它共线，
-         正交基退化；退化保护会临时换一个参考轴，而 |f.y| 在极点附近
-         每帧抖动，于是画面在两套姿态之间来回跳 —— 就是"极点卡动"。
-
-         解法是让参考轴**平滑过渡**到机体 up：一般机动完全不受影响，
-         只有最后约 10° 才逐渐跟随飞机滚转。那里数学上本来就不存在
-         "正"的参考，跟着飞机是唯一连续的选择。
-
-         注意垂直俯冲时飞机自己的"上"指向水平后方，所以画面是**侧过来**
-         而不是**翻过来** —— 不会让人失去上下方向感。 */
-      // 过渡带 |fwd.y| ∈ [0.90, 0.99]，约合俯仰 64°–82°。
-      // 起点定在 64° 而不是更早，是为了让常规俯冲、爬升、盘旋
-      // 完全不碰这条逻辑 —— 只有真正压到接近垂直时才会介入。
+         下面这段混合逻辑作为兜底保留：万一将来有人放宽限位、
+         或者自由视角把镜头推到极点附近，它仍能让过渡保持连续。 */
       var vert = Math.abs(camFwd.y);
       var mix = M3.clamp((vert - 0.90) / 0.09, 0, 1);
-      mix = mix * mix * (3 - 2 * mix);          // smoothstep，过渡不带折角
+      mix = mix * mix * (3 - 2 * mix);
       camUp = M3.lerpV(M3.V(0, 1, 0), p.up, mix);
 
       Renderer.setCamera(camPos, camFwd, camUp, S.fov);

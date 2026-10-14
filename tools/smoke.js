@@ -808,6 +808,61 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 空翻：飞机翻过正上方/正下方，镜头不该跳 ----
+     镜头俯仰被钳在 ±78°，飞机却可以翻过去。这时镜头的偏航要平滑转过
+     180°，而俯仰始终不越界 —— 后者是关键：只要镜头永远到不了极点，
+     正交基就不会退化。这里检查整段空翻过程中相机基是否连续。 */
+  {
+    const M3 = sandbox.M3;
+    const LIM = 78 * Math.PI / 180, dt = 1 / 60;
+
+    function rollOver(sign) {
+      let camYawBase = 0, prev = null, maxJump = 0, maxPitch = 0;
+      for (let i = 0; i <= 900; i++) {
+        const a = sign * (i / 900) * Math.PI * 1.2;
+        const fwd = M3.V(0, Math.sin(a), Math.cos(a));
+        const hx = fwd.x, hz = fwd.z, hlen = Math.sqrt(hx * hx + hz * hz);
+        if (hlen > 0.12) {
+          const tYaw = Math.atan2(hx, hz);
+          let dYaw = tYaw - camYawBase;
+          while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+          while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+          camYawBase += dYaw * (1 - Math.exp(-1.2 * dt));
+          if (camYawBase > Math.PI) camYawBase -= Math.PI * 2;
+          if (camYawBase < -Math.PI) camYawBase += Math.PI * 2;
+        }
+        let pa = Math.atan2(fwd.y, Math.max(hlen, 1e-4));
+        pa = Math.min(LIM, Math.max(-LIM, pa));
+        if (Math.abs(pa) > maxPitch) maxPitch = Math.abs(pa);
+        const cp = Math.cos(pa), sp = Math.sin(pa);
+        const camDir = M3.V(Math.sin(camYawBase) * cp, sp, Math.cos(camYawBase) * cp);
+        const cam = M3.makeCamera(M3.V(0, 0, 0), camDir, M3.V(0, 1, 0), 100, 100, 56);
+        const sig = [cam.fwd.x, cam.fwd.y, cam.fwd.z, cam.up.x, cam.up.y, cam.up.z];
+        if (prev) {
+          let d = 0;
+          for (let k = 0; k < 6; k++) d += Math.abs(sig[k] - prev[k]);
+          if (d > maxJump) maxJump = d;
+        }
+        prev = sig;
+      }
+      return { maxJump, maxPitch };
+    }
+
+    const up = rollOver(1), dn = rollOver(-1);
+    const bad = [];
+    if (up.maxJump > 0.12) bad.push('翻越正上方时相机基帧间差 ' + up.maxJump.toFixed(3));
+    if (dn.maxJump > 0.12) bad.push('翻越正下方时相机基帧间差 ' + dn.maxJump.toFixed(3));
+    // 关键不变量：镜头俯仰绝不能越过限位，否则会碰到极点
+    if (up.maxPitch > LIM + 1e-6) bad.push('镜头仰角越界：' + (up.maxPitch * 180 / Math.PI).toFixed(1) + '°');
+    if (dn.maxPitch > LIM + 1e-6) bad.push('镜头俯角越界：' + (dn.maxPitch * 180 / Math.PI).toFixed(1) + '°');
+
+    if (bad.length) bad.forEach(fail);
+    else {
+      ok('空翻时镜头平稳：帧间差 ' + up.maxJump.toFixed(3) +
+        '，仰角钳在 ' + (up.maxPitch * 180 / Math.PI).toFixed(1) + '°');
+    }
+  }
+
   /* ---- 命名体系（设定集 8.1）----
      装备编号一律取逻辑语三字母词根，机型用「单字母 + 序号」。
      两份表分开，所以 C-11（飞机）和 CEL-3（机炮）不会混。

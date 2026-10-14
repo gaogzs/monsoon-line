@@ -74,6 +74,22 @@ var M3 = (function () {
      由"机头"和"上方"构造正交基。
      返回 {fwd, up, right}，满足 right × up = fwd
      ============================================================ */
+  /* 球面插值：在两个单位方向之间走最短弧。
+     直接对 (yaw, pitch) 做线性插值是不行的 —— 翻过顶点的瞬间水平投影
+     会反向 180°，角度插值会绕半个球走，看起来就是镜头绕飞机转了一圈。
+     对方向向量本身插值则永远走短边。 */
+  function slerpDir(a, b, t) {
+    var d = dot(a, b);
+    if (d > 0.9995) return norm(lerpV(a, b, t));   // 几乎同向，退化成线性
+    if (d < -0.9995) return norm(lerpV(a, b, t));  // 几乎反向，线性也够用
+    d = d < -1 ? -1 : (d > 1 ? 1 : d);
+    var ang = Math.acos(d);
+    var s = Math.sin(ang);
+    var w1 = Math.sin((1 - t) * ang) / s;
+    var w2 = Math.sin(t * ang) / s;
+    return norm(add(mul(a, w1), mul(b, w2)));
+  }
+
   function orthonormalize(fwd, up) {
     var f = norm(fwd);
     var u = sub(up, mul(f, dot(up, f)));
@@ -200,7 +216,7 @@ var M3 = (function () {
   return {
     V: V, clone: clone, add: add, sub: sub, mul: mul, mad: mad, neg: neg,
     dot: dot, cross: cross, len: len, len2: len2, dist: dist, dist2: dist2,
-    norm: norm, lerpV: lerpV,
+    norm: norm, lerpV: lerpV, slerpDir: slerpDir,
     clamp: clamp, lerp: lerp, wrapPi: wrapPi, smooth: smooth, rnd: rnd,
     rndInt: rndInt, pick: pick, easeCurve: easeCurve,
     rotAxis: rotAxis, orthonormalize: orthonormalize,
