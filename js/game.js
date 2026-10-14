@@ -90,6 +90,7 @@ var Game = (function () {
   /* 追尾镜头的基准朝向。它不直接等于机头方向 —— 见 updateCamera 里的说明：
      俯仰被限制在 ±78°，而且偏航要按最短角差平滑，否则翻过顶点时会瞬移。 */
   var camYawBase = 0;           // 追尾镜头的基准偏航（已按最短角差平滑）
+  var camPitchSmooth = null;    // 基准俯仰的平滑值，首帧惰性初始化
   var banner = { t: 0, title: '', sub: '', col: '' };
   var hits = [];
   var stats = null;
@@ -1482,8 +1483,14 @@ var Game = (function () {
     }
   }
 
+  /* 相对方位角。
+
+     两个参数都是**位置向量**，不是实体 —— 这里原来是混着写的：
+     from 当向量（from.x），to 当实体（to.pos.x）。调用处传的是两个向量，
+     于是 to.pos 是 undefined，一旦有防空浮台开火就抛异常。
+     那个分支以前没被跑到，加了基地目标之后才暴露出来。 */
   function bearing(from, to) {
-    var dx = to.pos.x - from.x, dz = to.pos.z - from.z;
+    var dx = to.x - from.x, dz = to.z - from.z;
     var deg = (Math.atan2(dx, dz) * 180 / Math.PI + 360) % 360;
     return ('00' + deg.toFixed(0)).slice(-3);
   }
@@ -1547,6 +1554,7 @@ var Game = (function () {
          之前那套"混合参考"只能把跳变抹成旋转，抹不掉极点本身；
          把俯仰限住，镜头就永远不会到达那个位置。 */
       var CAM_PITCH_LIM = 78 * Math.PI / 180;
+      var SIN_LIM = Math.sin(CAM_PITCH_LIM);   // 视线 y 分量的上限
 
       /* 只平滑**偏航角**，俯仰始终钳在限位内。
 
@@ -1573,7 +1581,18 @@ var Game = (function () {
 
       var camPitchAng = Math.atan2(p.fwd.y, Math.max(hlen, 1e-4));
       camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
-      var cpc = Math.cos(camPitchAng), cps = Math.sin(camPitchAng);
+
+      /* 俯仰也要平滑 —— 这一点和偏航不同，之前漏了。
+
+         相机 up 恒为世界 up，正交化之后 up 的长度是 cos(pitch)：
+         俯仰越接近限位，这个长度越小，同样的视线变化引起的 up 变化越大。
+         所以猛拉杆时如果俯仰直接阶跃，地平线就会跟着抖。
+         时间常数取 9（比偏航的 1.2 快得多），因为俯仰是玩家直接控制的，
+         滞后感太强会显得操纵迟滞。 */
+      if (camPitchSmooth === null) camPitchSmooth = camPitchAng;
+      camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-9 * dt));
+
+      var cpc = Math.cos(camPitchSmooth), cps = Math.sin(camPitchSmooth);
       var camDir = M3.V(Math.sin(camYawBase) * cpc, cps, Math.cos(camYawBase) * cpc);
 
       var off0 = M3.rotAxis(M3.mul(camDir, -S.camDist), M3.V(0, 1, 0), camYaw);
@@ -1582,20 +1601,26 @@ var Game = (function () {
       camPos = M3.lerpV(camPos, want, k);
       // 观察点前移：镜头距离很小的时候，如果还盯着机身本身，
       // 飞机的下沉角会大到跑出视场。给一个下限让视线稳定在前方。
-      var look = M3.add(p.pos, M3.mul(camDir, Math.max(30, S.camDist * 1.45)));
-      camFwd = M3.lerpV(camFwd, M3.norm(M3.sub(look, camPos)), 1 - Math.exp(-8.5 * dt));
-      camFwd = M3.norm(camFwd);
+      /* 视线方向**直接取 camDir**，不再做第二次插值。
 
-      /* 相机 up：既然俯仰已经被限在 ±78°，视线就不可能垂直，
-         世界 up 与它永远不共线，直接用世界 up 即可 ——
-         地平线保持水平，镜头也不跟随滚转。
+         以前这里是从 (观察点 − camPos) 插值出来的。问题在于 camPos 本身
+         就是插值量，天生滞后 camDir：姿态越猛烈滞后越多，实测能偏到 8.5°，
+         把 78° 的俯仰限位一路推到 86° 以上 —— 限位等于白加了。
+         而 camDir 已经过了俯仰、偏航两重平滑，再插一次纯属多余。
 
-         下面这段混合逻辑作为兜底保留：万一将来有人放宽限位、
-         或者自由视角把镜头推到极点附近，它仍能让过渡保持连续。 */
-      var vert = Math.abs(camFwd.y);
-      var mix = M3.clamp((vert - 0.90) / 0.09, 0, 1);
-      mix = mix * mix * (3 - 2 * mix);
-      camUp = M3.lerpV(M3.V(0, 1, 0), p.up, mix);
+         这条链路修过三次，教训是一样的：**不要用滞后的位置去反推方向。** */
+      camFwd = camDir;
+
+      /* 相机 up 直接取世界 up，**没有任何兜底逻辑**。
+
+         这里原来留了一段"混合参考"：视线变陡时让 camUp 平滑过渡到
+         机体 up。那是限位方案之前的东西，限位生效后它不仅多余，
+         而且有害 —— 视线只要稍微陡一点它就开始跟随机体滚转，
+         而机体 up 在极点附近变化极快，等于是把抖动提前引了出来。
+
+         现在视线被硬钳在 78° 以内，世界 up 与它永远不共线，
+         orthonormalize 不可能退化，兜底也就没有存在的理由。 */
+      camUp = M3.V(0, 1, 0);
 
       Renderer.setCamera(camPos, camFwd, camUp, S.fov);
     } else if (camMode === 1) {

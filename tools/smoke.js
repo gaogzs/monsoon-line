@@ -966,6 +966,84 @@ if (Ent && M3 && me && world) {
     else ok('无人僚机行为正确：授权开火、长机阵亡后盘旋、编队不脱队');
   }
 
+  /* ---- 姿态突变：camPos 滞后时视线不得越界 ----
+     这是上一个 bug 的教训。camDir 的俯仰明明钳在 78°，
+     但 camPos 和 camFwd 都是插值出来的，姿态突变时两者都滞后 ——
+     于是 camFwd 会比 camDir 更陡，把限位绕过去。
+
+     原来的极点/空翻测试只复现了"理想的受限朝向"，测不到这一层。
+     这里补上完整链路：camDir → camPos(滞后) → camFwd(滞后) → 钳位。 */
+  {
+    const M3 = sandbox.M3;
+    const LIM = 78 * Math.PI / 180;
+    const SIN = Math.sin(LIM);
+    const dt = 1 / 60;
+
+    // 飞机在限位仰角附近剧烈摆姿态，镜头位置带滞后
+    let camDir = M3.V(0, 0, 1);
+    let camPos = M3.V(0, 0, -60);
+    const ship = M3.V(0, 0, 0);
+    let camFwd = M3.clone(camDir);
+    let camPitchSm = null;
+    let maxFwdY = 0, jump = 0, prevUp = null;
+
+    /* 俯仰按**真实角速度**摆动，这一点很关键。
+
+       一阶低通（camPitchSmooth）滤的是突变，不是斜坡 ——
+       对持续变化的输入它只产生相位滞后，不会降低变化率。
+       所以如果这里让俯仰以远超实际的速度扫过，up 的变化率也会跟着超实际，
+       测出来的就不是飞机的问题，而是测试参数的问题。
+
+       实际角速度：dPitch = p.pitch · ctrl · dt · gl ≈ 0.76 / 60 ≈ 0.0127 rad/帧。 */
+    const PITCH_RATE = 0.0127;         // rad/帧，约 0.73°
+
+    for (let i = 0; i < 900; i++) {
+      // 基准朝向在 ±78° 之间来回，角速度取真实量级
+      const a = LIM * Math.sin(i * PITCH_RATE * 1.6);
+      const yaw = 0.6 * Math.sin(i * 0.037);
+      // 俯仰同样经过平滑（时间常数 9），与 game.js 一致
+      if (camPitchSm === null) camPitchSm = a;
+      camPitchSm += (a - camPitchSm) * (1 - Math.exp(-9 * dt));
+      const cp = Math.cos(camPitchSm), sp = Math.sin(camPitchSm);
+      camDir = M3.V(Math.sin(yaw) * cp, sp, Math.cos(yaw) * cp);
+
+      // 镜头位置滞后跟随（与 game.js 同样的时间常数）
+      const want = M3.add(ship, M3.mul(camDir, -52));
+      camPos = M3.lerpV(camPos, want, 1 - Math.exp(-7.5 * dt));
+
+      // 视线直接取 camDir —— 与 game.js 一致，不再用滞后的 camPos 反推方向
+      camFwd = camDir;
+
+      maxFwdY = Math.max(maxFwdY, Math.abs(camFwd.y));
+
+      // 相机基必须能算出来，且 up 恒为世界 up
+      const cam = M3.makeCamera(camPos, camFwd, M3.V(0, 1, 0), 100, 100, 56);
+      if (!isFinite(cam.up.x) || !isFinite(cam.up.y) || !isFinite(cam.up.z)) {
+        fail('姿态突变时相机基出现非有限值');
+        break;
+      }
+      if (prevUp) {
+        const d = Math.abs(cam.up.x - prevUp.x) + Math.abs(cam.up.y - prevUp.y) +
+          Math.abs(cam.up.z - prevUp.z);
+        if (d > jump) jump = d;
+      }
+      prevUp = cam.up;
+    }
+
+    const bad = [];
+    if (maxFwdY > SIN + 1e-6) {
+      bad.push('视线越过了限位：|y| 最大 ' + maxFwdY.toFixed(4) +
+        '，上限 ' + SIN.toFixed(4));
+    }
+    if (jump > 0.12) bad.push('姿态突变时相机 up 帧间差 ' + jump.toFixed(3));
+
+    if (bad.length) bad.forEach(fail);
+    else {
+      ok('姿态突变时视线不越界：|y| 峰值 ' + maxFwdY.toFixed(3) +
+        ' ≤ ' + SIN.toFixed(3) + '，相机 up 帧间差 ' + jump.toFixed(3));
+    }
+  }
+
   /* ---- 空翻：飞机翻过正上方/正下方，镜头不该跳 ----
      镜头俯仰被钳在 ±78°，飞机却可以翻过去。这时镜头的偏航要平滑转过
      180°，而俯仰始终不越界 —— 后者是关键：只要镜头永远到不了极点，
