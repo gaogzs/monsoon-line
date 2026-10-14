@@ -734,12 +734,13 @@ var Game = (function () {
       if (w.kind === 'dew' && w.interceptRange) {
         bits.push('拦截 ' + (w.interceptRange / 1000).toFixed(1) + ' km');
       }
-      var sk = ({ ir: '红外', radar: '雷达', laser: '激光照射', none: '无制导' })[w.seeker];
+      var sk = ({ ir: '红外', eo: '光电', radar: '雷达',
+        laser: '激光照射', none: '无制导' })[w.seeker];
       if (sk && w.seeker !== 'none') {
-        // 激光弹没有导引头，也就没有"预测品质"可言
-        bits.push(w.seeker === 'laser'
-          ? '导引 ' + sk + '（需保持照射）'
-          : '导引 ' + sk + ' ' + Math.round((w.lead || 0) * 100) + '%');
+        // 光电与激光都不做提前量解算，报"预测品质"没有意义
+        if (w.seeker === 'eo') bits.push('导引 光电（不受干扰弹影响）');
+        else if (w.seeker === 'laser') bits.push('导引 激光照射（需保持照射）');
+        else bits.push('导引 ' + sk + ' ' + Math.round((w.lead || 0) * 100) + '%');
       }
     }
     bits.push(w.mass + ' kg');
@@ -1352,7 +1353,13 @@ var Game = (function () {
     if (launch(player, t, world)) {
       Radio.raw({
         who: CALLSIGN.player, cls: 'ally',
-        tx: w.unguided ? '<b>投放</b>'
+        /* Fox 呼叫只适用于空空导弹。
+
+           炸弹（包括有制导的）应该报"投放" —— 原来的判断只看了
+           unguided，于是 PEJ-30 这类制导炸弹会喊出 Fox 2，
+           那是战斗机发射格斗弹时的呼叫。 */
+        tx: (w.unguided || w.kind === 'bomb' || w.kind === 'agm' || w.kind === 'asm')
+          ? '<b>投放</b>'
           : (w.seeker === 'radar' ? '<b>Fox 3</b>'
             : (w.seeker === 'laser' ? '<b>照射</b>' : '<b>Fox 2</b>')),
         gap: 0.4
@@ -1601,7 +1608,8 @@ var Game = (function () {
        机头一偏照射就断，得重新建立。 */
     var rate = 1 / (w.nezer ? 1.5
       : (w.seeker === 'ir' ? 0.55
-        : (w.seeker === 'laser' ? 1.6 : 1.1)));
+        : (w.seeker === 'eo' ? 0.60      // 光电与红外同属被动成像，都快
+          : (w.seeker === 'laser' ? 1.6 : 1.1))));
     if (ok) {
       if (player.lockProgress < 1 && player.lockProgress + rate * dt >= 1) {
         SFX.lock();

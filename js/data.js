@@ -999,16 +999,34 @@ var WEAPONS = {
        激光照射，被干扰弹骗不到。也删掉 flare。
        原来的 unguided: true 是错的，它明明写着"命中前保持照射"。 */
     speed: 280, life: 12.0, vsLife: 24.0,
-    /* seeker 是 'laser'：它没有自己的导引头，靠的是照射。
+    /* ---- seeker: 'eo'（光电制导）----
 
-       这一项不能省。updateLock 会用 seeker 决定锁定速率
-       （ir 最快、radar 居中），stepMissile 用它判断能否制导 ——
-       字段缺失时它会被当成"无导引头"，锁定表现和文案对不上。 */
-    turn: 0.20, seeker: 'laser', lockCone: 60 * Math.PI / 180, lockDist: 2400,
+       导引头是可见光 / 近红外**成像**的，像普通制导弹一样工作：
+       锁定、追踪、修正，没有额外机制。
+       这在物理上也说得通：热焰弹是骗红外**点源**导引头的，
+       箔丝是骗雷达的，两者对成像导引头都没有意义。
+
+       **flare: 0 是必须写出来的，不能省。**
+
+       breakLock 的判定是 `if (Math.random() >= w.flare) continue;`。
+       如果不给这个字段，chance 就是 undefined → NaN，
+       而 NaN 参与的任何比较都是 false，于是那个 continue 永远不执行，
+       弹**每次都会被骗走** —— 和"不受干扰"正好相反。
+       写成 0 才能让 `Math.random() >= 0` 恒真，从而永远跳过。
+       （这个坑是测试抓出来的：注释里一度写着"不设就会免疫"。） */
+    flare: 0,
+
+    /* 关于原来的激光制导：机制代码还留在 entities.js 里
+       （seeker === 'laser' 那条分支），HUD 的照射提示也还在 hud.js，
+       但当前没有任何武器使用它，所以整条路径是休眠的。
+       将来要启用，把某件弹的 seeker 填成 'laser' 即可。 */
+    turn: 0.20, seeker: 'eo', lockCone: 60 * Math.PI / 180, lockDist: 2400,
     dmg: 210, ammo: 6, cd: 0.24, salvo: 1, prox: 42,
     target: 'ground', cluster: true, ballistic: true,
-    desc: `激光制导集束炸弹，抛撒 <b>72 枚</b>子弹药，覆盖半径 80 米。
-      需要俯冲投放并在命中前保持照射。<b>交战规则禁用区同样锁定。</b>`,
+    desc: `光电制导集束炸弹，抛撒 <b>72 枚</b>子弹药，覆盖半径 80 米。
+      导引头看的是可见光 / 近红外图像，<b>热焰弹和箔丝都骗不到它</b>。
+      代价是需要俯冲投放，让导引头在命中前一直看得见目标。
+      <b>交战规则禁用区同样锁定。</b>`,
     stat: { dmg: 0.90, spd: 0.10, trn: 0.08, rng: 0.20, ecm: 1.0 }
   },
   e4: {

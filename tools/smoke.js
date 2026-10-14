@@ -1779,9 +1779,14 @@ if (Ent && M3 && me && world) {
     // 激光制导炸弹反过来：该有制导，但不该有发动机与导引头
     {
       const w = W4.v30;
-      if (w.turn === undefined) bad.push('PEJ-30 是激光制导，不该没有 turn');
+      if (w.turn === undefined) bad.push('PEJ-30 是制导炸弹，不该没有 turn');
       if (w.boost !== undefined) bad.push('PEJ-30 是滑翔弹，不该有 boost');
-      if (w.flare !== undefined) bad.push('PEJ-30 靠照射制导，不该有 flare');
+      /* 光电制导**要**显式写 flare: 0。
+         省略它不是"免疫"，而是每次都被骗走 —— 见 data.js 里的说明。 */
+      if (w.flare !== 0) {
+        bad.push('PEJ-30 的 flare 必须显式写 0（光电免疫干扰弹），现在是 ' +
+          (w.flare === undefined ? '缺失' : w.flare));
+      }
     }
 
     /* 弹道测试：水平投放，看它会不会掉高度。
@@ -2064,15 +2069,21 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
   }
 
-  /* ---- 激光制导：载机必须保持照射 ----
+  /* ---- 激光制导机制（休眠中，但代码要能跑）----
 
-     PEJ-30 的 desc 写着"需要俯冲投放并在命中前保持照射"。
-     在此之前全项目只有 ir 和 radar 两种导引，写个 seeker: 'laser'
-     进数据是没人读的（图鉴还会把它显示成"雷达"）。现在这条机制是真的：
-     弹每一帧都去问投放它的载机"你还在照着目标吗"。 */
+     PEJ-30 已经从 laser 改成 eo（光电制导），所以现在**没有任何武器**
+     使用 seeker: 'laser'。这段机制是完整的，只是休眠 —— 为了不让它
+     悄悄烂掉，测试里临时借一件弹挂上 'laser' 来验，验完还回去。
+
+     （将来要给某件弹启用激光制导，只要把它的 seeker 填成 'laser'，
+     机制、图鉴、挂载面板、HUD 提示都已经就位。） */
   {
     const E9 = sandbox.Ent, M3i = sandbox.M3;
     const bad = [];
+
+    // 借 v30 的数值一用，临时改成激光制导
+    const realSeeker = sandbox.WEAPONS.v30.seeker;
+    sandbox.WEAPONS.v30.seeker = 'laser';
 
     const mk = (shooter) => {
       const tgt = { pos: M3i.V(0, 0, 3000), alive: true, kind: 'target',
@@ -2087,30 +2098,81 @@ if (Ent && M3 && me && world) {
       return m;
     };
 
-    // ① 载机一直照着 → 不该丢照射
     const good = mk({ pos: M3i.V(0, 2600, 0), alive: true,
       fwd: M3i.norm(M3i.V(0, -0.5, 1)) });
     if (good.laserLost) {
       bad.push('载机一直照着目标，弹却判定失去照射');
     } else {
-      ok('激光制导：载机保持照射时，弹正常受修正');
+      ok('激光制导（休眠）：载机保持照射时弹正常受修正');
     }
 
-    // ② 载机机头转开 → 立刻失去修正
     const away = mk({ pos: M3i.V(0, 2600, 0), alive: true,
       fwd: M3i.norm(M3i.V(0, 1, -1)) });
     if (!away.laserLost) {
       bad.push('载机机头转开了，弹却还在修正 —— 照射没有约束力');
     } else {
-      ok('激光制导：载机一转向，弹立即失去修正（但不消失，继续下坠）');
+      ok('激光制导（休眠）：载机一转向，弹立即失去修正');
     }
 
-    // ③ 它必须真的读过 seeker === 'laser' 这个值
-    if (sandbox.WEAPONS.v30.seeker !== 'laser') {
-      bad.push('PEJ-30 的 seeker 不是 laser，机制挂不上');
+    sandbox.WEAPONS.v30.seeker = realSeeker;      // 还回去
+    if (bad.length) bad.forEach(fail);
+  }
+
+  /* ---- PEJ-30 现在是光电制导：有制导、无动力、不吃干扰弹 ---- */
+  {
+    const W10 = sandbox.WEAPONS, bad = [];
+    const w = W10.v30;
+
+    if (w.seeker !== 'eo') {
+      bad.push('PEJ-30 的 seeker 应该是 eo（光电），现在是 ' + w.seeker);
+    }
+    // 有制导 → 必须有可用过载；无动力 → 必须有 ballistic 且没有 boost
+    if (w.turn === undefined) bad.push('光电制导的 PEJ-30 必须有 turn');
+    if (!w.ballistic) bad.push('PEJ-30 是无动力炸弹，必须有 ballistic');
+    if (w.boost !== undefined) bad.push('PEJ-30 无动力，不该有 boost');
+    /* 不吃干扰弹 —— 实现方式是 **flare: 0**，而且这个 0 必须显式写。
+
+       breakLock 的判定是 `if (Math.random() >= w.flare) continue;`：
+         写成 0        → Math.random() >= 0 恒真 → 永远跳过 → 骗不到
+         省略这个字段   → chance 是 undefined/NaN → 比较恒假 →
+                          continue 不执行 → **每次都被骗走**
+       也就是说"不设字段"和"设成 0"的效果正好相反。
+       这条断言两头都拦：既不许有非零值，也不许缺失。 */
+    if (w.flare !== 0) {
+      bad.push('PEJ-30 要免疫干扰弹，flare 必须显式写成 0，现在是 ' +
+        (w.flare === undefined ? '缺失（会导致每次都被骗走）' : w.flare));
+    }
+
+    /* 实测"不吃干扰弹" —— 不能只验 flare 字段不存在，
+       要真的投一组干扰弹看它会不会被甩掉。 */
+    {
+      const E10 = sandbox.Ent, M3k = sandbox.M3;
+      const tgt = { pos: M3k.V(0, 0, 3000), alive: true, kind: 'target',
+        radius: 10, dead: false };
+      const shooter = { pos: M3k.V(0, 2000, 0), alive: true, fwd: M3k.V(0, 0, 1),
+        vel: M3k.V(0, 0, 250), up: M3k.V(0, 1, 0), flares: 80, flareCd: 0,
+        team: 0, pos0: null };
+      const m = E10.makeMissile({
+        weapon: 'v30', team: 1,
+        pos: M3k.V(0, 1900, 100), fwd: M3k.norm(M3k.V(0, -0.3, 1)), speed: 300,
+        target: shooter, owner: null
+      });
+      // 目标就是那架"载机"，朝他投干扰弹
+      const wd2 = { particles: [], actors: [], targets: [tgt], missiles: [m] };
+      let spoofed = false;
+      for (let n = 0; n < 40 && !spoofed; n++) {
+        E10.breakLock(shooter, wd2);
+        if (m.target !== shooter) spoofed = true;
+      }
+      if (spoofed) {
+        bad.push('光电制导炸弹被干扰弹骗走了 —— 它本该完全不受影响');
+      } else {
+        ok('光电制导不受干扰弹影响（连投 40 组也没骗走）');
+      }
     }
 
     if (bad.length) bad.forEach(fail);
+    else ok('PEJ-30 光电制导：无动力 + 有制导 + 不受干扰弹影响');
   }
 
   /* ---- 端到端：激光制导炸弹的完整使用流程 ----
@@ -2149,7 +2211,7 @@ if (Ent && M3 && me && world) {
       if (pl.lockProgress < 1) {
         bad.push('对着目标飞了 10 秒锁定环都没转满');
       } else {
-        ok('激光弹锁定耗时 ' + lockSec + ' s（desc 说激光最慢，这是刻意的）');
+        ok('光电制导炸弹锁定耗时 ' + lockSec + ' s（光电与红外同属被动成像，都快）');
       }
 
       // 投放
@@ -2186,7 +2248,12 @@ if (Ent && M3 && me && world) {
         }
       }
 
-      // 反向：中途把机头转开，必须失去修正
+      /* 光电制导**不需要**保持照射 —— 它应该表现得像一枚普通制导炸弹。
+
+         和休眠中的激光机制正好相反：那个要求载机一直照着目标，
+         一转向就丢修正；光电导引头是成像的，投出去之后自己看，
+         载机可以立刻脱离。这条断言就是在保护这个区别 ——
+         如果哪天有人在 PEJ-30 上重新启用激光机制，它会立刻失败。 */
       pl.spCd = 0;
       pl.slotCd.v30 = [0];
       pl.lockProgress = 1;
@@ -2198,14 +2265,17 @@ if (Ent && M3 && me && world) {
       kd3.forEach(fn => fn({ code: 'Enter', preventDefault() {} }));
       if (w.missiles.length > n1) {
         const m2 = w.missiles[w.missiles.length - 1];
-        // 一投出去就把机头抬走
+        // 一投出去就把机头抬走，然后**直接驱动弹**（pump 会重算玩家姿态）
         pl.fwd = M3j.norm(M3j.V(0, 1, -1));
-        for (let f = 0; f < 60; f++) { pump(1); if (!m2.alive) break; }
-        if (!m2.laserLost && m2.alive) {
-          bad.push('机头转开后炸弹仍在修正 —— 照射没有约束力');
+        for (let f = 0; f < 60; f++) {
+          sandbox.Ent.stepMissile(m2, 1 / 60, w);
+          if (!m2.alive) break;
+        }
+        if (m2.laserLost) {
+          bad.push('光电制导炸弹竟然有"失去照射"这回事 —— ' +
+            '它应该像普通制导炸弹一样自己找目标');
         } else {
-          ok('机头转开 → 炸弹立即失去修正' +
-            (m2.alive ? '（继续下坠，未命中）' : '（已落地）'));
+          ok('光电制导：投放后载机立即脱离，弹仍自行修正');
         }
       }
     }

@@ -828,8 +828,10 @@ function _seekerLabel(w) {
   if (w.passive) return '被动';
   if (w.seeker === 'none') return '无制导';
   var s = (w.seeker === 'ir') ? '红外'
-    : (w.seeker === 'laser' ? '激光照射' : '雷达');
-  // 激光弹没有导引头，谈不上"预测品质"——它靠的是载机一直照着
+    : (w.seeker === 'eo' ? '光电'
+      : (w.seeker === 'laser' ? '激光照射' : '雷达'));
+  // 光电/激光靠图像或照射，谈不上"预测品质"那种提前量解算
+  if (w.seeker === 'eo') return s + ' · 不受干扰弹影响';
   if (w.seeker === 'laser') return s + ' · 需保持照射';
   if (w.lead !== undefined) s += ' · 预测 ' + Math.round(w.lead * 100) + '%';
   return s;
