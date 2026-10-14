@@ -105,7 +105,7 @@ function makeEl(tag, id) {
     __listeners: Object.create(null),
     value: 0, checked: false, disabled: false,
     type: '', min: 0, max: 100, step: 1,
-    className: '', textContent: '', innerHTML: '',
+    className: '', textContent: '',
     width: 1280, height: 720, clientWidth: 1280, clientHeight: 720,
     onclick: null,
     getContext() { return ctx2d(); },
@@ -123,6 +123,14 @@ function makeEl(tag, id) {
       if (type === 'click' && typeof el.onclick === 'function') el.onclick.call(el, e);
     }
   };
+  /* innerHTML 的 setter 必须清空 children ——
+     真实的 DOM 会这么做，而只改字符串属性的话，
+     重复构建（比如每次进机库）会让子元素越积越多，
+     测试里就会看到"8 行应该是 4 行"这种假故障。 */
+  Object.defineProperty(el, 'innerHTML', {
+    get() { return el.__html; },
+    set(v) { el.__html = String(v); el.children.length = 0; }
+  });
   Object.defineProperty(el, 'classList', {
     value: {
       add: (...c) => c.forEach(x => el.__cls.add(x)),
@@ -528,6 +536,42 @@ if (Ent && M3 && me && world) {
     AI.steerTo(a, d3, out, null);
     if (Math.abs(out.roll) < 0.4) fail('正侧方目标没有触发滚转（roll=' + out.roll.toFixed(3) + '）');
     else ok('正侧方目标 → 滚转对齐（roll=' + out.roll.toFixed(2) + '）');
+  }
+
+  /* ---- 机库的选装面板 ---- */
+  {
+    // 上一步已经点进过机库，选装面板应当已经渲染
+    const picker = byId.get('hpPicker');
+    const list = byId.get('hpList');
+    if (!picker) {
+      fail('index.html 缺少 #hpPicker');
+    } else {
+      const cards = picker.children.filter(c => /pk-card/.test(c.className || ''));
+      if (!cards.length) {
+        fail('选装面板没有生成任何卡片');
+      } else {
+        let noRole = 0, noDesc = 0;
+        cards.forEach(c => {
+          if (!/pk-role/.test(c.innerHTML)) noRole++;
+          if (!/pk-d/.test(c.innerHTML)) noDesc++;
+        });
+        if (noRole) fail(noRole + ' 张挂载卡片缺少定位行');
+        else if (noDesc) fail(noDesc + ' 张挂载卡片缺少简介');
+        else ok('选装面板：' + cards.length + ' 张卡片，均含定位与简介');
+      }
+
+      // 左栏每个挂载点组都要有一行
+      if (!list) fail('index.html 缺少 #hpList');
+      else {
+        const rows = list.children.filter(c => /hp-row/.test(c.className || ''));
+        const want = sandbox.AIRCRAFT.filter(a => !a.npcOnly)[0].hardpointGroups.length;
+        if (rows.length !== want) {
+          fail('挂载点组列表有 ' + rows.length + ' 行，应该是 ' + want + ' 行');
+        } else {
+          ok('挂载点组列表 ' + rows.length + ' 行');
+        }
+      }
+    }
   }
 
   /* ---- 敌机的呼号与型号不能混为一谈 ---- */

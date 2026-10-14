@@ -514,7 +514,23 @@ var Game = (function () {
     return ({ tip: '翼尖', light: '通用', heavy: '重挂', belly: '机腹' })[k] || k;
   }
 
+  /* ============================================================
+     挂载点编辑器
+
+     左栏是挂载点组，右栏是该组能挂的东西 —— 每一项都是一张卡片，
+     带定位、简介和关键参数。
+
+     早期版本这里是个下拉框，里面只有型号（"TOR-2 ×16"）。
+     问题是玩家根本不知道 TOR-2 是什么：打什么的、能打多远、
+     为什么该选它而不是旁边那个，全得靠背。
+     ============================================================ */
   function buildHardpointEditor(ac, lo) {
+    buildHpGroups(ac, lo);
+    buildHpPicker(ac, lo);
+  }
+
+  /** 左栏：挂载点组列表。点一行切换右栏显示哪一组。 */
+  function buildHpGroups(ac, lo) {
     var host = document.getElementById('hpList');
     if (!host) return;
     host.innerHTML = '';
@@ -522,70 +538,112 @@ var Game = (function () {
     var groups = ac.hardpointGroups || [];
     for (var i = 0; i < groups.length; i++) {
       (function (g) {
+        var w = lo[g.id] ? WEAPONS[lo[g.id]] : null;
+
         var row = document.createElement('div');
         row.className = 'hp-row' + (g.id === activeHpGroup ? ' on' : '');
         row.setAttribute('data-hp', g.id);
+        row.innerHTML =
+          '<div class="hp-top"><span class="hp-id">' + g.id + '</span>' +
+          '<span class="hp-lb">' + g.label + '</span></div>' +
+          '<div class="hp-sub">' + g.pts.length + ' 点 · ' + hpKindLabel(g.kind) + '</div>' +
+          '<div class="hp-cur' + (w ? '' : ' empty') + '">' +
+          (w ? w.name + ' ' + w.cn.split(' · ')[0] : '空置') + '</div>';
 
-        var idEl = document.createElement('span');
-        idEl.className = 'hp-id';
-        idEl.textContent = g.id;
-
-        var lbEl = document.createElement('span');
-        lbEl.className = 'hp-lb';
-        lbEl.innerHTML = g.label + '<i>' + g.pts.length + ' 点 · ' + hpKindLabel(g.kind) + '</i>';
-
-        var sel = document.createElement('select');
-        sel.className = 'hp-sel';
-
-        var o0 = document.createElement('option');
-        o0.value = '';
-        o0.textContent = '空置';
-        sel.appendChild(o0);
-
-        for (var wid in WEAPONS) {
-          if (!Object.prototype.hasOwnProperty.call(WEAPONS, wid)) continue;
-          var w = WEAPONS[wid];
-          if (w.kind === 'gun') continue;
-          if (!w.fits || w.fits.indexOf(g.kind) < 0) continue;
-          var o = document.createElement('option');
-          o.value = wid;
-          o.textContent = w.name + ' ×' + (g.pts.length * (w.perPoint || 1));
-          sel.appendChild(o);
-        }
-        sel.value = lo[g.id] || '';
-
-        sel.addEventListener('change', function () {
-          lo[g.id] = sel.value || null;
+        row.onclick = function () {
           activeHpGroup = g.id;
           SFX.click();
           buildHangar();
-        });
-        sel.addEventListener('focus', function () {
-          activeHpGroup = g.id;
-          PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup);
-          markHpRows();
-        });
-
-        row.addEventListener('mouseenter', function () {
-          activeHpGroup = g.id;
-          PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup);
-          markHpRows();
-        });
-
-        row.appendChild(idEl);
-        row.appendChild(lbEl);
-        row.appendChild(sel);
+        };
         host.appendChild(row);
       })(groups[i]);
     }
   }
 
-  /** 只切高亮，不重建控件（悬停时用，避免打断下拉框） */
-  function markHpRows() {
-    var rows = document.querySelectorAll('[data-hp]');
-    for (var i = 0; i < rows.length; i++) {
-      rows[i].classList.toggle('on', rows[i].getAttribute('data-hp') === activeHpGroup);
+  /** 右栏：当前选中组的可选项，每个一张卡片 */
+  function buildHpPicker(ac, lo) {
+    var host = document.getElementById('hpPicker');
+    if (!host) return;
+    host.innerHTML = '';
+
+    var groups = ac.hardpointGroups || [];
+    var g = null, i;
+    for (i = 0; i < groups.length; i++) {
+      if (groups[i].id === activeHpGroup) g = groups[i];
     }
+    if (!g) { g = groups[0]; activeHpGroup = g ? g.id : null; }
+    if (!g) return;
+
+    var head = document.createElement('div');
+    head.className = 'pk-head';
+    head.textContent = '挂载点 ' + g.id + ' · ' + g.label +
+      '（' + hpKindLabel(g.kind) + ' · ' + g.pts.length + ' 点）';
+    host.appendChild(head);
+
+    // 空置排最前 —— 它也是一个正经选项，不是"什么都不选"
+    host.appendChild(makeStoreCard(lo, g, null));
+
+    for (var wid in WEAPONS) {
+      if (!Object.prototype.hasOwnProperty.call(WEAPONS, wid)) continue;
+      var w = WEAPONS[wid];
+      if (w.kind === 'gun') continue;
+      if (!w.fits || w.fits.indexOf(g.kind) < 0) continue;
+      host.appendChild(makeStoreCard(lo, g, wid));
+    }
+  }
+
+  /** 一张挂载卡片。wid 为 null 表示"空置"。 */
+  function makeStoreCard(lo, g, wid) {
+    var n = g.pts.length;
+    var card = document.createElement('div');
+    var cur = (lo[g.id] || null) === wid;
+    card.className = 'pk-card' + (cur ? ' on' : '') + (wid ? '' : ' empty');
+
+    if (!wid) {
+      card.innerHTML =
+        '<div class="pk-n">空置</div>' +
+        '<div class="pk-role">不挂任何东西</div>' +
+        '<div class="pk-d">省下这一组的挂载重量，换回一点机动性 —— ' +
+        '挂载越重，加速与转向越吃亏。</div>';
+    } else {
+      var w = WEAPONS[wid];
+      var cnt = n * (w.perPoint || 1);
+      card.innerHTML =
+        '<div class="pk-n">' + w.name +
+        '<span class="pk-cn">' + w.cn + '</span>' +
+        '<span class="pk-cnt">×' + cnt + '</span></div>' +
+        '<div class="pk-role">' + (w.role || '—') + '</div>' +
+        '<div class="pk-d">' + (w.desc || '') + '</div>' +
+        '<div class="pk-q">' + storeStatLine(w) + '</div>';
+    }
+
+    card.onclick = function () {
+      lo[g.id] = wid;
+      SFX.click();
+      buildHangar();
+    };
+    return card;
+  }
+
+  /** 卡片底部的参数行 */
+  function storeStatLine(w) {
+    var bits = [];
+    if (w.passive) {
+      bits.push('被动 · 不占扳机');
+    } else {
+      var r = missileRange(w);
+      if (r) bits.push('射程 ' + r.toFixed(1) + ' km');
+      if (w.kind === 'dew' && w.interceptRange) {
+        bits.push('拦截 ' + (w.interceptRange / 1000).toFixed(1) + ' km');
+      }
+      var sk = ({ ir: '红外', radar: '雷达', none: '无制导' })[w.seeker];
+      if (sk && w.seeker !== 'none') {
+        bits.push('导引 ' + sk + ' ' + Math.round((w.lead || 0) * 100) + '%');
+      }
+    }
+    bits.push(w.mass + ' kg');
+    if (w.cd) bits.push('冷却 ' + w.cd.toFixed(1) + 's');
+    return bits.join(' · ');
   }
 
   function kindLabel(k) {
