@@ -58,8 +58,10 @@ function spawnEnemy(w, o) {
 }
 
 function spawnWingman(w, idx, slotX, slotY, slotZ) {
+  // 僚机是「折翼」级无人僚机（KA-7），不是有人机 ——
+  // 这里原来写的是 c11，于是设定里的无人僚机在游戏里飞着有人机。
   var a = Ent.makeAircraft({
-    type: 'c11',
+    type: 'ucav',
     team: 0,
     x: w.player.pos.x + slotX,
     y: w.player.pos.y + slotY,

@@ -782,7 +782,7 @@ if (Ent && M3 && me && world) {
     const RAFSI = ['CEL', 'TOR', 'SUT', 'GIR', 'CLA', 'SPO', 'GUT', 'PEJ',
       'GUS', 'ZUN', 'DAR', 'BIN', 'BAD', 'CAV', 'DIL'];
     // 上游：按用途分类，同用途共用首字母；舰载型在尾部追加一个字母
-    const UP_PREFIX = ['D', 'DB', 'F', 'G'];
+    const UP_PREFIX = ['D', 'DB', 'F', 'G', 'KA'];
     // 下游：按设计局分类
     const DOWN_PREFIX = ['ROK', 'GAL', 'VAC'];
     const bad = [];
