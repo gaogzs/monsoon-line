@@ -213,12 +213,12 @@ roll   × lp.roll      // 1 − 0.12·lf
 
 | 机型 | caps |
 |---|---|
-| BL-11 军舰鸟 | `strike` `ew` |
-| GA-14 旗鱼 | `intercept` |
-| GU-6 鲣鸟 | `strike` |
-| FA-9 海燕 | `intercept` |
-| MI-21 贼鸥 | `strike` `ew` |
-| SU-33 信天翁 | （无）—— 纯格斗机，20 种通用弹 |
+| DB-11 军舰鸟 | `strike` `ew` |
+| D-14 旗鱼 | `intercept` |
+| G-6 鲣鸟 | `strike` |
+| F-9 海燕 | `intercept` |
+| D-21 贼鸥 | `strike` `ew` |
+| D-33 信天翁 | （无）—— 纯格斗机，20 种通用弹 |
 
 判定函数是 `canCarry(ac, w)`。**默认配置也受这条约束**，
 `preflight` 会检查，`smoke.js` 也会。
@@ -277,12 +277,12 @@ roll   × lp.roll      // 1 − 0.12·lf
 
 | 机型 | caps |
 |---|---|
-| BL-11 军舰鸟 | `strike` `ew` |
-| GA-14 旗鱼 | `intercept` |
-| GU-6 鲣鸟 | `strike` |
-| FA-9 海燕 | `intercept` |
-| MI-21 贼鸥 | `strike` `ew` |
-| SU-33 信天翁 | （无）—— 纯格斗机，20 种通用弹 |
+| DB-11 军舰鸟 | `strike` `ew` |
+| D-14 旗鱼 | `intercept` |
+| G-6 鲣鸟 | `strike` |
+| F-9 海燕 | `intercept` |
+| D-21 贼鸥 | `strike` `ew` |
+| D-33 信天翁 | （无）—— 纯格斗机，20 种通用弹 |
 
 判定函数是 `canCarry(ac, w)`。**默认配置也受这条约束**，
 `preflight` 会检查，`smoke.js` 也会。

@@ -1766,7 +1766,7 @@ var Game = (function () {
       if (!a.alive) continue;
       var m2 = MODELS[a.model];
       if (!m2) continue;
-      // sweep 只对带 morph 数据的模型（BL-11 的可变后掠翼）有意义
+      // sweep 只对带 morph 数据的模型（DB-11 的可变后掠翼）有意义
       Renderer.pushModel(m2, a.pos, a.fwd, a.up, { sweep: a.sweep || 0 });
     }
     // 导弹

@@ -360,8 +360,8 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <h4>本作数值</h4>
 <table class="cx-table">
   <tr><th>型号</th><th>口径</th><th>射速</th><th>备弹</th><th>初速</th><th>装备</th></tr>
-  <tr><td>CEL-3</td><td>20mm 六管</td><td>3900 发/分</td><td>480</td><td>1100 m/s</td><td>BL-11 · GA-14</td></tr>
-  <tr><td>CEL-7</td><td>30mm 四管</td><td>3900 发/分</td><td>1350</td><td>1020 m/s</td><td>GU-6</td></tr>
+  <tr><td>CEL-3</td><td>20mm 六管</td><td>3900 发/分</td><td>480</td><td>1100 m/s</td><td>DB-11 · D-14</td></tr>
+  <tr><td>CEL-7</td><td>30mm 四管</td><td>3900 发/分</td><td>1350</td><td>1020 m/s</td><td>G-6</td></tr>
 </table>`
   },
 

@@ -48,7 +48,7 @@ var AIRCRAFT = [
   {
     id: 'c11',
     model: 'c11',
-    name: 'BL-11',
+    name: 'DB-11',
     nick: 'Frigatebird',
     cn: '军舰鸟',
     role: '舰载多用途战斗机',
@@ -87,7 +87,7 @@ var AIRCRAFT = [
   {
     id: 'c14',
     model: 'c14',
-    name: 'GA-14',
+    name: 'D-14',
     nick: 'Sailfish',
     cn: '旗鱼',
     role: '平流层制空战斗机',
@@ -100,7 +100,7 @@ var AIRCRAFT = [
     gun: 'k3',
     maxLoad: 4800,
 
-    // GA-14 没有翼尖挂架，但有多一处机腹重挂点
+    // D-14 没有翼尖挂架，但有多一处机腹重挂点
     hardpointGroups: [
       { id: 'A', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 2.6, y: -2.3 }, { x: -2.6, y: -2.3 }] },
       { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 4.2, y: -4.2 }, { x: -4.2, y: -4.2 }] },
@@ -120,7 +120,7 @@ var AIRCRAFT = [
   {
     id: 's6',
     model: 's6',
-    name: 'GU-6',
+    name: 'G-6',
     nick: 'Booby',
     cn: '鲣鸟',
     role: '近距空中支援攻击机',
@@ -147,16 +147,16 @@ var AIRCRAFT = [
 这个设计逻辑从一百年前就没变过：把飞行员裹在装甲里，
 然后让他飞到防空炮火正中间去。</p>
 <p>两台自适应循环发动机塞在翼根，第三涵道的冷气流优先供给那口浴缸和弹药舱 ——
-GU-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。</p>
+G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。</p>
 <p><b>特点：</b>唯一能把机炮当主武器用的飞机。用它打空战是自杀，用它舔地是艺术。</p>`
   },
 
   /* ============================================================
-     FA-9 海燕 —— 高空高速截击机
+     F-9 海燕 —— 高空高速截击机
      ============================================================ */
   {
     id: 'c9',
-    name: 'FA-9', nick: 'Petrel', cn: '海燕',
+    name: 'F-9', nick: 'Petrel', cn: '海燕',
     role: '高空高速截击机',
     faction: '上游公约',
     planformType: '三角翼',
@@ -180,11 +180,11 @@ GU-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型�
   },
 
   /* ============================================================
-     MI-21 贼鸥 —— 多用途隐形战斗机
+     D-21 贼鸥 —— 多用途隐形战斗机
      ============================================================ */
   {
     id: 'c21',
-    name: 'MI-21', nick: 'Skua', cn: '贼鸥',
+    name: 'D-21', nick: 'Skua', cn: '贼鸥',
     role: '多用途隐形战斗机',
     faction: '上游公约',
     planformType: '无尾菱形翼',
@@ -208,16 +208,16 @@ GU-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型�
   },
 
   /* ============================================================
-     SU-33 信天翁 —— 高机动格斗机
+     D-33 信天翁 —— 高机动格斗机
      ============================================================ */
   {
     id: 'c33',
-    name: 'SU-33', nick: 'Albatross', cn: '信天翁',
+    name: 'D-33', nick: 'Albatross', cn: '信天翁',
     role: '高机动格斗机',
     faction: '上游公约',
     planformType: '前掠翼',
     caps: [],                    // 纯格斗机：没有对地火控，也不带电子战设备
-    maker: '上游公约 · 丹湾飞机厂',
+    maker: '上游公约 · 南港试验厂',
     model: 'c33',
     desc: `前掠翼有个老问题：翼尖会先失速，然后机翼会以一种
       非常壮观的方式自己拧断。这个问题困扰了工程师将近一百年，
@@ -242,20 +242,22 @@ GU-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型�
 
      以前它只作为模型键 m27 存在，AIRCRAFT 表里查不到 ——
      于是 makeAircraft() 会静默回退到 AIRCRAFT[0]，
-     HUD 上把 RO-27 标成"BL-11 军舰鸟"。
+     HUD 上把 ROK-27 标成"DB-11 军舰鸟"。
      现在它有正式条目：npcOnly 让它不出现在机库，
      但资料库和 HUD 都能正确引用它。
      ============================================================ */
   {
     id: 'm27',
-    name: 'RO-27', nick: 'Schist', cn: '片岩',
+    name: 'ROK-27', nick: 'Schist', cn: '片岩',
     role: '多用途战斗机',
     faction: '下游同盟',
     planformType: '后掠翼',
-    maker: '下游同盟 · 第二航空工厂',
+    caps: ['strike'],
+    // 下游的字母来自设计局，设计局名取自逻辑语词根（参照 MiG / Su 的用法）
+    maker: 'Rokci 设计局 · rokci 岩石',
     npcOnly: true,
     model: 'm27',
-    desc: `下游同盟能拿出的最好的东西。飞行性能大致相当于十年前的 BL-11，
+    desc: `Rokci 设计局的主力。飞行性能大致相当于十年前的 DB-11，
       火控和电子设备还要更旧一代，但产量是上游的三倍 ——
       他们用数量补质量，而且从来不缺愿意坐进去的人。`,
     stats: { spd: 0.62, mob: 0.58, stl: 0.18, fire: 0.68, dur: 0.55, rng: 0.52 },
@@ -271,22 +273,88 @@ GU-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型�
   },
 
   /* ============================================================
+     GAL-31「玄武岩」—— Galtu 设计局的重型截击机
+
+     下游的机型前缀取自**设计局**（参照苏联按 MiG / Su / Tu 分的做法），
+     而 galtu（高）正是这家厂唯一的招牌。它存在的理由也只有一个：
+     让那批在 15 公里以上飞了半辈子的老兵有东西可开。
+     ============================================================ */
+  {
+    id: 'gal31',
+    name: 'GAL-31', nick: 'Basalt', cn: '玄武岩',
+    role: '重型截击机',
+    faction: '下游同盟',
+    planformType: '双三角翼',
+    caps: ['intercept'],
+    maker: 'Galtu 设计局 · galtu 高',
+    npcOnly: true,
+    model: 'gal31',
+    desc: `Galtu 设计局的唯一产品，也是下游同盟飞得最高的一架。
+      两台大推力发动机、巨大的雷达、四枚远距弹 ——
+      低空笨得没法看，可它的战场从来不在低空。
+      <p>开它的多半是那批老兵。在这个高度上，
+      他们的手感比上游任何一个人都好。</p>`,
+    stats: { spd: 0.80, mob: 0.32, stl: 0.16, fire: 0.78, dur: 0.68, rng: 0.58 },
+    phys: { vMax: 585, vMil: 470, vStall: 142, accel: 30, decel: 30, pitch: 0.44, roll: 2.0, yaw: 0.22, hp: 150 },
+    gun: 'k7',
+    maxLoad: 6200,
+    hardpointGroups: [
+      { id: 'A', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 3.6, y: -1.4 }, { x: -3.6, y: -1.4 }] },
+      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 6.0, y: -2.2 }, { x: -6.0, y: -2.2 }] }
+    ],
+    defaultLoadout: {}
+  },
+
+  /* ============================================================
+     VAC-14「砂岩」—— Vacri 设计局的轻型攻击机
+
+     便宜、结构简单、能在半条跑道上起飞。下游造了四千多架，
+     损失掉的那些从来没让编制表空过。
+     ============================================================ */
+  {
+    id: 'vac14',
+    name: 'VAC-14', nick: 'Sandstone', cn: '砂岩',
+    role: '轻型攻击机',
+    faction: '下游同盟',
+    planformType: '平直翼',
+    caps: ['strike'],
+    maker: 'Vacri 设计局 · vacri 空气',
+    npcOnly: true,
+    model: 'vac14',
+    desc: `Vacri 设计局的廉价品。飞行性能平庸、电子设备只有一部测距器，
+      但它能在一条不到八百米的土跑道上起降，而且**便宜到可以损失**。
+      <p>下游同盟前后造了四千多架。它在战场上的作用不是"打赢"，
+      而是让对手的弹药先消耗完。</p>`,
+    stats: { spd: 0.36, mob: 0.50, stl: 0.12, fire: 0.62, dur: 0.60, rng: 0.44 },
+    phys: { vMax: 395, vMil: 330, vStall: 92, accel: 20, decel: 42, pitch: 0.60, roll: 2.5, yaw: 0.32, hp: 130 },
+    gun: 'k7',
+    maxLoad: 3400,
+    hardpointGroups: [
+      { id: 'A', label: '翼下内侧', kind: 'heavy', pts: [{ x: 2.6, y: -0.6 }, { x: -2.6, y: -0.6 }] },
+      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 4.6, y: -1.2 }, { x: -4.6, y: -1.2 }] }
+    ],
+    defaultLoadout: {}
+  },
+
+  /* ============================================================
      分水群岛国 —— 名义中立的当地武装
      ============================================================ */
   {
     id: 'k8',
-    name: 'XA-8', nick: 'Tideline', cn: '潮线',
+    // 商品名体系：系列名取自逻辑语（xamsi 海），后面跟世代号 ——
+    // 就像 Mirage III 那样，名字本身就是牌子，不带军标前缀
+    name: '潮线 Mk.2', nick: 'Tideline', cn: 'XAMSI',
     role: '轻型拦截机',
     faction: '分水群岛国',
     planformType: '平直翼',
-    caps: ['strike'],
-    maker: '分水群岛国 · 丹湾飞机厂',
+    caps: ['intercept'],
+    maker: '丹湾飞机厂',
     npcOnly: true,
     model: 'c14',
-    desc: `说是国产，其实只有总装线在本地 —— 发动机来自北边，
-      雷达来自南边，两边都很乐意把上一代的东西卖过来。
-      它飞不快，也打不远。但在这片空域里，它是唯一一面
-      不属于任何一方的旗。`,
+    desc: `丹湾飞机厂的第二个型号 —— 说是国产，其实只有总装线在本地。
+      发动机来自北边，雷达来自南边，两边都很乐意把上一代的东西卖过来。
+      <p>它飞不快，也打不远。但在这片空域里，它是唯一一面
+      不属于任何一方的旗。</p>`,
     stats: { spd: 0.44, mob: 0.62, stl: 0.14, fire: 0.40, dur: 0.44, rng: 0.48 },
     phys: { vMax: 430, vMil: 350, vStall: 102, accel: 21, decel: 40, pitch: 0.62, roll: 2.9, yaw: 0.32, hp: 100 },
     gun: 'k3',
@@ -298,14 +366,48 @@ GU-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型�
   },
 
   /* ============================================================
+     「浪花」SPRAY Mk.1 —— 海上巡逻机
+
+     群岛国不叫它战斗机，因为它的确不是：一架飞得慢、转得笨、
+     但能在海上待很久的机器，机腹挂一副搜救吊舱和两挺机枪。
+     政变之后，它是这片海域里唯一还会回应求救信号的东西。
+     ============================================================ */
+  {
+    id: 'spray',
+    name: '浪花 Mk.1', nick: 'Spray', cn: 'DJACU',
+    role: '海上巡逻机',
+    faction: '分水群岛国',
+    planformType: '高展弦比直翼',
+    caps: [],
+    maker: '丹湾飞机厂',
+    npcOnly: true,
+    model: 'spray',
+    desc: `严格说它不算军用飞机：飞得慢、转得笨，
+      唯一的本事是能在海上待六个小时。
+      <p>机腹挂一副搜救吊舱、两挺机枪 —— 就这些。
+      政变之后，它是这片海域里唯一还会回应求救信号的东西。</p>`,
+    stats: { spd: 0.28, mob: 0.30, stl: 0.10, fire: 0.26, dur: 0.52, rng: 0.92 },
+    phys: { vMax: 340, vMil: 290, vStall: 82, accel: 14, decel: 36, pitch: 0.38, roll: 2.1, yaw: 0.30, hp: 110 },
+    gun: 'k3',
+    maxLoad: 1400,
+    hardpointGroups: [
+      { id: 'A', label: '翼下挂点', kind: 'light', pts: [{ x: 3.0, y: -0.8 }, { x: -3.0, y: -0.8 }] },
+      { id: 'B', label: '机腹', kind: 'belly', pts: [{ x: 0.8, y: -1.6 }, { x: -0.8, y: -1.6 }] }
+    ],
+    defaultLoadout: {}
+  },
+
+  /* ============================================================
      调节场管理局 —— 技术机构，状态不明
      ============================================================ */
   {
     id: 'a2',
-    name: 'ME-2', nick: 'Datum', cn: '水准',
+    // 管理局是技术机构，它的飞机不挂军标，只有自己的批次名
+    name: '水准', nick: 'Datum', cn: 'MERLI',
     role: '高空勤务机',
     faction: '调节场管理局',
     planformType: '高展弦比直翼',
+    caps: [],
     maker: '调节场管理局 · 自建',
     npcOnly: true,
     model: 'sower',
@@ -341,7 +443,7 @@ var WEAPONS = {
     name: 'CEL-7', cn: '30mm 四管转膛炮', kind: 'gun',
     rpm: 3900, speed: 1020, dmg: 17, spread: 0.0028, ammo: 14000,
     range: 2000, highRange: 3100,
-    desc: 'GU-6 专用。一发足以打穿装甲车辆的顶甲。'
+    desc: 'G-6 专用。一发足以打穿装甲车辆的顶甲。'
   },
 
   /* ---------- 基础短程空空导弹 ----------
@@ -732,6 +834,87 @@ var WEAPONS = {
     stat: { dmg: 0.0, spd: 0.0, trn: 0.0, rng: 0.0, ecm: 1.0 }
   },
 
+  /* ============================================================
+     下游同盟与分水群岛国的装备
+
+     它们和上游共用逻辑语编号（那是通用技术语言），但**型号号各自排** ——
+     所以会出现同词根不同号的情况：上游的 SPO-6 与下游的 SPO-14
+     都出自 daspo（摧毁），只是两家分别排自己的号。
+
+     fits 留空 = 玩家挂不上，只作为 NPC 的制式装备存在。
+     ============================================================ */
+
+  /* --- 下游：认知电子战是他们的看家本事 --- */
+  vzu: {
+    id: 'vzu', name: 'ZUN-6', cn: '迷雾 · MISTVEIL', kind: 'ecm',
+    model: 'missile',
+    speed: 0, boost: 0, life: 0, vsLife: 0,
+    turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
+    dmg: 0, ammo: 0, cd: 34, salvo: 1, flare: 1.0, prox: 0,
+    target: 'air', passive: true,
+    passiveEffect: { lockResist: 0.30 },
+    fits: [], perPoint: 0, mass: 0,
+    desc: `下游的干扰吊舱，比上游的 ZUN-8 老一代，但装得更多。
+       ​它们的逻辑很直白：<b>只要你先看不见，谁先发现谁就不重要了。</b>`,
+    stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.78 }
+  },
+
+  /* --- 下游：对地 --- */
+  vgt: {
+    id: 'vgt', name: 'GUT-7', cn: '碎石 · RUBBLE', kind: 'agm',
+    model: 'missile',
+    speed: 430, boost: 120, life: 9.0, vsLife: 20.0,
+    turn: 0.62, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 7000,
+    dmg: 190, ammo: 2, cd: 55, salvo: 1, flare: 0.62, prox: 30,
+    target: 'ground',
+    fits: [], perPoint: 0, mass: 0,
+    desc: `下游的通用对地弹。精度比不上上游的 GUT-9，但便宜、库存大 ——
+       而且他们从来不介意多丢几发。`,
+    stat: { dmg: 0.62, spd: 0.34, trn: 0.22, rng: 0.56, ecm: 0.30 }
+  },
+
+  /* --- 下游：反大型 --- */
+  vsr: {
+    id: 'vsr', name: 'SPO-14', cn: '坍方 · SLIPFALL', kind: 'asm',
+    model: 'missile',
+    speed: 560, boost: 150, life: 11.0, vsLife: 24.0,
+    turn: 0.55, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 9000,
+    dmg: 260, ammo: 1, cd: 78, salvo: 1, flare: 0.72, prox: 34,
+    target: 'ship',
+    fits: [], perPoint: 0, mass: 0,
+    desc: `打大型目标的半穿甲弹，飞行剖面很高、末段俯冲 ——
+       这个设计是为了绕开调节场上空那些不好惹的东西。`,
+    stat: { dmg: 0.76, spd: 0.46, trn: 0.20, rng: 0.70, ecm: 0.34 }
+  },
+
+  /* --- 下游：格斗 --- */
+  vbn: {
+    id: 'vbn', name: 'BIN-9', cn: '双生 · TWINBORN', kind: 'aam',
+    model: 'missile',
+    speed: 780, boost: 300, life: 4.0, vsLife: 10.0,
+    turn: 2.10, seeker: 'ir', lockCone: 62 * Math.PI / 180, lockDist: 4200,
+    dmg: 42, ammo: 2, cd: 40, salvo: 1, flare: 0.58, prox: 20,
+    target: 'air',
+    fits: [], perPoint: 0, mass: 0,
+    desc: `两个导引头共用一个弹体 —— 打丢一个还有第二个。
+       下游飞行员喜欢它，因为<b>被它盯上时，一发干扰弹不够用</b>。`,
+    stat: { dmg: 0.48, spd: 0.52, trn: 0.62, rng: 0.34, ecm: 0.26 }
+  },
+
+  /* --- 分水群岛国：两边卖的旧货 --- */
+  otr: {
+    id: 'otr', name: 'TOR-1', cn: '旧锭 · OLDBAR', kind: 'aam',
+    model: 'missile',
+    speed: 620, boost: 200, life: 3.0, vsLife: 7.0,
+    turn: 1.35, seeker: 'ir', lockCone: 38 * Math.PI / 180, lockDist: 3000,
+    dmg: 30, ammo: 2, cd: 30, salvo: 1, flare: 0.86, prox: 18,
+    target: 'air',
+    fits: [], perPoint: 0, mass: 0,
+    desc: `上游二十年前的外销型，如今在群岛国手里算是主力。
+       导引头迟钝、抗干扰极差 —— 但它便宜，而且两边都还在供货。`,
+    stat: { dmg: 0.34, spd: 0.40, trn: 0.34, rng: 0.18, ecm: 0.10 }
+  },
+
   /* ---------- 下游武器 ---------- */
   dl4: {
     id: 'dl4', name: 'DAR-4', cn: '砾石 · GRAVEL', kind: 'aam', model: 'missile',
@@ -915,11 +1098,18 @@ var STORE_ROLE = {
   dl4:  '中距拦截',
   dl6:  '格斗',
   dl9:  '要地防空',
+  vzu:  '被动 · 抗锁定（下游）',
+  vgt:  '对地攻击（下游）',
+  vsr:  '反大型（下游）',
+  vbn:  '格斗 · 双导引头',
 
   /* 补位的三种 */
   swm:  '反无人机 · 蜂群',
   hva:  '极高空拦截',
-  lcm:  '远程对地巡航'
+  lcm:  '远程对地巡航',
+
+  /* 分水群岛国 */
+  otr:  '老式短程弹'
 };
 
 (function () {
@@ -1072,7 +1262,9 @@ var MISSILE_LEAD = {
   asl: 0.65, asl2: 0.70, sat: 0.68, rkt: 0.0, clb: 0.50,
   v25: 0.66, v22: 0.74, v30: 0.48,
   dl4: 0.74, dl6: 0.48, dl9: 0.80,
-  swm: 0.44, hva: 0.80, lcm: 0.62
+  swm: 0.44, hva: 0.80, lcm: 0.62,
+  /* 下游与分水 */
+  vgt: 0.58, vsr: 0.70, vbn: 0.66, otr: 0.32
 };
 
 (function () {

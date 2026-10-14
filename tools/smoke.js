@@ -742,15 +742,35 @@ if (Ent && M3 && me && world) {
   {
     const RAFSI = ['CEL', 'TOR', 'SUT', 'GIR', 'CLA', 'SPO', 'GUT', 'PEJ',
       'GUS', 'ZUN', 'DAR', 'BIN', 'BAD', 'CAV', 'DIL'];
-    // 机型用两字母 rafsi，武器用三字母 —— 长度本身就是区分
-    const RAFSI2 = ['BL', 'GA', 'GU', 'FA', 'MI', 'SU', 'RO', 'XA', 'ME'];
+    // 上游：按用途分类，同用途共用首字母；舰载型在尾部追加一个字母
+    const UP_PREFIX = ['D', 'DB', 'F', 'G'];
+    // 下游：按设计局分类
+    const DOWN_PREFIX = ['ROK', 'GAL', 'VAC'];
     const bad = [];
 
     sandbox.AIRCRAFT.forEach(a => {
-      const m = a.name.match(/^([A-Z]{2})-(\d+)$/);
-      if (!m) bad.push('机型 ' + a.name + ' 不是「两字母 rafsi - 序号」格式');
-      else if (RAFSI2.indexOf(m[1]) < 0) {
-        bad.push('机型 ' + a.name + ' 的前缀 ' + m[1] + ' 不在机型 rafsi 表里');
+      const m = a.name.match(/^([A-Z]+)-(\d+)$/);
+      if (a.faction === '上游公约') {
+        if (!m) bad.push('上游机型 ' + a.name + ' 不是「前缀-序号」格式');
+        else if (UP_PREFIX.indexOf(m[1]) < 0) {
+          bad.push('上游机型 ' + a.name + ' 的用途前缀 ' + m[1] + ' 不在表里');
+        }
+      } else if (a.faction === '下游同盟') {
+        if (!m) bad.push('下游机型 ' + a.name + ' 不是「厂商前缀-序号」格式');
+        else if (DOWN_PREFIX.indexOf(m[1]) < 0) {
+          bad.push('下游机型 ' + a.name + ' 的设计局前缀 ' + m[1] + ' 不在表里');
+        }
+      } else {
+        // 分水群岛国用商品名、管理局用批次名，都不该出现「字母-数字」
+        if (m) bad.push(a.faction + ' 的 ' + a.name + ' 不该用「字母-数字」编号');
+      }
+    });
+
+    // 舰载型必须是「用途字母 + 追加字母」，不能凭空冒出别的双字母
+    sandbox.AIRCRAFT.forEach(a => {
+      const m = a.name.match(/^([A-Z]{2})-/);
+      if (m && UP_PREFIX.indexOf(m[1]) < 0) {
+        bad.push('机型 ' + a.name + ' 用了未登记的双字母前缀 ' + m[1]);
       }
     });
 

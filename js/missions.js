@@ -9,8 +9,18 @@ var MISSIONS = [];
    生成器
    ============================================================ */
 function spawnEnemy(w, o) {
+  /* 用 o.ac 指定机型（AIRCRAFT 表的 id），性能、外形、名称全部取自
+     该条目。早先这里把 RO-27 的数值硬编码在函数里，于是换机型
+     只是换个名字，飞起来还是同一架。 */
+  var acId = o.ac || 'm27';
+  var ac = null;
+  for (var ai = 0; ai < AIRCRAFT.length; ai++) {
+    if (AIRCRAFT[ai].id === acId) { ac = AIRCRAFT[ai]; break; }
+  }
+  if (!ac) ac = AIRCRAFT[0];
+
   var a = Ent.makeAircraft({
-    type: o.type || 'm27',
+    type: ac.id,
     team: 1,
     x: o.x, y: o.y, z: o.z,
     fwd: o.fwd || M3.V(0, 0, -1),
@@ -18,22 +28,29 @@ function spawnEnemy(w, o) {
     special: o.special || 'dl6',
     throttle: 0.8
   });
-  // 下游机型（AIRCRAFT 表里只有上游的三架，这里单独套参数）
-  a.model = 'm27';
-  a.phys = { vMax: 505, vMil: 398, vStall: 118, accel: 25, decel: 38, pitch: 0.56, roll: 2.7, yaw: 0.30, hp: 120 };
-  a.maxHp = 120;
-  a.hp = 120;
+  a.model = ac.model;
+  a.phys = {
+    vMax: ac.phys.vMax, vMil: ac.phys.vMil, vStall: ac.phys.vStall,
+    accel: ac.phys.accel, decel: ac.phys.decel,
+    pitch: ac.phys.pitch, roll: ac.phys.roll, yaw: ac.phys.yaw,
+    hp: ac.phys.hp
+  };
+  a.maxHp = ac.phys.hp;
+  a.hp = ac.phys.hp;
   a.radius = 8;
 
   /* 名字与呼号是两件事：
-       name  —— 机型（RO-27 片岩）
+       name  —— 机型（ROK-27 片岩）
        label —— 呼号（枯河 DRYRIVER），没有就留空
      之前把两者混成一个字符串，于是 HUD 上冒出了"测绘机 3"这种东西 ——
      那个既不是呼号也不是型号，纯粹是把内部编号漏了出来。 */
-  a.name = 'RO-27 片岩';
+  a.name = ac.name + ' ' + ac.cn;
   a.label = o.callsign || null;
   AI.attach(a, { role: 'enemy', skill: o.skill === undefined ? 0.55 : o.skill });
   a.ai.cmd = o.behavior || 'pursue';
+  // 护航机不算任务目标：任务简报说的是"测绘编队 5 架"，
+  // 把它们算进去会让"剩余 N"对不上
+  if (o.escort) a.ai.escort = true;
   a.behavior = o.behavior || 'pursue';
   a.wave = o.wave || 0;
   w.actors.push(a);
@@ -100,7 +117,7 @@ MISSIONS.push({
     '注意：本空域高度 7000 m 以上，动压充足，正常交战'
   ],
   threats: [
-    'RO-27「片岩」截击机 ×5（侦察构型，自卫为主）',
+    'ROK-27「片岩」截击机 ×5（侦察构型，自卫为主）',
     'BIN-6「燧火」红外格斗弹',
     '无地面防空威胁'
   ],
@@ -148,6 +165,24 @@ MISSIONS.push({
       e.flee = false;
       e.bigTarget = false;
     }
+
+    /* 两架 VAC-14 护航。它们比测绘机快、也更愿意打 ——
+       空气设计局的廉价品本来就是干这个的。 */
+    for (i = 0; i < 2; i++) {
+      spawnEnemy(w, {
+        ac: 'vac14',
+        x: (i - 0.5) * 2200, y: 8600, z: 9200,
+        fwd: M3.V(0, 0, -1),
+        speed: 300,
+        special: 'otr',
+        skill: 0.40,
+        behavior: 'escort',
+        escort: true,
+        callsign: downstreamCallsign(5 + i),
+        wave: 1
+      });
+    }
+
     w.objective = '拦截下游测绘编队';
     w.objectiveSub = '剩余 5';
     w.flags.killed = 0;
@@ -158,7 +193,7 @@ MISSIONS.push({
     var i, alive = 0;
     for (i = 0; i < w.actors.length; i++) {
       var e = w.actors[i];
-      if (e.team !== 1) continue;
+      if (e.team !== 1 || (e.ai && e.ai.escort)) continue;   // 护航不计入目标
       if (e.alive) alive++;
     }
     w.objectiveSub = '剩余 ' + alive;
@@ -198,7 +233,10 @@ MISSIONS.push({
   win: function (w) {
     var i;
     for (i = 0; i < w.actors.length; i++) {
-      if (w.actors[i].team === 1 && w.actors[i].alive) return false;
+      var a = w.actors[i];
+      if (a.team !== 1 || !a.alive) continue;
+      if (a.ai && a.ai.escort) continue;      // 护航机没打掉也能过关
+      return false;
     }
     return true;
   },
@@ -238,7 +276,7 @@ MISSIONS.push({
   ],
   threats: [
     'BAD-9「高墙」远程防空导弹（4 个阵地，射程 9 km）',
-    'RO-27「片岩」截击机（任务中段出现）',
+    'ROK-27「片岩」截击机（任务中段出现）',
     '地形：海面，无地形遮蔽可用'
   ],
   intel: `云底 <b>900 m</b> · 云顶 4200 m · 中继平台高度 <b>4000 m</b><br>
@@ -350,11 +388,16 @@ MISSIONS.push({
       w.radio.play('m2', 'radarDown');
       // 下游截击机从南边进场
       var k;
+      /* 两架 GAL-31 打头、两架 ROK-27 跟进。
+         高空设计局的重型截击机专为这种场合造的：
+         从高空俯冲下来打一轮中距弹，然后脱离再爬升。 */
       for (k = 0; k < 4; k++) {
+        var isHeavy = (k < 2);
         var e = spawnEnemy(w, {
-          x: -1200 + k * 900, y: 2600, z: 14000,
-          fwd: M3.V(0, 0, -1), speed: 340,
-          special: (k % 2) ? 'dl4' : 'dl6',
+          ac: isHeavy ? 'gal31' : 'm27',
+          x: -1200 + k * 900, y: isHeavy ? 6200 : 2600, z: 14000,
+          fwd: M3.V(0, 0, -1), speed: isHeavy ? 430 : 340,
+          special: isHeavy ? 'dl4' : 'dl6',
           skill: k === 0 ? 0.72 : 0.5,
           callsign: downstreamCallsign(5 + k)
         });
@@ -416,7 +459,7 @@ MISSIONS.push({
   ],
   threats: [
     '「灰烬」级播撒机 ×6（大型、低速、结构脆弱但数量多）',
-    'RO-27 护航编队',
+    'ROK-27 护航编队',
     'DRYWELL —— 下游第 4 战术联队指挥官'
   ],
   intel: `高度 <b>19 500 m</b> · 密度 0.076 kg/m³ · 温度 −57 ℃<br>
@@ -488,12 +531,17 @@ MISSIONS.push({
       s.weaponPod = true;
     }
 
-    // 两架护航
+    /* 两架护航：一架空气设计局的 VAC-14 贴地跟着，
+       一架高空设计局的 GAL-31 在上面看着。这是下游的标准搭配 ——
+       便宜的负责数量，贵的负责质量。 */
     for (i = 0; i < 2; i++) {
+      var isHeavy2 = (i === 1);
       spawnEnemy(w, {
-        x: -3000 + i * 6000, y: 19800, z: 11500,
-        fwd: M3.V(0, 0, -1), speed: 380,
-        special: 'dl6', skill: 0.6, callsign: downstreamCallsign(15 + i)
+        ac: isHeavy2 ? 'gal31' : 'vac14',
+        x: -3000 + i * 6000, y: isHeavy2 ? 20600 : 19800, z: 11500,
+        fwd: M3.V(0, 0, -1), speed: isHeavy2 ? 420 : 380,
+        special: isHeavy2 ? 'dl4' : 'vbn',
+        skill: 0.6, callsign: downstreamCallsign(15 + i)
       });
     }
 
