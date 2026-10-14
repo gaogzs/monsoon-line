@@ -171,7 +171,7 @@ S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       { id: 'A', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 4.1, y: -1.2 }, { x: -4.1, y: -1.2 }] },
       { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.9, y: -2.6 }, { x: -5.9, y: -2.6 }] }
     ],
-    defaultLoadout: { A: 'ram', B: 'mrm' }
+    defaultLoadout: { A: 'hva', B: 'mrm' }
   },
 
   /* ============================================================
@@ -198,7 +198,7 @@ S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       { id: 'A', label: '内埋弹舱', kind: 'belly', pts: [{ x: 1.1, y: -2.2 }, { x: -1.1, y: -2.2 }] },
       { id: 'B', label: '翼下挂点', kind: 'light', pts: [{ x: 3.6, y: -3.4 }, { x: -3.6, y: -3.4 }] }
     ],
-    defaultLoadout: { A: 'mrm', B: 'oep' }
+    defaultLoadout: { A: 'lcm', B: 'oep' }
   },
 
   /* ============================================================
@@ -582,6 +582,50 @@ var WEAPONS = {
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.50 }
   },
 
+  /* ---------- 补位：三个此前没有对应型号的定位 ---------- */
+
+  swm: {
+    id: 'swm', name: 'GIR-12', cn: '鸦群 · MURMUR', kind: 'aam',
+    model: 'missile',
+    speed: 720, boost: 300, life: 3.5, vsLife: 9.0,
+    turn: 2.55, seeker: 'ir', lockCone: 55 * Math.PI / 180, lockDist: 3400,
+    dmg: 16, ammo: 8, cd: 0.85, salvo: 4, flare: 0.44, prox: 14,
+    target: 'air', highAltScale: true,
+    desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下十六发，
+      一次齐射四枚 —— 它的用法不是"击落"，而是把蜂群从天上扫下来。
+      <b>拿去打有人机是浪费。</b>`,
+    stat: { dmg: 0.16, spd: 0.44, trn: 0.72, rng: 0.28, ecm: 0.22 }
+  },
+
+  hva: {
+    id: 'hva', name: 'SPO-9', cn: '落雷 · THUNDERFALL', kind: 'aam',
+    model: 'missile',
+    speed: 980, boost: 240, life: 8.0, vsLife: 18.0,
+    turn: 1.30, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 11000,
+    dmg: 62, ammo: 1, cd: 6.0, salvo: 1, flare: 0.70, prox: 32,
+    target: 'air', highAltImmune: true, bigTarget: true,
+    desc: `为两万米以上专门设计的拦截弹。舵面比同级大将近一倍，
+      代价是低空阻力大、加速慢。
+      <b>它的过载不随空气变稀而崩塌</b> —— 这是它唯一的长处，
+      也是在那个高度唯一还重要的东西。`,
+    stat: { dmg: 0.78, spd: 0.84, trn: 0.38, rng: 0.88, ecm: 0.24 }
+  },
+
+  lcm: {
+    id: 'lcm', name: 'GUT-30', cn: '远帆 · FARSAIL', kind: 'agm',
+    model: 'missile',
+    // 涡扇是全程工作的，所以 life（动力段）要够长，
+    // 否则"远程巡航弹"的射程会算得还不如一枚中距弹
+    speed: 480, boost: 110, life: 30.0, vsLife: 42.0,
+    turn: 0.48, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 14000,
+    dmg: 300, ammo: 1, cd: 8.0, salvo: 1, flare: 0.85, prox: 36,
+    target: 'ground', bigTarget: true,
+    desc: `涡扇动力的对地巡航弹，射程是全家族里最远的。
+      但它飞得慢、转弯迟钝 —— 一旦被拦，连躲的能力都没有。
+      <b>它的生存性完全建立在"发射前没人发现你"上。</b>`,
+    stat: { dmg: 0.86, spd: 0.30, trn: 0.14, rng: 1.00, ecm: 0.36 }
+  },
+
   /* ---------- 上游公约特殊武器 ---------- */
   v11: {
     id: 'v11', name: 'SUT-11', cn: '锥刺 · STING', kind: 'aam',
@@ -731,6 +775,7 @@ var STORE_ATTR = {
   hos:  { fits: ['tip', 'light', 'heavy'], perPoint: 4,  mass: 100 },
   qsr:  { fits: ['tip', 'light', 'heavy'], perPoint: 12, mass: 92 },
   wasp: { fits: ['tip', 'light', 'heavy'], perPoint: 3,  mass: 145 },
+  swm:  { fits: ['tip', 'light', 'heavy'], perPoint: 16, mass: 62 },
   v9:   { fits: ['tip', 'light', 'heavy'], perPoint: 2,  mass: 110 },
   v11:  { fits: ['light', 'heavy'],        perPoint: 2,  mass: 135 },
   // 中距弹可以进内埋弹舱 —— 隐形机就是靠这个保住隐身的
@@ -739,6 +784,7 @@ var STORE_ATTR = {
   arm:  { fits: ['heavy'],                 perPoint: 2,  mass: 310 },
   ram:  { fits: ['heavy'],                 perPoint: 2,  mass: 340 },
   vlar: { fits: ['heavy'],                 perPoint: 1,  mass: 720 },
+  hva:  { fits: ['heavy'],                 perPoint: 1,  mass: 560 },
 
   /* 对地与反大型 */
   v25:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 330 },
@@ -749,6 +795,7 @@ var STORE_ATTR = {
   v30:  { fits: ['heavy', 'belly'],        perPoint: 1,  mass: 295 },
   clb:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 350 },
   rkt:  { fits: ['light', 'heavy'],        perPoint: 28, mass: 280 },
+  lcm:  { fits: ['heavy', 'belly'],        perPoint: 1,  mass: 780 },
 
   /* 吊舱（主动） */
   e4:   { fits: ['light', 'belly'],        perPoint: 1,  mass: 215 },
@@ -859,7 +906,12 @@ var STORE_ROLE = {
   /* 下游 */
   dl4:  '中距拦截',
   dl6:  '格斗',
-  dl9:  '要地防空'
+  dl9:  '要地防空',
+
+  /* 补位的三种 */
+  swm:  '反无人机 · 蜂群',
+  hva:  '极高空拦截',
+  lcm:  '远程对地巡航'
 };
 
 (function () {
@@ -898,7 +950,8 @@ var MISSILE_LEAD = {
   ram: 0.86, vlar: 0.90,
   asl: 0.65, asl2: 0.70, sat: 0.68, rkt: 0.0, clb: 0.50,
   v25: 0.66, v22: 0.74, v30: 0.48,
-  dl4: 0.74, dl6: 0.48, dl9: 0.80
+  dl4: 0.74, dl6: 0.48, dl9: 0.80,
+  swm: 0.44, hva: 0.80, lcm: 0.62
 };
 
 (function () {

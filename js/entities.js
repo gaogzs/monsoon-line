@@ -369,7 +369,13 @@ var Ent = (function () {
         if (m.lostTime > 0.5) m.seekerOn = false;
       } else {
         m.lostTime = 0;
-        var maxTurn = m.turn * turnFactor(m.pos.y) * dt;
+        /* 有些弹是专门为稀薄大气造的（舵面比同级大一倍），
+           它们的过载不随空气变稀而崩塌 —— 在这个游戏里
+           这就是"高空拦截弹"唯一说得通的定义，
+           否则所有弹在上两万米之后都退化成同一种东西。 */
+        var tf = turnFactor(m.pos.y);
+        if (w.highAltImmune) tf = Math.max(tf, 0.78);
+        var maxTurn = m.turn * tf * dt;
         var B = M3.turnToward(m.fwd, m.up, desired, maxTurn);
         m.fwd = B.fwd; m.up = B.up;
         m.right = M3.cross(m.up, m.fwd);
