@@ -630,8 +630,8 @@ var HUD = (function () {
     }
 
     // 空中目标：第一行呼号（认人），第二行机型（认机）
-    var line1 = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.nick) : (t.name || ''));
-    var line2 = t.label && t.ac ? (t.ac.name + ' ' + t.ac.nick) : null;
+    var line1 = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.name || ''));
+    var line2 = t.label && t.ac ? (t.ac.name + ' ' + t.ac.cn) : null;
 
     var tx = s.x + sz + 7, ty = s.y - sz + 8;
     text(ctx, line1, tx, ty, col, FS, 'left');
@@ -684,9 +684,10 @@ var HUD = (function () {
     text(ctx, label, tx, ty + 10, col, 'bold 12px Consolas,monospace', 'left');
     var ly = ty + 24;
 
-    // 机型代号 —— 效仿皇牌空战，红框旁边直接写清那是什么飞机
+    // 机型代号 —— 效仿皇牌空战，红框旁边直接写清那是什么飞机。
+    // 用 cn（中文名）而不是 nick（英文绰号）。
     if (t.ac) {
-      text(ctx, t.ac.name + ' ' + t.ac.nick, tx, ly, col, FS, 'left');
+      text(ctx, t.ac.name + ' ' + t.ac.cn, tx, ly, col, FS, 'left');
       ly += 14;
     }
 

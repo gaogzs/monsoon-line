@@ -159,7 +159,7 @@ S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
      ============================================================ */
   {
     id: 'm27',
-    name: 'M-27', nick: '片岩', cn: 'SCHIST',
+    name: 'M-27', nick: 'Schist', cn: '片岩',
     role: '多用途战斗机',
     faction: '下游同盟',
     planformType: '后掠翼',
@@ -186,7 +186,7 @@ S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
      ============================================================ */
   {
     id: 'k8',
-    name: 'K-8', nick: '潮线', cn: 'TIDELINE',
+    name: 'K-8', nick: 'Tideline', cn: '潮线',
     role: '轻型拦截机',
     faction: '分水群岛国',
     planformType: '平直翼',
@@ -212,7 +212,7 @@ S-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
      ============================================================ */
   {
     id: 'a2',
-    name: 'A-2', nick: '水准', cn: 'DATUM',
+    name: 'A-2', nick: 'Datum', cn: '水准',
     role: '高空勤务机',
     faction: '调节场管理局',
     planformType: '高展弦比直翼',
@@ -561,7 +561,9 @@ var WEAPONS = {
   v30: {
     id: 'v30', name: 'PEJ-30', cn: '铁蒺藜 · CALTROP', kind: 'bomb',
     model: 'bomb',
-    speed: 0, boost: 0, life: 99, vsLife: 99,
+    // 无动力滑翔：投放后靠载机初速前进。早期的 speed/life 是 0/99，
+    // 意味着这东西在游戏里根本不往前走
+    speed: 280, boost: 0, life: 12.0, vsLife: 24.0,
     turn: 0.20, seeker: 'none', lockCone: 60 * Math.PI / 180, lockDist: 2400,
     dmg: 210, ammo: 6, cd: 1.2, salvo: 1, flare: 1.0, prox: 42,
     target: 'ground', cluster: true, unguided: true,
@@ -729,6 +731,82 @@ var CS_DOWNSTREAM = [
 function downstreamCallsign(i) {
   var c = CS_DOWNSTREAM[i % CS_DOWNSTREAM.length];
   return c.cn + ' ' + c.en;
+}
+
+/* ============================================================
+   挂载定位
+   —— 一句话说清"这东西在战场上干什么用"。
+   光看 kind（空空/空地）和一堆参数，说不出它扮演什么角色；
+   图鉴里单列出来，选装的时候才好横向比较。
+   ============================================================ */
+var STORE_ROLE = {
+  /* 空空 */
+  srm:  '近距自卫 · 基础弹',
+  trm:  '近距自卫 · 抗干扰',
+  hos:  '大离轴格斗',
+  qsr:  '近距压制 · 齐射',
+  wasp: '快速反应格斗',
+  v9:   '大离轴格斗 · 双联',
+  v11:  '高机动格斗',
+  mrm:  '中距拦截 · 主动雷达',
+  arm:  '中距反辐射',
+  v17:  '远距拦截 · 冲压',
+  ram:  '远距拦截 · 冲压改进',
+  vlar: '超远距 · 反预警机',
+
+  /* 对地与反大型 */
+  asl:  '防区外对地 · 轻量',
+  asl2: '加固目标侵彻',
+  v25:  '防区外对地',
+  sat:  '反浮空平台',
+  v22:  '反大型目标',
+  rkt:  '近距火力压制',
+  clb:  '面压制 · 子母弹',
+  v30:  '面压制 · 集束',
+
+  /* 吊舱 */
+  e4:   '主动电子战',
+  l2:   '定向能拦截',
+  ecm2: '被动 · 抗锁定',
+  dec:  '被动 · 干扰弹容量',
+  oep:  '被动 · 扩展锁定',
+  irp:  '被动 · 静默探测',
+  hdp:  '被动 · 生存性',
+
+  /* 下游 */
+  dl4:  '中距拦截',
+  dl6:  '格斗',
+  dl9:  '要地防空'
+};
+
+(function () {
+  for (var k in STORE_ROLE) {
+    if (Object.prototype.hasOwnProperty.call(WEAPONS, k)) WEAPONS[k].role = STORE_ROLE[k];
+  }
+})();
+
+/**
+ * 估算一枚弹的"有效射程"（公里）—— 动力段能把它送多远。
+ *
+ * 为什么不直接用 speed × life：那样忽略了加速阶段。
+ * 导弹发射时带着载机的速度（约 350 m/s），先加速到 speed，
+ * 再匀速飞完动力段剩余时间。出动力段之后它只能滑翔，
+ * 机动能力断崖式下降，所以这个数比"总飞行距离"更贴近实战。
+ *
+ * 返回 null 表示它不是一枚可以"打到某处"的东西（吊舱之类）。
+ */
+function missileRange(w) {
+  if (!w) return null;
+  if (w.passive) return null;
+  if (!w.speed || !w.life) return null;
+
+  var v0 = 350;                                   // 载机初速
+  if (!w.boost) return w.speed * w.life / 1000;   // 无动力（火箭巢）
+
+  var tAcc = Math.min(w.life, Math.max(0, (w.speed - v0) / w.boost));
+  var rAcc = v0 * tAcc + 0.5 * w.boost * tAcc * tAcc;
+  var rCruise = w.speed * Math.max(0, w.life - tAcc);
+  return (rAcc + rCruise) / 1000;
 }
 
 var MISSILE_LEAD = {

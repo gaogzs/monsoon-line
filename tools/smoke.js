@@ -355,6 +355,24 @@ for (const k in WEAPONS) {
 }
 if (!badStore) ok('全部武器都有挂载属性');
 
+// 可发射的武器必须有飞行参数。
+// PEJ-30 曾经是 speed:0 / life:99 —— 那样它在游戏里根本不往前走。
+// 注意排除吊舱：ECM 与 DEW 不发射实体，没有 speed/life 是正常的。
+{
+  let bad = 0;
+  for (const k in WEAPONS) {
+    const w = WEAPONS[k];
+    if (w.kind === 'gun' || w.passive) continue;
+    if (w.kind === 'ecm' || w.kind === 'dew') continue;
+    if (!w.speed || !w.life) {
+      fail('武器 ' + k + '（' + w.name + '）缺少飞行参数：speed=' +
+        w.speed + ' life=' + w.life);
+      bad++;
+    }
+  }
+  if (!bad) ok('全部可发射武器都有 speed / life');
+}
+
 // 有制导方式的武器都该有导引品质（lead）
 // 注意：被动吊舱和 ECM/DEW 本来就不制导，不该要求它们有 lead
 {
