@@ -1321,6 +1321,13 @@ var Game = (function () {
        要么在另一些 FOV 下过早触发。
 
        直接看鼠标在屏幕上的位置就没有这个耦合。 */
+    /* 鼠标在屏幕上的归一化位置（±1 = 边缘）。
+
+       这是 steerTo 判断"推杆还是滚转"的依据 —— **必须用屏幕坐标**。
+       飞机滚转之后"屏幕下方"和"机体下方"根本不是一回事：
+       侧飞 90° 时屏幕右侧恰好落在机体 up 方向上，用机体坐标判断
+       会把"拉右"误判成"抬头"。 */
+    player.aimX = (mouse.x - Renderer.W / 2) / (Renderer.W * 0.5);
     player.aimDown = (mouse.y - Renderer.H / 2) / (Renderer.H * 0.5);
 
     // 传 player 自身作为锁存容器（提供 rollLock / aimDown 字段）
