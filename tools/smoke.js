@@ -1814,6 +1814,74 @@ if (Ent && M3 && me && world) {
     else ok('对空/对地弹药的 target 字段自洽（发射前的匹配检查据此拒绝错误目标）');
   }
 
+  /* ---- 无制导火箭：无目标也能打，而且真的一点制导都没有 ----
+
+     两件事都要验：
+       ① 没有锁定任何目标时也必须能投放（无制导武器不该有锁定门槛）
+       ② 打出去之后**航向绝不能变** —— 无制导意味着除了重力，
+          没有任何东西在影响它。这一条才算真的"一点制导都没有"。 */
+  {
+    const G6 = sandbox.Game, E6 = sandbox.Ent;
+    const bad = [];
+    G6.startMission(1);
+    const pl = G6.__player();
+    const w = G6.__world();
+    for (let f = 0; f < 30; f++) pump(1);
+
+    // 故意什么目标都不锁
+    pl.target = null;
+    pl.spCd = 0;
+    pl.lockProgress = 0;
+    pl.locked = false;
+    pl.special = 'rkt';
+    pl.spAmmo = 20;
+    pl.slotCd.rkt = [0];
+
+    const kd2 = docListeners['keydown'] || [];
+    const n0 = w.missiles.length;
+    kd2.forEach(fn => fn({ code: 'Enter', preventDefault() {} }));
+    const fired = w.missiles.length - n0;
+    if (fired < 1) {
+      bad.push('无锁定目标时无制导火箭打不出去 —— 它本来就不需要锁定');
+    } else {
+      ok('无锁定也能投放无制导武器（一次出膛 ' + fired + ' 枚，' +
+        '锁定量 ' + pl.lockProgress.toFixed(2) + '）');
+    }
+
+    // ② 打出去的火箭必须直飞
+    const m = w.missiles[w.missiles.length - 1];
+    if (m) {
+      const ww = m.w;
+      ['turn', 'lead', 'seeker', 'flare', 'boost'].forEach(k => {
+        if (ww[k] !== undefined) bad.push('无制导火箭仍有 ' + k + ' = ' + ww[k]);
+      });
+      if (m.target) bad.push('无制导火箭竟然带着目标引用');
+      if (m.seekerOn === false && ww.seeker !== undefined) {
+        bad.push('无制导火箭仍有导引头开关');
+      }
+
+      // 飞 0.5 秒，看水平航向有没有被修正过
+      const a0 = Math.atan2(m.fwd.z, m.fwd.x);
+      for (let f = 0; f < 30; f++) {
+        E6.stepMissile(m, 1 / 60, w);
+        if (!m.alive) break;
+      }
+      if (m.alive) {
+        const a1 = Math.atan2(m.fwd.z, m.fwd.x);
+        let dA = Math.abs(a1 - a0);
+        if (dA > Math.PI) dA = Math.abs(dA - Math.PI * 2);
+        if (dA > 0.01) {
+          bad.push('火箭航向变了 ' + (dA * 180 / Math.PI).toFixed(1) +
+            '° —— 除重力之外还有东西在影响它');
+        } else {
+          ok('无制导火箭直飞：0.5 秒内航向变化 < 0.6°');
+        }
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+  }
+
   /* ---- 端到端：打错目标会被拒绝，打对了能命中 ---- */
   {
     const G3 = sandbox.Game, M3f = sandbox.M3, E5 = sandbox.Ent;

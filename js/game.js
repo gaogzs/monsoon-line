@@ -995,7 +995,10 @@ var Game = (function () {
       Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>交战规则限制 —— 该武器在阵列空域内被锁定。</b>', gap: 0.9 });
       return false;
     }
-    if (!target && wp.target !== 'ground' && wp.target !== 'ship') return false;
+    /* 无目标也允许发射。
+
+       无制导弹本来就不需要目标；有导引头的弹打出去之后直飞，
+       或者靠 reAcquire 自己找 —— 那是玩家自己的选择，不该被拦。 */
 
     /* 一次按键只打 1 枚。
        挂载点决定的是"能同时装填几发"（也就是 slotArr 的长度），
@@ -1313,25 +1316,43 @@ var Game = (function () {
       Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: 'GUS-2 是自动拦截系统，无需手动发射。', gap: 0.6 });
       return;
     }
-    if (!player.target || !player.target.alive) {
-      Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: '<i>没有锁定目标。</i>', gap: 0.5 });
-      return;
-    }
     if (player.spAmmo <= 0) { SFX.loseLock(); return; }
     if (player.spCd > 0) { SFX.loseLock(); return; }
 
-    /* 目标类型对不上：明确说清为什么打不出去，而不是静默失败。
-       这一条必须在扣弹与冷却之前 —— 打错的代价不该是白等一个冷却。 */
-    var mism = targetMismatch(w, player.target);
-    if (mism) {
-      Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: mism, gap: 0.7 });
-      SFX.fail();
-      return;
+    /* ---------- 不再要求"必须先锁定才能开火" ----------
+
+       这一条以前拦掉两种完全正当的用法：
+
+       ① 无制导武器。火箭巢和炸弹没有导引头，出膛之后往哪飞只看
+          投放那一刻的机头指向 —— 要求先锁定，等于给一件从原理上
+          就不需要锁定的武器加了一道锁定门槛。
+
+       ② 俯冲扫射式的对地攻击。玩家压低机头对准目标，按下去却只
+          得到一句"没有锁定目标"。
+
+       现在只保留**一条**拦截：目标类型和武器对不上（拿对空弹打浮台）。
+       那是真的打不出去，必须说清楚；而"打不打得中"是玩家自己的判断。 */
+    var t = player.target;
+    if (t && !t.alive) t = null;
+
+    if (t) {
+      var mism = targetMismatch(w, t);
+      if (mism) {
+        Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: mism, gap: 0.7 });
+        SFX.fail();
+        return;
+      }
     }
 
-    if (player.lockProgress < 1 && w.seeker === 'radar') { SFX.loseLock(); return; }
-    if (launch(player, player.target, world)) {
-      Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: w.seeker === 'radar' ? '<b>Fox 3</b>' : '<b>Fox 2</b>', gap: 0.4 });
+    /* lockProgress 不再拦发射。它仍然驱动 HUD 上的锁定环 ——
+       那是给玩家看的"火控解算进度"，不是开火许可。 */
+    if (launch(player, t, world)) {
+      Radio.raw({
+        who: CALLSIGN.player, cls: 'ally',
+        tx: w.unguided ? '<b>投放</b>'
+          : (w.seeker === 'radar' ? '<b>Fox 3</b>' : '<b>Fox 2</b>'),
+        gap: 0.4
+      });
     }
   }
 
