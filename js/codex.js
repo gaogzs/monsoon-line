@@ -650,6 +650,11 @@ function _hpKind(k) {
   return ({ tip: '翼尖', light: '通用', heavy: '重挂', belly: '机腹' })[k] || k;
 }
 
+/** 能力标签的中文名 */
+function _capLabel(c) {
+  return ({ strike: '对地火控', intercept: '高空拦截', ew: '电子战' })[c] || c;
+}
+
 /** 射程列的文字 */
 function _rngTxt(w) {
   // 定向能吊舱不"飞过去"，它有一个拦截半径
@@ -763,7 +768,10 @@ CODEX.push({
           '<td>' + _rngTxt(w) + '</td>' +
           '<td>' + (w.passive ? '—' : '×' + w.perPoint) + '</td>' +
           '<td>' + w.mass + '</td>' +
-          '<td>' + fits.join(' / ') + '</td>' +
+          '<td>' + fits.join(' / ') +
+          (w.needs && w.needs.length
+            ? '<br><span class="d">限 ' + w.needs.map(_capLabel).join(' / ') + '</span>'
+            : '') + '</td>' +
           '<td>' + _seekerLabel(w) + '</td>' +
           '<td>' + (w.cd ? w.cd + 's' : '—') + '</td>' +
           '</tr>';

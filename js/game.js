@@ -625,12 +625,21 @@ var Game = (function () {
     // 空置排最前 —— 它也是一个正经选项，不是"什么都不选"
     host.appendChild(makeStoreCard(lo, g, null));
 
+    /* 两类筛选是独立的：
+         fits  —— 挂点类型对不对（物理上挂不挂得住）
+         caps  —— 机体能力够不够（火控、供电、散热撑不撑得住）
+       第二类是后来补的：只有 fits 的话，制空战斗机也能挂重型巡航导弹。 */
+    var blocked = 0;
     for (var wid in WEAPONS) {
       if (!Object.prototype.hasOwnProperty.call(WEAPONS, wid)) continue;
       var w = WEAPONS[wid];
       if (w.kind === 'gun') continue;
       if (!w.fits || w.fits.indexOf(g.kind) < 0) continue;
+      if (!canCarry(ac, w)) { blocked++; continue; }
       host.appendChild(makeStoreCard(lo, g, wid));
+    }
+    if (blocked) {
+      head.textContent += '  ·  ' + blocked + ' 项因机体能力不足不可挂';
     }
   }
 
@@ -1936,9 +1945,13 @@ var Game = (function () {
         var ok = false;
         for (var wk in WEAPONS) {
           var ww = WEAPONS[wk];
-          if (ww.kind !== 'gun' && ww.fits && ww.fits.indexOf(gg.kind) >= 0) { ok = true; break; }
+          if (ww.kind !== 'gun' && ww.fits && ww.fits.indexOf(gg.kind) >= 0 &&
+              canCarry(ac, ww)) { ok = true; break; }
         }
-        if (!ok) problems.push('机型 ' + ac.id + ' 的挂载点组 ' + gg.id + ' 没有任何武器挂得上');
+        if (!ok) {
+          problems.push('机型 ' + ac.id + ' 的挂载点组 ' + gg.id +
+            ' 在当前能力下没有任何武器挂得上');
+        }
       }
       // 默认配置里引用的武器必须真的能挂到那一组
       for (var dk in (ac.defaultLoadout || {})) {
@@ -1951,6 +1964,10 @@ var Game = (function () {
         if (!WEAPONS[dw].fits || WEAPONS[dw].fits.indexOf(dg.kind) < 0) {
           problems.push('机型 ' + ac.id + ' 的默认配置把 ' + WEAPONS[dw].name +
             ' 挂到了挂不下的 ' + dg.label);
+        }
+        if (!canCarry(ac, WEAPONS[dw])) {
+          problems.push('机型 ' + ac.id + ' 的默认配置带了 ' + WEAPONS[dw].name +
+            '，但它缺少对应的机体能力（需要 ' + WEAPONS[dw].needs.join(' / ') + '）');
         }
       }
       if (!ac.phys || !ac.phys.vMax) problems.push('机型 ' + ac.id + ' 缺少飞行性能参数');

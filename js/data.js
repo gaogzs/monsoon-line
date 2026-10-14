@@ -54,6 +54,8 @@ var AIRCRAFT = [
     role: '舰载多用途战斗机',
     faction: '上游公约',
     planformType: '可变后掠翼',
+    // 能力标签：决定它能挂哪些"有门槛"的武器，见下面的 STORE_NEEDS
+    caps: ['strike', 'ew'],
     maker: '上游公约 · 北岸航空',
     stats: { spd: 0.68, mob: 0.72, stl: 0.55, fire: 0.70, dur: 0.62, rng: 0.76 },
     phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.76, roll: 3.0, yaw: 0.30, hp: 130 },
@@ -91,6 +93,7 @@ var AIRCRAFT = [
     role: '平流层制空战斗机',
     faction: '上游公约',
     planformType: '菱形翼',
+    caps: ['intercept'],
     maker: '上游公约 · 高空试验局',
     stats: { spd: 0.96, mob: 0.84, stl: 0.86, fire: 0.54, dur: 0.32, rng: 0.48 },
     phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.80, roll: 3.4, yaw: 0.28, hp: 92 },
@@ -123,6 +126,7 @@ var AIRCRAFT = [
     role: '近距空中支援攻击机',
     faction: '上游公约',
     planformType: '平直翼',
+    caps: ['strike'],
     maker: '上游公约 · 铁砧重工',
     stats: { spd: 0.34, mob: 0.44, stl: 0.30, fire: 0.98, dur: 0.98, rng: 0.60 },
     phys: { vMax: 380, vMil: 320, vStall: 88, accel: 18, decel: 44, pitch: 0.62, roll: 2.2, yaw: 0.34, hp: 250 },
@@ -156,6 +160,7 @@ A-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     role: '高空高速截击机',
     faction: '上游公约',
     planformType: '三角翼',
+    caps: ['intercept'],
     maker: '上游公约 · 北岭重工',
     model: 'c9',
     desc: `海燕不是为缠斗造的。它的设计出发点只有一个：
@@ -183,6 +188,7 @@ A-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     role: '多用途隐形战斗机',
     faction: '上游公约',
     planformType: '无尾菱形翼',
+    caps: ['strike', 'ew'],
     maker: '上游公约 · 环带工程',
     model: 'c21',
     desc: `上游公约第一种真正意义上的低可探测飞机，
@@ -210,6 +216,7 @@ A-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     role: '高机动格斗机',
     faction: '上游公约',
     planformType: '前掠翼',
+    caps: [],                    // 纯格斗机：没有对地火控，也不带电子战设备
     maker: '上游公约 · 丹湾飞机厂',
     model: 'c33',
     desc: `前掠翼有个老问题：翼尖会先失速，然后机翼会以一种
@@ -272,6 +279,7 @@ A-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     role: '轻型拦截机',
     faction: '分水群岛国',
     planformType: '平直翼',
+    caps: ['strike'],
     maker: '分水群岛国 · 丹湾飞机厂',
     npcOnly: true,
     model: 'c14',
@@ -956,6 +964,59 @@ function missileRange(w) {
    早期版本只有 0.5–1.5 秒，而且是一次按键把所有槽同时打光 ——
    那样"齐射数"完全没有战术意义，因为打完之后眨眼就能再来一轮。
    ============================================================ */
+/* ============================================================
+   挂载的能力门槛
+
+   光有挂点类型（fits）是不够的 —— 那等于"位置一样就能挂"，
+   于是制空战斗机也能挂上重型巡航导弹，机体差异白设计了。
+
+   这里只给**少数有门槛的**武器加要求，机型的 caps 必须包含它。
+   大部分武器没有门槛。限制集中在三类：
+
+     strike     对地 / 对海打击：需要完整的对地火控与重型挂架
+     intercept  高空高速拦截：需要高空点火与冷却系统
+     ew         电子战：耗电与散热不是每架飞机都撑得住
+   ============================================================ */
+var STORE_NEEDS = {
+  /* 对地 / 对海 */
+  arm:  ['strike'],      // 反辐射：需要反辐射接收机
+  asl2: ['strike'],      // 加固目标侵彻弹
+  v25:  ['strike'],      // 防区外对地
+  lcm:  ['strike'],      // 远程巡航弹
+  sat:  ['strike'],      // 反浮空平台
+  v22:  ['strike'],      // 反大型目标
+
+  /* 高空拦截 */
+  hva:  ['intercept'],   // 极高空拦截弹
+  vlar: ['intercept'],   // 超远距空空弹：需要大孔径雷达
+
+  /* 电子战 */
+  e4:   ['ew'],          // 主动电子战吊舱
+  l2:   ['ew']           // 定向能：耗电巨大
+};
+
+(function () {
+  for (var k in STORE_NEEDS) {
+    if (Object.prototype.hasOwnProperty.call(WEAPONS, k)) {
+      WEAPONS[k].needs = STORE_NEEDS[k];
+    }
+  }
+})();
+
+/**
+ * 这架飞机能不能挂这件武器。
+ * 只看**能力门槛**，挂点类型（fits）由调用方另行判断 ——
+ * 两者是独立的：位置对得上但机体撑不住，一样挂不了。
+ */
+function canCarry(ac, w) {
+  if (!w || !w.needs || !w.needs.length) return true;
+  var caps = (ac && ac.caps) || [];
+  for (var i = 0; i < w.needs.length; i++) {
+    if (caps.indexOf(w.needs[i]) < 0) return false;
+  }
+  return true;
+}
+
 var STORE_COOLDOWN = {
   /* 空空 —— 单发从十几秒到两分半，重弹基本一场只能打一次 */
   srm: 24, trm: 28, hos: 26, qsr: 38, wasp: 42,

@@ -590,6 +590,44 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 挂载的机体能力门槛 ---- */
+  {
+    const playable = sandbox.AIRCRAFT.filter(a => !a.npcOnly);
+    const bad = [];
+
+    // 1. 默认配置必须全部合法
+    playable.forEach(a => {
+      const dlo = a.defaultLoadout || {};
+      for (const gid in dlo) {
+        const w = WEAPONS[dlo[gid]];
+        if (w && !sandbox.canCarry(a, w)) {
+          bad.push(a.name + ' 默认带 ' + w.name + '，但缺少 ' + w.needs.join('/'));
+        }
+      }
+    });
+
+    // 2. 门槛必须真的起作用，不能形同虚设
+    let blockedAny = 0;
+    playable.forEach(a => {
+      for (const k in WEAPONS) {
+        const w = WEAPONS[k];
+        if (w.needs && w.needs.length && !sandbox.canCarry(a, w)) blockedAny++;
+      }
+    });
+    if (!blockedAny) bad.push('能力门槛形同虚设：没有任何武器被任何机型挡住');
+
+    // 3. 盯住最初提出的那个例子
+    const capOnly = playable.find(a => a.cn === '旗鱼');
+    if (!capOnly) {
+      bad.push('找不到制空机「旗鱼」，测试失去意义');
+    } else if (sandbox.canCarry(capOnly, WEAPONS.lcm)) {
+      bad.push('制空机「旗鱼」居然能挂远程巡航弹 GUT-30 —— 门槛没生效');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('机体能力门槛生效（含"制空机挂不了重型巡航弹"），共挡下 ' + blockedAny + ' 处');
+  }
+
   /* ---- 挂载性能系数 ---- */
   {
     const lp0 = sandbox.loadoutPenalty(0);
