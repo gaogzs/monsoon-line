@@ -2673,7 +2673,7 @@ var Game = (function () {
       'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb',
       /* 水面舰船（SHIPS 表）—— 接入关卡之前它们也要先被自检覆盖，
          否则模型名写错要到任务里才暴露 */
-      'tern', 'manta', 'salt', 'tuff', 'pumice', 'daplu',
+      'orca', 'bluewhale', 'trilobite', 'ammonite', 'seascorpion', 'daplu',
       'skori', 'diklo', 'cross', 'icecore', 'atoll'];
     for (i = 0; i < needModels.length; i++) {
       if (!MODELS[needModels[i]]) problems.push('缺少模型 ' + needModels[i]);

@@ -335,7 +335,7 @@ var UnitView = (function () {
 
     /* 标题读法按装备类型分：
          机型 —— 型号在前，中文名在后（D-14 旗鱼），英文绰号跟在后面小字
-         舰船 —— 制式编号在前，中文舰名在后（BEI-2 蝠鲼），英文名小字 */
+         舰船 —— 制式编号在前，中文舰名在后（BEI-2 蓝鲸），英文名小字 */
     var name = isAir ? (r.name + ' ' + r.cn) : (r.hull + ' ' + r.cn);
     var nick = isAir ? (r.nick || '') : (r.name || '');
     var sub = isAir
@@ -400,7 +400,7 @@ var UnitView = (function () {
   var yaw = 0.7, pitch = 0.30, lastT = 0, drag = null, acc = 0;
 
   /* 预览限 30 fps。
-     旋转本身不需要 60 —— 30 已经足够平滑，而像「蝠鲼」那种
+     旋转本身不需要 60 —— 30 已经足够平滑，而像「蓝鲸」那种
      386 个面的模型（三层集装箱堆出来的）在低端设备上单帧不便宜。
      反正这一屏是静止的资料库，没有跟手的操作要响应。 */
   var FRAME_MIN = 1 / 30;

@@ -442,7 +442,7 @@ node tools/render-units.js
 
 ```bash
 node tools/shot-unitview.js              # 默认四个：有/无俯视图的飞机各一 + 两种舰船
-node tools/shot-unitview.js ship:manta   # 指定单位（ship: 前缀表示舰船）
+node tools/shot-unitview.js ship:bluewhale   # 指定单位（ship: 前缀表示舰船）
 ```
 
 它生成一个**最小页面**：只加载详情页需要的 7 个模块，刻意**不加载 `game.js`**
