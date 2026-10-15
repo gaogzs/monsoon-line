@@ -197,6 +197,7 @@ monsoon-line/
     ├── render-planform.js  机库俯视图 PNG 预览器
     ├── render-ships.js     舰船外形 PNG 预览器
     ├── render-units.js     单位详情页 3D 预览 PNG
+    ├── render-mounts.js    NPC 实体挂载 PNG 预览器
     └── shot-unitview.js    无头 Chrome 截详情页布局
 ```
 

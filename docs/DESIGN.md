@@ -406,6 +406,9 @@ requestAnimationFrame(loop)
 | — | **更新日志生成两次**（`CHANGELOG.md` → `tools/release.js` → `js/changelog.js`） | 浏览器里没有 Markdown 解析器，而为了这一屏装一个（哪怕最小的）都违反"零依赖"。所以工具读 Markdown、写 JS 对象，两边都是纯数据，界面只负责画。见 [6.9](#69-为什么更新日志要生成两次) |
 | — | **新增 `docs/VERSIONING.md` + `tools/release.js`：提交自己给自己分配版本号** | 版本号原来只活在提交信息里，靠人记。现在每个版本条目带一个 `<!-- commit: xxx -->` 锚点，`release.js` 用 `git log <锚点>..HEAD` 取新提交、按提交信息判 major/minor/patch，然后把新条目追加到 `CHANGELOG.md` 顶部并刷新两个生成物。人只负责把工具生成的"待润色"标题改成人话 —— 版本号可以算，但"这批改动对玩家意味着什么"算不出来。工具只做机械的部分 |
 | — | 版本戳从标题页左上角搬到右上角 | 左上角是开机自检那几行 `.boot` 的地盘，两者都绝对定位在同一个角落，字一直是叠着印出来的；加上版本号之后第一行变长，重叠更明显 |
+| — | **实体挂载对敌我 NPC 生效**（`npcFits` 第二张适配表 + `Ent.mountPlan()` / `buildNpcMounts()` + `launch()` 统一回写弹药池） | 上一版"挂架上的实物"只画玩家：下游弹的 `fits` 是空数组（语义是"上游拿不到实物"），被渲染当成"挂不上"过滤掉，敌机机翼永远是干净的；僚机倒是画得出来，却没有弹药池与发射槽，弹永远挂着不消失。现在两张适配表分开（玩家 `fits` / NPC `npcFits`）、NPC 按"吊舱先占、制式弹铺满剩下的组"分配，并统一回写弹药池 —— AI 射速不受影响（`s.shootT` 下限比槽冷却长）。**适配表没有删掉**：`pelican` / `quartz` / `a2` / `gal44` 只有机腹挂点，删了就等着看格斗弹长在预警机机腹上。吊舱与制式弹**共存**（吊舱从外侧/机腹往里占，把重挂点留给导弹；正序占位会让 `spray` 那种通用+机腹的机型一枚弹都画不出来）。见 [loadout.md](systems/loadout.md#npc-的挂载)；肉眼验证走新增的 `tools/render-mounts.js`（走真正的 `makeAircraft` + `pushStores` + `render.js`） |
+| — | **吊舱有了自己的模型 `MODELS.pod`**（短粗钝头 + 尾端散热格栅），9 件吊舱不再借用导弹外壳；挂点组新增可选字段 `hy`（吊挂高度） | 吊舱原来全是 `model: 'missile'`（`e4` / `l2` 连 model 都没写），于是"这架带了干扰吊舱"在画面上读不出来 —— 一张"导弹 + 吊舱"的预览图和一张"纯导弹"的预览图**字节相同**。换成独立剪影之后一眼可分。顺带查出一条一直存在的几何 bug：默认吊挂高度是按战斗机（机身深一米上下）定的，GAL-44 干扰机与石英预警机的机腹在 −2.60 m，吊舱按 −1.95 挂**整件埋进机身**，而吊舱正是那两型飞机唯一的外挂特征。修法是让挂点组自己带一个 `hy`，并给 `smoke.js` 加一条几何断言（挂载物顶部必须比挂点正下方的机体表面低至少 0.30 m）——把 hy 改回默认它真的会 FAIL |
+| — | **AI 开火时选弹**（`Ent.chooseWeapon` / `setWeapon`）+ **关卡可写逐组 NPC 挂载**（`spawnEnemy` 的 `o.loadout`） | 敌机到这一版为止只能挂一件制式弹（`special`），AI 开火段还写着 `kind === 'aam' && dist < 7200` 一刀切 —— 混挂既没法指定也没意义。现在：AI 每次开火前按**目标类别（对空 / 对面）+ 射程**挑一件（够得着的里面取射程最短的；无制导弹不参与，AI 没有投弹瞄准）；"谁能打谁"合并成唯一的 `Ent.weaponMatchesTarget`（玩家的 `targetMismatch` 也改读它），"设成当前武器"合并成唯一的 `Ent.setWeapon`（玩家换弹也走它）。关卡侧新增 `o.loadout: { 组id: 武器id }`，**上游 NPC 的每一条都必须符合该挂点的选项限制**（`fits` ∩ `canCarry`）——配错不崩，但会记进 `Ent.mountIssues`，`smoke.js` 断言它是空的；下游 NPC 不需要（单一制式弹 + `npcFits` 已经保证适配）。顺带接上一条缺了很久的行为：AI 以前完全看不见 `world.targets`，带对面弹的飞机现在会去挑面目标（现有 NPC 里没有一件对地弹，所以现有三关的行为零变化）。见 [missions.md](systems/missions.md#给-npc-设计挂载) |
 
 ---
 
@@ -420,6 +423,12 @@ requestAnimationFrame(loop)
 5. 跑 `node tools/smoke.js`——它会自动检查新任务的字段完整性
 
 `map` 里的坐标是**世界米**，相对进入点。绘图由 `drawMap()` 统一处理。
+
+**给这一关的 NPC 配挂载时先读 [missions.md「给 NPC 设计挂载」](systems/missions.md#给-npc-设计挂载)**：
+上游 NPC 用逐组 `loadout` 指定，每一条都必须符合该挂点的选项限制
+（`fits` ∩ `canCarry`），写错会进 `Ent.mountIssues`，`smoke.js` 会拦；
+下游 NPC 只写 `special`（+ 可选 `pods`），它们的 `npcFits` 已经保证适配。
+注意带上对地弹的敌机会真的去炸海面/地面目标 —— 那是在改这一关的胜负条件。
 
 ---
 

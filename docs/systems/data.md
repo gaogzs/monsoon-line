@@ -128,7 +128,9 @@ phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40,
 
 ```js
 hardpointGroups: [
-  { id: 'A', label: '翼尖', kind: 'tip', pts: [{ x: 7.5, y: -2.8 }, { x: -7.5, y: -2.8 }] }
+  { id: 'A', label: '翼尖', kind: 'tip', pts: [{ x: 7.5, y: -2.8 }, { x: -7.5, y: -2.8 }] },
+  // 需要时再加 hy（吊挂高度），见下
+  { id: 'B', label: '机腹', kind: 'belly', hy: -3.0, pts: [{ x: 1.2, y: -2.0 }, { x: -1.2, y: -2.0 }] }
 ],
 defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 ```
@@ -136,6 +138,13 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 - `pts` 是机体系俯视坐标，**同时是俯视识别图的引线锚点**（单一数据源，别再建一份）
 - `pts.length` 必须是**偶数**（成对挂载），`preflight` 会查
 - `defaultLoadout` 的值是 `WEAPONS` 的键或 `null`；NPC 机型写 `{}`
+- `hy`（可选）是**吊挂高度**（机体系 y，单位米）。不写就用
+  `Ent.STORE_HY` 按 `kind` 给的默认值（tip −0.35 / light −1.15 /
+  heavy −1.35 / belly −1.95）。默认值是按**战斗机**（机身深一米上下）定的，
+  大型机体会把挂载物埋进机身：GAL-44 干扰机与石英预警机的机腹在 −2.60 m，
+  用默认的 −1.95 等于整件看不见。**改了模型就要重新量一遍** ——
+  `smoke.js` 有一条几何断言盯着它（挂载物顶部必须比挂点正下方的机体
+  表面低至少 0.30 m）
 - 完整语义（`kind` 适配、`perPoint`、被动吊舱、能力门槛）见 [loadout.md](loadout.md)
 
 ---
@@ -228,6 +237,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `prox` | 近炸半径（米） | 命中判定用 |
 | `target` | `air` / `ground` / `ship` / `none` | `updateLock` 分"对空导引头"与"对面投放包线"两套判据 |
 | `desc` | 简介（可含 HTML） | 机库卡片、图鉴 |
+| `model` | `MODELS` 的键，**只有挂载物与飞出去的弹读它** | 缺省回退 `MODELS.missile`。吊舱一律写 `'pod'` —— 跟着导弹用 `'missile'` 的话两类挂载在画面上分不出来 |
 | `stat` | `{dmg,spd,trn,rng,ecm}` 0..1 | ⚠️ **当前没有任何代码读取**，是给未来界面留的 |
 
 **飞行参数（可发射武器才有）：** `speed`（最大速度 m/s）、`boost`（助推加速度 m/s²）、`life`（动力段秒）、`vsLife`（总寿命秒）、`turn`（最大转向率 rad/s）。`smoke.js` 要求非 `passive` 且非 `ecm`/`dew` 的武器必须有 `speed` 与 `life`。
@@ -263,7 +273,8 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 
 | 字段 | 来自 | 谁读 |
 |---|---|---|
-| `fits` / `perPoint` / `mass` | `STORE_ATTR` | 挂载适配、单点携弹量、挂载重量 |
+| `fits` / `perPoint` / `mass` | `STORE_ATTR` | 挂载适配（玩家）、单点携弹量、挂载重量 |
+| `npcFits` | **手写在 `WEAPONS` 条目里**，不经过补丁表 | NPC 的挂载适配（`Ent.fitsKind`）——只给下游专用弹写 |
 | `role` | `STORE_ROLE` | 机库卡片、图鉴"定位"列 |
 | `needs` | `STORE_NEEDS` | `canCarry()` |
 | `lead` | `MISSILE_LEAD` | 导弹提前量预测 |
@@ -292,6 +303,21 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 单独放的理由是"一眼横着比较谁挂得下、谁带得多、谁更重"。`fits` 的取值只有四种：`tip` / `light` / `heavy` / `belly`。
 
 **下游专用弹（`vzu` `vgt` `vsr` `vbn` `otr` `dl4` `dl6` `dl9` `vsc`）直接把 `fits: []` 写在 `WEAPONS` 里，不放进 `STORE_ATTR`**——空数组 = 玩家挂不上。`vsc`（ZUN-14 焦炬）是下游的**烧穿吊舱**：主动 ECM，靠 `jamRadius` / `jamK` 在 `world` 里建范围压制场（见 [game.md](game.md) 的 `updateJamming()`）。
+
+这些弹另有一个手写字段 `npcFits`（**只有它们有**）：
+
+| 武器 | `npcFits` |
+|---|---|
+| `dl4` | light, heavy |
+| `dl6` / `vbn` / `otr` | tip, light, heavy |
+| `vsc` / `vzu` | light, belly |
+| `vgt` | heavy, belly |
+| `vsr` | heavy |
+| `dl9` | 不写（地面发射，不上机） |
+
+原因见 [loadout.md](loadout.md#npc-的挂载)：`fits: []` 的语义是"上游拿不到实物"，
+而渲染实体挂载时把它当"挂不上"就会把敌机机翼清空。
+`Ent.fitsKind()` 按 `a.isPlayer` 在两张表之间选。
 
 ### `STORE_ROLE`（37 键）
 

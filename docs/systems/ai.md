@@ -274,7 +274,14 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | `drone` + `spread` | 自主接战：`nearestEnemy(a, world, 9000)` |
 | `wingman` + `focus` | 继承长机的目标 |
 | `wingman` + `cover` | 同 `drone + cover`（共用 `leadThreat()`） |
-| 其余（含 `enemy`） | 被主动雷达照射时优先咬照射者（12 km 内）；否则 `nearestEnemy(a, world, role === 'wingman' ? 11000 : 15000)` |
+| 其余（含 `enemy`） | 被主动雷达照射时优先咬照射者（12 km 内）；否则 `nearestEnemy(a, world, role === 'wingman' ? 11000 : 15000)`；**空中一个都没有时**，带得动对面弹的飞机转去挑面目标（`surfaceTargetFor`） |
+
+> **面目标（海上平台 / 地面设施）是后加的。** 在这之前 `nearestEnemy` 只扫
+> `world.actors`，`world.targets` 对 AI 完全不存在 —— 所以"敌机来炸你的
+> 前进基地"这件事在代码里根本没有落点，下游的随队攻击机只能是摆设。
+> 判据与玩家锁定循环一致：0 与 1 互为敌，2 是中立（没人主动打它）。
+> 只有真带着能用的对面弹（有导引头、还有弹）的飞机才会去挑，射程取
+> 它自己那几件里最远的一件。
 
 > **僚机指令（1/2/3）真的会改变行为。** 这三条写在题头、操作说明和
 > 游戏内资料库里，但实现曾经只认 `role === 'wingman'`，而 `spawnWingman()`
@@ -296,7 +303,8 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | drone 且长机在 | 长机编队槽位 | 落后 > 700 m 加力，否则 0.75 |
 | drone 且长机没了 | 切向盘旋，`y = pos.y < 3200 ? 0.12 : -0.05` | 0.6 |
 | wingman 且（无目标或 `spread`） | 编队槽位；有目标时改走 `leadTo` | 落后 > 900 m 加力，否则 0.7；接战 0.95 加力 |
-| 有目标 | `pursue(a, s.target, world)` | 见 `pursue()` |
+| 有目标（`target`） | `approachSurface(a, s.target)`：**保持高度**，只把机头转过去 | 0.9 |
+| 有目标（飞机） | `pursue(a, s.target, world)` | 见 `pursue()` |
 | 都没有 | 巡逻：`wander += dt*0.25`，`V(cos(wander), 0.02, sin(wander))` | 0.62 |
 
 编队槽位用长机机体坐标（所以编队会跟着长机滚转和转向）：
@@ -367,15 +375,26 @@ a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
 以前只有玩家自己的机炮有音效，AI 打出去的子弹**无声**，
 而它们通常在视线的侧后方，于是玩家会以为"敌人从来不开炮"。
 
-导弹的外层门槛是 `s.shootT <= 0 && dist < 7200`、`a.spAmmo > 0`、
-`a.spCd <= 0`、武器 `kind === 'aam'`。四个条件都满足才发射：
+导弹的外层门槛是 `s.shootT <= 0`、`a.spAmmo > 0`、`a.spCd <= 0`，
+四个条件都满足才发射：
 
-1. **锁定锥**：`off < cone * 0.85`，`y > 18000` 时 `cone *= 0.8`（收窄 20%）
-2. **锁定距离**：`dist < lockDist * lockK * resist`，其中
+1. **挑一件武器**：`Ent.chooseWeapon(a, t, dist)` —— 先看**目标类别**
+   （目标物 `kind === 'target'` 算"对面"，其余算"空中"，判据与玩家的
+   `targetMismatch` 同源），再看**射程**：够得着的里面取射程最短的那件
+   （用远距弹打格斗距离是浪费），都够不着就取最接近的。装填中的垫底，
+   无制导弹（炸弹 / 火箭巢）不参与 —— AI 没有投弹瞄准逻辑。
+   挑中谁就 `Ent.setWeapon(a, pick)`，也就是"AI 换武器"的全部：
+   **没有独立的选弹状态**，只有每次开火前的一次挑选
+2. **锁定锥**：`off < cone * 0.85`，`y > 18000` 时 `cone *= 0.8`（收窄 20%）
+3. **锁定距离**：`dist < lockDist * lockK * resist`，其中
    `lockK = 1 - min(0.25, max(0, (y - 15000) / 40000))`（越高越难锁），
    `resist = t.lockResist ? 1 - t.lockResist : 1`（目标的干扰舱打折）
-3. **最小距离**：`dist > (spW.nezer ? 1400 : 700)`
-4. **意愿**：`Math.random() < 0.35 + skill * 0.45`
+4. **最小距离**：`dist > (spW.nezer ? 1400 : (对面目标 ? 1200 : 700))`
+5. **意愿**：`Math.random() < 0.35 + skill * 0.45`
+
+> 这里以前写的是 `dist < 7200 && kind === 'aam'` —— 一刀切是对空弹时代
+> 的写法（那时所有 AI 弹的 `lockDist` 都 ≤ 7200）。改成逐件判之后，
+> 远距弹（CLA-17 的 12.5 km）与对地弹的投放包线才各按各的来。
 
 发射后冷却 `s.shootT = rnd(2.6, 5.2) * (1.6 - skill * 0.6)`，
 即技能 0 → 4.16–8.32 s，技能 1 → 2.6–5.2 s。
@@ -528,7 +547,10 @@ desired = norm(V(tan.x, climb, tan.z));      // 取切向 → 持续转圈
 | 规避触发距离（4.2 km） | `findIncoming()` 里的 `4200` |
 | 脱离血量阈值 | `update()` 里 `a.hp < a.maxHp * 0.25` |
 | 威胁警戒半径 | `nearestEnemy()` 调用处的 `15000` / `11000` / `9000` |
+| 面目标搜索半径 | `surfaceTargetFor()` 里取"自己最远那件对面弹的 `lockDist × 1.15`" |
+| 挑弹规则（类别 + 射程） | `entities.js` `chooseWeapon()` |
+| 对地目标的接近角 | `approachSurface()` 里的 `-0.06`（远）/ `-0.02`（近） |
 | 升限钳制 | `clampCeiling()` 里的 `1200` / `-0.22` / `0.08` |
 | 编队槽位 | `missions.js` `spawnWingman()` 的调用参数 |
 | 各机技能 | `missions.js` 各关 `spawn()` 里的 `skill` |
-| 导弹最小发射距离 | `update()` 里 `spW.nezer ? 1400 : 700` |
+| 导弹最小发射距离 | `update()` 里 `spW.nezer ? 1400 : (对面目标 ? 1200 : 700)` |

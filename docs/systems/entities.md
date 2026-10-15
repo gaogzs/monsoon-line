@@ -33,8 +33,17 @@
 | `qOf` | `qOf(y, speed) → Pa` | 动压 `½ρv²` |
 | `ctrlFactor` | `ctrlFactor(y, speed, ac) → 0..1` | 气动权限系数，端点可被机型覆盖 |
 | `turnFactor` | `turnFactor(y) → 0.34..1` | 导弹转弯率的气动缩放 |
-| `makeAircraft` | `makeAircraft(o) → a` | 造飞机。`o = {type, team, x/y/z, fwd, speed, throttle, special, isPlayer, isDrone, flares, radio, group}` |
+| `makeAircraft` | `makeAircraft(o) → a` | 造飞机。`o = {type, team, x/y/z, fwd, speed, throttle, special, loadout, pods, isPlayer, isDrone, flares, radio, group}`。非玩家会顺手建 `ammoPool` / `slotCd`（§ 3.1） |
 | `stepAircraft` | `stepAircraft(a, dt, world)` | 飞机每帧：动压→姿态→速度→位置→冷却→拖烟 |
+| `fitsKind` | `fitsKind(w, kind, playerStyle) → bool` | 这件武器挂得住这种挂点吗。玩家读 `fits`，NPC 读 `npcFits`（缺省退回 `fits`） |
+| `mountPlan` | `mountPlan(a) → [弹种或 null]` | 逐组挂载分配（逐组配置 → 吊舱 → 制式弹），下标对齐 `ac.hardpointGroups` |
+| `storePos` | `storePos(a, g, pt) → 世界坐标` | 一个挂点的挂载物该画在哪。`pt` 只有 (横向, 前后)，高度取 `g.hy` 或按类型给的默认值（`STORE_HY`） |
+| `STORE_HY` | `{ tip, light, heavy, belly }` | 默认吊挂高度表（米，机体系）。机型可用挂点组的 `hy` 覆盖 |
+| `chooseWeapon` | `chooseWeapon(a, t, dist) → 武器id\|null` | AI 开火前挑一件：按目标类别（对空 / 对面）+ 射程（够得着的取最短）。判据见 §7 坑 14 |
+| `setWeapon` | `setWeapon(a, wid)` | 把它设成"当前触发的那件"（`special` / `spAmmo` / `spCd`）。玩家换弹与 AI 选弹共用 |
+| `weaponMatchesTarget` | `weaponMatchesTarget(w, t) → bool` | 武器能不能打这个目标（与 `game.js` 的 `targetMismatch` 同源） |
+| `mountIssues` | `[string]` | 关卡里写错的 NPC 挂载（挂不上 / 能力不足）。`smoke.js` 断言它是空的 |
+| `clearMountIssues` | `clearMountIssues()` | 清空上表（测试用） |
 | `makeMissile` | `makeMissile(o) → m` | 造导弹/炸弹。`o = {weapon, team, pos, fwd, speed, target, owner}` |
 | `stepMissile` | `stepMissile(m, dt, world)` | 导弹每帧：动力段→导引→位置→近炸→尾迹 |
 | `effectiveLife` | `effectiveLife(w, y) → s` | 动力段时长，冲压弹在 18 km 以上缩短 |
@@ -75,6 +84,10 @@
   gun, gunAmmo, gunHeat, firingGun, gunTimer,
   special, spAmmo, spCd,
   slotCd:{},                           // { 武器id: [槽1剩余, 槽2剩余, ...] }
+  /* 挂载：玩家那套由 startMission 按机库配置另建；NPC 由 makeAircraft
+     末尾的 buildNpcMounts() 建（弹药取 w.ammo，槽数 = 挂点数）。
+     pods 是任务写定的被动吊舱，机制与外观（mountPlan）都用它。 */
+  ammoPool, pods,
   spActive, spCharges, spChargeT,      // ECM 生效 / DEW 充能
   /* 认知电子战的闭环（设定 7.3）：ewT 开机时长、ewBurnT 对手完成对抗的
      时刻、ewPower 当前压制强度（唯一出口）、ewWid 用的哪件吊舱、
@@ -94,7 +107,7 @@
 |---|---|---|
 | `label` | `game.js` / `missions.js` | 呼号，与 `name`（机型）分开 |
 | `radius` | `missions.js` | 敌机命中半径（8），轰炸机 22 |
-| `loadoutList` / `ammoPool` / `loadout` | `game.js` `startMission` | 挂载列表 / 各武器储备 / 原始配置 |
+| `loadoutList` / `ammoPool` / `loadout` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy` 的 `o.loadout`（NPC） | 挂载列表 / 各武器储备 / **逐组**配置（组 id → 弹种）。NPC 的 `ammoPool` / `slotCd` 在 `makeAircraft()` 里就建好了（见 [loadout.md](loadout.md#npc-的挂载)） |
 | `wpIdx` / `spSalvo` | `game.js` | 当前挂载下标；`spSalvo` **写入后无人读取** |
 | `loadFactor` / `armor` / `lockResist` / `lockRangeK` / `silentLock` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy`（敌机 `pods`） | 重量惩罚与被动吊舱加成。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
 | `gLoad` / `brake` / `hiG` | `game.js` `controlPlayer` | 高 G 倍率 / 减速板 / HUD 指示 |
@@ -221,7 +234,8 @@ keydown Enter / 鼠标右键
 
 ### 4.3 装填与冷却：`slotCd` 的真实语义
 
-- 槽数 = 该武器占用的**挂载点数**（`game.js` `startMission` 按 `wl[wi].salvo` 建数组）。
+- 槽数 = 该武器占用的**挂载点数**（玩家的 `game.js` `startMission` 按 `wl[wi].salvo` 建数组；
+  NPC 的 `entities.js` `buildNpcMounts()` 在造飞机时建，槽数 = 它挂得住的挂点数）。
 - 按一次发射键只打**一个**槽（外加该武器的 `salvo` 枚共用这一槽，如 GIR-5 三联装）。
 - 每个槽独立倒计时（`stepAircraft` 里的 `for (var ck in a.slotCd)`），切挂载不会跳过装填。
 - 储备弹少于挂架数时，多出来的槽一开始就是 `SLOT_EMPTY`（`1e9`），永远不会装填完成——HUD 显示的是"没得装了"，而不是骗人的"装填中"。
@@ -313,11 +327,11 @@ keydown Enter / 鼠标右键
 
 5. **尾迹判据是 `ballistic` 不是 `unguided`。** 两者正交：有发动机 / 无制导的火箭巢应当拉烟，无发动机 / 有制导的滑翔弹不应当。按 `unguided` 判断会把两类全弄反。
 
-6. **槽数组是**按武器**建的，渲染是**按挂点组**遍历的。** `game.js` `pushStores()` 必须自己维护 `used[wid]` 起始下标，否则两组挂同一种弹时会共用前两个槽，出现"打掉一个、两组同时消失"。
+6. **槽数组是**按武器**建的，渲染是**按挂点组**遍历的。** `game.js` `pushStores()` 必须自己维护 `used[wid]` 起始下标，否则两组挂同一种弹时会共用前两个槽，出现"打掉一个、两组同时消失"。**推进 `used[wid]` 必须发生在适配检查之后**——否则一个挂不上的组也会占掉下标，把它后面的挂架整体顶偏。
 
 7. **挂载重量是整体替换 `p`，不是就地缩放。** `stepAircraft()` 里 `p = { vMax, vMil, vStall, accel, decel, pitch, roll }`——少列一个字段（历史上漏过 `accel`/`decel`）就会让那个字段变成 `undefined`，加速变成瞬时。加字段时记得同步这里。
 
-8. **AI 不走 `slotCd`。** AI 的 `slotCd` 永远是空对象，`launch()` 对它退回单冷却 `spCd`。给 AI 加多挂载逻辑要同时改 `launch()` 与 `makeAircraft` 的初始化。
+8. **AI 只发射 `a.special` 这一件武器，但它现在也有 `slotCd` 了。** 以前 NPC 的 `slotCd` 是空对象，`launch()` 对它退回单冷却 `spCd`；现在 `buildNpcMounts()` 会按挂点数建槽（实体挂载要靠它判断"这一发还在不在"）。这不改变 AI 的射速 —— `ai.js` 自己的 `s.shootT` 下限（1.0–2.6 s）比任何槽冷却都长。想做"敌机换弹打"要动的是 AI 的选弹逻辑，不是这里。
 
 9. **`hitTarget()` 里 `var penal = ...` 算了没用。** 真正的误伤扣分是紧接着那段 `source.isPlayer` 判断累加 `world.friendlyLoss`。别把这个变量当成扣分依据。
 
@@ -326,6 +340,10 @@ keydown Enter / 鼠标右键
 11. **看门狗的根因没定位。** 任何飞机静止超过 1.5 秒会被强制重置姿态与速度并 `console.warn`。这是兜底，不是修好了——警告里带有当时的速度、姿态、操控输入，下次真触发时它就是定位起点。
 
 12. **`spSalvo` / `t.vital` / `a.firingAllowed` / `world.roeActive` / `world.baseHpFull` / `a.gunHeat` 都是"写了没人读"的字段。** 看到它们别以为对应机制存在（`gunHeat` 还在每帧递减，但没有任何地方读它——机炮过热是个没做完的机制）。
+
+13. **`fits` 是"玩家能不能挂"，不是"挂不挂得上"。** 下游弹的 `fits` 是空数组（玩家拿不到实物），而空数组是 truthy —— 拿它当"挂点适配"判据会把敌机的挂载全部过滤掉。所以 `Ent.fitsKind()` 分两张表：玩家 `fits`、NPC `npcFits`。加新武器时别只填一张。
+
+14. **AI 选弹与玩家选弹必须同源。** `Ent.weaponMatchesTarget()` 是"这弹能不能打那个目标"的**唯一**判据（`game.js` 的 `targetMismatch` 与它一致）：目标是 `kind === 'target'` 的东西就算对面。两边各写一套的话，玩家会被提示"换对地弹"，而 AI 会拿格斗弹去打海面平台 —— 这类不一致不会报错，只会让行为看起来"有点笨"。同理，"设成当前武器"只有 `Ent.setWeapon()` 一个入口（玩家的 `syncWeapon` 也走它）。
 
 ---
 

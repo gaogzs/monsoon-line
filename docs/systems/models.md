@@ -74,6 +74,7 @@
 | `atoll` | OSV「环礁」观察船（环外共同体） | 11.4 | 56 | `ground` `sea` | `radius: 18` |
 | `missile` | 导弹小模型 | 1.3 | 3.4 | — | 兜底模型（见下） |
 | `bomb` | 炸弹小模型 | 1.4 | 2.2 | — | |
+| `pod` | 吊舱小模型（干扰 / 光电 / 对抗） | 1.1 | 2.9 | — | 挂载物里**唯一不是弹药**的东西：短、粗、钝头，尾端散热格栅 |
 
 > `span` / `len` / `air` / `sea` 这些元数据**目前没有任何消费者**，
 > 只有 `radius` 与 `ground` 在 `missions.js` 里被显式重抄一遍。详见"易踩的坑"。
@@ -328,18 +329,24 @@ b.hull([
 | 模块 | 怎么用 |
 |---|---|
 | `render.js` | `pushModel(model, P, fwd, up, opts)` 读 `model.v` / `model.f`，按 `model.morph` 插值 `opts.sweep` |
-| `game.js` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 **26** 个必需模型 |
+| `game.js` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 **27** 个必需模型 |
 | `entities.js` | 用 `ent.radius` 做受击判定与爆炸规模（`radius` 最终来自任务传入） |
 | `missions.js` | `spawnTarget({ model, radius, ground, ... })` 决定用哪个模型、多大、是否贴海面 |
 | `data.js` | `AIRCRAFT[].model` 与 `SHIPS[].model` 里的字符串就是 `MODELS` 的键（如 `'c11'` / `'ammonite'`） |
 
-`MODELS.missile` 是**兜底模型**：`game.js:2129`（挂载物 `pushOneStore`）与
-`game.js:2222`（飞行中的导弹）在按 model 名查不到时回退到它，所以挂载 / 弹药
-至少能画出一枚弹的形状。**注意目标物与飞机没有这个兜底**——
-`game.js:2204` / `2212` 查不到就 `continue`，那一帧什么都不画（自检会先报错）。
+`MODELS.missile` 是**兜底模型**：`game.js` 的 `pushOneStore()`（挂载物，
+`game.js:2660`）与 `render()` 里的导弹段（`game.js:2764`）在按 model 名
+查不到时回退到它，所以挂载 / 弹药至少能画出一枚弹的形状。
+**注意目标物与飞机没有这个兜底** —— `game.js:2746` / `2754` 查不到就
+`continue`，那一帧什么都不画（自检会先报错）。
+
+挂载物这一路对**敌我 NPC 都生效**：`pushStores()` 对 `world.actors` 里
+每一架飞机都调用（玩家的弹种来自机库配置，NPC 来自 `Ent.mountPlan()`）。
+哪几种弹能画在哪种挂点上由 `Ent.fitsKind()` 决定 —— 玩家读 `fits`，
+NPC 读 `npcFits`。见 [loadout.md](loadout.md#npc-的挂载)。
 
 `preflight()` 的必需清单是：
-`c11 c14 s6 m27 ucav sower relay cell sam radar depot cmdpost station missile bomb`
+`c11 c14 s6 m27 ucav sower relay cell sam radar depot cmdpost station missile bomb pod`
 **+ 16 艘舰船** `orca bluewhale humpback spermwhale dolphin trilobite ammonite
 seascorpion cameroceras dunkleosteus daplu skori diklo cross icecore atoll`
 ——新增模型后记得往 `game.js` 的 `needModels` 数组里加，否则自检不会覆盖它。

@@ -37,8 +37,58 @@ var AI = (function () {
     return best;
   }
 
-  /* 正在锁定长机的敌机 —— "掩护"这条指令的核心。
+  /* 最近的**敌方面目标**（海上平台 / 地面设施）。
 
+     敌我判据与玩家锁定循环一致：0 与 1 互为敌，2 是中立
+     （双方流弹都可能伤到它，但没人主动去打）。以前 AI 眼里只有
+     `world.actors`，世界里的面目标对它是不存在的。 */
+  function nearestSurfaceTarget(a, world, maxR) {
+    if (!world.targets) return null;
+    var best = null, bd = (maxR || 12000) * (maxR || 12000);
+    for (var i = 0; i < world.targets.length; i++) {
+      var t = world.targets[i];
+      if (!t.alive || t.team === a.team || t.team > 1) continue;
+      var d = M3.dist2(t.pos, a.pos);
+      if (d < bd) { bd = d; best = t; }
+    }
+    return best;
+  }
+
+  /* 这架飞机该不该去找面目标打：得真带着能用的对面弹（有导引头、还有弹）。
+
+     射程用它自己那几件里最远的一件 —— "够不够得着"由开火那一段逐件判，
+     这里只负责别让它追一个根本打不到的东西。 */
+  function surfaceTargetFor(a, world) {
+    if (!a.ammoPool) return null;
+    var reach = 0;
+    for (var wid in a.ammoPool) {
+      if (!Object.prototype.hasOwnProperty.call(a.ammoPool, wid)) continue;
+      if (!(a.ammoPool[wid] > 0)) continue;
+      var w = WEAPONS[wid];
+      if (!w || !w.seeker || w.seeker === 'none') continue;
+      if (w.target !== 'ground' && w.target !== 'ship') continue;
+      if ((w.lockDist || 0) > reach) reach = w.lockDist;
+    }
+    if (reach <= 0) return null;
+    return nearestSurfaceTarget(a, world, reach * 1.15);
+  }
+
+  /* 对面目标的接近方向：**保持高度**，只把机头转过去。
+
+     不能用 pursue()：它是为空战写的，`leadTo` 会把机头一路指向海面，
+     飞机就一头扎下去；而下面的"离地 420 m 强行拉起"会把它拉回来，
+     于是变成在目标上方反复俯冲-拉起，永远进不了投放包线。
+     所以这里只给水平方向与一点沉稳的下压 —— 对地弹也要机头大致
+     对准目标才锁得住。 */
+  function approachSurface(a, t) {
+    var toT = M3.sub(t.pos, a.pos);
+    var d = M3.len(toT);
+    if (d < 1) return a.fwd;
+    var dir = M3.mul(toT, 1 / d);
+    return M3.norm(M3.V(dir.x, d > 6000 ? -0.06 : -0.02, dir.z));
+  }
+
+  /* 正在锁定长机的敌机 —— "掩护"这条指令的核心。
      两个分支（wingman 的 cover、drone 的 cover）共用它。
      它以前直接写在 wingman 的 cover 分支里面，而那条分支
      因为僚机都是 drone 而从来没跑到过（见 docs/systems/ai.md）。
@@ -621,6 +671,12 @@ var AI = (function () {
           s.target = a.rwrSrc;
         } else {
           s.target = nearestEnemy(a, world, s.role === 'wingman' ? 11000 : 15000);
+          /* 空中没目标、手上却带着对面弹 → 去挑海面上的打。
+
+             以前 AI 完全看不见 world.targets（nearestEnemy 只扫 actors），
+             于是"敌机炸你的前进基地"这件事在代码里根本不存在 ——
+             下游的随队攻击机只能是摆设。 */
+          if (!s.target) s.target = surfaceTargetFor(a, world);
         }
       }
     }
@@ -695,6 +751,14 @@ var AI = (function () {
         // 有空战机会时仍要接战
         if (s.target) { desired = leadTo(a, s.target); throttle = 0.95; ab = true; }
       } else desired = a.fwd;
+    } else if (s.target && s.target.kind === 'target') {
+      /* 对面目标：**保持高度**，只把机头转过去。
+
+         不能走 pursue()：那是为空战写的，`leadTo` 会一路指向海面，
+         飞机就一头扎下去 —— 而下面有"离地 420 m 强行拉起"的保护，
+         结果是在目标上方反复俯冲-拉起，永远进不了投放包线。 */
+      desired = approachSurface(a, s.target);
+      throttle = 0.9; ab = false;
     } else if (s.target) {
       var res = pursue(a, s.target, world);
       desired = res.dir;
@@ -769,11 +833,21 @@ var AI = (function () {
       if (world.player) SFX.gunShotAt(M3.dist(a.pos, world.player.pos));
     }
 
-    // --- 导弹 ---
-    if (s.shootT <= 0 && dist < 7200) {
-      var spW = WEAPONS[a.special];
-      var canUse = spW && (spW.kind === 'aam');
-      if (canUse && a.spAmmo > 0 && a.spCd <= 0) {
+    // --- 导弹 / 对面弹 ---
+    /* 开火前挑一件：先看目标类别（对空 / 对面），再看射程 ——
+       够得着的里面取**射程最短**的那件（用远距弹打近目标，等于把一场
+       只有几发的重弹浪费在格斗距离上）。挑中谁，`a.special` 就是谁：
+       这就是"AI 换武器"的全部 —— 没有独立的选弹状态，只有这一次挑选。
+       规则见 entities.js 的 chooseWeapon()。
+
+       注意这里**不再**用 dist < 7200 一刀切：那是对空弹时代的写法，
+       远距弹（CLA-17 的 12.5 km）与对地弹的投放包线差了好几倍，
+       够不够得着由每件武器自己的 lockDist 判。 */
+    var pick = Ent.chooseWeapon(a, t, dist);
+    if (pick) {
+      Ent.setWeapon(a, pick);
+      var spW = WEAPONS[pick];
+      if (s.shootT <= 0 && a.spAmmo > 0 && a.spCd <= 0) {
         var cone = spW.lockCone;
         // 高空时导引头视场收窄
         if (a.pos.y > 18000) cone *= 0.8;
@@ -793,7 +867,9 @@ var AI = (function () {
         }
         var okDist = dist < spW.lockDist * lockK * resist;
         var okAng = off < cone * 0.85;
-        var minR = spW.nezer ? 1400 : 700;
+        /* 最小发射距离。对面目标给得比空中小目标保守一点：
+           贴得太近，滑翔弹/炸弹的引信来不及开。 */
+        var minR = spW.nezer ? 1400 : (t.kind === 'target' ? 1200 : 700);
         if (okDist && okAng && dist > minR && Math.random() < 0.35 + s.skill * 0.45) {
           if (world.fireMissile) world.fireMissile(a, t);
           s.shootT = M3.rnd(2.6, 5.2) * (1.6 - s.skill * 0.6);

@@ -45,7 +45,79 @@
 > 但**有一件事要先做**：现有 `makeTarget` 只支持按正弦缓慢漂移（`o.drift`），
 > 而 40 节的导弹快艇需要一套真的航路逻辑 —— 那不在 `makeTarget` 的能力范围内。
 
-`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（缺省 `'dl6'`）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
+`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（缺省 `'dl6'`）/ **`loadout`**（逐组挂载，见下一节）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
+
+`special` 与 `pods` 都**同时管机制和外观**：
+
+| 字段 | 机制 | 外观（实体挂载） |
+|---|---|---|
+| `special` | AI 唯一会发射的那件武器（`a.spAmmo` / `a.spCd`） | 铺满所有挂得住的组（`Ent.mountPlan`） |
+| `pods` | `Ent.passiveEffects()` 汇总锁抗 / 装甲 / 干扰弹 | 从最后一组往前占（外侧 / 机腹），把重挂点留给 `special` |
+
+两者是**共存**的：吊舱先占掉它挂得住的组，制式弹再铺满剩下的 ——
+"一枚空空弹 + 一个干扰吊舱"就是这么来的（m3 的护航那样）。吊舱占位后
+导弹的可视挂架会变少，但它的弹药池不变，AI 该打几发还是几发。
+
+弹种能挂到哪类挂点由 `data.js` 的 `npcFits` 决定（**不是** `fits` —— 那是玩家机库的表）。
+所以给敌机指定弹种时，要确认目标机型有对应的挂点类型：
+`pelican` / `quartz` / `a2` / `gal44` 只有机腹挂点，写 `special: 'dl6'`（格斗弹）
+不会画出来（也不会报错 —— 它照旧能发射）。
+
+### 给 NPC 设计挂载
+
+关卡里指定 NPC 挂什么，**上游与下游的写法不一样**：
+
+| | 挂的是 | 写法 | 为什么不一样 |
+|---|---|---|---|
+| **上游 NPC** | 玩家那一套武器（`fits` 表） | 逐组 **`loadout: { 组id: 武器id }`** | 一型机能挂的东西很多，"带哪一种、带在哪一组"是任务要做的决定 |
+| **下游 NPC** | 下游制式弹（`npcFits` 表） | 只写 `special`（+ 可选 `pods`） | 下游弹是单一弹种，适配表已经保证了它能落在哪几类挂点上 —— 没有"挑一件"这回事 |
+
+**上游 NPC 的每一条都必须符合该挂点的选项限制。** 机库给玩家的选项是
+`fits` ∩ `canCarry`，NPC 这边是同样两道：
+
+1. **挂点类型**：这一组的 `kind` 必须在这件武器的适配表里
+   （`data.js` 的 `hardpointGroups[].kind` × 武器的 `fits` / `npcFits`）
+2. **机体能力**：武器的 `needs` 必须落在机型的 `caps` 里（`canCarry()`）
+
+写错了**不会崩**：那一组空着，同时在 `Ent.mountIssues` 里记一条人话，
+并在控制台 `console.warn` 一次。`smoke.js` 跑完所有任务后断言这份清单
+是空的 —— 所以"配错了但没人发现"这条路是堵死的。
+`node tools/render-mounts.js` 能把结果落成图，肉眼确认挂的是不是你想要的那些。
+
+```js
+// 一架用**上游武器**的 NPC 敌机（"上游 NPC"说的是它读哪张武器表，不是阵营）
+spawnEnemy(w, {
+  ac: 'c11', team: 1, x: 0, y: 8000, z: 6000,
+  loadout: { A: 'srm', B: 'vgt' },   // A 翼尖 / B 重挂 —— 都是挂得上的组合
+  special: 'srm',                    // 当前触发的那件的默认值
+  skill: 0.7
+});
+```
+
+几条**设计约束**（不是建议，是代码的边界）：
+
+- **`loadout` 里的组就是全部装机。** 没写到的组空着 —— 不要指望
+  `special` 去填满它（那层兜底只在完全没有 `loadout` 时才生效）。
+- **`special` 可以省。** 没写就从 `loadout` 里取第一件当"当前触发的那件"；
+  万一那一件被校验挡掉了，会自动换成第一件真挂上的（`buildNpcMounts`
+  末尾的兜底），不会出现"AI 拿着一件不在机翼上的弹去开火"。
+- **AI 只发射有导引头的武器。** 无制导弹（`clb` 炸弹 / `rkt` 火箭巢）
+  它能挂、能画出来，但**不会投** —— AI 没有投弹瞄准逻辑。想让敌机对地，
+  给它 `vgt` / `v25` / `lcm` 这类，而不是 `clb` / `rkt`。
+- **混挂是有意义的**：AI 每次开火前按"目标类别（对空 / 对面）+ 射程"
+  重挑一件（够得着的里面取射程最短的）。同一架飞机遇到空中目标用格斗弹、
+  遇到海面目标用对地弹 —— 前提是两件都真的挂上了。
+- **吊舱（`pods`）与逐组 `loadout` 可以共存**：`loadout` 先落位，
+  吊舱只去占它没写到的组 —— 两者看中同一组时 `loadout` 赢。
+- **带得动对面弹的敌机现在会主动去找面目标**（空中没有目标时）。
+  这是新接上的一条 AI 行为：以前 `nearestEnemy` 只扫飞机，
+  `world.targets` 对 AI 是不存在的。想让某关"敌机来炸基地"，
+  给它一件对地弹就够了 —— 注意这会真的改变关卡的可失败条件。
+- **对地攻击要安排在低一些的高度**。实测：从 5 km 平飞打 6 km 外的
+  海面目标，`vgt` 会在离目标还有几百米的地方到期（20 秒寿命用完）——
+  这型弹的动力段撑不住从高空斜着压下来的距离。3 km 上下进入就能命中。
+  （AI 接近面目标时**不会**一头扎下去，见 ai.md 的 `approachSurface()`；
+  所以"投得出去"这件事得由任务的高度安排保证。）
 
 ### 空中预警机
 
@@ -303,6 +375,8 @@ spawn()
 | 敌人技术水平 | `spawnEnemy` 的 `skill`（m1 测绘机 0.32，m3 王牌 0.96） |
 | 敌机行为标签 | `spawnEnemy` 的 `behavior`（写进 `a.ai.cmd` 与 `a.behavior`） |
 | 护航是否计入目标 | `spawnEnemy` 的 `escort`，以及 `tick()` / `win()` 里的 `a.ai.escort` 判断 |
+| 敌机挂什么弹 / 吊舱 | `spawnEnemy` 的 `special` / `pods` |
+| 那些弹画在哪几类挂点上 | `data.js` 的 `npcFits` + `entities.js` `mountPlan()` |
 | 僚机队形与数量 | `spawnWingman(w, idx, slotX, slotY, slotZ)` |
 | 目标物血量 / 半径 / 漂移 | `spawnTarget` 的 `hp` / `radius` / `drift` |
 | 防空阵地武器与节奏 | `spawnTarget` 的 `weapon` / `fireCd`，开火逻辑在 `game.js` `updateTargets()` |

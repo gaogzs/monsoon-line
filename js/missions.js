@@ -62,7 +62,20 @@ function spawnEnemy(w, o) {
     fwd: o.fwd || M3.V(0, 0, -1),
     speed: o.speed || 300,
     special: o.special || 'dl6',
-    throttle: 0.8
+    throttle: 0.8,
+    /* 任务写定的吊舱要一路传到飞机上：它不只是机制（下面那段
+       passiveEffects），还要作为**实体挂载**画在挂得住的挂点组上
+       （Ent.mountPlan 会把它排在制式弹前面）。 */
+    pods: o.pods || null,
+    /* 任务写死的逐组挂载，形状与机库配置一样：{ 组id: 武器id }。
+
+       每一条都必须**真的挂得上**：组的 kind 要在武器的适配表里
+       （上游弹看 fits，下游弹看 npcFits），机体的 caps 也要满足
+       武器的 needs。写错了不会崩 —— 那一组空着，并在 Ent.mountIssues
+       里记一条，smoke.js 会断言它是空的。
+       `special` 是"当前触发的那件"，AI 开火前会按目标与射程重挑
+       （见 ai.js 的开火段），所以它只是默认值 / 兜底。 */
+    loadout: o.loadout || null
   });
   a.model = ac.model;
   a.phys = {

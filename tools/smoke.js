@@ -1805,6 +1805,366 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
     else ok('挂架装填受储备弹数约束：打光不恢复、有弹才装填');
 
+  /* ---- NPC 的实体挂载 ----
+     以前这套只画玩家：
+       · 下游弹（dl6 / dl4 / vbn …）的 fits 是空数组，语义是"玩家拿不到
+         实物"；而 pushStores 拿 fits 当"挂不挂得上"的判据，空数组是
+         truthy → 全部被 continue 掉，敌机机翼永远是干净的。
+       · 僚机倒是画得出来（v9 有 fits），但 NPC 没有 ammoPool / slotCd，
+         pushStores 的两条判据（打光不画 / 装填中空着）都无从判断，
+         于是弹永远挂在翼下。
+
+     现在 NPC 读 npcFits，并且 makeAircraft 会给它建弹药池与发射槽。
+     这条断言直接数"渲染器收到的模型数"，所以能抓到"看得见但不变"这类
+     回归。 */
+  {
+    const Ent3 = sandbox.Ent, M3n = sandbox.M3, Rn = sandbox.Renderer;
+    const W3 = sandbox.WEAPONS;
+    const bad = [];
+
+    function npc(type, special, pods) {
+      return Ent3.makeAircraft({
+        type: type, team: 1, x: 0, y: 6000, z: 0,
+        fwd: M3n.V(0, 0, -1), speed: 300,
+        special: special, pods: pods || null
+      });
+    }
+    function countStoresOf(a) {
+      let c = 0;
+      const o = Rn.pushModel;
+      Rn.pushModel = function (m, p, f, u, op) { c++; return o(m, p, f, u, op); };
+      sandbox.Game.__pushStores(a);
+      Rn.pushModel = o;
+      return c;
+    }
+
+    // 1. 典型敌机：片岩（重挂点 2 + 通用挂点 2）挂下游格斗弹 → 4 枚
+    const m27 = npc('m27', 'dl6');
+    const n1 = countStoresOf(m27);
+    if (n1 !== 4) bad.push('ROK-27 挂 BIN-6 应当画出 4 枚，实际 ' + n1);
+    // 打光之后机翼必须变干净（弹药池 = 0）
+    m27.ammoPool.dl6 = 0; m27.spAmmo = 0;
+    const n2 = countStoresOf(m27);
+    if (n2 !== 0) bad.push('ROK-27 的弹打光后翼下仍然挂着 ' + n2 + ' 枚');
+    // 装填中的挂架空着 —— 这条以前对 NPC 完全不存在
+    const m27b = npc('m27', 'dl6');
+    if (!m27b.slotCd.dl6 || m27b.slotCd.dl6.length !== 4) {
+      bad.push('ROK-27 没有按挂点数建起 4 个发射槽');
+    } else {
+      m27b.slotCd.dl6[0] = 99;
+      const n3 = countStoresOf(m27b);
+      if (n3 !== 3) bad.push('ROK-27 一个槽装填中，却画出了 ' + n3 + ' 枚（应为 3）');
+    }
+
+    // 2. 支援机只有机腹挂点：适配表必须拦住空空弹
+    const aewc = npc('pelican', 'dl6');
+    const n4 = countStoresOf(aewc);
+    if (n4 !== 0) bad.push('只有机腹挂点的预警机被画上了 ' + n4 + ' 枚空空弹');
+
+    // 3. 僚机 KA-7：翼下通用挂点 2 个，挂 GIR-9
+    const wing = npc('ucav', 'v9');
+    const n5 = countStoresOf(wing);
+    if (n5 !== 2) bad.push('KA-7 应当画出 2 枚 GIR-9，实际 ' + n5);
+
+    // 4. 任务写定的吊舱也要看得见：玄武岩挂 DAR-4 + ZUN-6
+    //    （吊舱先占通用挂点，制式弹占重挂点）
+    const gal = npc('gal31', 'dl4', ['vzu']);
+    const n6 = countStoresOf(gal);
+    if (n6 !== 4) bad.push('GAL-31 挂 DAR-4 + ZUN-6 应当画出 4 件，实际 ' + n6);
+    if (!gal.ammoPool || gal.ammoPool.dl4 !== W3.dl4.ammo) {
+      bad.push('GAL-31 没有建起弹药池');
+    }
+    if (!gal.slotCd || !gal.slotCd.dl4 || gal.slotCd.dl4.length !== 2) {
+      bad.push('GAL-31 的发射槽数与它占的挂点数不符');
+    }
+    // 吊舱不占发射槽，也不该跟着导弹一起"打光"
+    gal.ammoPool.dl4 = 0;
+    const n7 = countStoresOf(gal);
+    if (n7 !== 2) bad.push('DAR-4 打光后干扰吊舱也跟着消失了（剩 ' + n7 + ' 件）');
+
+    // 4b. 吊舱与制式弹**共存**：片岩（重 + 通用）挂 BIN-6 + ZUN-6 ——
+    //     吊舱占外侧通用挂点、导弹保住重挂点。可视挂架少了两个，
+    //     但弹药池不能跟着改：AI 该打几发还是几发。
+    const mixed = npc('m27', 'dl6', ['vzu']);
+    const n9 = countStoresOf(mixed);
+    if (n9 !== 4) bad.push('ROK-27 挂 BIN-6 + ZUN-6 应当画出 4 件，实际 ' + n9);
+    if (mixed.ammoPool.dl6 !== W3.dl6.ammo) {
+      bad.push('挂了吊舱之后导弹的弹药池被改了（' + mixed.ammoPool.dl6 + '）');
+    }
+    if (!mixed.slotCd.dl6 || mixed.slotCd.dl6.length !== 2) {
+      bad.push('ROK-27 上 BIN-6 的发射槽应当只剩它占的那 2 个，实际 ' +
+        (mixed.slotCd.dl6 ? mixed.slotCd.dl6.length : '无'));
+    }
+
+    // 4c. 吊舱不能把制式弹挤到一个挂点都不剩：砂岩（通用 + 机腹）挂
+    //     BIN-9 + ZUN-6 —— 吊舱若从第一组往后占（吃掉 light），
+    //     而这枚弹挂不上 belly，机翼上就一枚弹都画不出来，可 AI 照样发射。
+    const spray = npc('spray', 'vbn', ['vzu']);
+    const n10 = countStoresOf(spray);
+    if (n10 !== 4) {
+      bad.push('砂岩挂 BIN-9 + ZUN-6 应当画出 4 件（导弹不能被吊舱挤掉），实际 ' + n10);
+    }
+
+    // 5. 玩家的"空置"组不该凭空长出当前选中的那枚弹
+    //    （旧代码对空置组回退到 a.special，于是 8 个挂点全画上弹）
+    const p0 = Ent3.makeAircraft({
+      type: 'c11', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
+      fwd: M3n.V(0, 0, 1), speed: 300, special: 'srm'
+    });
+    p0.loadout = {};                       // 全部空置
+    p0.ammoPool = { srm: 16 };
+    p0.slotCd = { srm: [0, 0] };
+    const n8 = countStoresOf(p0);
+    if (n8 !== 0) bad.push('玩家全部挂点空置，却画出了 ' + n8 + ' 件挂载');
+
+    // 6. 端到端：真实任务里生出来的敌机也要有挂载 ——
+    //    这条覆盖 missions.js 把 special / pods 传进 makeAircraft 的那一段
+    sandbox.Game.startMission(0);
+    const w0 = sandbox.Game.__world();
+    let npcCount = 0, npcStores = 0;
+    for (let i = 0; i < w0.actors.length; i++) {
+      const ea = w0.actors[i];
+      if (ea.isPlayer || !ea.ai) continue;
+      npcCount++;
+      npcStores += countStoresOf(ea);
+    }
+    if (npcCount === 0 || npcStores === 0) {
+      bad.push('任务 1 里 ' + npcCount + ' 架 NPC 一共只画出 ' + npcStores + ' 件挂载');
+    }
+
+    // 7. 主循环的接线：render() 必须对**每一架**飞机调 pushStores。
+    //    上面几条都是直接调函数的，这条走真实的一帧 —— 挂载的指纹是
+    //    pushModel 的 scale 0.85（飞机 / 目标 / 导弹都不带这个值）。
+    let expect = 0;
+    for (let i = 0; i < w0.actors.length; i++) {
+      if (w0.actors[i].alive) expect += countStoresOf(w0.actors[i]);
+    }
+    let drawn = 0;
+    {
+      const o = Rn.pushModel;
+      Rn.pushModel = function (m, p, f, u, op) {
+        if (op && op.scale === 0.85) drawn++;
+        return o(m, p, f, u, op);
+      };
+      pump(1);
+      Rn.pushModel = o;
+    }
+    if (drawn !== expect) {
+      bad.push('一帧里渲染出的挂载数（' + drawn +
+        '）与逐架推送的总和（' + expect + '）对不上 —— render() 漏了谁');
+    }
+
+    /* 8. 挂载高度：挂载物不能埋进机体里。
+
+       这条是**几何不变量**，判据取自模型本身而不是写死的数值：
+       把每个面投影到 xz 平面，找出挂点正下方那些面里最低的 y，
+       挂载中心必须比它低至少一个挂载物半径（0.30）——
+       低了才叫"挂在外面"，否则那一件在画面上根本看不见。
+
+       抓过一次：GAL-44 干扰机与石英的机腹在 -2.60 m，而按机型类型给的
+       默认吊舱高度是 -1.95（对战斗机合适），于是机腹吊舱整件埋进机身 ——
+       而吊舱是那两架飞机唯一的外挂特征。 */
+    const STORE_HYX = Ent3.STORE_HY;
+    function surfaceUnderModel(m2, px, pz) {
+      let best = null;
+      for (let fi = 0; fi < m2.f.length; fi++) {
+        const idx = m2.f[fi].i;
+        if (idx.length < 3) continue;
+        for (let t = 1; t < idx.length - 1; t++) {
+          const A = m2.v[idx[0]], B = m2.v[idx[t]], C2 = m2.v[idx[t + 1]];
+          const d = (B[2] - C2[2]) * (A[0] - C2[0]) + (C2[0] - B[0]) * (A[2] - C2[2]);
+          if (Math.abs(d) < 1e-9) continue;
+          const w1 = ((B[2] - C2[2]) * (px - C2[0]) + (C2[0] - B[0]) * (pz - C2[2])) / d;
+          const w2 = ((C2[2] - A[2]) * (px - C2[0]) + (A[0] - C2[0]) * (pz - C2[2])) / d;
+          const w3 = 1 - w1 - w2;
+          if (w1 < -0.02 || w2 < -0.02 || w3 < -0.02) continue;
+          const y = w1 * A[1] + w2 * B[1] + w3 * C2[1];
+          if (best === null || y < best) best = y;
+        }
+      }
+      return best;
+    }
+    for (let ai = 0; ai < sandbox.AIRCRAFT.length; ai++) {
+      const ac2 = sandbox.AIRCRAFT[ai];
+      const m2 = sandbox.MODELS[ac2.model];
+      if (!m2) continue;
+      for (let gi2 = 0; gi2 < ac2.hardpointGroups.length; gi2++) {
+        const g2 = ac2.hardpointGroups[gi2];
+        const hy2 = (typeof g2.hy === 'number') ? g2.hy : STORE_HYX[g2.kind];
+        for (let pi2 = 0; pi2 < g2.pts.length; pi2++) {
+          const pt2 = g2.pts[pi2];
+          if (pt2.x < 0) continue;                       // 左右对称，只看右翼
+          const s2 = surfaceUnderModel(m2, pt2.x, pt2.y);
+          if (s2 === null) continue;                     // 挂点在机体之外，判不了
+          if (s2 - hy2 < 0.30) {
+            bad.push(ac2.id + ' 的挂点组 ' + g2.id + '（' + g2.kind + '）挂载物埋进机体：' +
+              '挂载中心 ' + hy2 + '、局部下表面 ' + s2.toFixed(2) + ' m');
+          }
+        }
+      }
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('NPC 实体挂载：制式弹逐点画出、打光变干净、吊舱常显、支援机不被误挂（任务 1：' +
+      npcCount + ' 架 → ' + npcStores + ' 件）');
+  }
+
+  /* ---- AI 的开火选弹：按目标类别 + 射程挑一件 ----
+     AI 没有"换武器"这个机制 —— 每次开火前挑一次，挑中谁 `a.special` 就是谁
+     （Ent.setWeapon）。判据在 entities.js 的 chooseWeapon()：
+
+       · 先看类别：目标物（kind === 'target'）算对面，其余算空中，
+         与玩家那边的 targetMismatch 同一套判据
+       · 再看射程：够得着里面取射程最短的（别拿远距弹打格斗距离），
+         都够不着就取最接近的
+       · 装填中的垫底；无制导弹不参与（AI 没有投弹瞄准）
+
+     顺带盯住"任务给 NPC 写的逐组挂载必须真的挂得上"——写错不崩，
+     但会在 Ent.mountIssues 里留一条，下面第 4 条与任务压力测试都会查。 */
+  {
+    const Ent4 = sandbox.Ent, M3q = sandbox.M3, AI4 = sandbox.AI, W4 = sandbox.WEAPONS;
+    const bad = [];
+
+    function npcOf(type, loadout, team) {
+      return Ent4.makeAircraft({
+        type: type, team: team === undefined ? 1 : team, x: 0, y: 5000, z: 0,
+        fwd: M3q.V(0, 0, 1), speed: 300, loadout: loadout
+      });
+    }
+    function surfaceOf(team, x, z) {
+      return Ent4.makeTarget({ ttype: 'ground', model: 'radar', label: 'T',
+        x: x, y: 0, z: z, hp: 100, radius: 10, ground: true, team: team });
+    }
+    const airT = Ent4.makeAircraft({
+      type: 'c11', team: 0, x: 0, y: 5000, z: -4000,
+      fwd: M3q.V(0, 0, -1), speed: 300
+    });
+
+    // 1. 一架上挂三种射程的空空弹：按距离挑"够得着里面最短的那件"
+    //    c11 的组：A 翼尖 / B 重挂 / C 通用 —— srm 4.2 km / mrm 8.6 / v17 12.5
+    const mix = npcOf('c11', { A: 'srm', B: 'v17', C: 'mrm' });
+    if (!mix.ammoPool || mix.ammoPool.srm !== W4.srm.ammo ||
+        mix.ammoPool.v17 !== W4.v17.ammo || mix.ammoPool.mrm !== W4.mrm.ammo) {
+      bad.push('逐组挂载没有建成弹药池：' + JSON.stringify(mix.ammoPool));
+    }
+    const at = (a, t, d) => Ent4.chooseWeapon(a, t, d);
+    const cases = [[3000, 'srm'], [8000, 'mrm'], [12000, 'v17'], [20000, 'v17']];
+    for (const [d, want] of cases) {
+      const got = at(mix, airT, d);
+      if (got !== want) bad.push(d + ' m 上应当挑 ' + want + '，实际 ' + got);
+    }
+    // 格斗弹全在装填 → 改用够得着的中距弹，而不是干等
+    mix.slotCd.srm[0] = 5; mix.slotCd.srm[1] = 5;
+    if (at(mix, airT, 3000) !== 'mrm') {
+      bad.push('格斗弹在装填时应当改用 mrm，实际 ' + at(mix, airT, 3000));
+    }
+
+    // 2. 类别不对的不参与：手里只有对空弹时，不该挑出任何一件来打面目标
+    const surf = surfaceOf(0, 0, 0);
+    if (at(mix, surf, 3000) !== null) {
+      bad.push('只有对空弹时，面目标不该挑出武器（挑到了 ' + at(mix, surf, 3000) + '）');
+    }
+
+    // 3. 对空 + 对地混挂：各打各的
+    const mixed = npcOf('c11', { A: 'srm', B: 'vgt' });
+    if (at(mixed, airT, 3000) !== 'srm') bad.push('混挂时对空目标没挑到 srm');
+    if (at(mixed, surf, 5000) !== 'vgt') {
+      bad.push('混挂对面目标没挑到 vgt，实际 ' + at(mixed, surf, 5000));
+    }
+
+    // 4. 任务写错的逐组挂载要被记下来，并且那一组空着
+    Ent4.clearMountIssues();
+    const wrongKind = npcOf('c11', { A: 'v17' });          // 翼尖挂不了重型远距弹
+    if (Ent4.mountIssues.length !== 1) {
+      bad.push('翼尖挂 v17 应当记 1 条挂载问题，实际 ' + Ent4.mountIssues.length);
+    }
+    if (wrongKind.ammoPool && wrongKind.ammoPool.v17) {
+      bad.push('挂不上的武器不该进弹药池');
+    }
+    const noCaps = npcOf('c14', { C: 'lcm' });             // 截击机没有 strike 火控
+    if (Ent4.mountIssues.length !== 2) {
+      bad.push('机体能力不足时应当再记一条，实际 ' + Ent4.mountIssues.length);
+    }
+    if (noCaps.ammoPool && noCaps.ammoPool.lcm) {
+      bad.push('能力不足的武器不该进弹药池');
+    }
+    Ent4.clearMountIssues();
+
+    // 5. 端到端：挑中的弹真的打出去了，而且挑的是对的那一件
+    /*  一条只验证 chooseWeapon 是不够的 —— 真正要保的是"开火那一段
+        用了挑中的武器"。所以这里跑完整的 AI.update + stepAircraft，
+        并把 fireMissile 记账（跟 launch 一样扣弹、占槽）。 */
+    function raid(loadout, targetKind, distM, seconds, altM) {
+      const w = { actors: [], targets: [], bullets: [], missiles: [], particles: [],
+        time: 0, player: null, killed: 0, friendlyLoss: 0 };
+      const atk = npcOf('c11', loadout);
+      atk.pos = M3q.V(0, altM === undefined ? 5000 : altM, 0);
+      atk.fwd = M3q.V(0, 0, 1);
+      let tg;
+      if (targetKind === 'surface') {
+        tg = surfaceOf(0, 0, distM);
+        w.targets.push(tg);
+      } else {
+        tg = Ent4.makeAircraft({ type: 'c11', team: 0, x: 0, y: 5000, z: distM,
+          fwd: M3q.V(0, 0, -1), speed: 300 });
+        w.actors.push(tg);
+      }
+      w.actors.push(atk);
+      AI4.attach(atk, { role: 'enemy', skill: 0.85 });
+
+      const fired = [];
+      w.fireMissile = function (actor, t) {
+        if (actor.spAmmo <= 0 || actor.spCd > 0) return false;
+        const wid = actor.special;
+        const sl = actor.slotCd ? actor.slotCd[wid] : null;
+        if (sl) {
+          let idx = -1;
+          for (let i = 0; i < sl.length; i++) if (sl[i] <= 0) { idx = i; break; }
+          if (idx < 0) return false;
+          sl[idx] = W4[wid].cd;
+        }
+        actor.spAmmo -= 1;
+        if (actor.ammoPool) actor.ammoPool[wid] = actor.spAmmo;
+        w.missiles.push(Ent4.makeMissile({
+          weapon: wid, team: actor.team, pos: actor.pos, fwd: actor.fwd,
+          speed: actor.speed, target: t, owner: actor
+        }));
+        fired.push(wid);
+        return true;
+      };
+
+      const frames = Math.round(seconds * 60);
+      for (let i = 0; i < frames; i++) {
+        AI4.update(atk, 1 / 60, w);
+        Ent4.stepAircraft(atk, 1 / 60, w);
+        for (let k = 0; k < w.missiles.length; k++) Ent4.stepMissile(w.missiles[k], 1 / 60, w);
+      }
+      return { fired: fired, target: tg };
+    }
+
+    // 5a. 8 km 上的空中目标：格斗弹够不着，第一发就该是远距弹 v17
+    const air8 = raid({ A: 'srm', B: 'v17' }, 'air', 8000, 30);
+    if (!air8.fired.length) bad.push('对空：带 v17 的敌机 30 秒内一次都没开火');
+    else if (air8.fired[0] !== 'v17') {
+      bad.push('对空 8 km：第一发应当是 v17，实际 ' + air8.fired[0]);
+    }
+
+    // 5b. 对地：混挂的敌机去打面目标，打出来的必须全是对地弹
+    //     高度压到 3000 m：对地弹是要真的飞到目标上的，从 5000 m 平飞
+    //     投放还差几百米就到期（见下面的说明）
+    const gnd = raid({ A: 'srm', B: 'vgt' }, 'surface', 5000, 30, 3000);
+    if (!gnd.fired.length) bad.push('对地：带 vgt 的敌机 30 秒内没去炸面目标');
+    for (const wid of gnd.fired) {
+      if (wid !== 'vgt') bad.push('对地目标却打出了 ' + wid);
+    }
+    if (gnd.target.alive && gnd.target.hp >= gnd.target.maxHp) {
+      bad.push('对面目标挨了 ' + gnd.fired.length + ' 发对地弹，血量却一点没掉');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('AI 开火选弹：按目标类别与射程挑一件（3/8/12 km → srm/mrm/v17；对地弹打面目标）');
+  }
+
   /* ---- BIN-8 追云：一枚对空的重型拦截弹，制空/截击机必须挂得上 ----
 
      它原来被标成"反辐射弹"、要求 strike（对地火控），于是只有攻击机
@@ -3093,8 +3453,12 @@ if (Ent && M3 && me && world) {
         bad.push('任务 ' + (mi + 1) + ' 抛异常：' + e.message);
       }
     }
+    /* 关卡里给 NPC 写的挂载必须真的挂得上（组的 kind 适配 + 机体能力）。
+       写错了不会崩，只会静默少画几件 —— 所以在这里一次性查干净。 */
+    const issues = sandbox.Ent.mountIssues || [];
+    for (let i = 0; i < issues.length; i++) bad.push('NPC 挂载问题：' + issues[i]);
     if (bad.length) bad.forEach(fail);
-    else ok('全部 ' + n + ' 个任务各跑 30 秒无异常、无 NaN');
+    else ok('全部 ' + n + ' 个任务各跑 30 秒无异常、无 NaN，且没有 NPC 挂载问题');
   }
 
   /* ---- ② 每个机型各飞 10 秒 ---- */

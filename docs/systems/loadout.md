@@ -44,6 +44,10 @@ hardpointGroups: [
 - `pts` 是**机体系俯视坐标**（机头 +y，右翼 +x，单位米）
 - **`pts` 同时就是俯视识别图的标注锚点** —— 单一数据源，不要再另建一份
 - 每组点数**必须是偶数**（成对挂载）；`smoke.js` 检查 `pts.length % 2`
+- 组上可以带一个 `hy`：**吊挂高度**（机体系 y，米）。不写就用
+  `Ent.STORE_HY` 按 `kind` 给的默认值。默认值是按战斗机定的，
+  大型机体要自己给 —— 否则挂载物会埋进机身（`smoke.js` 有几何断言盯着，
+  见 [data.md](data.md#hardpointgroups--defaultloadout)）
 
 可驾驶的六架机（`npcOnly` 的机型也有组，但只用于资料库展示）：
 
@@ -118,6 +122,27 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 
 下游专用弹（`dl4` / `dl6` / `dl9` / `vgt` / `vsr` / `vbn` / `otr` / `vzu`）
 的 `fits` 是**空数组**，表示玩家挂不上它们。
+
+但"玩家挂不上"不等于"挂不上"。空数组在 `w.fits && …` 里是 truthy，
+所以渲染实体挂载时如果拿 `fits` 当判据，这批弹会被全部过滤掉 ——
+敌机机翼永远是干净的。NPC 走的就是另一张表：
+
+| 武器 | `npcFits`（写在 `WEAPONS` 条目里，不在 `STORE_ATTR`） |
+|---|---|
+| `dl4` DAR-4 | light, heavy |
+| `dl6` BIN-6 | tip, light, heavy |
+| `vbn` BIN-9 | tip, light, heavy |
+| `otr` TOR-1 | tip, light, heavy |
+| `vsc` ZUN-14 | light, belly |
+| `vgt` GUT-7 | heavy, belly |
+| `vsr` SPO-14 | heavy |
+| `vzu` ZUN-6 | light, belly |
+| `dl9` BAD-9 | 不写 —— 地面发射，不上机 |
+
+适配表**不能不要**：`a2` / `pelican` / `quartz` / `gal44` 这些
+`npcOnly` 机型只有机腹挂点，而 `spawnEnemy` 的默认弹是空空弹，
+不查就会把格斗弹画到预警机的机腹上。两张表的取舍见
+[§ NPC 的挂载](#npc-的挂载)。
 
 **为什么单独放一张 `STORE_ATTR` 表而不是塞进 `WEAPONS`**：
 这样能横着比较"谁挂得下、谁带得多、谁更重"，不用在几百行表里翻。
@@ -337,6 +362,69 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 **注意 `STORE_COOLDOWN` 必须覆盖所有可发射武器**（`smoke.js` 会检查
 `fits` 非空的非被动武器）。漏掉的话那件武器会保留 `data.js` 里的原始 `cd` ——
 那个值可能是按旧语义定的，会快得离谱（CLA-17 就这样漏过一次）。
+
+---
+
+## NPC 的挂载
+
+同一套"槽 = 挂点数 + 弹药池"的机制也用在 NPC 身上，但**入口不同**：
+
+| 谁 | 弹种从哪来 | 适配表 |
+|---|---|---|
+| 玩家 | 机库配置 `a.loadout`（组 id → 弹种） | `fits` |
+| NPC | 任务脚本写定的 `a.loadout`（逐组）、或 `a.special`（一件制式弹）+ `a.pods`（吊舱） | `npcFits`，没写就退回 `fits` |
+
+走哪条路看 `a.isPlayer`。NPC 的 `Ent.mountPlan(a)` 按三条规矩铺：
+
+1. **逐组 `loadout` 先落位**（上游 NPC 的写法，`missions.js` 的 `o.loadout`）
+   —— 作者说了算，但**必须真的挂得上**：组的 kind 要在适配表里，
+   机体能力（`canCarry`）也要够。不满足就记一条 `Ent.mountIssues`
+   并把那一组空着（任务文档里有专门一节讲这条规矩）
+2. **任务写定的吊舱占剩下的组** —— 数量少，而且"编队里那一架带干扰吊舱"
+   是设定里写明的事（`missions.js` 的 `o.pods`）
+3. **制式弹 `a.special` 铺满再剩下的** —— 只在**完全没有**逐组配置时生效
+
+第 2 条的顺序不是随便定的：吊舱占位是**从最后一组往前**。挂点组在
+`data.js` 里按"内侧 → 外侧"排，倒着走等于让吊舱优先落在外侧/机腹，
+把靠里的重挂点留给制式弹。按正序（从第一组往后）会踩到：`spray`
+（通用 + 机腹）挂一枚空空弹加一个吊舱时，吊舱先吃掉通用挂点，
+而那枚弹挂不上机腹 —— **机翼上一枚弹都画不出来**，可 AI 照样在发射
+（`smoke.js` 有断言盯着）。
+
+所以"一种导弹 + 一些吊舱"、以及"两种导弹各占一组"都是支持的。
+吊舱吃掉挂点后，导弹的**可视挂架会变少，但弹药池不变**
+（`ammoPool[wid] = w.ammo`）—— AI 该打几发还是几发，只是能看见的发射架少了。
+
+`Ent.buildNpcMounts(a)`（`makeAircraft()` 末尾对非玩家调用）据此建两样东西：
+
+- `a.ammoPool[wid] = w.ammo` —— **取 `w.ammo`，不是玩家的
+  `挂点数 × perPoint`**；下游弹的 `perPoint` 是 0，按玩家口径会建出 0 发弹
+- `a.slotCd[wid] = [...]` —— 长度 = 该武器占用的挂点数，超出储备的槽标
+  `SLOT_EMPTY`（与玩家同一条规矩）
+
+没有这两样，实体挂载就只是装饰：`pushStores()` 判断"这枚还在不在"
+靠的正是它们（打光即不画 / 装填中则挂架空），而它们以前只有玩家有 ——
+于是僚机的弹永远挂在翼下，打光也不消失。
+
+**多件挂载时，AI 每次开火前挑一件**（`Ent.chooseWeapon`）：按目标类别
+（对空 / 对面）与射程，够得着的里面取射程最短的那件；挑中谁就
+`Ent.setWeapon(a, wid)` 把它设成"当前触发的那件"。玩家按 R 换弹
+（`game.js` 的 `syncWeapon`）也走同一个 `setWeapon` —— 两边不会再各写一份。
+判据与任务侧的写法见 [missions.md](missions.md#给-npc-设计挂载)、
+[ai.md](ai.md)。
+
+发射侧的弹药池回写也在 `launch()` 里对两边统一做了
+（`actor.ammoPool[actor.special] = actor.spAmmo`）。**AI 的发射节奏不变**：
+它自己的 `s.shootT` 下限是 1.0–2.6 秒，比任何槽冷却都长，
+所以槽数变多不会把敌机变成连发火箭炮。
+
+**吊舱与定向能不占发射槽，也一直挂在挂架上**（`kind === 'ecm' || 'dew'`）。
+这条以前只对 `passive` 吊舱成立，于是 ZUN-4 开一次机就会在翼下消失一个
+冷却周期，看起来像被扔掉了。
+
+肉眼验证走 `node tools/render-mounts.js`（把十二个代表性配置落成 PNG，
+走的是真正的 `makeAircraft` + `pushStores` + `render.js`），见
+[tools.md](tools.md#toolsrender-mountsjs)。
 
 ---
 
@@ -584,6 +672,10 @@ cd[wid] = slots.map(剩余 => 1 - clamp(剩余 / w.cd, 0, 1));
 
 **别忘第 3 步。** 漏了不会崩，但那个武器永远不会出现在任何下拉框里。
 
+只给 NPC 用的弹（下游那批）走另一条路：`fits` 留空数组、`perPoint` / `mass`
+填 0，再写一条 `npcFits`（§ NPC 的挂载）；`STORE_ATTR` / `STORE_COOLDOWN`
+里都不用出现它 —— 玩家那边根本不列它。
+
 ## 加一架新飞机
 
 1. 在 `AIRCRAFT` 里定义 `hardpointGroups`（**点数必须成对**）和 `defaultLoadout`
@@ -602,6 +694,9 @@ cd[wid] = slots.map(剩余 => 1 - clamp(剩余 / w.cd, 0, 1));
 |---|---|
 | 挂载点布局与类型 | `data.js` 各机型的 `hardpointGroups` |
 | 单点弹数 / 重量 / 适配类型 | `data.js` 的 `STORE_ATTR` |
+| NPC 的挂点适配 | `data.js` 各武器的 `npcFits` |
+| NPC 的挂载分配（吊舱先占） | `entities.js` 的 `mountPlan()` / `buildNpcMounts()` |
+| 实体挂载渲染（3D） | `game.js` 的 `pushStores()` / `pushOneStore()` |
 | 每槽冷却 | `data.js` 的 `STORE_COOLDOWN` |
 | 能力门槛与机型能力 | `data.js` 的 `STORE_NEEDS` / `AIRCRAFT[].caps` |
 | 最大挂载重量 | `data.js` 各机型的 `maxLoad` |

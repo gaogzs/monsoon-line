@@ -281,7 +281,10 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     hardpointGroups: [
       { id: 'A', label: '翼下内侧', kind: 'heavy', pts: [{ x: 3.0, y: 0.4 }, { x: -3.0, y: 0.4 }] },
       { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.4, y: 1.6 }, { x: -5.4, y: 1.6 }] },
-      { id: 'C', label: '翼尖', kind: 'tip', pts: [{ x: 7.4, y: 2.4 }, { x: -7.4, y: 2.4 }] }
+      /* 翼尖在这型机上比翼根**高**（前掠翼 + 上反），默认的 tip 高度 -0.35
+         会把整枚弹压进翼面里。hy 是按机体下表面量的（见 models.md）。 */
+      { id: 'C', label: '翼尖', kind: 'tip', hy: -0.85,
+        pts: [{ x: 7.4, y: 2.4 }, { x: -7.4, y: 2.4 }] }
     ],
     defaultLoadout: { A: 'wasp', B: 'qsr', C: 'irp' }
   },
@@ -463,7 +466,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: 'k11',
     maxLoad: 22000,
     hardpointGroups: [
-      { id: 'A', label: '弹舱', kind: 'belly', pts: [{ x: 1.6, y: -2.2 }, { x: -1.6, y: -2.2 }] },
+      { id: 'A', label: '弹舱', kind: 'belly', hy: -2.30, pts: [{ x: 1.6, y: -2.2 }, { x: -1.6, y: -2.2 }] },
       { id: 'B', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 6.0, y: -1.5 }, { x: -6.0, y: -1.5 }] }
     ],
     defaultLoadout: {}
@@ -560,7 +563,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: 'k2',
     maxLoad: 900,
     hardpointGroups: [
-      { id: 'A', label: '机腹挂点', kind: 'belly', pts: [{ x: 0.9, y: -1.4 }, { x: -0.9, y: -1.4 }] }
+      { id: 'A', label: '机腹挂点', kind: 'belly', hy: -1.85, pts: [{ x: 0.9, y: -1.4 }, { x: -0.9, y: -1.4 }] }
     ],
     defaultLoadout: {}
   },
@@ -599,7 +602,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: 'k3',
     maxLoad: 0,
     hardpointGroups: [
-      { id: 'A', label: '机腹雷达罩', kind: 'belly', pts: [{ x: 0.9, y: -1.6 }, { x: -0.9, y: -1.6 }] }
+      { id: 'A', label: '机腹雷达罩', kind: 'belly', hy: -1.85, pts: [{ x: 0.9, y: -1.6 }, { x: -0.9, y: -1.6 }] }
     ],
     defaultLoadout: {}
   },
@@ -627,7 +630,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: 'k3',
     maxLoad: 0,
     hardpointGroups: [
-      { id: 'A', label: '机背天线阵', kind: 'belly', pts: [{ x: 1.0, y: -1.8 }, { x: -1.0, y: -1.8 }] }
+      // hy 同 GAL-44：机背天线阵在 -2.60 m，默认的 -1.95 会埋进去
+      { id: 'A', label: '机背天线阵', kind: 'belly', hy: -3.00, pts: [{ x: 1.0, y: -1.8 }, { x: -1.0, y: -1.8 }] }
     ],
     defaultLoadout: {}
   },
@@ -655,7 +659,11 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: 'k3',
     maxLoad: 0,
     hardpointGroups: [
-      { id: 'A', label: '机腹干扰吊舱', kind: 'belly', pts: [{ x: 1.2, y: -2.0 }, { x: -1.2, y: -2.0 }] }
+      /* 机腹干扰吊舱。hy 是这架飞机的机腹下表面（-2.60 m）再减一点余量 ——
+         默认的 belly 高度 -1.95 是按战斗机定的，在这架 12 米高的机身上
+         等于把吊舱塞进机身里，图上完全看不见。 */
+      { id: 'A', label: '机腹干扰吊舱', kind: 'belly', hy: -3.00,
+        pts: [{ x: 1.2, y: -2.0 }, { x: -1.2, y: -2.0 }] }
     ],
     defaultLoadout: {}
   }
@@ -1481,7 +1489,7 @@ var WEAPONS = {
 
   ecm2: {
     id: 'ecm2', name: 'ZUN-8', cn: '静默 · HUSH', kind: 'ecm',
-    model: 'missile',
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
@@ -1494,7 +1502,7 @@ var WEAPONS = {
 
   dec: {
     id: 'dec', name: 'ZUN-12', cn: '雾障 · FOGSCREEN', kind: 'ecm',
-    model: 'missile',
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
@@ -1507,7 +1515,7 @@ var WEAPONS = {
 
   oep: {
     id: 'oep', name: 'GUS-6', cn: '明瞳 · CLEAREYE', kind: 'ecm',
-    model: 'missile',
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
@@ -1522,7 +1530,7 @@ var WEAPONS = {
 
   irp: {
     id: 'irp', name: 'GUS-9', cn: '夜枭 · NIGHTOWL', kind: 'ecm',
-    model: 'missile',
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
@@ -1536,7 +1544,7 @@ var WEAPONS = {
 
   hdp: {
     id: 'hdp', name: 'BAD-3', cn: '护盾 · AEGIS', kind: 'ecm',
-    model: 'missile',
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
@@ -1695,7 +1703,7 @@ var WEAPONS = {
   },
   e4: {
     id: 'e4', name: 'ZUN-4', cn: '回声 · ECHO', kind: 'ecm',
-    model: null,
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 99, cd: 5, salvo: 0, flare: 1.0, prox: 0,
@@ -1707,7 +1715,7 @@ var WEAPONS = {
   },
   l2: {
     id: 'l2', name: 'GUS-2', cn: '日光 · HELIOS', kind: 'dew',
-    model: null,
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 99, cd: 3.6, salvo: 0, flare: 1.0, prox: 0,
@@ -1732,12 +1740,16 @@ var WEAPONS = {
      都出自 daspo（摧毁），只是两家分别排自己的号。
 
      fits 留空 = 玩家挂不上，只作为 NPC 的制式装备存在。
+
+     给 NPC 备的那张挂点适配表叫 npcFits（见文件末尾"挂载属性"一节）。
+     两张表必须分开：fits 空数组的语义是"没有实物可挂"，
+     不是"挂不上"—— 渲染实体挂载时读错表，敌机的弹会被全部过滤掉。
      ============================================================ */
 
   /* --- 下游：认知电子战是他们的看家本事 --- */
   vzu: {
     id: 'vzu', name: 'ZUN-6', cn: '迷雾 · MISTVEIL', kind: 'ecm',
-    model: 'missile',
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 0, cd: 6.8, salvo: 1, flare: 1.0, prox: 0,
@@ -1750,6 +1762,7 @@ var WEAPONS = {
        它是六个被动吊舱里唯一用嵌套写法的，其余五个都写顶层。 */
     lockResist: 0.30,
     fits: [], perPoint: 0, mass: 0,
+    npcFits: ['light', 'belly'],
     desc: `下游的干扰吊舱，比上游的 ZUN-8 老一代，但装得更多。
        ​它们的逻辑很直白：<b>只要你先看不见，谁先发现谁就不重要了。</b>`,
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.78 }
@@ -1767,7 +1780,7 @@ var WEAPONS = {
      打上 suppressed —— 也就是你能做的只有离开那片空域。 */
   vsc: {
     id: 'vsc', name: 'ZUN-14', cn: '焦炬 · TORCH', kind: 'ecm',
-    model: 'missile',
+    model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 99, cd: 40, salvo: 0, flare: 1.0, prox: 0,
@@ -1777,6 +1790,7 @@ var WEAPONS = {
     /* 辐射特征大得藏不住 —— RWR 上是全屏最亮的那一个 */
     emitter: true,
     fits: [], perPoint: 0, mass: 0,
+    npcFits: ['light', 'belly'],
     desc: `下游的干扰吊舱，和上游的 ZUN-4 是两种哲学。
       <b>它不跟你玩波形。</b>八千瓦的噪声直接灌进接收前端，
       九公里以内所有人的雷达一起变成雪花 —— 包括预警机的数据链。
@@ -1794,6 +1808,8 @@ var WEAPONS = {
     dmg: 190, ammo: 2, cd: 11, salvo: 1, flare: 0.62, prox: 30,
     target: 'ground',
     fits: [], perPoint: 0, mass: 0,
+    /* 对地弹挂重型挂点或机腹 —— 下游的随队攻击机都是重型/机腹布局 */
+    npcFits: ['heavy', 'belly'],
     /* 原文写"精度比不上上游的 GUT-9"，但 GUT-9 是一枚**无动力滑翔弹**
        （扔出去就只能等，目标挪了就打空），拿它当精度基准说不通 ——
        碎石是有发动机的导弹，两者根本不是一类东西。
@@ -1812,6 +1828,8 @@ var WEAPONS = {
     dmg: 260, ammo: 1, cd: 15.6, salvo: 1, flare: 0.72, prox: 34,
     target: 'ship',
     fits: [], perPoint: 0, mass: 0,
+    /* 反大型弹只有重挂点撑得住（与上游的 SPO-22 同一档） */
+    npcFits: ['heavy'],
     desc: `打大型目标的半穿甲弹，飞行剖面很高、末段俯冲 ——
        这个设计是为了绕开调节场上空那些不好惹的东西。`,
     stat: { dmg: 0.76, spd: 0.46, trn: 0.20, rng: 0.70, ecm: 0.34 }
@@ -1826,6 +1844,7 @@ var WEAPONS = {
     dmg: 42, ammo: 2, cd: 8, salvo: 1, flare: 0.58, prox: 20,
     target: 'air',
     fits: [], perPoint: 0, mass: 0,
+    npcFits: ['tip', 'light', 'heavy'],
     desc: `两个导引头共用一个弹体 —— 打丢一个还有第二个。
        下游飞行员喜欢它，因为<b>被它盯上时，一发干扰弹不够用</b>。`,
     stat: { dmg: 0.48, spd: 0.52, trn: 0.62, rng: 0.34, ecm: 0.26 }
@@ -1840,6 +1859,7 @@ var WEAPONS = {
     dmg: 30, ammo: 2, cd: 6, salvo: 1, flare: 0.86, prox: 18,
     target: 'air',
     fits: [], perPoint: 0, mass: 0,
+    npcFits: ['tip', 'light', 'heavy'],
     desc: `上游二十年前的外销型，如今在群岛国手里算是主力。
        导引头迟钝、抗干扰极差 —— 但它便宜，而且两边都还在供货。`,
     stat: { dmg: 0.34, spd: 0.40, trn: 0.34, rng: 0.18, ecm: 0.10 }
@@ -1854,6 +1874,7 @@ var WEAPONS = {
     target: 'air', highAltScale: true,
     // 下游专用弹：fits 为空表示玩家挂不上它
     fits: [], perPoint: 0, mass: 0,
+    npcFits: ['light', 'heavy'],
     desc: '下游中距弹。'
   },
   dl6: {
@@ -1863,6 +1884,7 @@ var WEAPONS = {
     dmg: 26, ammo: 6, cd: 0.44, salvo: 1, flare: 0.35, prox: 24,
     target: 'air', highAltScale: true,
     fits: [], perPoint: 0, mass: 0,
+    npcFits: ['tip', 'light', 'heavy'],
     desc: '下游格斗弹。'
   },
   dl9: {
@@ -1881,13 +1903,27 @@ var WEAPONS = {
    —— 单独放在这里而不是塞进 WEAPONS 表里，是为了让"这个弹能挂在
    哪些挂点上、一个挂点带几发、有多重"集中在一处，一眼横着能比较。
 
-     fits     能挂的挂点类型
+     fits     能挂的挂点类型（**玩家机库**能选的）
               tip   翼尖（轻，只受得起小型空空弹）
               light 通用挂架
               heavy 重挂点（大型弹只有这里挂得下）
               belly 机腹（吊舱与对地弹）
+     npcFits  同一件事，但给**NPC 的制式装机**用（写在 WEAPONS 各条目里，
+              不在 STORE_ATTR —— 下游弹的 fits 是空的，不经过这张表）。
+              见下面"两张 fits 表"。
      perPoint 单个挂载点提供几发
      mass     单件重量 kg，用来算挂载对机动性的拖累
+
+     两张 fits 表
+
+     玩家的可挂判据（机库 UI、resolveLoadout、loadoutMass）只认 fits；
+     NPC 的实体挂载（game.js 的 pushStores → Ent.fitsKind）读 npcFits，
+     没写 npcFits 的武器退回 fits。
+
+     为什么不能合成一张：下游弹（dl4 / dl6 / vbn / …）的 fits 是空数组，
+     它的语义是"上游拿不到实物，玩家挂不上"，不是"挂不上"。
+     合成一张的话，要么敌机机翼永远是干净的（读 fits 的结果），
+     要么把空空弹画到只有机腹挂点的支援机上（删掉检查的结果）。
    ============================================================ */
 var STORE_ATTR = {
   /* 空空 */

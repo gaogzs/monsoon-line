@@ -24,6 +24,7 @@
 | `stamp-version.js` | 只把上一次提交写进 `js/version.js`（版本号从 `CHANGELOG.md` 顶部读） | **每次 `git commit` 之前** |
 | `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
 | `render-ships.js` | 用真正的 `models.js` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
+| `render-mounts.js` | 用真正的 `Ent.makeAircraft()` + `Game.__pushStores()` 把 NPC 的实体挂载渲染成 PNG | 改了挂载分配 / 挂点坐标之后 |
 | `render-units.js` | 用单位详情页自己的 `renderModel()` 把 25 个单位渲染成 PNG | 改了 `unitview.js` 的渲染代码之后 |
 | `shot-unitview.js` | 无头 Chrome 截详情页的**布局**（需要本机有 Chrome） | 改了详情页的 HTML 结构或 CSS 之后 |
 | `lib/raster.js` | 供上面几个预览器共用的光栅器与 PNG 编码 | —（被 require） |
@@ -469,6 +470,68 @@ node tools/render-ships.js
 
 ---
 
+## tools/render-mounts.js
+
+### 解决什么问题
+
+"挂架上的实物"是**画出来的**东西。冒烟测试能数清"画了几件"
+（`Game.__pushStores` 推了几个 `scale: 0.85` 的模型），但数不出
+"看起来是不是挂在翼下、机腹的吊舱有没有穿进机身、打光之后是不是真的干净"。
+这个工具把那几个有代表性的配置落成 PNG。
+
+它的价值在于**一行挂载逻辑都不重写**：
+
+```
+Ent.makeAircraft()   ← 真造一架（含 NPC 的弹药池 / 发射槽 / 挂载分配）
+Game.__pushStores()  ← 真的那条渲染路径（与实机同一份代码）
+js/render.js         ← 真的投影 / 光照 / 画家算法
+```
+
+所以图上看到的就是实机上看到的。它加载**全部**脚本（清单与顺序读
+`index.html`），因为 `Game.__pushStores` 在 `game.js` 里；`Game.init()`
+没有被调用（`window.addEventListener` 是空实现），所以那个 IIFE 只是被加载。
+
+### 怎么用
+
+```bash
+node tools/render-mounts.js
+```
+
+不用参数，输出 `tools/preview/mount-<机型>-<配置>.png`，620×360，
+右前上方 3/4（与图鉴详情页同一套角度）。十二个配置各自针对一条规则：
+
+| 图 | 验证什么 |
+|---|---|
+| `mount-m27-dl6` | 制式弹按挂点逐点画出（4 件） |
+| `mount-m27-dl6-dry` | 弹药池清零后机翼真的变干净 |
+| `mount-gal31-dl4-vzu` | 任务写定的吊舱与制式弹共存（吊舱占外侧、导弹占重挂点） |
+| `mount-m27-dl6-vzu` | 同上，另一型 |
+| `mount-spray-vbn-vzu` | 吊舱进机腹、制式弹不被挤掉（正序占位会在这里翻车） |
+| `mount-vac14-vbn` | 储备 2 发 < 挂点 4 个时，多出来的挂点出厂就是空的 |
+| `mount-gal44-vsc` | 只有机腹挂点的干扰机把吊舱挂在机腹 |
+| `mount-pelican-dl6` | 适配表拦住"预警机挂格斗弹"（一件都不该有） |
+| `mount-ucav-v9` | 僚机 |
+| `mount-gal44-vsc-belly` · `mount-spray-vbn-vzu-belly` · `mount-m27-dl6-belly` | 同一批配置从**下**往上看（机腹挂载只有这个角度看得见） |
+
+### 实现要点与限制
+
+- **数出来的件数是给终端看的**，它和图本身是两条独立的证据：
+  件数不对说明规则错了，图画得丑说明坐标或比例错了
+- 相机取景是**这个工具唯一自己写的部分**（`frameCamera()`，按模型包围盒
+  自适应距离）。挂载高度不在这里，它属于 `Ent.storePos()`
+- `Renderer.begin()` 之后要再 `ras.clear()` 一次，理由同 `render-ships.js`
+- 不支持玩家（`Game.init()` 没跑，`player` 是 null）。玩家的挂载本来就
+  在机库里能看见，更需要肉眼确认的是敌我 NPC 那几型
+- **吊舱不再借用导弹的外壳**：`data.js` 里 9 件吊舱（`vzu` `vsc` `e4` `l2`
+  `ecm2` `dec` `oep` `irp` `hdp`）的 `model` 都是 `'pod'`。在这之前它们
+  全用 `'missile'`（`e4` / `l2` 甚至没写 model，靠 `|| MODELS.missile` 兜底），
+  "这架带了干扰吊舱"在画面上读不出来 —— 两张预览图曾经**字节相同**
+- **机腹挂载要单独从下往上看**：3/4 俯视角度看不见机腹，所以那几型
+  （GAL-44 干扰机、浪花）额外出一张 `el` 为负的图。这不是额外的配置，
+  是同一个配置换了个仰角
+
+---
+
 ## tools/render-units.js 与 tools/shot-unitview.js
 
 这两个是**单位详情页**的验证工具。为什么要两个：详情页有两件事要肉眼确认，
@@ -562,6 +625,7 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 | 追尾镜头俯仰限位 | 追尾镜头那组的 `CAM_PITCH_LIM = 89 * Math.PI / 180`（复现自 `updateCamera`） |
 | 压力测试时长 | 每关 1800 帧、每机型 600 帧、每武器 400 帧 |
 | 预览图尺寸 / 输出目录 / 底板色 | `render-planform.js` 顶部 `W`/`H`、`OUT`（`tools/preview/`）、`BG` |
+| 挂载预览的取景 / 那七个配置 | `render-mounts.js` 的 `AZ` `EL` `FOV` `MARGIN` 与 `CASES` |
 | 版本戳显示位置 | `index.html` 的 `<div id="verStamp">`，由 `js/game.js` 的 `stampVersion()` 填 |
 | 更新记录页的样式 | `style.css` 的 `.cl-*`；数据在 `js/changelog.js`，条目文本由 `clInline()` 还原 `**粗**` / `` `代码` `` |
 | 涨版本号的判定规则 | `release.js` 的 `levelOf()`；改它必须同步改 [VERSIONING.md](../VERSIONING.md) 第 2 节 |

@@ -77,6 +77,259 @@ var Ent = (function () {
   }
 
   /* ============================================================
+     挂点适配：玩家一张表，NPC 另一张
+     ============================================================ */
+  /* 一件武器能挂在哪几类挂点上，**按谁来挂**分两张表：
+
+       fits     玩家机库能选的（在 STORE_ATTR 里维护）
+       npcFits  任务脚本给 NPC 写定的制式装机
+
+     下游弹的 fits 是**空数组**，那不是"哪儿都挂不上"，而是
+     "玩家拿不到实物"（见 data.js 的说明）。可空数组在 `w.fits && ...`
+     里是 truthy，于是渲染那段曾经把它们全部过滤掉 ——
+     敌机机翼永远是干净的。所以 NPC 改读 npcFits；没写 npcFits 的
+     武器（比如上游弹被任务直接塞给敌机）退回 fits。
+
+     注意适配表**不能不要**：`a2 / pelican / quartz / gal44` 这些
+     npcOnly 机型只有机腹挂点，而 spawnEnemy 的默认弹是空空弹，
+     不查的话就会被画到机腹上去。 */
+  function fitsKind(w, kind, playerStyle) {
+    var list = playerStyle ? w.fits : (w.npcFits || w.fits);
+    return !list || list.indexOf(kind) >= 0;
+  }
+
+  /* ============================================================
+     关卡里写错的 NPC 挂载记在这里
+     ============================================================ */
+  /* 任务脚本给 NPC 挂东西时，写错不会崩 —— 那一组静默少画几件而已。
+     所以必须有人喊：这里记一条人话，`smoke.js` 跑完所有任务后断言它是空的。
+     同一句只记一次（三架同型机犯同一个错不该刷屏）。 */
+  var mountIssues = [];
+  function mountIssue(msg) {
+    if (mountIssues.indexOf(msg) >= 0) return;
+    mountIssues.push(msg);
+    if (typeof console !== 'undefined' && console.warn) console.warn('[挂载] ' + msg);
+  }
+  function clearMountIssues() { mountIssues.length = 0; }
+
+  /* ============================================================
+     选弹与触发武器
+     ============================================================ */
+  /* 这件武器能不能打这个目标。
+
+     判据与**玩家那边同源**（game.js 的 targetMismatch）：目标是
+     `kind === 'target'` 的东西（海上平台 / 地面设施）就算"对面"，
+     其余（飞机、导弹）算"空中"。 */
+  function weaponMatchesTarget(w, t) {
+    if (!w || !t) return false;
+    var surface = (t.kind === 'target');
+    if (w.target === 'air') return !surface;
+    if (w.target === 'ground' || w.target === 'ship') return surface;
+    return false;
+  }
+
+  /* AI 开火前挑一件武器 —— "换武器"的全部就是这一次挑选。
+
+       ① 只挑打得着这个目标类别的（对空 / 对面）
+       ② 射程最适合：**够得着里面射程最短的那件** —— 用远距弹打近目标是
+          浪费掉一场只能带几发的东西；够不着的里面取射程最接近的
+       ③ 已经装填完的优先；全在装填里就垫底（打不出去，但"想用哪件"仍成立）
+       ④ 无制导弹（炸弹 / 火箭巢）不参与选弹 —— AI 没有投弹瞄准逻辑，
+          给它们一件也只会瞎扔。这条在文档里写成了设计约束
+
+     返回武器 id；一件能用的都没有就返回 null。 */
+  function chooseWeapon(a, t, dist) {
+    if (!a || !a.ammoPool || !t) return null;
+    if (dist === undefined) dist = M3.dist(a.pos, t.pos);
+    var best = null, bestScore = Infinity;
+    for (var wid in a.ammoPool) {
+      if (!Object.prototype.hasOwnProperty.call(a.ammoPool, wid)) continue;
+      if (!(a.ammoPool[wid] > 0)) continue;
+      var w = WEAPONS[wid];
+      if (!w || w.kind === 'gun' || w.kind === 'ecm' || w.kind === 'dew') continue;
+      if (!w.seeker || w.seeker === 'none') continue;      // 无制导：AI 不会瞄
+      if (!weaponMatchesTarget(w, t)) continue;
+      var reach = w.lockDist || 0;
+      if (reach <= 0) continue;
+      var score = (reach >= dist) ? reach : 1e6 + (dist - reach);
+      var sl = a.slotCd ? a.slotCd[wid] : null;
+      if (sl && Math.min.apply(null, sl) > 0) score += 1e9;   // 装填中：垫底
+      if (score < bestScore) { bestScore = score; best = wid; }
+    }
+    return best;
+  }
+
+  /* 把某件武器设成"当前触发的那件"：special / spAmmo / spCd。
+
+     玩家按 R 换弹（game.js 的 syncWeapon）与 AI 按目标挑弹都汇到这里，
+     免得两边各写一份、迟早不一致。 */
+  function setWeapon(a, wid) {
+    if (!a) return;
+    if (!wid || !WEAPONS[wid]) {
+      a.special = null; a.spAmmo = 0; a.spCd = 0;
+      return;
+    }
+    a.special = wid;
+    a.spAmmo = a.ammoPool ? (a.ammoPool[wid] || 0) : 0;
+    var sl = a.slotCd ? a.slotCd[wid] : null;
+    a.spCd = sl ? Math.min.apply(null, sl) : 0;
+  }
+
+  /* 逐个挂点组的弹种分配，下标与 ac.hardpointGroups 对齐。
+
+     玩家那边这张表就是机库配置（game.js 的 a.loadout）。NPC 按三条规矩
+     依次落位：
+
+       ① 任务写死的**逐组配置**（`a.loadout`，与玩家那张表同一种形状）
+          —— 作者说了算，但必须真的挂得上：组的 kind 要在武器的适配表里
+          （`fitsKind`），机体能力也要够（`canCarry`）。不满足就记一条
+          mountIssue 并把那一组空着 —— 挂错不该崩，但必须有人喊。
+       ② 任务写定的吊舱占剩下的组 —— 数量少，而且"编队里那一架带干扰吊舱"
+          是设定里写明的事（missions.js 的 o.pods）
+       ③ 制式弹 `a.special` 铺满再剩下的
+
+     同一个组不会被两件东西共用。
+
+     吊舱的占位顺序是**从最后一组往前**（不是从第一组往后）。
+     理由是挂点组在 data.js 里按"内侧 → 外侧"排，倒着走等于让吊舱
+     优先落在外侧/机腹，把靠里的重挂点留给制式弹。按正序会踩到一个坑：
+     `spray`（light + belly）挂一枚空空弹加一个吊舱时，吊舱先吃掉
+     light 组，而这只弹挂不上 belly —— 于是机腹上是吊舱、导弹一枚都画不出来，
+     可 AI 照样在发射。倒着走则是吊舱进机腹、导弹占 light，两样都在。 */
+  function mountPlan(a) {
+    var groups = (a.ac && a.ac.hardpointGroups) || [];
+    var plan = [], gi, pi;
+    for (gi = 0; gi < groups.length; gi++) plan.push(null);
+
+    // ① 任务写死的逐组配置
+    var lo = a.loadout || null;
+    if (lo) {
+      for (gi = 0; gi < groups.length; gi++) {
+        var lw = WEAPONS[lo[groups[gi].id]];
+        if (!lw) continue;
+        if (!fitsKind(lw, groups[gi].kind, false)) {
+          mountIssue('机型 ' + (a.type || '?') + ' 的挂点组 ' + groups[gi].id +
+            '（' + groups[gi].kind + '）挂不上 ' + lw.name +
+            '「' + lw.cn + '」—— NPC 的挂载也必须符合该挂点的适配表');
+          continue;
+        }
+        if (!canCarry(a.ac, lw)) {
+          mountIssue('机型 ' + (a.type || '?') + ' 的挂点组 ' + groups[gi].id +
+            ' 想挂 ' + lw.name + '「' + lw.cn + '」，但它需要机体能力 ' +
+            lw.needs.join(' / ') + '，而这型机只有 [' +
+            ((a.ac && a.ac.caps) || []).join(' / ') + ']');
+          continue;
+        }
+        plan[gi] = lo[groups[gi].id];
+      }
+    }
+
+    // ② 任务写定的吊舱
+    var pods = a.pods || [];
+    for (pi = 0; pi < pods.length; pi++) {
+      var pw = WEAPONS[pods[pi]];
+      if (!pw) continue;
+      var placed = false;
+      for (gi = groups.length - 1; gi >= 0; gi--) {
+        if (plan[gi]) continue;
+        if (!fitsKind(pw, groups[gi].kind, false)) continue;
+        plan[gi] = pods[pi];
+        placed = true;
+        break;
+      }
+      if (!placed) {
+        mountIssue('机型 ' + (a.type || '?') + ' 挂不上吊舱 ' + pw.name +
+          '「' + pw.cn + '」—— 它的适配表里没有这型机有的挂点类型');
+      }
+    }
+
+    // ③ 制式弹
+    /* 注意：任务给了逐组配置时**不再**用 special 兜底 —— 那张表就是
+       全部装机，没写到的组就是空着。否则作者写 `{A:'srm'}`、
+       special 又恰好被推断成同一个弹，剩下的组会凭空多出几发来。 */
+    if (lo) return plan;
+    for (gi = 0; gi < groups.length; gi++) {
+      if (plan[gi] || !a.special) continue;
+      var sw = WEAPONS[a.special];
+      if (!sw || !fitsKind(sw, groups[gi].kind, false)) continue;
+      plan[gi] = a.special;
+    }
+    return plan;
+  }
+
+  /* 给 NPC 建弹药池与发射槽。
+
+     没有这两样，实体挂载就只是装饰：pushStores 判断"这枚还在不在"
+     靠的是 ammoPool（打光即不画）与 slotCd（装填中则挂架空），
+     而它们以前只有玩家有 —— 于是敌机的弹永远挂在翼下，打光也不消失。
+
+     弹药数取 w.ammo：那是 AI 一直在用的预算（spAmmo），
+     不能换成玩家的 `挂点数 × perPoint` —— 下游弹的 perPoint 是 0，
+     那样会建出 0 发。 */
+  function buildNpcMounts(a) {
+    var groups = (a.ac && a.ac.hardpointGroups) || [];
+    var plan = mountPlan(a);
+    var pts = {}, gi, k;
+
+    for (gi = 0; gi < groups.length; gi++) {
+      var wid = plan[gi];
+      if (!wid) continue;
+      var w = WEAPONS[wid];
+      /* 吊舱与定向能不是打出去的东西，不占发射槽（渲染那边也一直挂着） */
+      if (!w || w.kind === 'gun' || w.kind === 'ecm' || w.kind === 'dew') continue;
+      pts[wid] = (pts[wid] || 0) + groups[gi].pts.length;
+    }
+
+    for (k in pts) {
+      if (!Object.prototype.hasOwnProperty.call(pts, k)) continue;
+      var ammo = WEAPONS[k].ammo || 0;
+      var arr = [];
+      /* 与玩家同一条规矩：储备少于挂架数时，多出来的挂点一开始就是空的
+         （SLOT_EMPTY 永远不会被减到 0，见 stepAircraft 的冷却段） */
+      for (gi = 0; gi < pts[k]; gi++) arr.push(gi < ammo ? 0 : SLOT_EMPTY);
+      a.slotCd[k] = arr;
+      if (!a.ammoPool) a.ammoPool = {};
+      a.ammoPool[k] = ammo;
+    }
+
+    /* special 兜底：任务写的逐组配置里如果那件被校验挡掉了（挂不上 /
+       能力不足），a.special 可能指着一件根本没装上的东西。换成第一件
+       真挂上的，否则 AI 会拿着一件不在机翼上的弹去挑、去开火。 */
+    if (a.ammoPool && (!a.special || !a.ammoPool[a.special])) {
+      var first = null;
+      for (k in a.ammoPool) {
+        if (!Object.prototype.hasOwnProperty.call(a.ammoPool, k)) continue;
+        first = k;
+        break;
+      }
+      setWeapon(a, first);
+    }
+  }
+
+  /* 挂载物的世界坐标。
+
+     hardpointGroups 的 pts 只有 (x, y)，对应机体的(横向, 前后)，
+     **没有高度** —— 所以按挂点类型补一个默认吊挂高度：翼下吊挂比翼尖低、
+     机腹最低。放在这里而不是 game.js，是为了让离线预览器
+     （tools/render-mounts.js）用同一份坐标，不然那几张图就没有意义了。
+
+     默认值是按**战斗机**（机身深一米上下）定的。大型机体不行：
+     GAL-44 干扰机与石英预警机的机腹在 -2.6 m，吊舱按 -1.95 挂会整件
+     埋进机身里 —— 图上什么都看不见，而它是那架飞机唯一的外挂特征。
+     所以挂点组可以自己带一个 `hy`（data.js 的 hardpointGroups），
+     优先于默认值。 */
+  var STORE_HY = { tip: -0.35, heavy: -1.35, light: -1.15, belly: -1.95 };
+
+  function storePos(a, g, pt) {
+    var hy = (typeof g.hy === 'number') ? g.hy : STORE_HY[g.kind];
+    if (hy === undefined) hy = -1.2;
+    // 机体坐标 → 世界：x 取右、y 取上、z 取机头方向
+    var local = M3.V(pt.x, hy, pt.y);
+    return M3.add(a.pos, M3.add(M3.mul(a.right, local.x),
+      M3.add(M3.mul(a.up, local.y), M3.mul(a.fwd, local.z))));
+  }
+
+  /* ============================================================
      飞机
      ============================================================ */
   function makeAircraft(o) {
@@ -84,10 +337,15 @@ var Ent = (function () {
     for (i = 0; i < AIRCRAFT.length; i++) if (AIRCRAFT[i].id === o.type) ac = AIRCRAFT[i];
     if (!ac) ac = AIRCRAFT[0];
 
-    /* 挂载武器：优先用调用方指定的，没指定就退回该机型默认配置里的第一种
-       （AI 走这条路）。注意不能再用 ac.defSpecial —— 挂载系统改造后
-       那个字段已经不存在了，早先这里会读到 undefined 然后崩掉。 */
+    /* 挂载武器：优先用调用方指定的，没指定就翻逐组配置，再没有就退回该机型
+       默认配置里的第一种（AI 走前两条路）。注意不能再用 ac.defSpecial ——
+       挂载系统改造后那个字段已经不存在了，早先这里会读到 undefined 然后崩掉。 */
     var spWid = o.special || null;
+    if (!spWid && o.loadout) {
+      for (var lk in o.loadout) {
+        if (o.loadout[lk]) { spWid = o.loadout[lk]; break; }
+      }
+    }
     if (!spWid && ac.defaultLoadout) {
       for (var dk in ac.defaultLoadout) {
         if (ac.defaultLoadout[dk]) { spWid = ac.defaultLoadout[dk]; break; }
@@ -180,11 +438,23 @@ var Ent = (function () {
       ai: null,
       radio: o.radio || null,
       kills: 0,
-      group: o.group || null
+      group: o.group || null,
+
+      /* 任务写定的被动吊舱（spawnEnemy 的 o.pods）。
+         它既是机制（Ent.passiveEffects 汇总），也是外观 ——
+         mountPlan 会把它铺到某个挂得住的挂点组上。 */
+      pods: o.pods || null,
+
+      /* 任务写死的**逐组**挂载（spawnEnemy 的 o.loadout），形状与玩家的
+         机库配置一样：{ 组id: 武器id }。玩家那份由 startMission 覆盖。 */
+      loadout: o.loadout || null
     };
     a.right = M3.cross(a.up, a.fwd);
     var w0 = WEAPONS[a.special];
     if (w0 && w0.kind === 'dew') a.spCharges = w0.charges;
+    /* NPC 的弹药池与发射槽。玩家那套由 startMission 按机库配置另建
+       （那里要按 perPoint 算，和这里的口径不同）。 */
+    if (!a.isPlayer) buildNpcMounts(a);
     return a;
   }
 
@@ -1152,6 +1422,15 @@ var Ent = (function () {
   return {
     airDensity: airDensity, qOf: qOf, ctrlFactor: ctrlFactor, turnFactor: turnFactor,
     makeAircraft: makeAircraft, stepAircraft: stepAircraft,
+    /* 挂点适配与 NPC 的挂载分配 —— game.js 的 pushStores 渲染实体挂载时
+       要用同一份规则，不能再抄一遍。 */
+    fitsKind: fitsKind, mountPlan: mountPlan, storePos: storePos, STORE_HY: STORE_HY,
+    /* 选弹与"当前触发武器" —— game.js 的 syncWeapon（玩家换弹）与 ai.js
+       的开火选弹都走 setWeapon，判据同源。 */
+    chooseWeapon: chooseWeapon, setWeapon: setWeapon,
+    weaponMatchesTarget: weaponMatchesTarget,
+    /* 关卡里写错的 NPC 挂载（smoke.js 断言它是空的） */
+    mountIssues: mountIssues, clearMountIssues: clearMountIssues,
     makeMissile: makeMissile, stepMissile: stepMissile, effectiveLife: effectiveLife,
     breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects,
     fireGun: fireGun, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,

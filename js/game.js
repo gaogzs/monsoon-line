@@ -1093,18 +1093,16 @@ var Game = (function () {
   /** 把 wpIdx 指向的那一组同步到 special / spAmmo / spSalvo / spCd */
   function syncWeapon(a) {
     if (!a || !a.loadoutList || !a.loadoutList.length) {
-      if (a) { a.special = null; a.spAmmo = 0; a.spSalvo = 1; a.spCd = 0; }
+      if (a) { a.spSalvo = 1; Ent.setWeapon(a, null); }
       return;
     }
     if (a.wpIdx >= a.loadoutList.length) a.wpIdx = 0;
     var e = a.loadoutList[a.wpIdx];
-    a.special = e.wid;
-    a.spAmmo = a.ammoPool ? (a.ammoPool[e.wid] || 0) : 0;
     a.spSalvo = e.salvo;
-    // 冷却也跟着切过去，每件武器各算各的
-    // spCd = 最快就绪的那个槽的剩余时间，供 HUD 与 AI 判断能不能打
-    var sl = a.slotCd ? a.slotCd[e.wid] : null;
-    a.spCd = sl ? Math.min.apply(null, sl) : 0;
+    /* 选中的这一件 → special / spAmmo / spCd。
+       实际赋值在 entities.js 的 setWeapon 里 —— AI 的开火选弹用的是同一份，
+       两边各写一份迟早不一致。 */
+    Ent.setWeapon(a, e.wid);
   }
 
   /* ============================================================
@@ -1279,8 +1277,12 @@ var Game = (function () {
       actor.spCd = wp.cd;
     }
 
+    /* 弹药池的回写对**玩家与 NPC 都要做** —— 实体挂载靠它判断
+       "这一发还在不在"（pushStores 的 pool <= 0）。以前只在玩家分支里
+       回写，NPC 的池子永远停在初始值，于是敌机打光了翼下还挂着弹。 */
+    if (actor.ammoPool) actor.ammoPool[actor.special] = actor.spAmmo;
+
     if (actor.isPlayer) {
-      if (actor.ammoPool) actor.ammoPool[actor.special] = actor.spAmmo;
       w.shotsFired += 1;
       SFX.missile();
     } else {
@@ -1573,16 +1575,18 @@ var Game = (function () {
      只会觉得"这游戏的导弹坏了"。 */
   function targetMismatch(w, t) {
     if (!w || !t) return null;
-    var surface = (t.kind === 'target');       // 海上平台 / 地面设施
-    if (w.target === 'air' && surface) {
+    /* 不锁目标的武器（吊舱 / 定向能）不参与这条判断 —— 它们本来就不选目标 */
+    if (w.target !== 'air' && w.target !== 'ground' && w.target !== 'ship') return null;
+    /* 真正的判据只有一处：Ent.weaponMatchesTarget —— AI 的选弹读的是同一个
+       函数。两边各写一套的话，玩家会被提示"换对地弹"、而 AI 拿格斗弹去打
+       海面平台，这类不一致不会报错，只会让行为看起来"有点笨"。 */
+    if (Ent.weaponMatchesTarget(w, t)) return null;
+    if (t.kind === 'target') {
       return w.name + '「' + w.cn + '」是<b>对空弹</b>，打不了海面设施。' +
         '按 <b>R</b> 换成对地挂载。';
     }
-    if ((w.target === 'ground' || w.target === 'ship') && !surface) {
-      return w.name + '「' + w.cn + '」是<b>对面弹</b>，锁的是飞机。' +
-        '按 <b>F</b> 换个目标。';
-    }
-    return null;
+    return w.name + '「' + w.cn + '」是<b>对面弹</b>，锁的是飞机。' +
+      '按 <b>F</b> 换个目标。';
   }
 
   function fireSpecial() {
@@ -2640,28 +2644,27 @@ var Game = (function () {
      这样"还剩几发"不用盯 HUD 也知道，而且打完最后一发的瞬间
      整片机翼会明显变干净 —— 比数字更直观。
 
-     高度数据：hardpointGroups 的 pts 只有 (x, y)，
-     对应机体的(横向, 前后)，没有高度。所以按挂点类型补一个默认值，
-     翼下吊挂比翼尖低、机腹最低。
+     坐标（含挂点高度）在 entities.js 的 Ent.storePos() 里，
+     离线预览器 tools/render-mounts.js 用的是同一份。
      ============================================================ */
-  var STORE_HY = { tip: -0.35, heavy: -1.35, light: -1.15, belly: -1.95 };
-
-  function pushOneStore(a, pt, gkind, w) {
-    var hy = STORE_HY[gkind];
-    if (hy === undefined) hy = -1.2;
-    // 机体坐标 → 世界：x 取右、y 取上、z 取机头方向
-    var local = M3.V(pt.x, hy, pt.y);
-    var wp = M3.add(a.pos, M3.add(M3.mul(a.right, local.x),
-      M3.add(M3.mul(a.up, local.y), M3.mul(a.fwd, local.z))));
+  function pushOneStore(a, g, pt, w) {
     var mdl = MODELS[w.model] || MODELS.missile;
-    Renderer.pushModel(mdl, wp, a.fwd, a.up, { scale: 0.85 });
+    Renderer.pushModel(mdl, Ent.storePos(a, g, pt), a.fwd, a.up, { scale: 0.85 });
   }
 
   function pushStores(a) {
     if (!a.ac || !a.ac.hardpointGroups) return;
-    if (a === player && !a.loadout) return;
+    var isPlayer = !!a.isPlayer;
+    if (isPlayer && !a.loadout) return;
 
+    /* 弹种从哪儿来：
+         玩家  机库配置 lo（组 id → 弹种）
+         NPC   任务只写了一件制式弹（special）与可选的吊舱（pods），
+               铺在哪几组由 Ent.mountPlan() 推（它读 npcFits）
+       判据是 a.isPlayer —— 玩家以外一律走 mountPlan，哪怕以后任务脚本
+       也给 NPC 写一张逐组的 loadout。 */
     var lo = a.loadout || {};
+    var plan = isPlayer ? null : Ent.mountPlan(a);
     var slots = a.slotCd || {};
     var gi, pi;
 
@@ -2676,37 +2679,40 @@ var Game = (function () {
 
     for (gi = 0; gi < a.ac.hardpointGroups.length; gi++) {
       var g = a.ac.hardpointGroups[gi];
-      var wid = lo[g.id];
-      // NPC 没有 loadout，退到它的制式弹种
-      if (!wid && a.special) wid = a.special;
+      var wid = isPlayer ? lo[g.id] : plan[gi];
       if (!wid) continue;
-
-      var base = used[wid] || 0;
-      used[wid] = base + g.pts.length;      // 下一组从这里接着排
 
       var w = WEAPONS[wid];
       if (!w || w.kind === 'gun') continue;
       /* 这种弹能不能挂在这种挂点上。
 
-         玩家那边由选装界面保证，NPC 是代码直接指定弹种的，得自己查 ——
-         否则一枚只能进弹舱的巡航弹会被画到翼尖上去。 */
-      if (w.fits && w.fits.indexOf(g.kind) < 0) continue;
+         玩家那边由选装界面保证；NPC 走 npcFits（下游弹的 fits 为空，
+         那是"玩家拿不到实物"，不是"挂不上"）。见 Ent.fitsKind。
+         注意这一步必须在推进 used[wid] **之前** —— 否则一个挂不上的组
+         也会在槽数组里占掉几个下标，把后面的挂架整体顶偏。 */
+      if (!Ent.fitsKind(w, g.kind, isPlayer)) continue;
 
       // 已经打光：冷却早已归零，但挂架上不该再有任何东西
       var pool = a.ammoPool ? a.ammoPool[wid] : undefined;
       if (pool !== undefined && pool <= 0) continue;
 
-      if (w.kind === 'ecm' && w.passive) {
-        // 被动吊舱没有冷却，装上就一直在
-        for (pi = 0; pi < g.pts.length; pi++) pushOneStore(a, g.pts[pi], g.kind, w);
-        continue;
+      /* 吊舱与定向能不是"打出去"的东西 —— 主动被动都一直挂在挂架上。
+
+         以前只有 passive 吊舱这样处理，于是 ZUN-4 开一次机就会在翼下
+         消失一个冷却周期，看起来像被扔掉了。 */
+      if (w.kind === 'ecm' || w.kind === 'dew') {
+        for (pi = 0; pi < g.pts.length; pi++) pushOneStore(a, g, g.pts[pi], w);
+        continue;                    // 吊舱不占发射槽下标
       }
+
+      var base = used[wid] || 0;
+      used[wid] = base + g.pts.length;      // 下一组从这里接着排
 
       var arr = slots[wid] || [];
       for (pi = 0; pi < g.pts.length; pi++) {
         // 这个发射槽还在装填 → 挂架空着
         if ((arr[base + pi] || 0) > 0) continue;
-        pushOneStore(a, g.pts[pi], g.kind, w);
+        pushOneStore(a, g, g.pts[pi], w);
       }
     }
   }
@@ -3048,7 +3054,7 @@ var Game = (function () {
     }
 
     var needModels = ['c11', 'c14', 's6', 'm27', 'ucav', 'sower', 'relay', 'cell',
-      'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb',
+      'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb', 'pod',
       /* 水面舰船（SHIPS 表）—— 接入关卡之前它们也要先被自检覆盖，
          否则模型名写错要到任务里才暴露。顺序按阵营：上游 → 下游 → 其余 */
       'orca', 'bluewhale', 'humpback', 'spermwhale', 'dolphin',
@@ -3262,7 +3268,9 @@ var Game = (function () {
     startMission: startMission,
     // 调试/测试接口：把内部状态露出来，tools/smoke.js 靠它做断言
     __player: function () { return player; },
-    __world: function () { return world; }
+    __world: function () { return world; },
+    // 实体挂载的渲染：断言要能单独喂一架飞机进来数它画了几个挂载
+    __pushStores: pushStores
   };
 })();
 
