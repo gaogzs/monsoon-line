@@ -1,21 +1,21 @@
-# 低多边形机体模型
+# 低多边形机体与舰船模型
 
-代码：`js/models.js`（959 行）· 全局对象 `MODELS`
+代码：`js/models.js`（1496 行）· 全局对象 `MODELS`
 
-约定（文件头注释）：**机头朝 +z，右翼朝 +x，座舱朝 +y**，单位米。
+约定（文件头注释）：**机头（舰艏）朝 +z，右翼（右舷）朝 +x，座舱（桅顶）朝 +y**，单位米。
 面不做背面剔除，靠画家算法排序绘制（见 [rendering.md](rendering.md#画家算法)）。
 
 ## 代码位置与职责边界
 
 **做什么**：一个纯几何构造器 `MB`，加上游戏里全部实体的低多边形外形数据——
-可驾驶机型、敌我机体、无人机、海上平台、地面设施、导弹与炸弹。
+可驾驶机型、敌我机体、无人机、**水面舰船**、海上平台、地面设施、导弹与炸弹。
 另外提供 DB-11 可变后掠翼的 **morph** 数据（两套顶点位置 + 索引映射），
 供 `render.js` 每帧插值。
 
 **不做什么**：不渲染（那是 `render.js`）、不做动画、不参与逻辑、不加载任何外部资源
 （零依赖：颜色是写死的 hex 串，没有贴图、没有材质系统）。
 **不含飞行性能参数**——翼载、推重比、极速都在 `data.js` 的 `AIRCRAFT` 里，
-本文件只描述"长什么样"。
+本文件只描述"长什么样"。舰船的参数同理在 `data.js` 的 `SHIPS` 里。
 **不含俯视识别图**——那是 `planform.js` 的另一份独立数据（见 [planform.md](planform.md)）。
 
 ## 完整公开接口
@@ -32,7 +32,7 @@
   morph: { map, spread, swept } }       // 仅 c11 有
 ```
 
-现有 **22** 个键：
+现有 **33** 个键：飞机 13 · 浮空目标 2 · 海上/地面设施 5 · **水面舰船 11** · 弹药 2：
 
 | key | 名称 / 类别 | span | len | 元数据 | 备注 |
 |---|---|---|---|---|---|
@@ -56,11 +56,25 @@
 | `depot` | 燃油 / 弹药补给库 | 40 | 24 | `ground` `sea` | `radius: 12` |
 | `cmdpost` | 指挥 / 通信中枢 | 22 | 18 | `ground` `sea` | `radius: 9` |
 | `station` | 第 7 号控制平台 | 88 | 88 | `ground` `sea` | `radius: 56`，地标级 |
+| `tern` | BLO-11「鸬鹚」护航驱逐舰（上游） | 18.4 | 148 | `ground` `sea` | `radius: 44` |
+| `manta` | BEI-2「蝠鲼」快速战斗支援舰（上游） | 26.6 | 210 | `ground` `sea` | `radius: 62`，三座补给门架 |
+| `salt` | BLO-2「盐岩」导弹快艇（下游） | 8.4 | 42 | `ground` `sea` | `radius: 13`，两座四联装 |
+| `tuff` | BLO-8「凝灰岩」巡逻护卫舰（下游） | 15.2 | 118 | `ground` `sea` | `radius: 36` |
+| `pumice` | BEI-9「浮石」登陆舰（下游） | 20.4 | 132 | `ground` `sea` | `radius: 40`，艏门 + 跳板 |
+| `daplu` | DAPLU Mk.1「屿」巡逻艇（群岛国） | 6.6 | 31 | `ground` `sea` | `radius: 10` |
+| `skori` | SKORI「准绳」布缆船（管理局） | 18.4 | 102 | `ground` `sea` | `radius: 32`，艏楼绞盘 |
+| `diklo` | DIKLO「标杆」海洋测量船（管理局） | 17.2 | 62 | `ground` `sea` | `radius: 20`，**双体** |
+| `cross` | MV「南十字」重货船（南回契约） | 27.4 | 178 | `ground` `sea` | `radius: 54`，集装箱 |
+| `icecore` | R/V「冰芯」水文调查船（高纬联合） | 17.4 | 92 | `ground` `sea` | `radius: 30`，A 型吊架 |
+| `atoll` | OSV「环礁」观察船（环外共同体） | 11.4 | 56 | `ground` `sea` | `radius: 18` |
 | `missile` | 导弹小模型 | 1.3 | 3.4 | — | 兜底模型（见下） |
 | `bomb` | 炸弹小模型 | 1.4 | 2.2 | — | |
 
 > `span` / `len` / `air` / `sea` 这些元数据**目前没有任何消费者**，
 > 只有 `radius` 与 `ground` 在 `missions.js` 里被显式重抄一遍。详见"易踩的坑"。
+>
+> 舰船的 `span` 是**船宽**、`len` 是**舰长**（沿用同一对字段，没有为船另起名字），
+> `radius` 是受击半径。11 艘船的存在理由见 `data.js` 的 `SHIPS` 表与设定集 8.0.1 节。
 
 ### 构造器 `MB`（文件内部使用，加新模型时要用）
 
@@ -72,14 +86,17 @@
 | `face(i, c)` | 压入一个面，`i` 是索引数组，`c` 是颜色串 |
 | `quad(a, b, c, d, col)` | 四边面 |
 | `tri(a, b, c, col)` | 三角面 |
-| `fuselage(secs, col, colCap)` | 轴向棱柱机身，`secs = [{z, w, h, y?}]`；返回每节的 4 个顶点索引 |
+| `fuselage(secs, col, colCap)` | 轴向棱柱机身（菱形剖面），`secs = [{z, w, h, y?}]`；返回每节的 4 个顶点索引 |
+| `hull(secs, colSide, colDeck, colBottom)` | **船体**（矩形剖面：平甲板 / 直立舷侧 / 平底），`secs = [{z, w, y0, y1, x?}]` |
 | `box(cx, cy, cz, w, h, d, col, colTop)` | 长方体，`colTop` 可单独给顶面颜色 |
+| `boxTilt(cx, cy, cz, w, h, d, tilt, col, colTop)` | 绕 x 轴仰起 `tilt` 弧度的长方体（发射箱 / 吊架 / 艏门） |
 | `tube(a, b, ra, rb, seg, col, capCol)` | 任意轴圆柱 / 锥台，`seg` 是圆周分段数；`capCol` 非空才封底 |
 | `wing(p1, p2, p3, p4, col)` | 零厚度翼面（4 个点，双面渲染） |
 | `wingM(p1, p2, p3, p4, col)` | 同上，但 **x 取反**（镜像到左翼） |
 
 私有辅助：`done(mb, extra)` 把 `mb` 收成最终对象并合并 `extra` 元数据；
-`seaBase(b, w, d)` 生成海上平台底座。
+`seaBase(b, w, d)` 生成海上平台底座；`mast(b, x, z, y0, y1, r0, r1, col)`
+与 `house(b, x, z, w, h, d, y0, col, colTop)` 是舰船用的桅杆与舱段。
 
 ## 关键算法与数据结构
 
@@ -202,23 +219,62 @@ a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
 - 四角系泊桩
 
 甲板刻意做得比构件底座略低，让设施看起来"建在平台上"而不是"从水里长出来"。
-5 个目标（`sam` / `radar` / `depot` / `cmdpost` / `station`）都调用了它。
+5 个设施目标（`sam` / `radar` / `depot` / `cmdpost` / `station`）都调用了它。
+
+### 船体 `hull(secs, colSide, colDeck, colBottom)`
+
+**舰船不是浮台，所以没有复用 `seaBase`，而是另起了一个船体构造器。**
+浮台是"一片甲板 + 一排浮筒"，而船需要**艏部收尖、舷侧连续、平底**，
+以及沿船长变化的舷弧（艏部比艉部高）。`fuselage()` 的菱形剖面做不到这件事 ——
+那是机身用的，四条棱会落到船体上。
+
+```js
+// secs = [{z, w, y0, y1, x?}]   w = 半宽, y0 = 龙骨, y1 = 甲板面, x = 可选横向偏移
+b.hull([
+  { z: 74, w: 0.9, y0: -1.2, y1: 6.6 },   // 艏：窄、高
+  { z: 46, w: 6.2, y0: -3.6, y1: 6.0 },
+  { z: -16, w: 9.2, y0: -3.8, y1: 5.4 },  // 舯：最宽
+  { z: -74, w: 6.2, y0: -3.0, y1: 5.4 }   // 艉
+], C.hull, C.deck, C.boot);
+```
+
+每个截面是**矩形四点**（右舷甲板 / 右舷底 / 左舷底 / 左舷甲板），
+相邻截面之间缝四个面：右舷、船底、左舷、甲板。艏艉各封一个面。
+
+**水线取 `y = 0`**，所以 `y0` 为负（水下）、`y1` 为正（干舷）。
+水下部分照样会被画出来，但俯视时甲板与舷侧在画家算法里排在前面，
+会把它盖住 —— 现有浮台的浮筒（`y = -2.6`）就是这么处理的。
+
+`x` 是为**双体船**（`diklo`）加的：两个片体各用一次 `hull()`
+（`x = ±6.2`），再在上面盖一层连接甲板。
+
+### 构件辅助
+
+舰船的上层建筑全部由 `box` / `tube` 拼，其中三类重复得最多，抽成了函数：
+
+| 函数 | 用途 |
+|---|---|
+| `mast(b, x, z, y0, y1, r0, r1, col)` | 桅杆：桁架锥台 + 顶部小平台 |
+| `house(b, x, z, w, h, d, y0, col, colTop)` | 甲板上的箱形舱段（舰桥 / 机库 / 货舱） |
+| `boxTilt(...)`（`MB` 方法） | 绕 x 轴上仰的长方体（导弹发射箱 / A 型吊架 / 登陆舰艏门） |
 
 ## 重要常量 / 参数速查
 
 | 想改什么 | 在哪 |
 |---|---|
-| 配色 | 文件顶部 `C`（25 个色，如 `C.body` / `C.canopy` / `C.nozzle`） |
+| 配色 | 文件顶部 `C`（**36** 个色：25 个飞机/设施色 + 11 个舰船色 `C.hull` / `C.deck` / `C.boot` / `C.rust` / `C.snow` / `C.cargo*` 等） |
 | 某机型的外形 | 对应的 `M.xxx = (function () { ... })()` 函数体 |
 | 机身剖面（粗细、长度） | 该机型里 `b.fuselage([{z, w, h, y?}, ...])` 的数组 |
+| **船体线型（艏宽、舷弧、吃水）** | 该舰的 `b.hull([{z, w, y0, y1, x?}, ...])` 的数组 |
 | 翼型 / 翼位置 | 该机型里的 `b.wing(...)` / `b.wingM(...)` 四点坐标 |
 | 可变后掠的角度 | `sweepPt(20, ...)` / `sweepPt(62, ...)`（`SP` / `SW`） |
 | 后掠枢轴与翼展 | `PIVOT` / `R_SPAN` |
 | 后掠触发的速度区间 | `entities.js:267` 的 `(a.speed - 170) / 250` |
-| 模型尺寸元数据 | `done(b, { span, len })` |
+| 模型尺寸元数据 | `done(b, { span, len })`（舰船的 `span` 是船宽） |
 | 目标受击半径 | `done(...)` 里的 `radius`（同时要在 `missions.js` 里再传一次） |
 | 圆柱 / 喷口圆周分段 | `tube(a, b, ra, rb, seg, ...)` 的 `seg`（常见 6 / 8 / 10 / 12） |
 | 海上平台大小 | `seaBase(b, w, d)` 的调用参数 |
+| 舰船外形肉眼检查 | `node tools/render-ships.js` → `tools/preview/ship-*.png`（走真正的 `render.js`） |
 | 新增一个模型 | 仿照现有的 `M.xxx = (function () { var b = new MB(); ...; return done(b, {...}); })()` |
 
 ## 易踩的坑与设计取舍
@@ -237,6 +293,8 @@ a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
    `sea: true` 目前**全工程无人读取**，只是文档性标记。
 5. **`render.js` 有 2048 顶点上限。** `pushModel()` 里 `if (nv > MAXV) return;`
    （`MAXV = 2048`）——模型顶点超限会**静默消失**，不报错。
+   当前最大的是 `manta`（520 顶点 / 386 面）与 `cross`（428 / 328），
+   都是集装箱和门架堆出来的；**往舰船上继续堆货箱之前先看一眼这个数**。
 6. **`c9` 的 `sweepAlt: null` 是残留字段**，没有任何消费者，别以为它有含义。
 7. **零厚度翼面靠画家算法。** 绕序不重要（不剔除、光照取 `|dot|`），
    但共面片没有深度差，某些角度会闪；要消除只能给翼面一点厚度或错开坐标。
@@ -245,6 +303,13 @@ a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
 9. **构造器在加载时跑一次，结果常驻内存。** `v` / `f` 是共享数组，
    `pushModel()` 的 morph 插值写在 render 自己的 `Float32Array` 里，不回写模型——
    所以想改模型必须改源码，运行时改 `MODELS.x.v` 会影响所有同型实体。
+10. **船的水下部分会被画出来。** 海面在 `render.js` 里只是一层"天空 + 网格线"
+    的 2D 背景，**不参与深度排序**，所以没有任何东西真正"遮住"水线以下的面。
+    俯视时靠甲板与舷侧在画家算法里排在前面盖住它（现有浮台的浮筒同理），
+    但**贴着海面平视时会看到船底**——如果哪天有低空掠海视角，这里要处理。
+11. **`hull()` 的第一/最后一个截面就是艏艉封口。** 想让艏部更尖，
+    是加一个更小 `w` 的截面（`w` 不能为 0，那会让四个顶点重合成退化面），
+    而不是去改封口逻辑。
 
 ## 与其它模块的依赖关系
 
@@ -257,10 +322,10 @@ a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
 | 模块 | 怎么用 |
 |---|---|
 | `render.js` | `pushModel(model, P, fwd, up, opts)` 读 `model.v` / `model.f`，按 `model.morph` 插值 `opts.sweep` |
-| `game.js` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 15 个必需模型 |
+| `game.js` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 **26** 个必需模型 |
 | `entities.js` | 用 `ent.radius` 做受击判定与爆炸规模（`radius` 最终来自任务传入） |
 | `missions.js` | `spawnTarget({ model, radius, ground, ... })` 决定用哪个模型、多大、是否贴海面 |
-| `data.js` | `AIRCRAFT[].model` 里的字符串就是 `MODELS` 的键（如 `'c11'`） |
+| `data.js` | `AIRCRAFT[].model` 与 `SHIPS[].model` 里的字符串就是 `MODELS` 的键（如 `'c11'` / `'tuff'`） |
 
 `MODELS.missile` 是**兜底模型**：`game.js:2129`（挂载物 `pushOneStore`）与
 `game.js:2222`（飞行中的导弹）在按 model 名查不到时回退到它，所以挂载 / 弹药
@@ -269,4 +334,7 @@ a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
 
 `preflight()` 的必需清单是：
 `c11 c14 s6 m27 ucav sower relay cell sam radar depot cmdpost station missile bomb`
-——新增模型后记得往 `game.js:2518` 的数组里加，否则自检不会覆盖它。
+**+ 11 艘舰船** `tern manta salt tuff pumice daplu skori diklo cross icecore atoll`
+——新增模型后记得往 `game.js` 的 `needModels` 数组里加，否则自检不会覆盖它。
+舰船虽然**还没有出现在任何关卡里**，也已经进了这份清单：
+模型名写错要在自检里暴露，而不是等某个任务第一次引用它的时候才炸。

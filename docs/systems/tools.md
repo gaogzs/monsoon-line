@@ -1,7 +1,9 @@
 # 工具链与测试
 
 代码：`tools/smoke.js`（唯一的自动化测试）· `tools/stamp-version.js` + `js/version.js`（版本戳）
-· `tools/render-planform.js`（离线画风预览）· `tools/rename-aircraft.js`（一次性批量改名）
+· `tools/render-planform.js`（离线机库俯视图预览）· `tools/render-ships.js`（离线舰船外形预览）
+· `tools/lib/raster.js`（两个预览器共用的光栅器 / Canvas 桩 / PNG 编码）
+· `tools/rename-aircraft.js`（一次性批量改名）
 
 ---
 
@@ -17,7 +19,14 @@
 | `smoke.js` | 在无浏览器环境把整个游戏跑起来并断言 | **每次改完代码** |
 | `stamp-version.js` | 把上一次提交写进 `js/version.js` | **每次 `git commit` 之前** |
 | `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
+| `render-ships.js` | 用真正的 `models.js` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
+| `lib/raster.js` | 供上面两个预览器共用的光栅器与 PNG 编码 | —（被 require） |
 | `rename-aircraft.js` | 按表把旧机型编号全库替换成新编号 | 只在改命名规范时，一次性的 |
+
+`lib/` 这一层的由来：`render-planform.js` 最初把光栅器和 PNG 编码内联在自己文件里，
+舰船预览器需要同一套东西。**没有去动那个已经被验证过、能跑的旧工具** ——
+新代码走 `require('./lib/raster')`，旧文件保持原样。两份实现的差异只有一处：
+`lib/raster.js` 多了一个 `Raster.clear()`（预览器要铺底色，俯视图不需要）。
 
 ---
 
@@ -344,6 +353,61 @@ node tools/render-planform.js
   `clearRect`。**如果哪天 `planform.js` 开始用 `translate`/`rotate` 画图，
   预览会静默画错（图堆在原点）而不报错**——加变换时要么同时补桩，要么换办法
 - `getContext()` 每次调用返回**新的 ctx**，路径状态不共享，绘制函数必须只取一次
+
+---
+
+## tools/render-ships.js
+
+### 解决什么问题
+
+和 `render-planform.js` 同一个理由（没有浏览器、"这条船看起来像不像船"
+是代码看不出来的），但走的是**另一条路**：它不是调用某个 2D 绘制函数，
+而是直接把 `MODELS` 里的三维几何喂给**游戏自己的渲染管线**。
+
+```
+加载 js/math3d.js → js/models.js → js/data.js → js/render.js
+      ↓
+Renderer.init(桩 canvas) → setCamera() → pushModel(model) → flush()
+```
+
+所以它验证的不只是"模型数据能不能算"，而是**投影、光照、画家算法排序
+和配色在实机上到底是什么样子** —— 包括 `render.js` 里那些只在特定条件下
+才触发的分支（近平面裁剪、面积剔除、`f.d < 900` 时的细描边）。
+
+### 怎么用
+
+```bash
+node tools/render-ships.js
+```
+
+不用参数，输出到 `tools/preview/`：
+
+- `ship-<id>.png` —— 每艘一条，640×380，从右前上方 3/4 视角，
+  相机距离按模型尺寸自适应（`frameCamera()`）
+- `ship-lineup.png` —— 全部 11 艘**同一个 scale** 分三行排列，1200×640，
+  按满载吨位降序。这是"相对尺寸对照图"
+
+### 实现要点与限制
+
+- **`begin()` 画完之后要再 `ras.clear()` 一次**。`Renderer.begin()` 会调
+  `drawSky` / `drawClouds` / `drawGround`，那是给"从空中俯瞰"准备的画面；
+  预览里要的是纯色底，所以把背景涂掉再 `pushModel`。这一步不能省 ——
+  否则预览图里的船会浮在天空渐变上
+- **总览图每行单独渲染再上下拼接**。塞进同一个相机时，三行只能靠深度差
+  分开，而在接近侧视的角度下深度差几乎完全投影不掉：实测三行会重叠
+  成一行。拼接时所有行共用同一个 `scale`，这是"对照"成立的前提
+- **总览图的 `px` 必须取负**。相机在 +z 看向原点时
+  `right = up × fwd = (-1,0,0)`，也就是屏幕右 = 世界 -x；不取负的话
+  吨位最大的船会排到最右边
+- 透视用**小 FOV + 按比例拉远**（`FOV = 26`、距离再乘 `MARGIN = 1.35`）。
+  一条 210 米的船如果近距广角拍，艏部会被放大到框外
+- **共用 `tools/lib/raster.js`**（光栅器 / Canvas 桩 / PNG 编码）。
+  Canvas 桩的能力边界与 `render-planform.js` 完全相同 ——
+  `translate` / `rotate` / `setTransform` / 文字 / 真实渐变都是空实现。
+  舰船预览只用到 `fill` / `stroke` / `fillRect` / `arc` / `ellipse`，
+  都在支持范围内
+- **它不写任何断言**，只是把图落盘。看的人负责判断"像不像"——
+  这是这类工具的共同性质，别指望 CI 能替你判断画风
 
 ---
 

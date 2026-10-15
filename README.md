@@ -171,9 +171,9 @@ monsoon-line/
 │   └── style.css       界面样式
 ├── js/
 │   ├── math3d.js       向量 / 罗德里格斯旋转 / 近平面裁剪 / 透视投影
-│   ├── models.js       低多边形机体与地面目标几何
-│   ├── codex.js        游戏内资料库（12 条目）
-│   ├── data.js         机型 / 武器 / 呼号 / 无线电台词
+│   ├── models.js       低多边形机体 / 水面舰船 / 地面目标几何
+│   ├── codex.js        游戏内资料库（23 条目）
+│   ├── data.js         机型 / 舰船 / 武器 / 呼号 / 无线电台词
 │   ├── audio.js        全程序化音效合成（WebAudio）
 │   ├── render.js       天空 / 地面 / 深度排序面绘制 / 粒子
 │   ├── entities.js     飞行模型 / 动压缩放 / 导弹比例导引
@@ -186,7 +186,9 @@ monsoon-line/
 │   ├── world/          世界设定（可脱离代码单独阅读）
 │   └── systems/        渲染 / 飞行模型 / 武器 / AI / HUD / 音效
 └── tools/
-    └── smoke.js        冒烟测试（node tools/smoke.js）
+    ├── smoke.js        冒烟测试（node tools/smoke.js）
+    ├── render-planform.js  机库俯视图 PNG 预览器
+    └── render-ships.js     舰船外形 PNG 预览器
 ```
 
 `js/` 下的文件按 `index.html` 中的顺序用经典 `<script>` 标签加载，
@@ -237,7 +239,11 @@ node tools/smoke.js
 
 ## 状态
 
-三个任务、三架可驾驶机型、十二种武器系统、完整的 HUD 与雷达、四方势力背景设定。
+三个任务、六架可驾驶机型、十二种武器系统、完整的 HUD 与雷达、四方势力背景设定。
+
+海面上还有 **11 艘水面舰船**（模型、数据、图鉴、设定已就位，
+但还没有出现在任何关卡里）：四方的军船与勤务船，加上三个未参战国家
+停在这片海上的民用与科学船。见 [世界设定集 8.0.1 节](docs/world/SETTING.md)。
 
 已知问题清单见 [设计文档第 8 节](docs/DESIGN.md#8-已知问题与待改进)。
 
