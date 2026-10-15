@@ -472,11 +472,18 @@ var UnitView = (function () {
       if (ev.preventDefault) ev.preventDefault();
     });
 
-    /* 矢量俯视图：数据有则画，没有则那一栏已经不在了 */
+    /* 矢量俯视图：数据有则画，没有则那一栏已经不在了。
+       画布固定 640×440 —— 与机库 index.html 里 #planCv 的属性完全一致，
+       所以两边是同一套留白比例。
+       这里不能按 clientHeight/clientWidth 现算：paint() 的左右标注栏
+       （padL/padR = 132 px）是**像素**量，画布越扁、机身分到的缩放 k 越小；
+       而 `.uv-plan` 是 `height:auto`，一改 width 属性，clientHeight 立刻
+       按新宽高比变（默认 height 还是 150），读回来的已经是扁画布的比，
+       最后算出 640×150 —— 俯视图只剩中间一小条。 */
     var plan = document.getElementById('uvPlan');
     if (plan && typeof PLANFORM !== 'undefined' && PLANFORM.planes[u.rec.model]) {
       plan.width = 640;
-      plan.height = Math.max(1, Math.round(640 * (plan.clientHeight || 220) / (plan.clientWidth || 420)));
+      plan.height = 440;
       PLANFORM.draw(plan, u.rec, {}, null);
     }
 

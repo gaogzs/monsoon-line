@@ -165,6 +165,21 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 `NO DATA`，但那在详情页里更像"坏了"。所以那一栏改成一句说明：
 "这一型没有画俯视识别图 —— 资料的来源是敌方制式机的识别卡片，不是每一型都有。"
 
+### 俯视图画布固定 640×440
+
+`mount()` 里把 `#uvPlan` 的 `width` / `height` 属性直接写成 `640` / `440` ——
+**与机库 `index.html` 里 `<canvas id="planCv" width="640" height="440">` 完全一致**。
+
+理由是 `PLANFORM.paint()` 的左右标注栏（`padL` / `padR = 132`）是**像素**量：
+画布越扁，机身能分到的缩放 `k` 就越小，俯视图看着就越小。
+
+这里曾经按 `plan.clientHeight / plan.clientWidth` 现算高度，结果算出 `640×150`
+的扁画布、飞机只剩中间一小条。原因是 `.uv-plan` 是 `height:auto`：
+**一改 `width` 属性，`clientHeight` 立刻按新宽高比变**（`height` 属性还是默认的
+150），读回来的已经是扁画布的比。要按容器现算，必须用 `getBoundingClientRect()`
+或者先写 `style.height`；但既然机库已经有一个定死的尺寸，直接对齐它更省事，
+也让两边是同一套留白比例。
+
 ### 阵营与制造方分两行
 
 第一版把 `faction` 和 `maker` 拼在一行：
@@ -271,6 +286,9 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 7. **详情页不占左侧导航的一项。** 它是挂在当前条目之下的一个视图，
    `codexSel` 不变，所以返回时仍停在"机型图鉴 / 舰艇图鉴"上。
    想改成独立条目的话，`codexUnit` 这套状态就要整体重构。
+8. **俯视图画布尺寸写死成与机库 `#planCv` 相同的 640×440。**
+   别改成按 `clientHeight` 现算 —— `height:auto` 下改了 `width` 属性，
+   `clientHeight` 会立刻跟着变，算出来是一个扁画布（详见上文那节）。
 
 ## 参数速查
 
@@ -283,6 +301,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 | 拖动灵敏度 | `onDragMove()` 里的 `0.010` / `0.008` |
 | 俯仰限位 | `PITCH_LIMIT` |
 | 预览画布尺寸 | `css/style.css` 的 `.uv-3d{ height }` |
+| 俯视图画布尺寸 | `unitview.js` `mount()` 里的 `640` / `440`（须与 `index.html` 的 `#planCv` 一致） |
 | 左右栏比例 | `css/style.css` 的 `.uv-body{ grid-template-columns }` |
 | 参数表有哪些行 | `aircraftParams()` / `shipParams()` |
 | 详情页的 HTML 结构 | `html()` |
