@@ -1,0 +1,426 @@
+# 工具链与测试
+
+代码：`tools/smoke.js`（唯一的自动化测试）· `tools/stamp-version.js` + `js/version.js`（版本戳）
+· `tools/render-planform.js`（离线画风预览）· `tools/rename-aircraft.js`（一次性批量改名）
+
+---
+
+## 为什么这个项目会有 tools/
+
+游戏本身**零依赖、无构建**——没有 `package.json`，没有 `node_modules`，
+双击 `index.html` 就能玩。`tools/` 全是**开发期的旁路**，跑在 Node 里，
+产物不参与游戏运行（唯一例外是 `js/version.js`）。所以这里没有 npm script，
+一律 `node tools/xxx.js`。改完代码唯一必须做的事是 `node tools/smoke.js`。
+
+| 工具 | 一句话职责 | 什么时候跑 |
+|---|---|---|
+| `smoke.js` | 在无浏览器环境把整个游戏跑起来并断言 | **每次改完代码** |
+| `stamp-version.js` | 把上一次提交写进 `js/version.js` | **每次 `git commit` 之前** |
+| `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
+| `rename-aircraft.js` | 按表把旧机型编号全库替换成新编号 | 只在改命名规范时，一次性的 |
+
+---
+
+## tools/smoke.js
+
+### 怎么运行
+
+```bash
+node tools/smoke.js
+```
+
+没有参数、没有环境变量、没有 watch 模式。它读 `index.html`、读 `js/*.js`，
+在内存里造一个假浏览器，然后从零跑到任务里。
+
+### 输出格式与退出码
+
+```text
+== 加载脚本 ==
+  OK    13 个脚本全部加载，无语法/求值异常
+== 初始化 ==
+[季风线] 自检通过：模块与数据引用全部一致。
+  OK    开机自检通过：模块与数据引用一致
+  FAIL  主循环抛出异常 —— xxx is not a function
+
+✓ 冒烟测试全部通过          ← 或 →  ✗ 冒烟测试失败：N 项
+```
+
+分组之间用 `== 组名 ==` 分隔，每条断言行两格缩进。**`OK`**（绿）只打印，
+**`FAIL`**（红）既打印又进 `problems` 数组。**退出码只有两个**：
+`0` = 全部通过，`1` = 至少一条 FAIL。
+
+```js
+const problems = [];
+function fail(msg) { problems.push(msg); console.log('  \x1b[31mFAIL\x1b[0m  ' + msg); }
+function ok(msg) { console.log('  \x1b[32mOK\x1b[0m    ' + msg); }
+```
+
+**`fail()` 不中断**：后面的断言照跑，所以一次失败的输出里可能有几十条 FAIL，
+**第一条才是根因**，后面多半是"对象是 undefined，后续读取全炸"的次生现象。
+
+**"诊断"也算输出**：有些分组不打断言，只用 `ok()` 把当时数值打出来给人看
+（`诊断 M2 目标…`、`诊断 玩家钉在 20500m…`、`诊断 有目标 12600 · 进射程 0…`）。
+它们不带 FAIL 也**不代表通过**——看到 `进射程 0 · 进锥 0 · 实开火 0` 这种数字，
+得自己判断是不是退化。
+
+### 测试框架是怎么搭的
+
+没有测试框架。整个"框架"就是四个手写桩 + 一个 `vm` sandbox。
+
+#### 最小 DOM（`smoke.js:36-193`）
+
+`makeEl()` 返回普通对象，有 `children` / `classList` / `addEventListener` /
+`fire(type)` / `setAttribute` / `getBoundingClientRect`。关键几点：
+
+- **元素注册表来自 `index.html` 的正则扫描**，不是 DOM 解析：`<section id="scr-xxx">`
+  建屏幕元素（`class` 拆进 `__cls`），其余 `id="..."` 建 `div`，`data-go` /
+  `data-ptab` 建按钮（合成 id `go_<n>` / `ptab_<n>`）
+- **`querySelectorAll` 只认识三个选择器**：`.screen` / `[data-go]` / `[data-ptab]`；
+  查别的选择器一律得到 `[]`——这是桩的边界，不是 bug
+- **重复 id 会立刻 FAIL**（`makeEl` 里查 `byId`）：`index.html 出现重复 id：xxx`
+- **`innerHTML` 的 setter 必须清空 `children`**（`smoke.js:126-133`）。只改字符串属性
+  的话，反复构建（每次进机库）会让子元素越积越多，测出来是"8 行应该是 4 行"
+  这种**假故障**——踩过一次，注释就留在那儿了
+- `fire('click')` 同时调 `addEventListener` 注册的回调和 `el.onclick`
+
+#### Canvas 与 WebAudio（`smoke.js:42-94`）
+
+`ctx2d()` 返回 `Proxy`：未知属性一律返回 `() => {}`，所有绘制调用都是静默空操作
+（例外：`canvas` 属性、`measureText`、两个 `create*Gradient`）。
+`audioNode()` 同理，`frequency` / `gain` / `Q` / `detune` 自动生成带 `value`
+与四个空 ramp 方法的 `audioParam()`；`FakeAudioContext` 提供
+`createGain/Oscillator/BiquadFilter/BufferSource/Buffer`。
+
+**Canvas 桩不画任何像素，但可以挂勾子观测**——HUD 颜色、锁定框大小、
+海天分界高度都是这么"看"出来的：把 `ctx.strokeRect` / `ctx.fillRect` 换成
+记账后再转发给原函数的包装即可。音频桩只保证合成路径不抛异常，
+**不验证声音好不好听**。
+
+#### 脚本加载顺序只有一个权威来源（`smoke.js:25-28`）
+
+```js
+const ORDER = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/script>/g)]
+  .map(m => m[1]);
+```
+
+然后 `for (const name of ORDER)` 逐个 `vm.runInContext`。
+
+**这是这份测试里最重要的一个决定。** `index.html` 是加载顺序的**唯一权威来源**，
+测试不维护第二份清单——手工维护过一次，新加模块时漏掉了，结果**测试反而先炸了**
+（引用一个还没加载的全局）。推论：
+
+- 加模块只需在 `index.html` 底部加一行 `<script src="js/新模块.js"></script>`，
+  smoke.js 自动跟上
+- 脚本名必须匹配 `[a-zA-Z0-9_]+`，路径必须是 `js/<名字>.js`
+- `render-planform.js:293-294` 用**同一个正则**解析同一份 `index.html`——
+  两份工具、一个来源
+
+#### sandbox 里暴露了哪些全局（`smoke.js:195-224`）
+
+`const sandbox = windowStub;` 然后 `vm.createContext(sandbox)`。
+因为 sandbox **就是**那个 window 桩对象：
+
+- 脚本里所有顶层 `var` / `function` 都落在 sandbox 上，测试因此能直接读到
+  `sandbox.M3`、`sandbox.Ent`、`sandbox.Game`、`sandbox.Renderer`、`sandbox.WEAPONS`、
+  `sandbox.AIRCRAFT`、`sandbox.MISSIONS`、`sandbox.CODEX`、`sandbox.canCarry`、
+  `sandbox.loadoutPenalty`、`sandbox.STORE_COOLDOWN` 等
+- 反向也成立：测试**直接改** `WEAPONS.v30.seeker`、**包装** `Ent.stepAircraft` /
+  `Renderer.pushModel` / `Renderer.setCamera`，用完还回去。这是最常用的观测手法
+
+| 桩字段 | 值 / 行为 |
+|---|---|
+| `innerWidth` / `innerHeight` / `devicePixelRatio` | 1280 / 720 / 1 |
+| `AudioContext` / `performance.now` | `FakeAudioContext` / `Date.now` |
+| `requestAnimationFrame` | 回调压进 `rafQ`，返回递增序号 |
+| `addEventListener` / `localStorage` | 存进 `winListeners`（`load` 事件靠它拿到）/ 内存版存储 |
+| `document` | `body` / `getElementById` / `createElement` / `querySelectorAll` / `addEventListener` |
+| `setTimeout` / `clearTimeout` / `console` | 直接转发 Node 的 |
+
+`Game.init()` 不是直接调用的——测试触发**假 `load` 事件**：
+
+```js
+(winListeners.load || []).forEach(fn => fn());
+```
+
+开机自检没有返回值，它往 `body` 里塞一条红条，测试按文案找，找到就 FAIL：
+
+```js
+const preflightBox = bodyEl.children.find(c => /开机自检发现/.test(c.innerHTML || ''));
+```
+
+**`Game.__player()` / `Game.__world()` 是生产代码里的**（`js/game.js:2671-2672`），
+测试直接用。`Game.__fireSpecial` **不存在**——所以发射一律走真实链路：
+取 `docListeners['keydown']` 里的回调，发 `{ code: 'Enter' }`。
+
+#### 假时钟与 pump()（`smoke.js:334-343`）
+
+```js
+let fakeClock = Date.now();
+function pump(frames) {
+  for (let i = 0; i < frames; i++) {
+    const q = rafQ; rafQ = [];
+    if (!q.length) break;          // 没有排队的帧就停（避免死循环）
+    fakeClock += 16;               // 假时钟，每帧 16 ms
+    q.forEach(fn => fn(fakeClock));
+  }
+}
+```
+
+`pump` 是"推进世界"的唯一手段，推进 1 秒就是 `pump(60)`。
+**为什么必须是假时钟**：原来每次 `pump` 都传 `Date.now()`，连续调 `pump(1)` 时
+时间戳几乎不变，于是 `dt ≈ 0`、飞机不动——**卡死检测因此误报过**。
+
+### 它覆盖了哪些方面
+
+下表按源码里的实际分组列出。括号内是该分组的**源码标记**——带 `==` 的是
+`console.log('\n== 组名 ==')` 打的章节标题，其余是分组注释
+`/* ---- 首句 … */`。**用它在 `tools/smoke.js` 里搜就知道对应哪段代码**
+（行号会随改动漂移，标记不会）：
+
+| 分组 | 在防什么回归 |
+|---|---|
+| `== 加载脚本 ==` | 13 个脚本按 `index.html` 顺序求值，任何语法错/顶层求值异常 |
+| `== 初始化 ==` | `Game.init()` 抛异常；`preflight()` 的红条；初始屏幕必须是 `scr-title` |
+| `== 导航 ==` + `== 完整流程 ==` | 六个 `data-go` 在 `game.js` 里都要有 `go === '...'` 分支，且点击后 `.active` 真的换到目标 `scr-*`；再从 title 走一遍 brief → hangar（导航失效过一次：flex item 缺 `min-height` 把 footer 顶出视口） |
+| `== 任务与主循环 ==` + 卡死检测：不能有飞机长时间停在原地 | `startMission(0)` 成功 + 推进 240 帧不抛异常；再让三关各跑 900 帧，查 NaN、飞机连续静止 > 60 帧、同一帧同一对象出现两次、`world.actors` 重复条目（FAIL 时打出一整串现场） |
+| `== 挂载系统 ==` | 每件武器有 `fits`/`perPoint`/`mass`；可发射武器有 `speed`/`life`；`STORE_COOLDOWN` 全覆盖；制导武器有 `lead`；挂点组是偶数点且有弹可挂；玩家出击后有 `loadoutList`/`ammoPool` 且"齐射数 = 挂点数" |
+| `== 干扰与机动 ==` | 红外/雷达弹对干扰弹的失锁率贴住 `w.flare`（含"雷达弹也吃箔丝"）；`AI.steerTo` 三条基本控制律（前下方推杆、前上方拉杆、正侧方滚转） |
+| 机库的选装面板 + 挂载的机体能力门槛 + 挂载性能系数 + 六维条必须随挂载变化 | `#hpPicker` 生成的 `pk-card` 每张都有定位行与简介、`#hpList` 行数 = 挂点组数；默认配置合法、能力门槛不形同虚设（制空机挂不了重型巡航弹）；满载时加速惩罚最重、滚转最轻、失速速度升高；六维条必须随挂载变化（点卡片要真的变） |
+| 追尾镜头必须真的落到渲染器上 + 追尾镜头：稳定水平 + 俯仰限位 + 诊断：海面填充高度随海拔的变化 | **一帧内只能有一次 `setCamera` 调用**（防分支写错导致追尾镜头被覆盖）；地平线稳定、俯仰钳在 89°、扫限位/穿越极点/持续垂直都不抽动、正交基余量够；海天分界随海拔**单调下沉**（0.5 / 2 / 8 km 三点，防地球曲率项失效） |
+| 轰炸机：沿航线飞、到点投弹、不参与空战 + 无人僚机：授权开火 + 长机阵亡后盘旋 | M2 的 2 架轰炸机沿航线飞、到点投弹伤基地、投弹后转 `egress`、不自己选目标、不开加力，基地被摧毁即判负；无人僚机长机不锁定则不许找目标、锁定后继承同一目标、长机阵亡后盘旋且不逼近敌人、编队不脱队 |
+| 鼠标幅度 → 转向方式：全程插值，没有切换点 + 真实游戏里：鼠标略微朝正下方必须是推杆 | 滚转占比随鼠标幅度单调上升、俯仰不跳变，"中心推杆"只在机体相对镜头正着飞时成立；完整链路 mousemove → updateAim → steerTo → ctrl 下，柔和朝正下方必须推杆且不带滚转、峰值要够深、推到底要退场 |
+| 两组挂架挂同一种武器 + 挂架上的实物 + 储备打光后，挂架不再恢复 + 齐射 + 发射槽 | 两组挂同一种武器时槽下标不撞（数 `pushModel` 调用次数）；打空全部槽后模型数必须变少；储备打光后槽不再恢复；按一次出 `w.salvo` 枚且共用冷却槽；槽数 = 挂点数，连按只能出"槽数"枚 |
+| BIN-8 追云 + CLA-9 已并入 CLA-17 + "有没有发动机"和"有没有导引头"是两个正交的维度 + 两架高空机的性格必须真的分开 | BIN-8 去掉对地门槛且制空/截击机挂得上；CLA-9 并入 CLA-17 且继承射程速度；动力与制导两个维度正交（7 件对地弹 4 种组合）；D-14 与 F-9 的性格必须在物理上真的分开 |
+| ① 被动吊舱的加成字段必须在顶层 + ② 机炮射程必须真的驱动子弹寿命 + ③ DEW 充能必须按 recharge 计时 | 加成写成 `passiveEffect: {...}` 会静默失效；`fireGun` 不能把子弹寿命写死，否则 `range`/`highRange` 全是假值；DEW 不能拦掉一发就立刻补满 |
+| 切枪不该丢掉锁定 + 切换挂载（切枪不跳装填） | 按 R 切武器不许清掉 `lockProgress`；按一圈 R 回到起点，且不许把装填时间清零（那等于无冷却连射） |
+| 无制导弹必须是"真·无动力" + 无制导火箭：无目标也能打 | 不许留任何制导字段、必须真的受重力（水平投放 1 秒要下坠）；无锁定也能投放，且飞出去后航向绝不能变 |
+| 武器打错目标时必须拒绝发射 + 端到端：打错目标会被拒绝，打对了能命中 | 对空弹 `target` 必须是 `air`、对地弹不能是 `air`；带对空弹锁海面设施必须 0 枚出膛，无制导炸弹必须真能炸到设施 |
+| HUD：敌方标记一律红色 + HUD：引擎出力条与油门轴一致 | 地面标记不许用灰蓝（会和说明文字混）；锁定大框出现时基础小框仍在；引擎出力条必须跟油门轴一致 |
+| 激光制导机制（休眠中）+ PEJ-30 现在是光电制导 + 端到端：激光制导炸弹的完整使用流程 | 休眠中的激光制导仍可跑（临时借 `v30` 改成 `laser`，验完还回去）；PEJ-30 光电制导：有 `turn`、有 `ballistic`、无 `boost`、`flare` 必须**显式写 0**；端到端验锁定→投放→保持照射 |
+| 诊断：第二关的地面目标能不能被锁定 + 诊断：AI 追到极高空会不会卡住 + 诊断：AI 到底用不用机炮 | 这三条是**诊断**：连按 F 看锁定落到谁身上、玩家钉在 20500 m 时敌机是否停到 q < 8000 或失速的高度、AI 到底用不用机炮。只打数值、不判定，要看数字自己判断 |
+| ① 每个任务各跑 30 秒 + ② 每个机型各飞 10 秒 + ③ 每件能发射的武器各打一发 | 综合压力测试：三个维度都跑一遍，抓抛异常与数值崩坏（NaN） |
+| 命名体系（设定集 8.1）+ 敌机的呼号与型号不能混为一谈 | 机型必须是「两字母 rafsi - 序号」且前缀在登记表、武器必须是「三字母 rafsi - 序号」且词根在 `RAFSI` 表；敌机 `label` 要「中文 + 英文代号」、`name` 不许漏出 ` xxx 3` 这种内部下标 |
+| 资料库：动态生成的图鉴必须能跑 + 导弹急转应当掉速 | `CODEX` 里 `build()` 动态条目必须能生成且够长；导弹急转必须掉速（0.5 s 至少 15 m/s），否则躲导弹在物理上不可能 |
+
+### 怎么写一条新断言
+
+照抄这个骨架，插到**同主题分组的花括号里**（别插在
+`if (Ent && M3 && me && world)` 之外，那个 `else` 会直接 FAIL 一条"拿不到 Ent / world"）：
+
+```js
+/* ---- 一句话说明这条断言在防什么 ----
+    第二段写"为什么是这个判据"，以及当初踩的坑。 */
+{
+  const G = sandbox.Game, bad = [];
+  G.startMission(0);
+  const pl = G.__player();
+  for (let f = 0; f < 60; f++) pump(1);        // 先让世界稳定
+
+  const before = pl.hp;
+  pl.hp -= 25;
+  pump(1);
+
+  if (pl.hp !== before - 25) bad.push('掉血没有生效：' + before + ' → ' + pl.hp);
+
+  if (bad.length) bad.forEach(fail);
+  else ok('掉血：' + before + ' → ' + pl.hp);
+}
+```
+
+规矩：
+
+- **用 `bad.push()` + 末尾 `if (bad.length)...else ok(...)`**：一次能报多条，
+  成功时只留一行 OK，且 **OK 行要带实测数值**方便肉眼对比
+- **消息里必须带数值**，格式 `期望 vs 实际`。写"锁定框不对"不如写
+  `锁定后基础小框消失了 —— 目标的身份和距离读不到了`
+- **断言要打在最后生效的结果上**。追尾镜头那组就是教训：只复现 `camMode===0`
+  的计算过程拦不住"算完之后被另一条分支覆盖"，所以改成包装 `Renderer.setCamera`
+  数调用次数
+- **改过的状态要还回去**：`Ent.stepAircraft`、`Renderer.pushModel`、
+  `WEAPONS.v30.seeker`、玩家的 `special`/`spAmmo`/`slotCd` 都属于"借了要还"，
+  不还的话后面的分组会测出互相污染的结果
+- **别用 `Date.now()` 造时间**，用 `pump()` 推进；只想看数值不想断言，
+  就 `ok('诊断 ...')` 并把当时的现场带进消息
+
+### 测试的边界：它抓不住什么
+
+| 抓不住 | 为什么 | 改完要另外做什么 |
+|---|---|---|
+| **纯视觉风格 / 像素级效果** | Canvas 桩是空操作 Proxy，只对显式挂勾子的几个调用（`fillRect` / `strokeRect`）有效；没有真实光栅化，`addColorStop` 是空函数 | 用 `render-planform.js` 出 PNG，或在浏览器里肉眼确认 |
+| **真实浏览器行为 / 布局 / 响应式** | 没有 CSS 布局、没有 `flex`、没有真实视口，`getBoundingClientRect` 恒返回 1280×720 左上角 | 手动缩窗口看。导航那次失效（`min-height`）就是布局问题，测试当时拦不住 |
+| **键盘/鼠标的浏览器语义** | 事件是 `fire()` 直接调回调，没有冒泡、没有 `preventDefault` 的真实效果 | — |
+| **音频好不好听 / 性能与帧率** | 音频只验调用不抛异常；`fill()` 不耗时，`pump(60)` 不代表真实 60 帧 | 用耳朵；在浏览器里看帧率（瓶颈是 `fill()` 调用次数，见 [rendering.md](rendering.md#性能)） |
+| **纯文案正确性 / 白名单外的 `querySelectorAll`** | 只检查个别格式（呼号、编号），不读语义；桩只认识 `.screen` / `[data-go]` / `[data-ptab]`，别的返回 `[]`（通常静默跳过而不是失败） | 人工读；别指望它 |
+
+**结论**：smoke.js 是"逻辑回归网"，不是"验收"。改了画风、布局、手感，
+必须另外肉眼过一遍——这正是 `render-planform.js` 存在的原因。
+
+---
+
+## 版本戳机制
+
+### 为什么 `js/version.js` 是自动生成的
+
+它**只有 9 行**，第一行就写着"自动生成——不要手改"。它是 `stamp-version.js`
+从 git 记录里写出来的：
+
+```js
+var BUILD_STAMP = {
+  time: '2026-10-15 08:07',          // 本地可读时间
+  iso:  '2026-10-15T08:07:40+09:00', // git 的 %cI
+  hash: 'e996405',                   // 短哈希
+  subject: "PEJ-30 改为光电制导；激光制导机制休眠保留"
+};
+```
+
+四个字段全部来自 `git log -1`（`%cI` / `%h` / `%s`），时间转成本地 `YYYY-MM-DD HH:MM`。
+
+**为什么必须生成而不能运行时算**：本项目没有构建步骤，页面是静态托管的，
+运行时拿不到 git 信息。也**不能用 `document.lastModified`**——那取的是 HTML 的
+响应头，托管方有时给一个与内容无关的时间，而且在**缓存命中时不更新**，
+恰恰在最需要它的时候失效。
+
+### 谁来生成、什么时候必须重新生成
+
+```bash
+node tools/stamp-version.js
+```
+
+**每次 `git commit` 之前跑一遍。** 输出形如
+`js/version.js 已更新` + 时间 + 短哈希与提交标题。
+不在 git 仓库里时它打印 `读不到 git 记录（可能不在仓库里），跳过` 并 `process.exit(0)`。
+
+**注意一个细节**：脚本取的是**最后一次提交**的信息。你在提交 A 之后、提交 B 之前
+跑它，生成的 `version.js` 里记的是 A，而这个文件本身会被写进 B。所以页面上显示的
+是"这次的代码基于哪个已提交状态"——它有意的口径是**上一版**，而不是工作区里的这一版。
+
+### 标题页左上角那个时间戳的用途
+
+`index.html:21` 有个 `<div id="verStamp" class="ver-stamp">`。
+`Game.init()` 里 `stampVersion()`（`js/game.js` 内，`init()` 之前）往它填
+`BUILD 2026-10-15 08:07` 加一行 `e996405　PEJ-30 改为光电制导…`。
+
+**用途只有一个：确认部署的到底是哪一版。** 浏览器缓存、托管方的重建延迟、
+推送失败——这三件事从画面上完全看不出来，但时间戳变了就说明新的 commit
+确实上线了。文件缺失或 `BUILD_STAMP` 未定义时**静默降级**成 `BUILD 开发版`，
+不影响游戏本身（开发中直接开 `index.html` 就是这个样子）。
+
+---
+
+## tools/render-planform.js
+
+### 解决什么问题
+
+**"画风"光看代码判断不了，而开发机上没有浏览器。** 所以它实现了一个最小
+Canvas 2D 子集 + 光栅器 + PNG 编码器，直接把 `PLANFORM.draw()` 的输出落成图片。
+它加载的是**真正的 `js/planform.js`**，用的是同一份绘制代码——预览和游戏里
+看到的完全一致（同数据、同绘制函数、同底板色 `#070d12`）。
+
+### 怎么用
+
+```bash
+node tools/render-planform.js
+```
+
+不用参数，输出到 `tools/preview/`，命名 `机型ID-挂载.png`：
+
+- `<id>-default.png` —— `ac.defaultLoadout`；`<id>-clean.png` —— 空挂载
+- `<id>-<武器键>.png` —— 把该武器**装满所有挂得下的挂点组**（`fillWith()`），
+  并高亮第一个挂点组；枪不算、挂不上就跳过
+
+尺寸固定 640×440，每张图是独立 `Raster`。
+
+### 实现要点与限制
+
+- **它同样从 `index.html` 解析脚本名**（同一个正则），但只按顺序加载
+  `math3d` → `data` → `planform` → `models`。顺序不能乱：`planform.js`
+  依赖 `data.js` 里的 `WEAPONS`
+- 光栅器：`line()` 用点到线段距离做抗锯齿并支持虚线段；`poly()` 是扫描线 +
+  奇偶规则 + 4 倍纵向超采样。**支持** `stroke` / `fill` / `fillRect` / `strokeRect` /
+  `moveTo` / `lineTo` / `closePath` / `rect` / `arc` / `ellipse` / `quadraticCurveTo` /
+  `setLineDash` / `save` / `restore` / `#rrggbb` 与 `rgb[a]()` 颜色
+- **不支持**（空函数，静默）：`translate` / `rotate` / `scale` / `setTransform` /
+  `transform` / `fillText` / `strokeText` / `bezierCurveTo` / 渐变 / `shadow*` /
+  `clearRect`。**如果哪天 `planform.js` 开始用 `translate`/`rotate` 画图，
+  预览会静默画错（图堆在原点）而不报错**——加变换时要么同时补桩，要么换办法
+- `getContext()` 每次调用返回**新的 ctx**，路径状态不共享，绘制函数必须只取一次
+
+---
+
+## tools/rename-aircraft.js
+
+### 用途
+
+按一张**旧编号 → 新编号**的对照表，把全库机型编号精确整串替换。
+只在"改命名规范"时用，一次性的。命名规范写在脚本头部注释里（设定集 8.1）：
+上游按用途前缀（`D-` 战斗 / `DB-` 舰载战斗 / `F-` 截击 / `G-` 攻击 / `KA-`），
+下游按设计局前缀（`ROK-` / `GAL-` / `VAC-`），分水群岛国用商品名
+（`XA-8` → `潮线`），管理局用批次名（`ME-2` → `水准`）。
+
+### 怎么用
+
+```bash
+node tools/rename-aircraft.js
+```
+
+无参数、**无 dry-run**、**直接原地写文件**。跑完打印每个被改文件的替换次数与合计
+（形如 `js/data.js  替换 7 处` / `合计 10 处`）。`FILES` 清单是硬编码的 14 个路径：
+六个 `js/*.js`（`data` / `models` / `planform` / `codex` / `missions` / `game`）、
+`docs/` 下的七份（`world/SETTING.md`、四份 `systems/*.md`、`DESIGN.md`、`README.md`）、
+以及根 `README.md`。`PLANES` 数组是唯一的对照表。
+
+### 为什么这么做
+
+```js
+const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 'g');
+```
+
+**只做精确整串替换**，两侧用环视卡住"不能是字母数字 / 不能紧跟数字"——
+避免 `DA-1` 误伤 `DA-11`、`DA-14` 这类更长的编号。对照表里同时保留了
+**早先的中间命名**（`BL-11`、`GA-14`、`MI-21`、`SU-33`、`RO-27`），
+所以它能一次跑完从最初到当前的所有历史命名。
+
+**注意**：`FILES` 里**没有** `tools/*.js`，也没有 `docs/systems/` 下的新文件。
+改了编号之后要自己检查这两处。
+
+---
+
+## 参数速查
+
+| 想改什么 | 在哪 |
+|---|---|
+| 测试推进多少帧 / 假时钟步长 | `pump(N)`（1 秒 = 60 帧）；`pump` 里的 `fakeClock += 16`（毫秒） |
+| 卡死判定阈值 / "算静止"的帧间位移 | 卡死检测里的 `t.max > 60` 与 `d < 0.02`（米） |
+| 干扰成功率容差 | `±0.05`（1500 次采样）/ `±0.045`（1200 次采样） |
+| 追尾镜头俯仰限位 | 追尾镜头那组的 `CAM_PITCH_LIM = 89 * Math.PI / 180`（复现自 `updateCamera`） |
+| 压力测试时长 | 每关 1800 帧、每机型 600 帧、每武器 400 帧 |
+| 预览图尺寸 / 输出目录 / 底板色 | `render-planform.js` 顶部 `W`/`H`、`OUT`（`tools/preview/`）、`BG` |
+| 版本戳显示位置 | `index.html` 的 `<div id="verStamp">`，由 `js/game.js` 的 `stampVersion()` 填 |
+| 改名影响哪些文件 / 旧→新对照表 | `rename-aircraft.js` 的 `FILES` / `PLANES` 数组 |
+| 命名体系校验的词根表 | `smoke.js` 的 `RAFSI` / `UP_PREFIX` / `DOWN_PREFIX` |
+
+---
+
+## 易踩的坑
+
+1. **加了新模块却忘了动 `index.html`**：脚本不会被加载，全局是 `undefined`，
+   测试会在之后的第一个引用点炸。顺序的权威来源永远是 `index.html`
+2. **`fail()` 不中断**：第一条 FAIL 才是根因，从中间开始读会浪费很多时间
+3. **写死的 `Date.now()`**：连续 `pump` 之间时间几乎不变，`dt≈0`、飞机不动，
+   于是卡死检测误报。**一律用 `pump()` 推进**
+4. **`innerHTML` 的 setter 不真的清 DOM**：桩里显式处理了（`smoke.js:126-133`），
+   否则反复进机库会看到"行数翻倍"的假故障
+5. **借了不还**：包装 `Ent.stepAircraft` / `Renderer.pushModel` / `Renderer.setCamera`、
+   临时改 `WEAPONS.*.seeker`、改玩家的 `special`/`spAmmo`/`slotCd`——
+   不还原就会污染后面所有分组
+6. **断言打在中间计算上，或用超现实的测试参数**：追尾镜头那组试过"up 的倾斜度"
+   和"up 是否精确等于 (0,1,0)"，两个判据都会误报或漏报，最后用"一帧内
+   `setCamera` 调用次数"才干净；飞控测量曾用远超真实的扫掠角速度去测一阶低通，
+   量到的是测试参数的问题
+7. **`render-planform.js` 不支持的 Canvas 调用是静默的**：给 `planform.js` 加
+   `translate` / `rotate` / 文字 / 渐变，预览会画错而不报错
+8. **`rename-aircraft.js` 没有 dry-run 且 `FILES` 不含 `tools/`**：
+   跑之前先 `git status` 干净，跑完 `git diff` 看一眼，并手动检查工具脚本
+9. **`stamp-version.js` 记的是上一次提交，且必须在提交前跑**——
+   忘了跑的话页面上还是旧时间戳，"到底部署没部署"这件事就白问了
+10. **`js/version.js` 不要手改**：它是生成物，手改等于伪造部署状态

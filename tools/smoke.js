@@ -221,6 +221,22 @@ sandbox.console = console;
 sandbox.setTimeout = setTimeout;
 sandbox.clearTimeout = clearTimeout;
 
+/* ---------- 确定性随机源 ----------
+
+   有几条断言依赖游戏内部的随机（AI 的模式切换、干扰弹掷骰、云种子……），
+   而 Math.random 每次都不同 —— 同一份代码跑两次可能一次过、一次挂。
+   排查回归时这最浪费时间：你分不清是自己改坏了，还是恰好抽到了坏签。
+
+   所以在**加载脚本之前**把 Math.random 换成固定种子的 LCG，
+   序列每次运行完全相同，冒烟测试才是可复现的。
+   注意种子一旦改变，"诊断"行的数值会整体变化，这是预期的。 */
+let __seed = 0x2f6e2b1;
+sandbox.Math = Object.create(Math);
+sandbox.Math.random = function () {
+  __seed = (__seed * 1103515245 + 12345) & 0x7fffffff;
+  return __seed / 0x7fffffff;
+};
+
 const ctx = vm.createContext(sandbox);
 
 /* ============================================================
@@ -836,7 +852,7 @@ if (Ent && M3 && me && world) {
 
   /* ---- 追尾镜头：稳定水平 + 俯仰限位 ----
      相机 up 恒为世界 up，所以**无论飞机怎么滚转，地平线都不动**。
-     俯仰被钳在 ±78°，视线因此永远不会与世界 up 共线、正交基不会退化。
+     俯仰被钳在 ±89°，视线因此永远不会与世界 up 共线、正交基不会退化。
 
      限位附近最容易出的毛病是来回抽动，所以要检查两件事：
      一是地平线在整个过程中是否真的纹丝不动，
@@ -844,7 +860,7 @@ if (Ent && M3 && me && world) {
   {
     const M3 = sandbox.M3;
     const dt = 1 / 60;
-    const CAM_PITCH_LIM = 78 * Math.PI / 180;
+    const CAM_PITCH_LIM = 89 * Math.PI / 180;
     const SIN_LIM = Math.sin(CAM_PITCH_LIM);
     const bad = [];
 
@@ -941,8 +957,49 @@ if (Ent && M3 && me && world) {
       if (r.maxY > SIN_LIM + 1e-6) bad.push('穿越极点时视线越界：|y| ' + r.maxY.toFixed(4));
     }
 
+    // 4. 持续垂直（稳态）—— "边界上的连续反弹"只可能出在这里
+    //    pa 恒被钳在限位，pitchSm 指数收敛后应当彻底静止。
+    //    限位越高，正交化前的 |up| = cos(限位) 越小、越接近 1e-4 的退化阈值，
+    //    所以这里同时盯住"静止"和"余量"。
+    {
+      const N = 3600;                       // 60 秒，足够收敛
+      let yawBase = 0, pitchSm = null, prev = null, maxJump = 0, minOrtho = 1e9;
+      for (let i = 0; i < N; i++) {
+        const pa = Math.min(CAM_PITCH_LIM, Math.atan2(1, 1e-4));
+        if (pitchSm === null) pitchSm = pa;
+        pitchSm += (pa - pitchSm) * (1 - Math.exp(-9 * dt));
+
+        const cp = Math.cos(pitchSm), sp = Math.sin(pitchSm);
+        let camFwd = M3.V(Math.sin(yawBase) * cp, sp, Math.cos(yawBase) * cp);
+        const fy = Math.min(SIN_LIM, Math.max(-SIN_LIM, camFwd.y));
+        const fh2 = camFwd.x * camFwd.x + camFwd.z * camFwd.z;
+        if (fh2 > 1e-8) {
+          const fsc = Math.sqrt(Math.max(0, 1 - fy * fy)) / Math.sqrt(fh2);
+          camFwd = M3.V(camFwd.x * fsc, fy, camFwd.z * fsc);
+        }
+        if (i < N - 600) continue;          // 只看收敛之后的 10 秒
+
+        minOrtho = Math.min(minOrtho, Math.sqrt(Math.max(0, 1 - camFwd.y * camFwd.y)));
+        const cam = M3.makeCamera(M3.V(0, 0, -52), camFwd, M3.V(0, 1, 0), 100, 100, 56);
+        const s = [cam.up.x, cam.up.y, cam.up.z];
+        if (prev) {
+          let d = 0;
+          for (let k = 0; k < 3; k++) d += Math.abs(s[k] - prev[k]);
+          if (d > maxJump) maxJump = d;
+        }
+        prev = s;
+      }
+      if (maxJump > 1e-4) {
+        bad.push('持续垂直时镜头在限位上抽动（帧间差 ' + maxJump.toExponential(2) + '）');
+      }
+      if (minOrtho < 1e-3) {
+        bad.push('持续垂直时正交基余量不足：|up| ' + minOrtho.toExponential(2) +
+          '（orthonormalize 的退化阈值是 1e-4）');
+      }
+    }
+
     if (bad.length) bad.forEach(fail);
-    else ok('追尾镜头：地平线稳定、俯仰钳在 78°、全程不抽动');
+    else ok('追尾镜头：地平线稳定、俯仰钳在 89°、全程不抽动');
   }
 
 
@@ -2069,6 +2126,66 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
   }
 
+  /* ---- HUD：引擎出力条与油门轴一致 ----
+
+     出力是**输入**，速度是**结果**，两者必须能分别读出来 ——
+     这也正是它单独占一条带子、而不是塞进速度带里的原因。
+     断言盯三件事：标签在、读数跟着油门轴走、0 / 军推 / 加力三档分得开。
+
+     读数固定在带子的垂直中心（y = H/2 + 5），所以按 y 过滤就能把它
+     和别处的百分比文字（HULL 之类）分开，不会误判。 */
+  {
+    const G8 = sandbox.Game, R4 = sandbox.Renderer;
+    const bad = [];
+    G8.startMission(0);
+    const pl = G8.__player();
+    pump(1);
+
+    const ctx4 = R4.ctx;
+    const seen = [];                       // { t, x, y }
+    const origText = ctx4.fillText;
+    ctx4.fillText = function (t, x, y) {
+      seen.push({ t: String(t), x: x, y: y });
+      return origText.apply(this, arguments);
+    };
+
+    const midY = R4.H / 2 + 5;
+    let sawLabel = false;
+    /* 只用**稳态档位**：加力（>1.0）与减速板（<0.04）在 game.js 里是瞬时态，
+       不给输入时每帧会自己往军推/零位掉，拿它们当稳定读数会测出假失败。 */
+    const cases = [[0.5, '40%'], [1.0, '80%']];
+    for (const c of cases) {
+      pl.throttle = c[0];
+      seen.length = 0;
+      pump(1);
+      if (seen.some(s => s.t === 'THR')) sawLabel = true;
+      const readout = seen.filter(s => /%$/.test(s.t) && Math.abs(s.y - midY) < 2.5);
+      if (!readout.some(s => s.t === c[1])) {
+        bad.push('油门 ' + c[0] + ' 时出力条没有显示 ' + c[1] +
+          '（该高度的读数：' + (readout.map(s => s.t).join('/') || '无') + '）');
+      }
+    }
+
+    // 加力位必须显示到军推以上（推到底的第一帧还没有回落完）
+    {
+      pl.throttle = 1.25;
+      seen.length = 0;
+      pump(1);
+      const pct = seen.filter(s => /%$/.test(s.t) && Math.abs(s.y - midY) < 2.5)
+        .map(s => parseInt(s.t, 10));
+      if (!pct.some(v => v > 80)) {
+        bad.push('加力位没有显示出力超过军推（该高度的读数：' +
+          (pct.join('/') || '无') + '）');
+      }
+    }
+    ctx4.fillText = origText;
+
+    if (!sawLabel) bad.push('HUD 里找不到引擎出力条的 "THR" 标签');
+
+    if (bad.length) bad.forEach(fail);
+    else ok('引擎出力条：读数随油门走（杆位 0.5 → 40% / 军推 80% / 加力 >80%）');
+  }
+
   /* ---- 激光制导机制（休眠中，但代码要能跑）----
 
      PEJ-30 已经从 laser 改成 eo（光电制导），所以现在**没有任何武器**
@@ -2616,7 +2733,10 @@ if (Ent && M3 && me && world) {
       const qq = 0.5 * rho * a.speed * a.speed;
       return {
         n: a.name, y: Math.round(a.pos.y), v: Math.round(a.speed),
-        q: Math.round(qq), stall: a.stall
+        q: Math.round(qq), stall: a.stall,
+        // 真正的"操控权限"，q 只是它的代理
+        ctrl: q.ctrlFactor(a.pos.y, a.speed, a.ac),
+        ceil: (a.ac && a.ac.ceiling) || 16000
       };
     });
 
@@ -2625,16 +2745,28 @@ if (Ent && M3 && me && world) {
        玩家钉在 20500 米，而敌人按各自的实用升限（ac.ceiling）行事 ——
        不该跟上来悬在半空。踩过的坑：只有"y > 19000 就压住爬升角"时，
        ROK-27 会停到 17785 米 / 188 m/s / q=5793（ctrlFactor 只剩 0.26），
-       咬不住人也甩不掉。加了升限之后它们回到 15 公里、306 m/s。 */
-    const lowQ = rows.filter(r => r.q < 8000 || r.stall);
-    if (lowQ.length) {
-      bad.push('有敌机停在动压过低的高度（操控权限会很差）：' +
-        lowQ.map(r => r.n + ' ' + r.y + 'm ' + r.v + 'm/s q=' + r.q).join(' | '));
+       咬不住人也甩不掉。加了升限之后它们回到 15 公里、306 m/s。
+
+       **判据是 ctrlFactor，不是 q 的绝对值。**
+
+       q 只是"操控权限"的代理，而门槛随机型、随高度都不同：同样是 q=7000，
+       在低空能打，在 17 公里已经快没舵效了。原来卡 `q < 8000`，
+       可敌机按设计停在各自升限附近时 q 本来就可能掉到 7000 ——
+       于是同一条断言会随 AI 的随机决策时过时不过（实测同一份代码
+       跑 12 次里会挂 1 次，而代码一个字没改）。
+
+       0.26 才是"咬不住人也甩不掉"那条线（原文就写在 ai.js 的注释里），
+       这里留一点余量卡 0.30。 */
+    const lowCtrl = rows.filter(r => r.stall || r.ctrl < 0.30);
+    if (lowCtrl.length) {
+      bad.push('有敌机停在操控权限过低的高度：' +
+        lowCtrl.map(r => r.n + ' ' + r.y + 'm ' + r.v + 'm/s q=' + r.q +
+          ' ctrl=' + r.ctrl.toFixed(2) + ' 升限=' + r.ceil).join(' | '));
     }
 
     ok('诊断 玩家钉在 20500m 40 秒后，敌机状态：' +
       (rows.length ? rows.map(r => r.n + ' ' + r.y + 'm ' + r.v + 'm/s q=' +
-        r.q + (r.stall ? ' 失速' : '')).join(' | ') : '（无存活敌机）'));
+        r.q + ' ctrl=' + r.ctrl.toFixed(2) + (r.stall ? ' 失速' : '')).join(' | ') : '（无存活敌机）'));
 
     if (bad.length) bad.forEach(fail);
   }

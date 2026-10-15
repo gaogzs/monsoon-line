@@ -27,13 +27,17 @@
 monsoon-line/
 ├── index.html          所有屏幕的 DOM 结构（overlay），游戏入口
 ├── css/style.css       全部样式
-├── js/                 12 个模块，加载顺序由 index.html 决定
+├── js/                 13 个模块（含自动生成的 version.js），加载顺序由 index.html 决定
 ├── docs/               你正在读的东西
+│   ├── README.md       文档索引、阅读顺序、常用命令
 │   ├── world/          世界设定（可单独阅读）
-│   └── systems/        各子系统设计说明
+│   └── systems/        各子系统设计说明（js/ 下每个模块一份）
 └── tools/
-    ├── smoke.js            冒烟测试
-    └── render-planform.js  俯视图 PNG 预览器（本机无浏览器时用）
+    ├── smoke.js            冒烟测试（唯一的自动化测试）
+    ├── stamp-version.js    生成 js/version.js 的版本戳
+    ├── render-planform.js  俯视图 PNG 预览器（本机无浏览器时用）
+    ├── rename-aircraft.js  机型批量改名
+    └── preview/            预览器输出的 PNG
 ```
 
 ---
@@ -44,6 +48,7 @@ monsoon-line/
 
 | # | 模块 | 职责 | 依赖 |
 |---|---|---|---|
+| 0 | `version.js` → `BUILD_STAMP` | 版本戳（**自动生成，不要手改**） | — |
 | 1 | `math3d.js` → `M3` | 向量、罗德里格斯旋转、相机、投影、裁剪、射线求交 | — |
 | 2 | `models.js` → `MODELS` | 低多边形几何（机体、海上目标） | M3 |
 | 3 | `planform.js` → `PLANFORM` | 机库俯视识别图数据与绘制 | WEAPONS |
@@ -304,6 +309,9 @@ requestAnimationFrame(loop)
 | — | 机库选装改为卡片面板 | 下拉框里只有型号，玩家无从判断那是什么、打多远、为什么选它 |
 | — | 「齐射」改为并行发射槽 | 原实现是一次按键把所有槽一起打光，挤掉了发射节奏这个可经营的维度 |
 | — | 冷却条方向反转 | 先满后空读起来像"越打越有"；应该朝"能打"的方向生长 |
+| — | 相机俯仰限位 78° → 89° | 玩家要看得到更高的姿态。89° 时正交化前 \|up\| = cos(89°) = 1.75e-2，仍有 175 倍余量（阈值 1e-4），实测收敛后帧间差为 0；90° 才会退化。见 [game.md](systems/game.md) |
+| — | 油门条从屏幕左下角搬到空速带右侧 | 左下角正好是雷达圆心，而雷达在它之后绘制 —— 它一直被盖住，玩家根本看不到。搬到空速带右侧后与速度带同高、同一套刻度语言 |
+| — | 文档补全：每个模块一份设计文档 | 之前只有 8 份，缺 math3d / models / entities / data / codex / missions / game / tools。补齐后 [docs/README.md](README.md) 给出阅读顺序 |
 
 ---
 
