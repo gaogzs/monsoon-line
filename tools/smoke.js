@@ -296,6 +296,7 @@ else fail('初始屏幕应为 scr-title，实际是 ' + activeScreen());
    ============================================================ */
 console.log('\n== 导航 ==');
 const NAV_EXPECT = {
+  campaign: 'scr-campaign',
   brief: 'scr-brief',
   hangar: 'scr-hangar',
   codex: 'scr-codex',
@@ -321,10 +322,61 @@ for (const [go, want] of Object.entries(NAV_EXPECT)) {
   else fail('data-go="' + go + '" 应激活 ' + want + '，实际 ' + got);
 }
 
-// 回到标题，再走一遍真实流程：简报 → 机库 → 出击
+// 回到标题，再走一遍真实流程：战役 → 简报 → 机库 → 出击
 console.log('\n== 完整流程 ==');
-goEls.find(e => e.__attr['data-go'] === 'brief').fire('click');
-ok('进入简报，当前屏幕 ' + activeScreen());
+goEls.find(e => e.__attr['data-go'] === 'campaign').fire('click');
+ok('进入战役选择，当前屏幕 ' + activeScreen());
+
+/* ---- 战役层 ----
+   标题 → 战役 → 简报 这三步里最容易出的错是"点进战役之后列出来的
+   还是全部关卡"。所以断言的是**清单长度等于该战役的关卡数**，
+   不是大于零 —— 后者在筛选写错时照样会过。 */
+{
+  const campList = byId.get('campList');
+  const cards = campList ? campList.children.filter(c => /camp-card/.test(c.className || '')) : [];
+  const CAMP = sandbox.CAMPAIGNS[0];
+  if (cards.length !== sandbox.CAMPAIGNS.length) {
+    fail('战役列表有 ' + cards.length + ' 张卡片，应该是 ' + sandbox.CAMPAIGNS.length + ' 张');
+  } else {
+    ok('战役列表：' + cards.length + ' 个战役');
+  }
+
+  // 数据侧：每一关都必须恰好挂在一个战役下 —— 漏挂的关卡会静默消失在选关界面
+  const owner = new Array(sandbox.MISSIONS.length).fill(-1);
+  let bad = 0;
+  sandbox.CAMPAIGNS.forEach((c, i) => {
+    (c.missions || []).forEach(mi => {
+      if (mi < 0 || mi >= sandbox.MISSIONS.length) {
+        fail('战役 ' + c.id + ' 引用了不存在的任务下标 ' + mi); bad++;
+      } else if (owner[mi] >= 0) {
+        fail('任务 ' + sandbox.MISSIONS[mi].id + ' 被两个战役同时引用'); bad++;
+      } else owner[mi] = i;
+    });
+  });
+  owner.forEach((o, i) => {
+    if (o < 0) { fail('任务 ' + sandbox.MISSIONS[i].id + ' 没有归属任何战役'); bad++; }
+  });
+  if (!bad) ok('战役覆盖率：' + sandbox.MISSIONS.length + ' 关全部且只归属一个战役');
+
+  // 点第一张**可点**的战役卡，应当进入简报，且关卡清单只列本战役的关
+  const first = cards.find(c => !/camp-locked/.test(c.className || ''));
+  if (!first) {
+    fail('战役列表里没有可点的战役');
+  } else {
+    first.fire('click');
+    if (activeScreen() !== 'scr-brief') {
+      fail('点击战役卡应进入 scr-brief，实际是 ' + activeScreen());
+    } else {
+      const rows = byId.get('msnList').children.filter(c => /msn-item/.test(c.className || ''));
+      if (rows.length !== CAMP.missions.length) {
+        fail('战役内关卡清单有 ' + rows.length + ' 项，应该是 ' + CAMP.missions.length + ' 项');
+      } else {
+        ok('战役「' + CAMP.name + '」内 ' + rows.length + ' 关，简报页只列本战役');
+      }
+    }
+  }
+}
+
 goEls.find(e => e.__attr['data-go'] === 'hangar').fire('click');
 ok('进入机库，当前屏幕 ' + activeScreen());
 

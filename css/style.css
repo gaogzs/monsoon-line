@@ -464,6 +464,38 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
 .msn-item .st{ font-size:11px; color:var(--txt-d); margin-top:4px; }
 .msn-item .st.done{ color:var(--green); }
 
+/* ============================================================
+   战役选择
+   —— 标题与简报之间的一层。关卡怎么选属于简报（那里才有目标、
+      威胁与情报），这里只回答"打的是哪一场仗"。
+   ============================================================ */
+#scr-campaign{ padding:0; }
+.camp-wrap{ flex:1 1 auto; overflow-y:auto; padding:26px 30px; min-height:0; }
+.camp-hint{ font-family:var(--mono); font-size:12px; letter-spacing:1px;
+  color:var(--txt-d); margin-bottom:18px; }
+.camp-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(420px,1fr)); gap:18px; }
+.camp-card{ padding:18px 20px; cursor:pointer; border:1px solid var(--line);
+  background:linear-gradient(180deg,#0f1a23,#0a1218); transition:.13s; }
+.camp-card:hover{ border-color:var(--amber); background:linear-gradient(180deg,#16242f,#0b1319);
+  box-shadow:0 0 18px rgba(255,176,58,.25); }
+.camp-card .cc-no{ font-family:var(--mono); font-size:10.5px; letter-spacing:2px; color:var(--txt-d); }
+.camp-card .cc-name{ font-size:20px; color:#dbe8f2; margin-top:4px; }
+.camp-card:hover .cc-name{ color:var(--amber); }
+.camp-card .cc-en{ font-family:var(--mono); font-size:11px; letter-spacing:2px;
+  color:var(--amber); margin-left:8px; }
+.camp-card .cc-desc{ font-size:12.5px; color:#93a7b6; line-height:1.8; margin-top:10px; }
+.camp-card .cc-foot{ font-family:var(--mono); font-size:11px; color:var(--txt-d);
+  margin-top:14px; display:flex; justify-content:space-between; gap:12px; }
+.camp-card .cc-prog b{ color:var(--green); }
+.camp-card .cc-prog i{ font-style:normal; color:var(--txt-d); }
+.camp-card .cc-per{ font-family:var(--mono); font-size:10.5px; color:var(--txt-d);
+  margin-top:6px; letter-spacing:1px; }
+/* 资料封存：未来的战役在列表里占位，但不承诺任何内容 */
+.camp-card.camp-locked{ cursor:not-allowed; opacity:.5; }
+.camp-card.camp-locked:hover{ border-color:var(--line); box-shadow:none;
+  background:linear-gradient(180deg,#0f1a23,#0a1218); }
+.camp-card.camp-locked:hover .cc-name{ color:#dbe8f2; }
+
 /* 滚动条 */
 ::-webkit-scrollbar{ width:9px; height:9px; }
 ::-webkit-scrollbar-track{ background:#070c11; }

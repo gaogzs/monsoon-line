@@ -24,7 +24,7 @@
 | `__player` | `__player()` | 返回当前 `player`，未开局为 `null` |
 | `__world` | `__world()` | 返回当前 `world`，未开局为 `null` |
 
-后两个是**给 `tools/smoke.js` 做断言用的调试口**，不是玩法接口。局内状态全部藏在 IIFE 闭包里：`state / paused / world / player / mission / missionIdx / selectedAC / loadouts / activeHpGroup / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared / S`。
+后两个是**给 `tools/smoke.js` 做断言用的调试口**，不是玩法接口。局内状态全部藏在 IIFE 闭包里：`state / paused / world / player / mission / missionIdx / activeCampaign / selectedAC / loadouts / activeHpGroup / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared / S`。
 
 ### `Radio` 的导出
 
@@ -37,7 +37,7 @@
 
 ---
 ## 屏幕状态机
-`state` 是字符串，取值与 DOM 屏幕 id 一一对应（`#scr-<id>`）：`title · hangar · brief · codex · settings · help · debrief`，外加一个**没有 DOM 屏幕**的 `playing`。`show(id)` 是唯一的菜单切换入口：
+`state` 是字符串，取值与 DOM 屏幕 id 一一对应（`#scr-<id>`）：`title · campaign · brief · hangar · codex · settings · help · debrief`，外加一个**没有 DOM 屏幕**的 `playing`。`show(id)` 是唯一的菜单切换入口：
 
 ```js
 function show(id) {
@@ -60,8 +60,9 @@ function show(id) {
 
 | `data-go` | 动作 |
 |---|---|
+| `campaign` | `buildCampaignList(); show('campaign')` |
 | `hangar` | `buildHangar(); show('hangar')` |
-| `brief` | `buildBrief(); show('brief')` |
+| `brief` | 若 `activeCampaign` 不含 `missionIdx` 则夹回本战役首关，然后 `buildBrief(); show('brief')` |
 | `codex` | `buildCodex(); show('codex')` |
 | `settings` | `buildSettingsInto(#setWrap); show('settings')` |
 | `help` | `buildHelpPage(); show('help')` |
@@ -71,7 +72,25 @@ function show(id) {
 
 **为什么没有兜底 `else`**（源码注释明写）：早先的写法让任何拼错的 `data-go` 值都静默跳回标题页，出问题时完全看不出哪里错了。现在未知值**什么也不做** —— 改动时如果点了按钮没反应，第一件事就是查 `data-go` 字符串。
 
-**别的入口**：`Esc` 在 `playing` 时 `togglePause()`、在 `hangar / codex / help / brief` 时回 `show('title')`、其余状态什么也不做；`window` 的 `blur` 清空 `keys`、松开左右键并**战斗中自动暂停**（切出去不会让飞机继续飞）；暂停菜单三页签 `main / settings / help` 由 `switchPauseTab(name)` 切 `[data-ptab]` 与 `#pane-*` 的 `.on`。
+**别的入口**：`Esc` 在 `playing` 时 `togglePause()`、在 `campaign / hangar / codex / help / brief` 时回 `show('title')`、其余状态什么也不做；`window` 的 `blur` 清空 `keys`、松开左右键并**战斗中自动暂停**（切出去不会让飞机继续飞）；暂停菜单三页签 `main / settings / help` 由 `switchPauseTab(name)` 切 `[data-ptab]` 与 `#pane-*` 的 `.on`。
+
+### 战役层（`campaign`）
+
+标题 → **campaign** → brief → hangar → playing 是现在的菜单主链。战役层只做两件事：
+
+- **分组**：`buildCampaignList()` 按 `CAMPAIGNS` 渲染卡片；`missions: []` 的战役画成不可点的“资料封存”卡（不写地名与年份）。
+- **限定范围**：`buildMissionList()` 只列 `CAMPAIGNS[activeCampaign].missions` 里的关卡，
+  序号按战役内位置重编为 `OPERATION 01/02/03`（**不看 `m.no`** —— 那是全局编号，
+  新战役的关会是 04、05，直接拿来当战役内序号会跳号）。
+
+**索引只有一套。** `missionIdx` 始终是 `MISSIONS` 的全局下标，`startMission(idx)` 的语义
+和 `tools/smoke.js` 的 `Game.startMission(0|1|2)` 都没变；`activeCampaign` 只决定
+“列哪几关”和“返回回哪一层”。战役 → 简报时若 `missionIdx` 不在本战役里就夹回首关，
+避免看到别人战役的简报。
+
+“下一任务”（`#btnNext`）**只在本战役内推进**，到本战役末关置灰并显示“本战役已完结”，
+跨战役必须回战役选择屏。战役的分组数据与加战役清单见
+[missions.md §2.4](missions.md#24-战役campaigns) 与 [DESIGN.md §11](../DESIGN.md#11-如何加一场战役)。
 
 ---
 ## 主循环
@@ -152,7 +171,7 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
 5. `hideAll(); state = 'playing'; paused = false;` 摘掉暂停层，`p.target = null`。
 
 ### `finish(win)`
-- `if (win) cleared[missionIdx] = true;` —— **`cleared` 是本次会话内的对象，刷新页面就丢**，键是 `missionIdx` 而不是 `mission.id`（见 [DESIGN.md §8](../DESIGN.md#8-已知问题与待改进) 第 5 条）；`buildMissionList()` 读它显示“已完成”。
+- `if (win) cleared[MISSIONS[missionIdx].id] = true;` —— **`cleared` 是本次会话内的对象，刷新页面就丢**（见 [DESIGN.md §8](../DESIGN.md#8-已知问题与待改进) 第 5 条），但键已经改成 `mission.id` 而不是下标：新战役的关卡是接着 `MISSIONS` 追加的，按下标记会让进度错位；`buildMissionList()` 与 `buildCampaignList()` 都读它显示“已完成”。
 - 结算数值当场算：
 
   ```js
@@ -163,7 +182,7 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
   ```
 
   评级：`!win → F`；`score >= 16000 && penalty === 0 → S`；`>= 11000 → A`；`>= 7000 → B`；否则 `C`。
-- 逐项填 DOM（`#dRank #dTitle #dSub #dCallsign #dTable #dQuote #btnNext`），最后 `show('debrief')`，关掉 `warning / gun` 声道。`#btnNext` 在“输了”或“已是最后一关”时 `disabled`。
+- 逐项填 DOM（`#dRank #dTitle #dSub #dCallsign #dTable #dQuote #btnNext`），最后 `show('debrief')`，关掉 `warning / gun` 声道。`#btnNext` 在“输了”或“**本战役已完结**”时 `disabled` —— 它只在当前战役内推进（`CAMPAIGNS[campaignOf(missionIdx)].missions`），不会把玩家直接送进别的战役；跨战役要回战役选择屏。
 
 ### 已知的内存问题
 `finish()` **不释放任何东西**：`world`、`player` 仍被闭包引用，`world.actors / particles` 也原样留着（`debrief` 背后还要画战场快照）。只有 `#btnAbort`（放弃任务）那条路径会 `player = null; world = null;`。连续玩多关会累积内存，见 [DESIGN.md §8](../DESIGN.md#8-已知问题与待改进) 第 4 条。
@@ -370,7 +389,8 @@ var WD_LIMIT = 1.5;
 | 设置（独立页 + 暂停页签） | `buildSettingsInto(container)` | `SET_GROUPS` + `DEFAULTS` |
 | 操作说明（手册页 + 暂停页签） | `buildHelpHTML(forPause)` | `KEYMAP` + `TIPS` |
 | 机库 | `buildHangar()` → `buildHardpointEditor()` | `AIRCRAFT` + `WEAPONS` + `loadouts` |
-| 简报 | `buildBrief()` + `buildMissionList()` + `drawMap()` | `MISSIONS[missionIdx]` |
+| 战役选择 | `buildCampaignList()` | `CAMPAIGNS[]` + `cleared`（进度） |
+| 简报 | `buildBrief()` + `buildMissionList()` + `drawMap()` | `MISSIONS[missionIdx]` + `CAMPAIGNS[activeCampaign]` |
 | 资料库 | `buildCodex()` | `CODEX[]`（条目可给 `html` 或 `build()`） |
 | 结算 | `finish()` | 当场算出的 `score / rank / rows` |
 
@@ -421,7 +441,7 @@ var queue = [], timer = 0, box = null, live = [];
 ## 易踩的坑与设计取舍
 1. **`else if` 挂错分支**（相机那一段）：`camMode === 1` 曾是独立 `if`，`camMode === 0` 掉进 `else`（目标视角）被覆盖，画面看起来完全正常。相机测试只复现 `camMode === 0` 的计算，漏掉了这条分支链。
 2. **没有兜底 `else` 是有意的**：拼错的 `data-go` 什么都不做，而不是静默跳标题页。副作用是 `show('foo')` 会把 `state` 设成 `'foo'` 却没有任何屏幕被激活 —— 调试时先核对 `data-go` 与 `#scr-*` 的 id。
-3. **`cleared` 的键是 `missionIdx` 不是 `mission.id`**，且只活在内存里。调整 `MISSIONS` 顺序会让“已完成”标记错位。
+3. **`cleared` 的键是 `mission.id`**（不是 `missionIdx`），且只活在内存里 —— 调整 `MISSIONS` 顺序或增删关卡都不会让“已完成”标记错位。
 4. **离开战斗不 `Radio.clear()` 就会残留字幕**，因为字幕淡出只由战斗循环里的 `Radio.update()` 推进。
 5. **暂停时只停 `update`**，所以暂停菜单里改设置能立刻看到效果；反过来，任何“在 `update` 里做的一次性初始化”在暂停期间不会发生。
 6. **方向键自由视角只在追尾机位有效**；**目标机位有目标时 FOV 写死 55、不读 `S.fov`**。
@@ -429,3 +449,4 @@ var queue = [], timer = 0, box = null, live = [];
 8. **槽数组与挂载组的下标要自己维护**（`pushStores()` 里的 `used{}`）：槽数组按武器建、遍历按组走，两组挂同一种弹时若不自己累加起始下标，就会“四个挂架共用前两个槽”，打掉一个两组同时消失、后两个永不消失。发射那边是对的（`launch` 遍历整个 `slotCd[wid]`），**只有实体渲染会错位**。
 9. **`launch()` 兼容两种冷却形态**：`slotCd[wid]` 存在就走槽数组，不存在才退回 `actor.spCd`。AI 靠的就是后一条 —— 别把那个 `else if (actor.spCd > 0)` 删掉，否则 AI 会变成无冷却连射。
 10. **底部 `window.addEventListener('load', ...)` 必须最后加载**：`Game.init()` 第一件事就是 `preflight()` 检查所有全局模块，前面任何一个 `<script>` 没跑完都会报“核心模块 X 未加载”。**已知未释放**：`finish()` 之后 `world / player` 仍被闭包与 `debrief` 的渲染路径引用，只有 `#btnAbort` 会置空。
+11. **加关之后忘了写进 `CAMPAIGNS[].missions`**：关卡本身能跑、能通过 `preflight` 的字段检查，只是在选关界面永远列不出来。`preflight()` 现在会报“没有归属任何战役”，但触发它的前提是新关确实被加进了 `MISSIONS`。同一关被两个战役引用也会报。

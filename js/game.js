@@ -68,6 +68,11 @@ var Game = (function () {
   var cv, state = 'title', paused = false;
   var world = null, player = null, mission = null, missionIdx = 0;
   var selectedAC = 0;
+  /* 当前所处的战役（CAMPAIGNS 的下标）。它**不复制索引体系**：
+     missionIdx 仍然是 MISSIONS 的全局下标，startMission(idx) 的语义不变。
+     activeCampaign 只决定两件事 —— 简报页的关卡选择器列出哪几关、
+     各处的"返回"回到哪一层。 */
+  var activeCampaign = 0;
 
   /* 挂载配置：机型 id → { 组 id: 武器 id | null }
      玩家在机库里改的就是这个，改动会一直留着直到换机型 */
@@ -772,20 +777,101 @@ var Game = (function () {
   /* ============================================================
      简报
      ============================================================ */
-  /** 简报页顶部的任务选择器 —— 先看简报，再据此挑机体 */
+  /** 某一关属于哪个战役。preflight 保证每关恰好被一个战役覆盖，
+      所以这里找不到就退回 0 —— 那种情况本身会被自检拦下。 */
+  function campaignOf(idx) {
+    for (var i = 0; i < CAMPAIGNS.length; i++) {
+      if (CAMPAIGNS[i].missions.indexOf(idx) >= 0) return i;
+    }
+    return 0;
+  }
+
+  /** 战役进度：已完成关数 / 总关数 */
+  function campaignProgress(ci) {
+    var ms = CAMPAIGNS[ci].missions, done = 0;
+    for (var i = 0; i < ms.length; i++) {
+      if (cleared[MISSIONS[ms[i]].id]) done++;
+    }
+    return { done: done, total: ms.length };
+  }
+
+  /* 战役选择屏。它只认 CAMPAIGNS 这个数组 ——
+     加新战役不需要改这里，也不需要在 index.html 里加东西。 */
+  function buildCampaignList() {
+    var list = document.getElementById('campList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    for (var i = 0; i < CAMPAIGNS.length; i++) {
+      (function (ci) {
+        var c = CAMPAIGNS[ci];
+        var pg = campaignProgress(ci);
+        // 没有关卡的战役是"资料封存"占位项：让未来战役在列表里有位置，
+        // 但不承诺任何内容（地名、年份一律不写，免得与将来的设定打架）
+        var locked = !c.missions || !c.missions.length;
+
+        var d = document.createElement('div');
+        d.className = 'camp-card' + (locked ? ' camp-locked' : '');
+
+        var html =
+          '<div class="cc-no">' + (c.no || '') + '</div>' +
+          '<div class="cc-name">' + c.name + ' <span class="cc-en">' +
+            (c.sub || c.en || '') + '</span></div>';
+        if (!locked) {
+          html += '<div class="cc-desc">' + c.desc + '</div>';
+        } else {
+          html += '<div class="cc-desc cx-note">该方向的作战档案尚未解封。</div>';
+        }
+        html +=
+          '<div class="cc-foot">' +
+            '<span>' + (c.loc || '') + '</span>' +
+            '<span class="cc-prog">' +
+              (locked
+                ? '<i>未开放</i>'
+                : '已完成 <b>' + pg.done + '</b> / ' + pg.total) +
+            '</span>' +
+          '</div>';
+        if (!locked && c.period) {
+          html += '<div class="cc-per">' + c.period + '</div>';
+        }
+        d.innerHTML = html;
+
+        if (!locked) {
+          d.addEventListener('click', function () {
+            activeCampaign = ci;
+            /* 进入战役时把当前关卡移到这个战役里：
+               记住上次打到哪一关很体贴，但跨战役时那个下标是无效的 ——
+               夹回本战役第一关最省事，也不会让人看到别人的简报。 */
+            if (c.missions.indexOf(missionIdx) < 0) missionIdx = c.missions[0];
+            SFX.unlock(); SFX.click();
+            buildBrief(); show('brief');
+          });
+        }
+        list.appendChild(d);
+      })(i);
+    }
+  }
+
+  /** 简报页顶部的任务选择器 —— 先看简报，再据此挑机体。
+      列出的是**当前战役内**的关卡：跨战役跳关不该发生在这里，
+      想换战役就退回战役选择屏。 */
   function buildMissionList() {
     var list = document.getElementById('msnList');
     if (!list) return;
     list.innerHTML = '';
-    for (var i = 0; i < MISSIONS.length; i++) {
-      (function (idx) {
+    var ms = CAMPAIGNS[activeCampaign].missions;
+    for (var i = 0; i < ms.length; i++) {
+      (function (idx, pos) {
         var mm = MISSIONS[idx];
         var d = document.createElement('div');
         d.className = 'msn-item' + (idx === missionIdx ? ' sel' : '');
-        d.innerHTML = '<div class="no">' + mm.no + '</div>' +
+        /* 序号按战役内的位置重新编。关卡自身的 m.no 是全局编号
+           （新战役的关会是 04、05…），用它当战役内的序号会跳号。 */
+        var no = 'OPERATION ' + ('0' + (pos + 1)).slice(-2);
+        d.innerHTML = '<div class="no">' + no + '</div>' +
           '<div class="nm">' + mm.name + '</div>' +
-          '<div class="st' + (cleared[idx] ? ' done' : '') + '">' +
-          (cleared[idx] ? '已完成' : mm.en) + '</div>';
+          '<div class="st' + (cleared[mm.id] ? ' done' : '') + '">' +
+          (cleared[mm.id] ? '已完成' : mm.en) + '</div>';
         d.addEventListener('click', function () {
           if (idx === missionIdx) return;
           missionIdx = idx;
@@ -793,7 +879,7 @@ var Game = (function () {
           buildBrief();
         });
         list.appendChild(d);
-      })(i);
+      })(ms[i], i);
     }
   }
 
@@ -1165,7 +1251,7 @@ var Game = (function () {
       }
       if (e.code === 'Escape') {
         if (state === 'playing') togglePause();
-        else if (['hangar', 'codex', 'help', 'brief'].indexOf(state) >= 0) show('title');
+        else if (['hangar', 'codex', 'help', 'brief', 'campaign'].indexOf(state) >= 0) show('title');
       }
     });
     document.addEventListener('keyup', function (e) { keys[e.code] = false; });
@@ -2359,7 +2445,7 @@ var Game = (function () {
      结算
      ============================================================ */
   function finish(win) {
-    if (win) cleared[missionIdx] = true;
+    if (win) cleared[MISSIONS[missionIdx].id] = true;
     SFX.silence();
     state = 'debrief';
     SFX[win ? 'fanfare' : 'fail']();
@@ -2410,8 +2496,13 @@ var Game = (function () {
       '任务失败。下游的空情图仍然完整，第 7 号控制平台仍在他们的签名下运行。';
 
     var nb = document.getElementById('btnNext');
-    nb.disabled = !win || missionIdx >= MISSIONS.length - 1;
-    nb.textContent = missionIdx >= MISSIONS.length - 1 ? '已是最后任务' : '下一任务 >';
+    /* "下一任务"只在本战役内有意义 —— 打完最后一场就该回战役选择，
+       而不是把玩家直接送进别的战役。 */
+    var msn = CAMPAIGNS[campaignOf(missionIdx)].missions;
+    var mp = msn.indexOf(missionIdx);
+    var lastM = mp >= msn.length - 1;
+    nb.disabled = !win || lastM;
+    nb.textContent = lastM ? '本战役已完结' : '下一任务 >';
 
     show('debrief');
     SFX.warning(false);
@@ -2459,7 +2550,7 @@ var Game = (function () {
     var i, j;
 
     var core = ['M3', 'MODELS', 'PLANFORM', 'CODEX', 'AIRCRAFT', 'WEAPONS', 'VOICES',
-      'CALLSIGN', 'SFX', 'Renderer', 'Ent', 'AI', 'HUD', 'MISSIONS', 'Radio'];
+      'CALLSIGN', 'SFX', 'Renderer', 'Ent', 'AI', 'HUD', 'MISSIONS', 'CAMPAIGNS', 'Radio'];
     for (i = 0; i < core.length; i++) {
       if (typeof window[core[i]] === 'undefined') problems.push('核心模块 ' + core[i] + ' 未加载');
     }
@@ -2516,7 +2607,11 @@ var Game = (function () {
     }
 
     var needModels = ['c11', 'c14', 's6', 'm27', 'ucav', 'sower', 'relay', 'cell',
-      'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb'];
+      'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb',
+      /* 水面舰船（SHIPS 表）—— 接入关卡之前它们也要先被自检覆盖，
+         否则模型名写错要到任务里才暴露 */
+      'tern', 'manta', 'salt', 'tuff', 'pumice', 'daplu',
+      'skori', 'diklo', 'cross', 'icecore', 'atoll'];
     for (i = 0; i < needModels.length; i++) {
       if (!MODELS[needModels[i]]) problems.push('缺少模型 ' + needModels[i]);
     }
@@ -2535,6 +2630,42 @@ var Game = (function () {
         problems.push('任务 ' + m.id + ' 缺少胜负条件');
       }
       if (!VOICES[m.id]) problems.push('任务 ' + m.id + ' 缺少无线电台词表');
+    }
+
+    /* 战役分组自检。
+       最容易静默发生的错误是"关卡加了、没挂进任何战役" ——
+       那关在世界里存在，但选关界面永远列不到它，而且不会报错。
+       反过来，下标越界或一关挂进两个战役，会让战役内序号和进度对不上。 */
+    var owner = [];
+    for (i = 0; i < MISSIONS.length; i++) owner.push(-1);
+    for (i = 0; i < CAMPAIGNS.length; i++) {
+      var cp = CAMPAIGNS[i];
+      if (!cp.id || !cp.name) problems.push('战役 ' + i + ' 缺少 id / name');
+      if (!cp.missions || !cp.missions.length) {
+        /* 空列表是合法的"资料封存"占位项 —— 战役屏会把它画成不可点的卡片。
+           这里只检查它确实是个数组，而不是漏写的 undefined。 */
+        if (cp.missions !== undefined && !(cp.missions instanceof Array)) {
+          problems.push('战役 ' + cp.id + ' 的 missions 不是数组');
+        }
+        continue;
+      }
+      for (j = 0; j < cp.missions.length; j++) {
+        var mi = cp.missions[j];
+        if (mi < 0 || mi >= MISSIONS.length) {
+          problems.push('战役 ' + cp.id + ' 引用了不存在的任务下标 ' + mi);
+          continue;
+        }
+        if (owner[mi] >= 0) {
+          problems.push('任务 ' + MISSIONS[mi].id + ' 同时属于战役 ' +
+            CAMPAIGNS[owner[mi]].name + ' 与 ' + cp.name);
+        }
+        owner[mi] = i;
+      }
+    }
+    for (i = 0; i < owner.length; i++) {
+      if (owner[i] < 0) {
+        problems.push('任务 ' + MISSIONS[i].id + ' 没有归属任何战役，选关界面会漏掉它');
+      }
     }
 
     report(problems);
@@ -2607,7 +2738,18 @@ var Game = (function () {
         SFX.unlock(); SFX.click();
         var go = this.getAttribute('data-go');
         if (go === 'hangar') { buildHangar(); show('hangar'); }
-        else if (go === 'brief') { buildBrief(); show('brief'); }
+        else if (go === 'campaign') {
+          /* 战役屏没有"当前战役"的概念，每次进来都重新渲染进度；
+             按下哪一张卡由 buildCampaignList 里的监听决定。 */
+          buildCampaignList(); show('campaign');
+        }
+        else if (go === 'brief') {
+          /* 简报页的关卡选择器只列当前战役。若 missionIdx 落在别的战役里
+             （比如刚打完上一场战役，或从别处进来），先夹回本战役。 */
+          var campMs = CAMPAIGNS[activeCampaign].missions;
+          if (campMs.indexOf(missionIdx) < 0) missionIdx = campMs[0];
+          buildBrief(); show('brief');
+        }
         else if (go === 'codex') { buildCodex(); show('codex'); }
         else if (go === 'settings') { buildSettingsInto(document.getElementById('setWrap')); show('settings'); }
         else if (go === 'help') { buildHelpPage(); show('help'); }
@@ -2629,7 +2771,14 @@ var Game = (function () {
     };
     document.getElementById('btnNext').onclick = function () {
       SFX.unlock(); SFX.click();
-      missionIdx = Math.min(MISSIONS.length - 1, missionIdx + 1);
+      /* 只在本战役内推进：跨战役的"下一任务"应该走战役选择屏，
+         否则玩家会在一次点击里被扔进一场他没选过的战役。 */
+      var ms = CAMPAIGNS[campaignOf(missionIdx)].missions;
+      var pos = ms.indexOf(missionIdx);
+      if (pos >= 0 && pos < ms.length - 1) {
+        missionIdx = ms[pos + 1];
+        activeCampaign = campaignOf(missionIdx);
+      }
       buildBrief(); show('brief');
     };
     document.getElementById('btnRetry').onclick = function () {

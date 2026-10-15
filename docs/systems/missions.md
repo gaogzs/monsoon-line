@@ -27,6 +27,7 @@
 |---|---|---|
 | `MISSIONS` | `Array<mission>` | 三关，顺序即关卡编号（`missionIdx`） |
 | `getMission` | `getMission(idx) → mission` | 取任务，越界用 `M3.clamp` 夹回合法下标 |
+| `CAMPAIGNS` | `Array<campaign>` | **战役分组**，见 §2.4。`game.js` 的战役选择屏读它 |
 
 ### 2.2 生成器（**都是全局函数，不在任何命名空间里**）
 
@@ -36,6 +37,12 @@
 | `spawnWingman` | `spawnWingman(w, idx, slotX, slotY, slotZ) → a` | 造僚机（机型写死 `ucav`，队形相对长机），登记 `w.wings[idx]` |
 | `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets` |
 | `bombTheBase` | `bombTheBase(bomber, w)` | 轰炸机抵达投弹点的动作：48 个爆炸粒子 + 对 `w.baseTarget` 造成 340 伤害 |
+
+> **水面舰船还没有被这三个任务引用。** `data.js` 里的 `SHIPS` 表（11 艘，见
+> [SETTING.md 8.0.1](../world/SETTING.md)）已经备好了 `model` / `hp` / `radius` /
+> `value` / `label`，接进来只需要照着下面 `spawnTarget` 的写法加几行。
+> 但**有一件事要先做**：现有 `makeTarget` 只支持按正弦缓慢漂移（`o.drift`），
+> 而 40 节的导弹快艇需要一套真的航路逻辑 —— 那不在 `makeTarget` 的能力范围内。
 
 `spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（缺省 `'dl6'`）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave`。
 
@@ -50,6 +57,34 @@
 | `downstreamCallsign(i)` | 取第 i 个下游呼号，格式 `"枯河 DRYRIVER"`，越界取模 |
 
 任务脚本用的是 `w.radio`（`newWorld` 里指向 `Radio`）。全局事件 `'start'` 由 `startMission` 播，`'allyDown'` 由 `game.js` 主循环播。
+
+### 2.4 战役（`CAMPAIGNS`）
+
+一场战役 = 一组关卡 + 一份展示文案。它**不参与战场生成**，
+只是让 `game.js` 能画出"打的是哪一场仗"这一层。
+
+| 字段 | 谁读 | 说明 |
+|---|---|---|
+| `id` | `preflight` | 战役标识，如 `cmp1` |
+| `no` | 战役卡片 | `'CAMPAIGN 01'` |
+| `name` / `en` / `sub` | 战役卡片 | 中文名 / 英文代号 / 完整行动代号 |
+| `loc` / `period` | 战役卡片 | 区域与起止时间，都是纯展示 |
+| `desc` | 战役卡片 | 一段话，压缩自 `codex.js` 的同名战役条目 |
+| `missions` | `game.js` `campaignOf` / `campaignProgress` | **`MISSIONS` 的全局下标数组** |
+
+三条硬约定：
+
+1. **`missions` 里写的是全局下标，不是局部序号。** `missionIdx` 全项目
+   只有一套（`MISSIONS` 的下标），战役不另建索引 —— 两套索引互相换算
+   是这类分层界面最容易长出来的一类 bug。
+2. **每一关恰好属于一个战役。** 漏挂会让关卡存在却永远选不到，
+   `preflight()` 会报"没有归属任何战役"；重复挂也会报。
+3. **`missions: []` 是合法的**，表示"资料封存"的占位战役：战役屏会把它
+   画成不可点的卡片，且只写"该方向的作战档案尚未解封"——
+   **不写地名与年份**，免得提前承诺还没定的设定。
+
+`preflight()`（`game.js`）检查：下标越界、一关多挂、漏挂、
+`id`/`name` 缺失。它**不检查** `desc` / `loc` / `period` —— 漏了只是卡片上少一行字。
 
 ---
 
@@ -232,8 +267,14 @@ spawn()
 2. 必须提供：`id` `no` `name` `en` `loc` `date` `altStart` `speedStart` `prose` `objectives` `threats` `intel` `map` `spawn()` `tick()` `win()` `lose()`。
 3. 在 `js/data.js` 的 `VOICES` 里加**同名 `id`** 的台词表，至少要有 `start`、`win`、`lose`（`startMission` 会 `Radio.play(mission.id, 'start')`）。
 4. `map` 里的坐标是**世界米，相对进入点**；`type` 只用 `drawMap` 认得的几种（`base` / `enemy` / `relay` / `sam` / `site`）。
-5. 跑 `node tools/smoke.js`：它会自动加载全部脚本、跑三关各 240 帧，检查 NaN、卡死与异常。
-6. 开机自检（`game.js` `preflight()`）会检查：`spawn/tick/win/lose` 都是函数，且 `VOICES[id]` 存在。它**不检查** `prose` / `objectives` / `map` 是否存在——漏了会在简报页静默变空。
+5. **把新关的全局下标写进某个战役的 `missions` 数组。** 不写会触发
+   `preflight()` 的"没有归属任何战役"——选关界面永远列不到它，
+   而这是最容易漏掉、也最难在运行时看出来的一步。
+6. 跑 `node tools/smoke.js`：它会自动加载全部脚本、跑三关各 240 帧，检查 NaN、卡死与异常，
+   并断言战役覆盖率与"战役内关卡数"。
+7. 开机自检（`game.js` `preflight()`）会检查：`spawn/tick/win/lose` 都是函数、
+   `VOICES[id]` 存在、每关恰好归属一个战役。它**不检查**
+   `prose` / `objectives` / `map` 是否存在——漏了会在简报页静默变空。
 
 ---
 
@@ -260,6 +301,8 @@ spawn()
 | 简报地图比例 / 位置 | `game.js` `drawMap()` 的 `R = 17000` 与 `cy = H*0.72` |
 | 下游呼号池 | `data.js` `CS_DOWNSTREAM` + `downstreamCallsign()` |
 | 每句台词的停顿 | `VOICES` 里每条 `{ ... gap }` |
+| 战役分组 / 展示文案 | `missions.js` 顶部的 `CAMPAIGNS` |
+| 战役内关卡序号（简报页 01/02/03） | `game.js` `buildMissionList()`，按战役内位置重编，**不看 `m.no`** |
 
 ---
 

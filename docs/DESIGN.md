@@ -36,6 +36,8 @@ monsoon-line/
     ├── smoke.js            冒烟测试（唯一的自动化测试）
     ├── stamp-version.js    生成 js/version.js 的版本戳
     ├── render-planform.js  俯视图 PNG 预览器（本机无浏览器时用）
+    ├── render-ships.js     舰船外形 PNG 预览器（走真正的 models.js + render.js）
+    ├── lib/raster.js       上面两个预览器共用的光栅器 / Canvas 桩 / PNG 编码
     ├── rename-aircraft.js  机型批量改名
     └── preview/            预览器输出的 PNG
 ```
@@ -50,7 +52,7 @@ monsoon-line/
 |---|---|---|---|
 | 0 | `version.js` → `BUILD_STAMP` | 版本戳（**自动生成，不要手改**） | — |
 | 1 | `math3d.js` → `M3` | 向量、罗德里格斯旋转、相机、投影、裁剪、射线求交 | — |
-| 2 | `models.js` → `MODELS` | 低多边形几何（机体、海上目标） | M3 |
+| 2 | `models.js` → `MODELS` | 低多边形几何（机体、**水面舰船**、海上目标） | M3 |
 | 3 | `planform.js` → `PLANFORM` | 机库俯视识别图数据与绘制 | WEAPONS |
 | 4 | `codex.js` → `CODEX` | 游戏内资料库文本 | — |
 | 5 | `data.js` → `CALLSIGN` `AIRCRAFT` `WEAPONS` `VOICES` | 静态数据表 | — |
@@ -78,7 +80,7 @@ monsoon-line/
 `Game` 内部用字符串 `state` 表示当前屏幕，取值与 DOM 屏幕 id 一一对应：
 
 ```
-title · brief · hangar · codex · settings · help · playing · debrief
+title · campaign · brief · hangar · codex · settings · help · playing · debrief
 ```
 
 - `show(id)` 是唯一的屏幕切换入口：清掉所有 `.screen` 的 `active`，
@@ -87,6 +89,15 @@ title · brief · hangar · codex · settings · help · playing · debrief
   早先的写法让任何拼错的 `data-go` 值都静默跳回标题页，出问题时
   完全看不出哪里错了。现在未知值什么也不做
 - `playing` 不是 DOM 屏幕，所有 overlay 都会被隐藏
+- **`campaign` 是标题与简报之间的一层。** 它决定"打的是哪一场仗"，
+  而"选哪一关"留在简报页（那里才有目标、威胁与情报）。
+  战役清单由 `CAMPAIGNS`（`js/missions.js`）驱动，
+  加新战役不需要动 `index.html`
+
+**关卡索引只有一套**：`missionIdx` 始终是 `MISSIONS` 的全局下标，
+`activeCampaign` 只决定"简报页列出哪几关"和"返回回到哪一层"。
+不要为战役另建一套局部索引 —— 两套索引之间来回换算，
+是这类分层界面最容易长出的一类 bug。
 
 ### 4.2 主循环
 
@@ -226,6 +237,32 @@ requestAnimationFrame(loop)
 高空拦截？），而机体选择本来就该依据威胁。所以改成
 **简报 → 机库 → 出击**。
 
+### 6.7 为什么标题与简报之间多了一层战役选择
+
+原本"开始任务"直接进简报，而简报页顶部的关卡选择器已经把三关都列出来了。
+只有一场战役时，这一层确实是多余的。加它的理由不是现在，是以后：
+
+- **关卡与战役是两种不同的决定。** "打哪一场仗"属于战略层，
+  "这一场里选哪一关、带什么机体"属于任务层。战役越多，
+  把所有关卡平铺在一个清单里就越读不懂。
+- **选关留在简报页，不另建一个选关屏。** 简报页才是"这一关是什么"的
+  唯一权威（目标、威胁、情报、地图全在那儿）。另做一个选关屏就要把
+  这些信息复制一份，而两份一定会脱节。
+- **加战役不需要改界面代码。** 清单由 `CAMPAIGNS` 数组生成，
+  战役名、起止时间、简述都写在数据里；`game.js` 只是把它画出来。
+
+代价是多了一次点击。这笔交易划算，因为"以后还会有别的战役"
+是已经确定的事，而那一刻再补这一层就要动所有返回按钮。
+
+### 6.8 为什么通关记录按任务 id 记，不按下标
+
+`cleared` 原来按 `missionIdx`（`MISSIONS` 的全局下标）记。加入新战役后
+关卡会继续往后追加，**旧下标的含义可能漂移**；按下标记进度，
+迟早会出现"打了 A 关，B 关亮了"。
+
+改成按 `MISSIONS[i].id` 记之后，索引怎么变都不影响已有记录，
+战役进度也只是"把它名下几关的 id 数一遍"。
+
 ---
 
 ## 7. 性能策略
@@ -312,6 +349,11 @@ requestAnimationFrame(loop)
 | — | 相机俯仰限位 78° → 89° | 玩家要看得到更高的姿态。89° 时正交化前 \|up\| = cos(89°) = 1.75e-2，仍有 175 倍余量（阈值 1e-4），实测收敛后帧间差为 0；90° 才会退化。见 [game.md](systems/game.md) |
 | — | 油门条从屏幕左下角搬到空速带右侧 | 左下角正好是雷达圆心，而雷达在它之后绘制 —— 它一直被盖住，玩家根本看不到。搬到空速带右侧后与速度带同高、同一套刻度语言 |
 | — | 文档补全：每个模块一份设计文档 | 之前只有 8 份，缺 math3d / models / entities / data / codex / missions / game / tools。补齐后 [docs/README.md](README.md) 给出阅读顺序 |
+| — | **新增 11 艘水面舰船**（模型 / 数据 / 图鉴 / 设定各一份） | 战役舞台是纯海域，而海面上在此之前只有浮台。四方与三个未参战国各自的船补上之后，"这场战争里海军到底在做什么"才有一个能看的答案 —— 也是"**排水量最大的船不属于任何交战方**"这条设定的落点。见 [SETTING.md 8.0.1](world/SETTING.md) |
+| — | **舰船先做出来、不进关卡**（`SHIPS` 表 + `preflight` 清单已就位，`missions.js` 未引用） | 船的几何、数据与资料库条目可以独立验证完（模型进自检、图鉴进冒烟测试），而"它们上场之后怎么动"是另一件事 —— 现有 `makeTarget` 只支持正弦漂移，40 节的快艇需要一套航路逻辑，那要单独设计。先做能独立完成的那一半 |
+| — | 新增 `tools/render-ships.js` + `tools/lib/raster.js` | 舰船外形必须肉眼确认，而新预览器**直接走游戏自己的 `models.js` + `render.js`**（投影、光照、画家算法、配色全部是实机那一套），比再造一个 2D 预览器可信。光栅器抽到 `lib/` 共用，但**没有去动**已经被验证过的 `render-planform.js` |
+| — | **新增战役选择层**（`CAMPAIGNS` + `#scr-campaign`） | "开始任务"原来直接进简报，等于把"打哪一场仗"和"这一场选哪一关"压在同一屏上。只有一场战役时无所谓，但已经确定以后会有别的战役 —— 那时再补这一层就要改所有返回按钮。选关仍留在简报页（那里才有目标/威胁/情报），战役只提供分组与进度。见 [6.7](#67-为什么标题与简报之间多了一层战役选择) |
+| — | 通关记录 `cleared` 从按下标改为按任务 `id` | 新战役的关卡是接着 `MISSIONS` 往后追加的，下标含义会漂移；按 id 记才不会出现"打了 A 关、B 关亮了"。见 [6.8](#68-为什么通关记录按任务-id-记不按下标) |
 
 ---
 
@@ -321,6 +363,26 @@ requestAnimationFrame(loop)
 2. 必须提供：`id` `no` `name` `en` `loc` `date` `altStart` `speedStart`
    `prose` `objectives` `threats` `intel` `map` `spawn()` `tick()` `win()` `lose()`
 3. 在 `data.js` 的 `VOICES` 里加同名 `id` 的台词表，至少要有 `start`
-4. 跑 `node tools/smoke.js`——它会自动检查新任务的字段完整性
+4. **把它的全局下标写进某个战役的 `missions` 数组**（见下一节）——
+   漏了这一步，关卡会存在但永远选不到，`preflight()` 会报出来
+5. 跑 `node tools/smoke.js`——它会自动检查新任务的字段完整性
 
 `map` 里的坐标是**世界米**，相对进入点。绘图由 `drawMap()` 统一处理。
+
+---
+
+## 11. 如何加一场战役
+
+1. 在 `missions.js` 的 `CAMPAIGNS` 里 `CAMPAIGNS.push({...})`，
+   提供 `id` `no` `name` `en` `sub` `loc` `period` `desc` `missions`
+2. `missions` 里写**全局下标**，且每个下标只能属于一个战役。
+   新战役的关卡接着 `MISSIONS` 末尾追加，所以下标是连续的
+3. **不要动 `index.html` 和 `game.js`** —— 战役屏由 `CAMPAIGNS` 生成。
+   将来才做的战役可以写成 `missions: []`，它会以"资料封存"的
+   不可点卡片出现在列表里（那类卡片**不写地名与年份**，
+   免得提前承诺还没定的设定）
+4. 跑 `node tools/smoke.js`：它检查每一关都恰好归属一个战役，
+   并断言"点进战役后简报页列出的关卡数 = 该战役的关卡数"
+
+建议把战役的中文名与英文代号也写进 `codex.js` 的「战役 / CAMPAIGN」条目，
+两份文案应当同源 —— 资料库那份是完整的战略叙述，列表卡片是它的压缩版。
