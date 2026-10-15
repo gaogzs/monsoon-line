@@ -69,7 +69,7 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 | [systems/ai.md](systems/ai.md) | `js/ai.js` | 控制律、状态机、编队指令、难度 |
 | [systems/weapons.md](systems/weapons.md) | `js/data.js` + `js/entities.js` | 武器编号体系、导引、拦截、交战规则 |
 | [systems/loadout.md](systems/loadout.md) | `js/data.js` + `js/game.js` | **挂载系统** —— 分组挂载点、齐射数、重量惩罚 |
-| [systems/missions.md](systems/missions.md) | `js/missions.js` | 三关的战场生成、触发器、加新关的清单 |
+| [systems/missions.md](systems/missions.md) | `js/missions.js` | 十一关的战场生成、触发器、加新关的清单 |
 
 ### 表现与内容
 

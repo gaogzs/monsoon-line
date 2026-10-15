@@ -56,10 +56,10 @@
 | `explode` | `explode(list, pos, scale, count)` | 爆炸：多色火球 + 黑烟 |
 | `damage` | `damage(ent, amt, world, source) → bool` | 对**飞机**结算伤害（含装甲减伤），返回是否击杀 |
 | `kill` | `kill(ent, world, groundImpact, source)` | 击落飞机：爆炸 + 音效 + `source.kills++` |
-| `killGround` | `killGround(ent, world)` | 摧毁目标物：按半径缩放爆炸 + `SFX.bigHit()` |
+| `killGround` | `killGround(ent, world)` | 摧毁目标物：按半径缩放爆炸 + `SFX.bigHit()` + `world.groundKilled++` |
 | `explode2` | 同上 `explode` | 纯别名，历史遗留 |
-| `makeTarget` | `makeTarget(o) → t` | 造目标物（平台 / 设施） |
-| `stepTarget` | `stepTarget(t, dt, world)` | 目标物每帧：漂移 + 受损下沉 |
+| `makeTarget` | `makeTarget(o) → t` | 造目标物（平台 / 设施 / 舰船） |
+| `stepTarget` | `stepTarget(t, dt, world)` | 目标物每帧：航路或漂移 + 受损下沉 |
 | `randUnit` | `randUnit() → 单位向量` | 球面均匀随机方向（爆炸、干扰弹用） |
 
 **不导出的内部函数**：`detonate(m, t, world)`（近炸命中判定）、`killMissile(m, world, hit)`。它们只在 `stepMissile` 内部调用，外部模块要击落导弹请直接置 `m.alive = false`（`updateDEW` 就是这么做的）。
@@ -124,12 +124,16 @@
 { kind:'missile', team, weapon, w, model, alive,
   pos, fwd, up, right, speed, vel,
   target, age, life, dmg, turn, prox,
-  owner, reDone, trailTimer, seekerOn, lostTime }
+  owner, reDone, trailTimer, seekerOn, lostTime,
+  decoyTries, reLockT }
 ```
 
 - `w` 是 `WEAPONS[weapon]` 的引用，所有弹道参数都从这读，弹体本身**不复制**它们。
 - `vel` 只在**无动力弹**（`w.ballistic`）里独立累积；有发动机的弹每帧 `vel = fwd × speed`。
-- 运行期追加：`spoofed`（骗到它的飞机，见 `breakLock`）、`laserLost`（激光照射丢失，当前无武器使用）。
+- `decoyTries` / `reLockT` 是诱饵的两个计数器：前者控制"越投越难骗"，
+  后者是骗中之后的盲飞期（见 §4.5）。两者**都不因成功而清零**。
+- 运行期追加：`spoofed`（骗到它的飞机，只在 `reLockT > 0` 期间被避开）、
+  `laserLost`（激光照射丢失，当前无武器使用）。
 
 ### 3.3 子弹 `b`
 
@@ -149,18 +153,25 @@
 
 ### 3.5 目标物 `t`（`kind: 'target'`）
 
-调节单元、浮空中继平台、地面测控平台、防空浮台、前进基地都是它：
+调节单元、浮空中继平台、地面测控平台、防空浮台、前进基地、水面舰船都是它：
 
 ```js
 { kind:'target', team, ttype:'air'|'ground', label, model, alive, dead,
   pos, fwd, up, right, speed, vel,
   hp, maxHp, radius, ground, big, drift, drifting,
+  route, wpIdx, arrive, heading,
   fireCd, weapon, value }
 ```
 
 - `ttype:'air'` 且血量低于一半时会缓慢下沉（`stepTarget`）。
 - `drift` 是横向漂移速度；`drifting` 是相位累积器，靠 `cos/sin` 产生往复而非直线漂移。
-- `weapon` 非空时由 `game.js` `updateTargets()` 当成防空阵地开火；`team` 默认 1。
+- **`route` 是让水面舰船真的航行的那一支**（`{ wp: [{x,z}…], speed, loop, arrive, onArrive, despawn }`）。
+  有 `route` 时**优先于 `drift`** —— 一条船要么沿航路走，要么原地漂，不必两套叠在一起。
+  位置直线推进，`vel` 与 `fwd` 由**实际位移**反推（渲染与 HUD 读 `fwd`，
+  走位移而不是线段方向，是为了在拐弯处也给出连续朝向）。
+  走完最后一段：`loop` 回绕，否则调 `onArrive(t, world)` 停住；`despawn` 则退场。
+  `speed` 是**米/秒** —— `SHIPS[].speed` 是节，接入时自己 ×0.514。
+- `weapon` 非空时由 `game.js` `updateTargets()` 当成防空阵地开火（**只打玩家**）；`team` 默认 1。
 - 任务脚本追加：`friendlyAsset`（打坏扣分）、`vital`（**写入后无人读取**）。
 
 ### 3.6 世界对象 `world`
@@ -262,15 +273,37 @@ keydown Enter / 鼠标右键
 按住 V（玩家）或 AI 的 evade 分支
   → breakLock(a, world)
       ├ flares≤0 或 flareCd>0 → 直接返回 false
-      ├ flares−−；flareCd = 0.12（很短，按住就连投）
+      ├ flares−−；flareCd = 0.45（一次投放一次判定）
       ├ 6 个热焰弹粒子（#ffd070，向机体下方抛）+ 14 个箔丝粒子（#e6eef4）
-      └ 遍历 world.missiles：target===a 且 random() < m.w.flare
-            → m.target=null；seekerOn=false；lostTime=1；
-              reDone=true（关键：否则带 reAcquire 的弹下一帧就锁回来）
-              spoofed=a（重捕获时避开这架）
+      └ 遍历 world.missiles：target===a 的每一枚
+            ├ m.decoyTries++（抗欺骗计数，重捕获后不清零）
+            ├ chance = 按导引头取 flare / flareRD / 0
+            ├ chance = max(0.03, chance × 0.62^(decoyTries−1))
+            └ random() < chance 时
+                 → m.target=null；seekerOn=false；lostTime=1；
+                   reLockT=1.4（盲飞期：这之前谁都不能重新捕获）
+                   spoofed=a（盲飞期内优先避开这架，之后可以重咬）
+      ← 返回值只表示"投放动作发生了"；
+        a.decoysBroke / a.decoysIneffective 才是命中数与无效数
 ```
 
 `flare` 字段本身就是"被干扰概率"：**越大越容易被骗**。当前数值里雷达弹平均比红外弹更容易被骗，与直觉相反，属于已知待修问题（见 `entities.js` 里那段注释）。
+
+**抗欺骗递减**（`m.decoyTries`）是防止"诱饵无限强"的那一环：
+同一枚弹每被投放一次，成功率乘 0.62（地板 0.03），并且**不因一次成功而清零**。
+配套的节奏是 0.45 s 的 `flareCd` —— 早先的 0.12 s 配上 80 组诱饵，
+等于按住 V 就必然脱锁。见 [weapons.md](weapons.md#干扰弹玩家按-v)。
+
+**盲飞期**（`m.reLockT`）是另一半：诱饵只买到 **1.4 s**，不是永久免疫。
+它取代了旧实现里用 `m.reDone` 兼职的做法 —— 那一位置同时是 `reAcquire`
+的重捕获闸门，于是**一次诱饵就让带 reAcquire 的弹永久失去重捕获能力**；
+IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
+现在 `spoofed` 只在盲飞期内生效，归零后导弹可以重新咬住本机。
+
+**告警口径**：导弹告警音（`game.js`）与来袭标记（`hud.js`）
+判据是"当前锁定本机"**或**"刚被本机诱饵骗掉、`reLockT > 0`、且仍在本机 3600 m 内"。
+只认 `m.target` 会让撒出诱饵的那一瞬间告警与标记一起消失，
+而那枚弹还在同一片空域飞。
 
 ---
 

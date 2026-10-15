@@ -56,7 +56,7 @@
 ```js
 var CALLSIGN = {
   player: 'VESPER-1', wing2: 'VESPER-2', wing3: 'VESPER-3',
-  awacs: 'SEXTANT', enemy: 'FLINT', ace: 'DRYWELL'
+  awacs: 'SEXTANT', enemy: 'FLINT', ace: 'WINTERPORT'
 };
 ```
 
@@ -65,7 +65,7 @@ var CALLSIGN = {
 | `player` | 玩家 HUD 名、结算页呼号、无线电发言者 | `game.js` 出击/结算/无线电 |
 | `wing2` / `wing3` | 事件台词里的僚机发言者 | `game.js` 事件分支 |
 | `wing<idx>` | **动态拼键**：`missions.js` 用 `CALLSIGN['wing' + idx]`（idx = 2 / 3）取名 | `missions.js` `spawnWingman` |
-| `awacs` / `enemy` / `ace` | **三个都无代码读取**：`SEXTANT` 与干井的名字写死在 `VOICES` 的 `who` 里，敌机呼号走 `CS_DOWNSTREAM` | — |
+| `awacs` / `enemy` / `ace` | **三个都无代码读取**：`SEXTANT` 与冬港的名字写死在 `VOICES` 的 `who` 里，敌机呼号走 `CS_DOWNSTREAM` | — |
 
 **契约**：键缺失不会崩溃，但会渲染成字符串 `"undefined"`——读法都是直接拼进 innerHTML / textContent。
 `wing<idx>` 尤其隐蔽：它用的是**动态键名**，加/改僚机编号时要同时看 `missions.js`。

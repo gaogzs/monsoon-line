@@ -175,8 +175,18 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
   wings: {}, player: null, flags: {},
   objective: '', objectiveSub: '',
   roeBlocked: false, detected: false,
-  killed: 0, hitsLanded: 0, shotsFired: 0 }
+  killed: 0, hitsLanded: 0, shotsFired: 0,
+  timeLimit: 0, timeLeft: 0, groundKilled: 0 }
 ```
+
+- `timeLimit` / `timeLeft` —— 关卡时限（秒）。`startMission` 从 `mission.timeLimit`
+  落进来；主循环倒计时，归零时由**统一的一处**判负
+  （`world.timeLimit > 0 && world.timeLeft <= 0 → finish(false)`）。
+  任务脚本只要声明 `timeLimit`，不需要自己写倒计时；`0` 表示无时限，
+  HUD 也不画读秒。此前 `mission.timeLimit` 声明了却全项目没人读。
+- `groundKilled` —— 被摧毁的地面/海面目标数，由 `Ent.killGround` 累加。
+  `killed` 只统计 `team === 1` 的**飞机**，设施与舰船从不进那个数，
+  所以"摧毁 3 座浮空平台"必须单独记一笔。
 
 两个后挂的成员：`w.radio = Radio`；`w.fireMissile(actor, target)` —— **AI 唯一的发射入口**，内部转 `launch(actor, target, w)`，非玩家发射时按距离播 `SFX.missileAt()`（玩家那一路在 `fireSpecial()` 里已播过 `SFX.missile()`，刻意不重复）。
 
@@ -194,11 +204,18 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
   ```js
   acc  = shotsFired > 0 ? hitsLanded / shotsFired : 0
   hull = player.alive ? player.hp / player.maxHp : 0
-  score = killed*1000 + round(acc*3000) + round(hull*2000) + (win ? 4000 : 0)
-          - friendlyLoss*2500
+  score = killed*1000 + groundKilled*400 + round(acc*3000) + round(hull*2000)
+          + (win ? 4000 : 0) - friendlyLoss*2500
   ```
 
   评级：`!win → F`；`score >= 16000 && penalty === 0 → S`；`>= 11000 → A`；`>= 7000 → B`；否则 `C`。
+
+  **两个刻意的口径**：
+  - `groundKilled` 的权重 **400 低于一架飞机的 1000** —— 设施不会还手也不会跑，
+    按飞机同价会让"打平台刷分"比空战划算。
+  - 结算表那一栏叫 **「机炮精度」而不是「命中率」**：`hitsLanded` 只由**子弹**
+    命中累加（`scanShot`），导弹命中不记。所以一场反舰任务的读数会天然偏低，
+    那不是玩家打得差，是这个数只测机炮。
 - 逐项填 DOM（`#dRank #dTitle #dSub #dCallsign #dTable #dQuote #btnNext`），最后 `show('debrief')`，关掉 `warning / gun` 声道。`#btnNext` 在“输了”或“**本战役已完结**”时 `disabled` —— 它只在当前战役内推进（`CAMPAIGNS[campaignOf(missionIdx)].missions`），不会把玩家直接送进别的战役；跨战役要回战役选择屏。
 
 ### 已知的内存问题

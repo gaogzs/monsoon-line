@@ -17,7 +17,7 @@
 | 渲染 | Canvas 2D 手写三维管线 | 见 [rendering.md](systems/rendering.md#为什么不用-webgl) |
 | 音频 | WebAudio 全程序化合成 | 没有音频文件要分发，也不会有加载失败 |
 | 模块化 | 经典 `<script>` + 全局命名空间 | ES module 在 `file://` 下会被 CORS 拦死 |
-| 规模目标 | 小体量、内容完整 | 宁可三关做完，不要十关做一半 |
+| 规模目标 | 小体量、内容完整 | 宁可十关做完，不要二十关做一半 |
 
 ---
 
@@ -67,7 +67,7 @@ monsoon-line/
 | 9 | `ai.js` → `AI` | 控制律与行为 | M3, WEAPONS, Ent |
 | 10 | `hud.js` → `HUD` | 平显 | M3, WEAPONS |
 | 11 | `unitview.js` → `UnitView` | 单位详情页：实时 3D 预览、俯视图、参数表 | M3, MODELS, PLANFORM, AIRCRAFT, SHIPS |
-| 12 | `missions.js` → `MISSIONS` | 三关的战场生成与触发器 | Ent, AI |
+| 12 | `missions.js` → `MISSIONS` | 十一关的战场生成与触发器 | Ent, AI |
 | 13 | `game.js` → `Game` `Radio` | 状态机、主循环、UI 绑定、设置 | 全部 |
 
 > `unitview.js` 插在 `hud.js` 与 `missions.js` 之间，只是因为它**必须在
@@ -254,7 +254,7 @@ requestAnimationFrame(loop)
 
 ### 6.7 为什么标题与简报之间多了一层战役选择
 
-原本"开始任务"直接进简报，而简报页顶部的关卡选择器已经把三关都列出来了。
+原本"开始任务"直接进简报，而简报页顶部的关卡选择器已经把全部关卡都列出来了。
 只有一场战役时，这一层确实是多余的。加它的理由不是现在，是以后：
 
 - **关卡与战役是两种不同的决定。** "打哪一场仗"属于战略层，
@@ -352,6 +352,7 @@ requestAnimationFrame(loop)
 | 日期 | 改动 | 原因 |
 |---|---|---|
 | — | 初版：三关、三机型、十二种武器 | — |
+| — | 分水岭行动扩到十关、新增随机战役「第四周」；NPC 去了机炮、海面目标有航路、关卡有时限 | 战役的舞台从"三次空战"扩成一台十阶段的机器，见设定集第九节 |
 | — | 世界观重写为「季风线」 | 初版设定与既有作品撞车，整体推翻 |
 | — | 装备编号改为逻辑语词根 | 增强世界质感，见 [weapons.md](systems/weapons.md#编号体系) |
 | — | 修导航失效：`.help-wrap` 补 `min-height:0` | flex item 默认不收缩，内容一长就把 footer 顶出视口 |
@@ -414,7 +415,7 @@ requestAnimationFrame(loop)
 
 ## 10. 如何加一关
 
-1. 在 `missions.js` 末尾 `MISSIONS.push({...})`，字段照抄现有的三关
+1. 在 `missions.js` 末尾 `MISSIONS.push({...})`，字段照抄现有任何一关
 2. 必须提供：`id` `no` `name` `en` `loc` `date` `altStart` `speedStart`
    `prose` `objectives` `threats` `intel` `map` `spawn()` `tick()` `win()` `lose()`
 3. 在 `data.js` 的 `VOICES` 里加同名 `id` 的台词表，至少要有 `start`
