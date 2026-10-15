@@ -385,13 +385,25 @@ MISSIONS.push({
     /* 一架群岛国的 XAMSI Mk.2「潮线」在海面附近游荡。
 
        它不属于任何一方：政变之后，群岛国那几架飞机挂着四面不同的旗。
-       它不攻击谁，只是在那里 —— 而"那里"正好是交战空域的边缘。 */
+       它不攻击谁，只是在那里 —— 而"那里"正好是交战空域的边缘。
+       `behavior: 'recon'` 让它在满血时不主动接战，与"它不打架"一致
+       （受创之后它才会自卫 —— 一支换了三次旗的空军也是这么反应的）。 */
     spawnEnemy(w, {
       ac: 'k8', team: 2,
       x: 9000, y: 4200, z: 12000,
       fwd: M3.V(-1, 0, 0), speed: 240,
       special: 'otr', skill: 0.30,
       behavior: 'recon'
+    });
+
+    /* 同一片海面上的群岛国巡逻艇「屿」—— DAPLU Mk.1，31 米。
+
+       政变之后，「屿」级一共四条，挂着四面不同的旗，其中一条的旗
+       被撕掉了一半，一直没人去换。它也是**背景**：退出交战语法，
+       玩家锁不到、AI 不认它。 */
+    spawnShip(w, {
+      model: 'daplu', team: 2, label: '屿 DAPLU',
+      x: 14000, z: 6000, hp: 260, weapon: null
     });
 
     w.objective = '拦截下游测绘编队';
@@ -1045,19 +1057,21 @@ MISSIONS.push({
 还有几条不到三百吨的快艇。它们不带伞，只是把反舰弹的发射箱朝向海上。</p>
 <p>上游在这片海上没有第二条补给线，只有几条支援船。
 <span class="am">它们在编队南侧，距离交战空域不到 60 公里。</span></p>
+<p>海面上还有别人的船 —— 卖设备的、采水样的、架天线的。
+它们不属于任何一方，也不会还手。<b>别把它们算进目标里。</b></p>
 <p>你的任务是让那支编队无法展开。代价是：从现在开始，
 每一次进入低空都会同时进入他们的防空圈与反舰弹包线。</p>`,
 
   objectives: [
     '摧毁下游水面编队全部舰艇（5 艘）',
     '摧毁 2 座岸基雷达站',
-    '注意：编队内三型舰艇，CON-4「房角石」级武库舰是核心目标',
-    '海面有 WN-6「海豚」级护卫舰在己方一侧 —— 不要误击'
+    '注意：编队内三型舰艇，BLO-24「房角石」级武库舰是核心目标',
+    '海面有 BLO-6「海豚」级护卫舰在己方一侧 —— 不要误击'
   ],
   threats: [
-    'CON-4「房角石」级武库舰（312 个垂发井）',
-    'CON-16「邓氏鱼」级巡洋舰 ×1 / CON-8「菊石」级 ×2',
-    'CON-2「三叶虫」级导弹快艇（40 节，贴海机动）',
+    'BLO-24「房角石」级武库舰（312 个垂发井）',
+    'BLO-16「邓氏鱼」级巡洋舰 ×1 / BLO-8「菊石」级 ×2',
+    'BLO-2「三叶虫」级导弹快艇（40 节，贴海机动）',
     'BAD-9「高墙」防空导弹（岸基阵地 ×2，射程 9 km）',
     'BIN-4「中继」中距拦截（编队防空）'
   ],
@@ -1067,8 +1081,8 @@ MISSIONS.push({
     对方舰空弹的锁定与被照高度有关 —— 贴海进入可以缩短他们的反应时间`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: 0, z: 8000, type: 'enemy', label: '武库舰 CON-4' },
-    { x: -14000, z: 16000, type: 'enemy', label: '巡洋舰 CON-16' },
+    { x: 0, z: 8000, type: 'enemy', label: '武库舰 BLO-24' },
+    { x: -14000, z: 16000, type: 'enemy', label: '巡洋舰 BLO-16' },
     { x: 14000, z: 16000, type: 'enemy', label: '菊石级 ×2' },
     { x: -26000, z: 11000, type: 'sam', label: '岸基雷达站' },
     { x: 26000, z: 11000, type: 'sam', label: '岸基雷达站' },
@@ -1086,29 +1100,29 @@ MISSIONS.push({
 
     /* 下游水面编队 —— 这一关的目标。
 
-       CON-4 房角石是核心：312 个垂发井，甲板上最值钱的东西。
+       BLO-24 房角石是核心：312 个垂发井，甲板上最值钱的东西。
        它在最内层，由巡洋舰与快艇挡在外面 —— 想打它得先穿过一整层防空。 */
     spawnShip(w, {
-      model: 'cameroceras', label: '房角石 CON-4',
+      model: 'cameroceras', label: '房角石 BLO-24',
       x: 0, z: 16000, hp: 1800,
       weapon: 'dl9', fireCd: 4
     });
     spawnShip(w, {
-      model: 'dunkleosteus', label: '邓氏鱼 CON-16',
+      model: 'dunkleosteus', label: '邓氏鱼 BLO-16',
       x: -14000, z: 12000, hp: 900,
       route: { wp: [{ x: -14000, z: 12000 }, { x: -14000, z: 24000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
-      model: 'ammonite', label: '菊石 CON-8 A',
+      model: 'ammonite', label: '菊石 BLO-8 A',
       x: 13000, z: 13000, hp: 420,
       route: { wp: [{ x: 13000, z: 13000 }, { x: 24000, z: 6000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
-      model: 'ammonite', label: '菊石 CON-8 B',
+      model: 'ammonite', label: '菊石 BLO-8 B',
       x: 20000, z: 9000, hp: 420
     });
     spawnShip(w, {
-      model: 'trilobite', label: '三叶虫 CON-2 A',
+      model: 'trilobite', label: '三叶虫 BLO-2 A',
       x: -6000, z: 24000, hp: 240,
       route: { wp: [{ x: -6000, z: 24000 }, { x: 12000, z: 26000 }], speed: 20, loop: true }
     });
@@ -1165,6 +1179,31 @@ MISSIONS.push({
       special: 'vgt', loadout: { A: 'vgt' },
       skill: 0.64,
       callsign: downstreamCallsign(22)
+    });
+
+    /* 三条不属于任何交战方的船。
+
+       它们不是"中立目标"，是**海面本身**：南回契约的重货船（一个月
+       两次，先卸上游的备件再卸下游的传感器）、高纬联合的水文调查船
+       （采水、采沉积柱）、环外共同体的观察船（把天线架到尽可能高，
+       记录，然后发回去）。
+
+       `team: 2` 让它们退出交战语法：玩家锁不到（cycleTarget 只收 team 1），
+       下游带对地弹的飞机也不认它们（ai.js 的 nearestSurfaceTarget 跳过
+       team > 1）。这片海上的每一条商船都不该因为挡在编队中间而被顺手打掉。 */
+    spawnShip(w, {
+      model: 'cross', team: 2, label: '南十字 SOUTHERN CROSS',
+      x: -16000, z: -8000, hp: 900, weapon: null,
+      route: { wp: [{ x: -16000, z: -8000 }, { x: -24000, z: 6000 }], speed: 10, loop: true }
+    });
+    spawnShip(w, {
+      model: 'icecore', team: 2, label: '冰芯 ICECORE',
+      x: 18000, z: -12000, hp: 500, weapon: null,
+      route: { wp: [{ x: 18000, z: -12000 }, { x: 8000, z: -18000 }], speed: 8, loop: true }
+    });
+    spawnShip(w, {
+      model: 'atoll', team: 2, label: '环礁 ATOLL',
+      x: -20000, z: 20000, hp: 320, weapon: null
     });
 
     w.objective = '摧毁下游水面编队';
@@ -1356,6 +1395,35 @@ MISSIONS.push({
       skill: 0.4, callsign: downstreamCallsign(24)
     });
     cruise.bigTarget = true;
+
+    /* 调节场管理局自己的高空勤务机 MERLI「水准」。
+
+       它不打架：任务是给那些谁也靠不近的调节单元换零件，
+       顺路在这片海盆上量几条基准线。它出现在这里的原因很具体 ——
+       管理局的设施遍布群岛，而这一关打的就是他们的海域。
+
+       **不挂武器**：它的挂载组只有机腹一个（belly），而机腹挂不了
+       任何空空弹（可用的适配都是 tip / light / heavy）—— 这恰好与
+       设定里那句"名义上没有武器"一致，也省掉了"AI 拿着不在机翼上的
+       弹开火"那种看不见的错误。
+       `behavior: 'recon'` 让它在满血时不主动接战（见 ai.js 的开火段）。 */
+    spawnEnemy(w, {
+      ac: 'a2', team: 2,
+      x: 14000, y: 11000, z: 26000,
+      fwd: M3.V(-1, 0, 0), speed: 260,
+      skill: 0.30,
+      behavior: 'recon'
+    });
+
+    /* 管理局的海洋测量船 DIKLO「标杆」——双体船，正在这片海盆上
+       重测锚位。它和「准绳」是同一批船：一个在水下敲，一个在水上量。
+
+       中性：不设 team（默认 1 会被 AI 当敌方设施打），用 team 2 让它
+       退出交战语法 —— 玩家锁不到它，AI 也不认它，它只负责在场上。 */
+    spawnShip(w, {
+      model: 'diklo', team: 2, label: '标杆 DIKLO',
+      x: 11000, z: 9000, hp: 700, weapon: null
+    });
 
     w.objective = '压制下游空情网';
     w.objectiveSub = '雷达 3 · 防空 2 · 干扰机 1';
@@ -1576,12 +1644,12 @@ MISSIONS.push({
 
   objectives: [
     '摧毁 2 艘 BEI-9「海蝎」级登陆舰',
-    '摧毁 CON-4「房角石」级巡洋舰（防空圈核心）',
+    '摧毁 BLO-24「房角石」级巡洋舰（防空圈核心）',
     '压制或击落 GAL-44 干扰机',
     '尽量保持在 1500 m 以下 —— 雷达暴露意味着被锁定'
   ],
   threats: [
-    'CON-4「房角石」级巡洋舰（96 单元垂发）',
+    'BLO-24「房角石」级巡洋舰（96 单元垂发）',
     'BEI-9「海蝎」级登陆舰 ×2（武装薄弱、结构脆弱）',
     'GAL-44「磁石」干扰机（ZUN-14 压制场）',
     'BAD-9 舰空弹（低空进入可缩短反应时间）'
@@ -1592,7 +1660,7 @@ MISSIONS.push({
     低云会削弱光电与红外导引 —— 也可以被你利用`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: -2000, z: 12000, type: 'enemy', label: '巡洋舰 CON-4' },
+    { x: -2000, z: 12000, type: 'enemy', label: '巡洋舰 BLO-24' },
     { x: 8000, z: 16000, type: 'enemy', label: '登陆舰 ×2' },
     { x: -9000, z: 18000, type: 'relay', label: '干扰机' }
   ],
@@ -1608,7 +1676,7 @@ MISSIONS.push({
 
     // 巡洋舰在正面画防空圈
     spawnShip(w, {
-      model: 'cameroceras', label: '房角石 CON-4',
+      model: 'cameroceras', label: '房角石 BLO-24',
       x: -2000, z: 12000, hp: 1600,
       route: { wp: [{ x: -2000, z: 12000 }, { x: 6000, z: 14000 }], speed: 13, loop: true },
       weapon: 'dl9', fireCd: 4
@@ -1933,8 +2001,8 @@ MISSIONS.push({
   ],
   threats: [
     'BEI-9「海蝎」级登陆舰 ×3（目标）',
-    'CON-8「菊石」级巡逻护卫舰 ×2',
-    'CON-2「三叶虫」级导弹快艇 ×4',
+    'BLO-8「菊石」级巡逻护卫舰 ×2',
+    'BLO-2「三叶虫」级导弹快艇 ×4',
     'D-21「贼鸥」战斗机 ×2（在船团上空掩护）',
     '时限 300 秒'
   ],
@@ -1977,7 +2045,7 @@ MISSIONS.push({
     // 两艘护卫舰
     for (i = 0; i < 2; i++) {
       spawnShip(w, {
-        model: 'ammonite', label: '菊石 CON-8 ' + (i ? 'B' : 'A'),
+        model: 'ammonite', label: '菊石 BLO-8 ' + (i ? 'B' : 'A'),
         x: (i - 0.5) * 16000, z: 18000 + i * 4000, hp: 420,
         route: {
           wp: [{ x: (i - 0.5) * 16000, z: 18000 + i * 4000 },
@@ -1993,7 +2061,7 @@ MISSIONS.push({
     for (i = 0; i < 4; i++) {
       var sx = (i < 2) ? -1 : 1;
       spawnShip(w, {
-        model: 'trilobite', label: '三叶虫 CON-2 ' + (i + 1),
+        model: 'trilobite', label: '三叶虫 BLO-2 ' + (i + 1),
         x: sx * (9000 + (i % 2) * 3000), z: 8000 + (i % 2) * 6000, hp: 240,
         route: {
           wp: [{ x: sx * (9000 + (i % 2) * 3000), z: 8000 + (i % 2) * 6000 },
@@ -2120,14 +2188,14 @@ MISSIONS.push({
 
   objectives: [
     '击落 ROK-2「石英」预警机',
-    '摧毁 CON-4「房角石」级指挥舰',
+    '摧毁 BLO-24「房角石」级指挥舰',
     '击落 D-33「信天翁」—— 呼号「冬港」',
     '清除 ROK-27 / GAL-31 护航编队'
   ],
   threats: [
     'D-33「信天翁」×1（冬港本人，skill 极高）',
     'ROK-2「石英」预警机',
-    'CON-4「房角石」级指挥舰（96 单元垂发，在正中央）',
+    'BLO-24「房角石」级指挥舰（96 单元垂发，在正中央）',
     'GAL-31 / ROK-27 双层护航 ×6',
     'SPO-9「落雷」与 BIN-8「追云」重型拦截弹'
   ],
@@ -2137,7 +2205,7 @@ MISSIONS.push({
     <span class="am">冬港的 D-33 在 19 500 m，比你的起步高度高一层</span>`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: 0, z: 18000, type: 'enemy', label: '指挥舰 CON-4' },
+    { x: 0, z: 18000, type: 'enemy', label: '指挥舰 BLO-24' },
     { x: -12000, z: 14000, type: 'enemy', label: '护航' },
     { x: 12000, z: 14000, type: 'enemy', label: '护航' },
     { x: 0, z: 34000, type: 'site', label: '石英 QUARTZ' }
@@ -2159,7 +2227,7 @@ MISSIONS.push({
     /* 指挥舰：不带防空武器（它的防空靠护航与预警机），
        所以它是一个"必须在护航被撕开之后才能碰到"的目标。 */
     spawnShip(w, {
-      model: 'cameroceras', label: '指挥舰 CON-4',
+      model: 'cameroceras', label: '指挥舰 BLO-24',
       x: 0, z: 18000, hp: 2000, weapon: null
     });
 

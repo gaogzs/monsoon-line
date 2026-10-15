@@ -538,17 +538,31 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
 
 /* ============================================================
    简报页的任务选择
+
+   这里用 **grid** 而不是 flex:wrap。原来每条是 `flex:1 1 190px`，
+   于是同一行里的卡片会互相拉伸填满整行 —— 十一关排出来就是
+   "第一行六张被压窄、第二行四张被撑宽"，行与行宽度不一致，
+   看起来像是没对齐。
+
+   grid + `minmax(200px,1fr)` 让**所有卡片同宽**，列数随窗口变化，
+   最后一行不满也只是留下空位，不会把剩下的卡片拉宽。
+   200px 是卡片里最长的一行字（英文代号如 "UNDER THE ANVIL"）
+   在 12px 等宽字体下不换行的下限。
    ============================================================ */
-.msn-list{ display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
-.msn-item{ flex:1 1 190px; padding:10px 14px; cursor:pointer; border:1px solid var(--line);
-  background:linear-gradient(180deg,#0c141b,#080d12); transition:.13s; }
+.msn-list{ display:grid; gap:10px; margin-bottom:20px;
+  grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); }
+.msn-item{ padding:10px 14px; cursor:pointer; border:1px solid var(--line);
+  background:linear-gradient(180deg,#0c141b,#080d12); transition:.13s;
+  min-width:0; }
 .msn-item:hover{ border-color:var(--line2); background:#101a23; }
 .msn-item.sel{ border-color:var(--amber); background:linear-gradient(180deg,#1a2836,#0d161e);
   box-shadow:inset 0 0 22px rgba(255,176,58,.1); }
 .msn-item .no{ font-family:var(--mono); font-size:10.5px; color:var(--txt-d); letter-spacing:2px; }
-.msn-item .nm{ font-size:15px; color:#dbe8f2; margin-top:3px; }
+.msn-item .nm{ font-size:15px; color:#dbe8f2; margin-top:3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .msn-item.sel .nm{ color:var(--amber); }
-.msn-item .st{ font-size:11px; color:var(--txt-d); margin-top:4px; }
+.msn-item .st{ font-size:11px; color:var(--txt-d); margin-top:4px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .msn-item .st.done{ color:var(--green); }
 
 /* ============================================================

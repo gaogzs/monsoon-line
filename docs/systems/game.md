@@ -81,11 +81,19 @@ function show(id) {
 
 - **分组**：`buildCampaignList()` 按 `CAMPAIGNS` 渲染卡片；`missions: []` 的战役画成不可点的“资料封存”卡（不写地名与年份）。
 - **限定范围**：`buildMissionList()` 只列 `CAMPAIGNS[activeCampaign].missions` 里的关卡，
-  序号按战役内位置重编为 `OPERATION 01/02/03`（**不看 `m.no`** —— 那是全局编号，
-  新战役的关会是 04、05，直接拿来当战役内序号会跳号）。
+  序号按战役内位置重编为 `OPERATION 01…10`（**不看 `m.no`** —— 那是全局编号，
+  新战役的关会是 11，直接拿来当战役内序号会跳号）。
+
+**关卡卡片的排布用 grid，不是 flex。** `.msn-list` 原来是
+`display:flex; flex-wrap:wrap` 配 `.msn-item{ flex:1 1 190px }` ——
+同一行里的卡片会互相拉伸填满整行，于是十一关排出来是
+“第一行六张被压窄、第二行四张被撑宽”，行与行宽度不一致。
+现在用 `grid-template-columns:repeat(auto-fill, minmax(200px,1fr))`：
+**所有卡片同宽**，列数随窗口变化，最后一行不满只留空位。
+`.nm` / `.st` 配了 `nowrap + ellipsis`，卡片再窄也不会折行。
 
 **索引只有一套。** `missionIdx` 始终是 `MISSIONS` 的全局下标，`startMission(idx)` 的语义
-和 `tools/smoke.js` 的 `Game.startMission(0|1|2)` 都没变；`activeCampaign` 只决定
+和 `tools/smoke.js` 的 `Game.startMission(mi)` 都没变；`activeCampaign` 只决定
 “列哪几关”和“返回回哪一层”。战役 → 简报时若 `missionIdx` 不在本战役里就夹回首关，
 避免看到别人战役的简报。
 

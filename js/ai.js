@@ -817,7 +817,12 @@ var AI = (function () {
     var off = M3.angleBetween(a.fwd, losDir);
 
     // --- 机炮 ---
+    /* 没有机炮的机型是合法的（预警机、勤务机、重型轰炸机在数据里是
+       `gun: null`）。这一段的其余部分都假设有炮，所以在这里直接收口 ——
+       以前这里直接读 `WEAPONS[a.gun].range`，一架没有炮的飞机只要
+       走到开火段就会抛异常。 */
     var gunW = WEAPONS[a.gun];
+    if (!gunW) { a.firingGun = false; return; }
     var gunRange = (a.pos.y > 18000 ? gunW.highRange : gunW.range);
     var gunCone = 0.028 + (1 - s.skill) * 0.02;
     a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);

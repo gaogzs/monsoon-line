@@ -916,7 +916,7 @@ if (Ent && M3 && me && world) {
   {
     const pl = sandbox.Game.__player();
     const w2 = sandbox.Game.__world();
-    const TRIALS = 500;
+    const TRIALS = 900;
     const rates = [];
     const bad = [];
 
@@ -940,14 +940,16 @@ if (Ent && M3 && me && world) {
       rates.push(lost / TRIALS);
     }
 
-    // 单调下降（500 次采样，σ 约 2%，留 3 个百分点的余量）
+    // 单调下降（采样 900 次，σ 约 1.7%，留 3 个百分点的余量）
     for (let a = 1; a < rates.length; a++) {
       if (!(rates[a] < rates[a - 1] + 0.03)) {
         bad.push('第 ' + (a + 1) + ' 次投放（' + (rates[a] * 100).toFixed(0) +
           '%）没有比第 ' + a + ' 次（' + (rates[a - 1] * 100).toFixed(0) + '%）更难骗');
       }
     }
-    if (!(rates[0] > 0.4)) {
+    /* 首投的下限取 0.30 而不是 0.40：srm 的 flare 是 0.35，理论值就比
+       0.40 低；再加上 900 次采样的涨落，卡太紧会偶发误报（实测撞到过 36%）。 */
+    if (!(rates[0] > 0.30)) {
       bad.push('第一次投放的成功率只有 ' + (rates[0] * 100).toFixed(0) +
         '% —— 诱饵应该至少有一次真的有用');
     }
