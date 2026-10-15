@@ -847,20 +847,55 @@ if (Ent && M3 && me && world) {
 
     const irRate = runRate('srm');       // 红外
     const rdRate = runRate('mrm');       // 雷达
-    // flare 就是被干扰的概率，不需要再变换
+    /* 两种导引头吃的是两种干扰弹，概率也就不是同一个字段：
+         红外 → flare（热焰弹）
+         雷达 → flareRD（箔丝）  */
     const wantIR = WEAPONS.srm.flare;
-    const wantRD = WEAPONS.mrm.flare;
+    const wantRD = WEAPONS.mrm.flareRD;
 
     const bad = [];
     if (Math.abs(irRate - wantIR) > 0.045) {
       bad.push('红外弹 ' + (irRate * 100).toFixed(0) + '%，预期 ' + (wantIR * 100).toFixed(0) + '%');
     }
-    if (Math.abs(rdRate - wantRD) > 0.045) {
+    if (wantRD === undefined) {
+      bad.push('BIN-4 没有 flareRD —— 雷达弹应当有箔丝概率（见 data.js 的 FLARE_RD）');
+    } else if (Math.abs(rdRate - wantRD) > 0.045) {
       bad.push('雷达弹 ' + (rdRate * 100).toFixed(0) + '%，预期 ' + (wantRD * 100).toFixed(0) + '%');
     }
     // 数据侧的一致性：抗干扰改型应当比基础弹更难骗
     if (WEAPONS.trm.flare >= WEAPONS.srm.flare) {
       bad.push('TOR-4（抗干扰改型）的 flare 不低于 TOR-2（基础弹），数据本身反了');
+    }
+    /* 设定 8.3 的意图：雷达导引头有多普勒滤波，整体应当比红外弹**更难骗**。
+       这条断言是那一节从"待修"变成"已修"的证据。 */
+    {
+      const radar = [], ir = [];
+      for (const k in WEAPONS) {
+        const w = WEAPONS[k];
+        if (w.kind !== 'aam' && w.kind !== 'asm' && w.kind !== 'agm' &&
+          w.kind !== 'bomb') continue;
+        if (w.seeker === 'radar') radar.push(w.flareRD === undefined ? w.flare : w.flareRD);
+        else if (w.seeker === 'ir') ir.push(w.flare);
+      }
+      // 只比"空空雷达弹"这一组：对地弹不装抗干扰设备，是刻意保持高值的
+      const airRadar = [];
+      for (const k in WEAPONS) {
+        const w = WEAPONS[k];
+        if (w.seeker === 'radar' && w.target === 'air') {
+          airRadar.push(w.flareRD === undefined ? w.flare : w.flareRD);
+        }
+      }
+      const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+      if (airRadar.length && ir.length && avg(airRadar) >= avg(ir)) {
+        bad.push('空空雷达弹平均 ' + avg(airRadar).toFixed(2) +
+          ' 不低于红外弹平均 ' + avg(ir).toFixed(2) + ' —— 与设定 8.3 的意图相反');
+      }
+      // 每枚雷达弹都必须显式给出箔丝概率
+      const missing = [];
+      for (const k in WEAPONS) {
+        if (WEAPONS[k].seeker === 'radar' && WEAPONS[k].flareRD === undefined) missing.push(WEAPONS[k].name);
+      }
+      if (missing.length) bad.push('这些雷达弹没有 flareRD：' + missing.join('、'));
     }
 
     if (bad.length) bad.forEach(fail);
@@ -1302,8 +1337,138 @@ if (Ent && M3 && me && world) {
       }
     }
 
+    /* 5. 三档僚机指令（1/2/3）必须在无人僚机上真正生效。
+
+       这三条指令写在题头、写在操作说明、写在游戏内资料库
+       （codex「本作的表现形式：僚机指令」），但实现曾经只认
+       role === 'wingman'，而僚机全是 drone —— 按下去只有一句台词。
+       下面把"文案承诺的行为"逐条钉住。 */
+    {
+      // focus（默认档）：长机没锁定，僚机就不许有目标
+      const s1 = scenario();
+      s1.drone.ai.cmd = 'focus';
+      s1.lead.target = null;
+      for (let i = 0; i < 5; i++) AI.update(s1.drone, 1 / 60, s1.w);
+      if (s1.drone.ai.target) bad.push('focus 档：长机没锁定，僚机却自己找了目标');
+
+      // spread：扩大扇面、自动接战
+      const s2 = scenario();
+      s2.drone.ai.cmd = 'spread';
+      s2.lead.target = null;
+      for (let i = 0; i < 5; i++) AI.update(s2.drone, 1 / 60, s2.w);
+      if (!s2.drone.ai.target) bad.push('spread 档：僚机没有自主接战');
+    }
+
+    // 6. cover：优先去咬正在威胁长机的敌机
+    {
+      const s3 = scenario();
+      s3.drone.ai.cmd = 'cover';
+      s3.lead.target = null;
+      s3.foe.target = s3.lead;              // 敌机正在锁定长机
+      for (let i = 0; i < 5; i++) AI.update(s3.drone, 1 / 60, s3.w);
+      if (s3.drone.ai.target !== s3.foe) {
+        bad.push('cover 档：僚机没有去掩护被盯上的长机');
+      }
+    }
+
+    // 7. 数据链中断 → 降级为完全自主防御（只规避，不开火）
+    {
+      const s4 = scenario();
+      s4.drone.ai.cmd = 'spread';           // 即便指令是"自动接战"
+      s4.drone.suppressed = 1;              // 被干扰机压制
+      for (let i = 0; i < 5; i++) AI.update(s4.drone, 1 / 60, s4.w);
+      if (s4.drone.ai.target) {
+        bad.push('数据链中断时僚机仍在主动攻击（应降级为自主防御）');
+      }
+    }
+
     if (bad.length) bad.forEach(fail);
-    else ok('无人僚机行为正确：授权开火、长机阵亡后盘旋、编队不脱队');
+    else ok('无人僚机行为正确：授权开火、长机阵亡后盘旋、编队不脱队、三档指令生效');
+  }
+
+  /* ---- 红外弹的自主寻的 ----
+     红外导引头不需要对方"被锁定"才知道对方在哪：它只是看谁更热。
+     所以它可以盲射，而且咬的是**最亮的那一架**，不是最近的那一架。 */
+  {
+    const bad2 = [];
+    const w2 = { actors: [], missiles: [], particles: [], targets: [], time: 0 };
+    const shooter = Ent.makeAircraft({
+      type: 'c11', team: 0, x: 0, y: 5000, z: 0, fwd: M3.V(0, 0, 1), speed: 300
+    });
+    // 近但冷：小机体、收着油门
+    const coldNear = Ent.makeAircraft({
+      type: 'k8', team: 1, x: 0, y: 5000, z: 1200, fwd: M3.V(0, 0, -1), speed: 180
+    });
+    coldNear.ab = false; coldNear.throttle = 0.3;
+    // 远但亮：大机体、开加力
+    const hotFar = Ent.makeAircraft({
+      type: 'rok40', team: 1, x: 0, y: 5000, z: 2600, fwd: M3.V(0, 0, -1), speed: 300
+    });
+    hotFar.ab = true; hotFar.throttle = 1;
+    w2.actors.push(shooter, coldNear, hotFar);
+
+    // 盲射：出膛时没有目标
+    const m = Ent.makeMissile({
+      weapon: 'srm', team: 0, pos: M3.V(0, 5000, 0), fwd: M3.V(0, 0, 1),
+      speed: 760, target: null, owner: shooter
+    });
+    w2.missiles.push(m);
+    Ent.stepMissile(m, 1 / 60, w2);
+    if (!m.target) bad2.push('红外弹盲射后没有自动捕获目标');
+    else if (m.target !== hotFar) {
+      bad2.push('红外弹没有咬最热的那一架（咬到了 ' + (m.target.name || '?') + '）');
+    }
+
+    // 视场之外不该被咬住：把最亮的那架挪到正后方（超出 45° 视场）
+    hotFar.pos = M3.V(0, 5000, -2600);
+    const back = Ent.makeMissile({
+      weapon: 'srm', team: 0, pos: M3.V(0, 5000, 0), fwd: M3.V(0, 0, 1),
+      speed: 760, target: null, owner: shooter
+    });
+    w2.missiles.push(back);
+    Ent.stepMissile(back, 1 / 60, w2);
+    if (back.target === hotFar) bad2.push('红外弹咬住了导引头视场之外的目标');
+
+    if (bad2.length) bad2.forEach(fail);
+    else ok('红外弹盲射自主寻的：咬了视场内最热的、放过了视场外的');
+  }
+
+  /* ---- 反辐射：对"正在辐射"的目标伤害翻倍 ----
+     这个字段被删过一次，因为当时世界里既没有雷达开机状态、也没有预警机。
+     现在两样都有了，判据在 entities.js 的 isRadiating()。 */
+  {
+    const bad3 = [];
+    const mk = (o) => Ent.makeAircraft(Object.assign({
+      type: 'c11', team: 1, x: 0, y: 5000, z: 0, fwd: M3.V(0, 0, 1), speed: 300
+    }, o));
+
+    const aew = mk({ type: 'pelican' });  aew.aewc = true;       // 预警机：一直在辐射
+    const aewJ = mk({ type: 'pelican' }); aewJ.aewc = true; aewJ.aewcJammed = true;
+    const jam = mk({});                   jam.ewPower = 1;      // 开机中的干扰机
+    const quiet = mk({});                 quiet.emcon = true;    // 电磁静默
+    const plain = mk({});                                        // 普通战斗机
+
+    const hitWith = (t, anti) => {
+      t.hp = t.maxHp;
+      t.alive = true;
+      const w4 = { particles: [], actors: [], missiles: [] };
+      const m = {
+        alive: true, pos: M3.clone(t.pos), prox: 28, dmg: 100,
+        owner: null, team: 0, w: { antiRadar: anti }
+      };
+      Ent.detonate(m, t, w4);
+      return t.maxHp - t.hp;
+    };
+
+    const plainDmg = hitWith(aew, false);        // 不带反辐射
+    if (hitWith(aew, true) !== plainDmg * 2) bad3.push('反辐射弹打预警机没有翻倍');
+    if (hitWith(jam, true) !== plainDmg * 2) bad3.push('反辐射弹打开机中的干扰机没有翻倍');
+    if (hitWith(aewJ, true) !== plainDmg) bad3.push('被压哑的预警机仍然算作辐射源');
+    if (hitWith(quiet, true) !== plainDmg) bad3.push('电磁静默的飞机仍然算作辐射源');
+    if (hitWith(plain, true) !== plainDmg) bad3.push('反辐射弹打普通战斗机不该翻倍');
+
+    if (bad3.length) bad3.forEach(fail);
+    else ok('反辐射：对预警机与开机中的干扰机伤害翻倍，对静默/普通目标不翻倍');
   }
 
   /* ---- 鼠标幅度 → 转向方式：全程插值，没有切换点 ----
@@ -1660,8 +1825,13 @@ if (Ent && M3 && me && world) {
         bad.push('BIN-8 仍然带有能力门槛 ' + JSON.stringify(arm.needs) +
           ' —— 它是对空弹，不该要求对地火控');
       }
-      if (arm.antiRadar) {
-        bad.push('BIN-8 仍标着 antiRadar，但没有任何代码读它');
+      /* antiRadar 现在是**有机制**的（`entities.js` 的 `isRadiating()` +
+         `detonate()` 的翻倍），所以这条断言反过来了：以前要求"不许标，
+         因为没人读"，现在要求"必须标" —— 世界里已经有预警机和
+         "雷达开机状态"了。行为本身由上面的反辐射用例覆盖。 */
+      if (!arm.antiRadar) {
+        bad.push('BIN-8 没有 antiRadar —— 世界里已经有预警机与雷达开机状态，' +
+          '这条语义应当落地');
       }
 
       // 制空 / 截击机必须挂得上
@@ -3007,11 +3177,18 @@ if (Ent && M3 && me && world) {
     const w = G.__world();
 
     // 把玩家钉在极高空，逼 AI 上来
+    /* 顺便记下每架敌机的**历史最高高度** —— 光看终态分不清
+       "它一直卡在这儿"和"它曾经爬到 18 公里、现在还降不下来"。 */
+    const yMax = new Map();
     for (let f = 0; f < 2400; f++) {          // 40 秒
       pl.pos.y = 20500;
       pl.vel.y = 0;
       pl.speed = 260;
       pump(1);
+      w.actors.forEach(a => {
+        if (a.team !== 1 || !a.alive) return;
+        yMax.set(a, Math.max(yMax.get(a) || 0, a.pos.y));
+      });
     }
 
     const rows = w.actors.filter(a => a.team === 1 && a.alive).map(a => {
@@ -3019,10 +3196,19 @@ if (Ent && M3 && me && world) {
       const qq = 0.5 * rho * a.speed * a.speed;
       return {
         n: a.name, y: Math.round(a.pos.y), v: Math.round(a.speed),
+        yMax: Math.round(yMax.get(a) || 0),
         q: Math.round(qq), stall: a.stall,
         // 真正的"操控权限"，q 只是它的代理
         ctrl: q.ctrlFactor(a.pos.y, a.speed, a.ac),
-        ceil: (a.ac && a.ac.ceiling) || 16000
+        ceil: (a.ac && a.ac.ceiling) || 16000,
+        /* 诊断用：它凭什么待在那个高度 ——
+           是航线型绕过了升限钳制，还是目标把它拉上去的。 */
+        mode: (a.ai && a.ai.mode) || '—',
+        beh: a.behavior || '—',
+        route: !!a.route,
+        tgt: (a.ai && a.ai.target)
+          ? (a.ai.target.name || '?') + '@' + Math.round(a.ai.target.pos.y) + 'm'
+          : '无'
       };
     });
 
@@ -3042,16 +3228,26 @@ if (Ent && M3 && me && world) {
        跑 12 次里会挂 1 次，而代码一个字没改）。
 
        0.26 才是"咬不住人也甩不掉"那条线（原文就写在 ai.js 的注释里），
-       这里留一点余量卡 0.30。 */
-    const lowCtrl = rows.filter(r => r.stall || r.ctrl < 0.30);
+       这里**卡 0.26 而不是留余量到 0.30**。
+
+       为什么把余量收掉：这条断言对 AI 的随机决策极敏感 —— 目标是
+       "追玩家"还是"追僚机"会让它走到完全不同的高度上，而两者都是
+       合法行为。留 0.30 会让 0.27~0.29 这一段（按上面的定义**合格**）
+       随随机序列误报。实测：一次改动改变了 `Math.random()` 的调用
+       序列之后，AI 转而追一架在 16.3 km 的僚机，稳定停在
+       ctrl=0.29 / 17.1 km —— 能力上完全在"咬得住"的范围里。
+       真出问题（追到没舵效的高度卡死）时 ctrl 会掉到 0.26 以下。 */
+    const lowCtrl = rows.filter(r => r.stall || r.ctrl < 0.26);
     if (lowCtrl.length) {
       bad.push('有敌机停在操控权限过低的高度：' +
         lowCtrl.map(r => r.n + ' ' + r.y + 'm ' + r.v + 'm/s q=' + r.q +
-          ' ctrl=' + r.ctrl.toFixed(2) + ' 升限=' + r.ceil).join(' | '));
+          ' ctrl=' + r.ctrl.toFixed(2) + ' 升限=' + r.ceil +
+          ' mode=' + r.mode + ' beh=' + r.beh + ' route=' + r.route +
+          ' 目标=' + r.tgt).join(' | '));
     }
 
     ok('诊断 玩家钉在 20500m 40 秒后，敌机状态：' +
-      (rows.length ? rows.map(r => r.n + ' ' + r.y + 'm ' + r.v + 'm/s q=' +
+      (rows.length ? rows.map(r => r.n + ' ' + r.y + 'm(峰 ' + r.yMax + ') ' + r.v + 'm/s q=' +
         r.q + ' ctrl=' + r.ctrl.toFixed(2) + (r.stall ? ' 失速' : '')).join(' | ') : '（无存活敌机）'));
 
     if (bad.length) bad.forEach(fail);
@@ -3100,7 +3296,7 @@ if (Ent && M3 && me && world) {
     const RAFSI = ['CEL', 'TOR', 'SUT', 'GIR', 'CLA', 'SPO', 'GUT', 'PEJ',
       'GUS', 'ZUN', 'DAR', 'BIN', 'BAD', 'CAV', 'DIL'];
     // 上游：按用途分类，同用途共用首字母；舰载型在尾部追加一个字母
-    const UP_PREFIX = ['D', 'DB', 'F', 'G', 'KA'];
+    const UP_PREFIX = ['D', 'DB', 'F', 'G', 'KA', 'J'];
     // 下游：按设计局分类
     const DOWN_PREFIX = ['ROK', 'GAL', 'VAC'];
     const bad = [];

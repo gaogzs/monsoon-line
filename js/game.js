@@ -349,6 +349,7 @@ var Game = (function () {
     ['V', '投放干扰弹 —— 热焰弹与箔丝同时撒出，按住连续投放'],
     ['—', '机位（追尾 / 座舱 / 目标）在「设置 → 视角」里改，无热键'],
     ['1 / 2 / 3', '僚机指令：散开 / 集火 / 掩护'],
+    ['N', 'EMCON-Δ 电磁静默 —— 雷达关机、数据链断开、干扰机停辐射'],
     ['G', '高 G 机动 —— 大幅转向时按住，拉出额外过载，代价是掉速'],
     ['H', '暂停（暂停后可实时调整设置）']
   ];
@@ -570,28 +571,23 @@ var Game = (function () {
   }
 
   /**
-   * 汇总被动吊舱的效果。
-   * 这类挂载不发射任何东西，装上就一直在起作用 ——
-   * 它们让"少带一枚弹"变成一个真实的取舍，而不只是纯损失。
+   * 把机库的"挂载点分组 + 配置"翻译成被动吊舱列表，交给
+   * `Ent.passiveEffects()` 汇总。
+   *
+   * 真正的实现在 entities.js —— 因为**敌机也要用同一套**：
+   * 任务脚本给 NPC 挂吊舱（`spawnEnemy` 的 `o.pods`）时，
+   * 不能再写第二份汇总逻辑，否则迟早出现两边不一致。
    */
   function passiveEffects(ac, lo) {
-    var e = { lockResist: 0, armor: 0, lockRange: 1, flareBonus: 0 };
+    var list = [];
     var groups = ac.hardpointGroups || [];
     for (var i = 0; i < groups.length; i++) {
       var g = groups[i];
       var wid = lo ? lo[g.id] : null;
       if (!wid || !WEAPONS[wid]) continue;
-      var w = WEAPONS[wid];
-      if (!w.passive) continue;
-      var n = g.pts.length;
-      if (w.lockResist) e.lockResist = Math.max(e.lockResist, w.lockResist);
-      if (w.armorBonus) e.armor += w.armorBonus * n;
-      if (w.lockRangeBonus) e.lockRange += w.lockRangeBonus * n;
-      if (w.flareBonus) e.flareBonus += w.flareBonus * n;
+      list.push({ wid: wid, n: g.pts.length });
     }
-    e.armor = Math.min(e.armor, 0.55);
-    e.lockRange = Math.min(e.lockRange, 1.9);
-    return e;
+    return Ent.passiveEffects(list);
   }
 
   /** 挂载总重量（kg） */
@@ -1164,21 +1160,51 @@ var Game = (function () {
     return out;
   }
 
+  /* 当前最危险的对手有多强 —— 电子战的窗口长度取决于**对手**，
+     不是取决于自己的吊舱。取最近的敌方 AI；没有对手时给 0.5。 */
+  function vsSkill(actor) {
+    if (!world || !world.actors) return 0.5;
+    var best = -1, bd = 1e12;
+    for (var i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || e.team === actor.team || !e.ai) continue;
+      var d = M3.dist2(e.pos, actor.pos);
+      if (d < bd) { bd = d; best = e.ai.skill; }
+    }
+    return best < 0 ? 0.5 : best;
+  }
+
+  /* 开一件电子战吊舱：生效状态 + 冷却 + 播报。
+
+     **唯一**的开机入口。手动扣扳机（launch 的 ecm 分支）、协处理器的
+     自主决策（updateEWAuto）、任务脚本里干扰机航线到站，全部走它 ——
+     以前这段逻辑只存在于 launch 里，任何"绕过扳机"的开机方式都得抄一遍。
+
+     ewBurnT 描述的不是吊舱而是**对手**：信号处理能力强的部队能在 3 秒内
+     完成对抗，差的要 8 秒（见 entities.js 的 openEcm）。 */
+  function fireEcm(actor, wid) {
+    var w = WEAPONS[wid];
+    if (!w || w.kind !== 'ecm' || w.passive) return false;
+    Ent.openEcm(actor, wid, vsSkill(actor));
+    actor.spCd = w.cd;
+    if (actor.slotCd && actor.slotCd[wid]) actor.slotCd[wid][0] = w.cd;
+    SFX.laser();
+    Radio.raw({
+      who: actor.isPlayer ? CALLSIGN.player : (actor.label || actor.name),
+      cls: 'ally',
+      tx: '<i>认知电子战吊舱开机 —— 敌方锁定距离 −40%</i>', gap: 0.6
+    });
+    return true;
+  }
+
   function launch(actor, target, w) {
     var wp = WEAPONS[actor.special];
     if (!wp) return false;
 
-    /* ECM 吊舱 */
+    /* ECM 吊舱 —— 交给 fireEcm()，协处理器的自主开机走同一个入口。 */
     if (wp.kind === 'ecm') {
       if (actor.spCd > 0) return false;
-      actor.spActive = wp.duration;
-      actor.spCd = wp.cd;
-      if (actor.slotCd && actor.slotCd[actor.special]) {
-        actor.slotCd[actor.special][0] = wp.cd;
-      }
-      SFX.laser();
-      Radio.raw({ who: actor.isPlayer ? CALLSIGN.player : actor.name, cls: 'ally', tx: '<i>认知电子战吊舱开机 —— 敌方锁定距离 −40%</i>', gap: 0.6 });
-      return true;
+      return fireEcm(actor, actor.special);
     }
     /* DEW 是自动系统，不能手动发射 */
     if (wp.kind === 'dew') return false;
@@ -1319,6 +1345,15 @@ var Game = (function () {
     p.lockResist = pe.lockResist;    // 缩短敌方对我的锁定距离
     p.lockRangeK = pe.lockRange;     // 放大我的锁定距离
     p.flares += pe.flareBonus;
+    /* 被动测距（GUS-6 明瞳 / GUS-9 夜枭）：用被动方式锁定时，
+       对方的 RWR 收不到告警 —— 见 ai.js 里 rwrT 的判定。 */
+    p.silentLock = pe.silentLock;
+
+    /* 电子战的两项玩家状态：
+         ewAuto  协处理器可否自主开机（设定 7.3 授予它的权限）
+         emcon   完全电磁静默（雷达关机 / 数据链断开 / 干扰机停辐射） */
+    p.ewAuto = true;
+    p.emcon = false;
 
     // 原始配置留着 —— HUD 的挂载状态图要按它来画
     p.loadout = lo;
@@ -1369,6 +1404,7 @@ var Game = (function () {
         if (e.code === 'Digit1' && player) setWingCmd('spread');
         if (e.code === 'Digit2' && player) setWingCmd('focus');
         if (e.code === 'Digit3' && player) setWingCmd('cover');
+        if (e.code === 'KeyN' && player) toggleEmcon();
       }
       if (e.code === 'Escape') {
         if (state === 'playing') togglePause();
@@ -1408,11 +1444,41 @@ var Game = (function () {
     window.addEventListener('resize', function () { Renderer.resize(); });
   }
 
+  /* EMCON-Δ：完全电磁静默。
+
+     术语表里的定义是"雷达关机、数据链断开、干扰机停止辐射"。
+     玩法上它是一笔明确的交易：更难被对方发现，代价是自己也几乎瞎了
+     （锁定距离减半，见 updateLock()）。干扰机必须停下来 ——
+     一个还在辐射的平台不叫静默。 */
+  function toggleEmcon() {
+    if (!player || !player.alive) return;
+    player.emcon = !player.emcon;
+    if (player.emcon) {
+      player.spActive = 0;          // 干扰机停辐射
+      player.ewPower = 0;
+      player.ewWid = null;
+    }
+    Radio.raw({
+      who: CALLSIGN.player, cls: 'ally',
+      tx: player.emcon
+        ? '<b>EMCON-Δ 电磁静默。</b>雷达关机，数据链断开。'
+        : '解除静默，雷达开机。',
+      gap: 0.6
+    });
+    SFX.confirm();
+  }
+
   function setWingCmd(cmd) {
     var names = { spread: '散开 SPREAD', focus: '集火 FOCUS', cover: '掩护 COVER' };
     for (var k in world.wings) {
       if (world.wings[k] && world.wings[k].ai) world.wings[k].ai.cmd = cmd;
     }
+    /* 记下玩家最后一次手动下令的时刻与档位。
+
+       预警机（updateAewc）在 8 秒内不再自动下指令 —— 支援单位可以
+       替你操心，但不该抢你的操作。HUD 也读这个值画当前指令。 */
+    world.lastWingCmdT = world.time;
+    world.wingCmd = cmd;
     Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: '僚机指令：<b>' + names[cmd] + '</b>', gap: 0.5 });
     SFX.confirm();
   }
@@ -1835,6 +1901,166 @@ var Game = (function () {
   /* ============================================================
      锁定
      ============================================================ */
+  /* 玩家挂了哪一件**主动**电子战吊舱（没有就返回 null）。 */
+  function playerEcmPod() {
+    var lo = player.loadout;
+    if (!lo) return null;
+    for (var k in lo) {
+      var w = WEAPONS[lo[k]];
+      if (w && w.kind === 'ecm' && !w.passive) return lo[k];
+    }
+    return null;
+  }
+
+  /* 电子战协处理器的自主决策。
+
+     设定 7.3：这台协处理器"有权在没有飞行员指令的情况下自主改变干扰
+     策略 —— 这是全机唯一被授予此权限的子系统"。落到玩法上就是：
+     你被主动雷达盯上、而吊舱已经冷却好时，它自己开机，不等你按扳机。
+
+     player.ewAuto 允许关掉（HUD 上显示 EW AUTO / EW MAN）；
+     进了 EMCON-Δ 它也必须闭嘴 —— 静默状态不允许任何辐射。 */
+  function updateEWAuto(dt) {
+    if (!player.alive || player.emcon || !player.ewAuto) return;
+    if (player.spActive > 0 || player.spCd > 0) return;
+    var pod = playerEcmPod();
+    if (!pod) return;
+    for (var i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || e.team === player.team) continue;
+      if (e.target !== player) continue;                  // 它没在锁我
+      if (M3.dist2(e.pos, player.pos) > 8000 * 8000) continue;
+      fireEcm(player, pod);
+      Radio.raw({
+        who: 'SEXTANT', cls: 'cmd',
+        tx: '<i>电子战协处理器自主开机 —— 它不等你的指令。</i>', gap: 0.8
+      });
+      return;
+    }
+  }
+
+  /* ============================================================
+     空中预警机
+     ============================================================ */
+  /* 预警机不是战斗机，是**眼睛**。它用四条现有链路干活，不新增系统：
+
+       搜敌   与 nearestEnemy 同构的几何搜索，半径 30 km
+              （普通 AI 只有 11–15 km —— 这就是"看得更远"）
+       通报   现成的 bearing() + Radio.raw()
+       调度   现成的 setWingCmd()（对自家僚机）/ a.ai.target（对敌方编队）
+       沉默   被干扰机压制时闭嘴（新增的 suppressed）
+
+     击落它，这些全部停止：没有通报，也没有人替你调度僚机。 */
+  /* ============================================================
+     范围压制（下游的"烧穿"路线）
+     ============================================================ */
+  function updateJamming(dt) {
+    var i, j;
+    /* 每帧重算：压制是"此刻被照着"，不是一种累积状态 ——
+       离开那片空域，下一帧就恢复。 */
+    for (i = 0; i < world.actors.length; i++) world.actors[i].suppressed = 0;
+    for (i = 0; i < world.actors.length; i++) {
+      var a = world.actors[i];
+      if (!a.alive || a.ewPower <= 0) continue;
+      var r = a.ewFieldR || 0;
+      if (r <= 0) continue;
+      for (j = 0; j < world.actors.length; j++) {
+        var e = world.actors[j];
+        if (!e.alive || e.team === a.team || e === a) continue;
+        var d = M3.dist(e.pos, a.pos);
+        if (d > r) continue;
+        // 越靠中心越强；乘 ewPower 是为了让"关机"自动归零
+        var k = a.ewFieldK * (1 - d / r) * a.ewPower;
+        e.suppressed = Math.max(e.suppressed, Math.min(1, k));
+      }
+    }
+  }
+
+  function updateAewc(dt) {
+    for (var i = 0; i < world.actors.length; i++) {
+      var a = world.actors[i];
+      if (!a.aewc || !a.alive) continue;
+
+      /* 被压制就闭嘴 —— 这是它与电子战体系的耦合点：
+         干扰机压住预警机，玩家丢的不只是一部雷达，是整条指挥链。 */
+      var jammed = (a.suppressed || 0) > 0.3;
+      if (jammed !== !!a.aewcJammed) {
+        a.aewcJammed = jammed;
+        Radio.raw({
+          who: a.label || a.name, cls: 'cmd',
+          tx: jammed ? '<i>数据链中断 —— 我被压制了。</i>'
+            : '数据链恢复。继续给你报。',
+          gap: 0.8
+        });
+      }
+      if (jammed) continue;
+
+      a.aewcT = (a.aewcT === undefined ? 3 : a.aewcT) - dt;
+      if (a.aewcT > 0) continue;
+      a.aewcT = 9 + Math.random() * 4;
+
+      if (a.team === player.team) aewcReportAlly(a);
+      else aewcReportEnemy(a);
+    }
+  }
+
+  /* 我方预警机：报出最近的敌机，并在必要时替你调度僚机。 */
+  function aewcReportAlly(a) {
+    var best = null, bd = 30000 * 30000;
+    for (var i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || e.team === a.team) continue;
+      var d = M3.dist2(e.pos, a.pos);
+      if (d < bd) { bd = d; best = e; }
+    }
+    if (!best) return;
+    var d = Math.sqrt(bd);
+    Radio.raw({
+      who: a.label || a.name, cls: 'cmd',
+      tx: '目标方位 ' + bearing(a.pos, best.pos) + '，距离 ' +
+        (d / 1000).toFixed(1) + ' km，高度 ' + (Math.round(best.pos.y / 100) * 100) + '。',
+      gap: 1.0
+    });
+
+    /* 替你调度僚机 —— 这是"预警机在指挥"最直接的体现。
+       你刚手动下过指令就不插手（8 秒内），支援单位不该抢操作。 */
+    var near = M3.dist2(best.pos, player.pos) < 6000 * 6000;
+    var next = near ? 'spread' : 'focus';
+    if (next !== world.wingCmd && world.time - (world.lastWingCmdT || -99) > 8) {
+      setWingCmd(next);
+    }
+  }
+
+  /* 敌方预警机：给它自己的人分配目标 —— 下游的"有组织集火"。
+     打掉它，他们就退回各自为战，这正是它值钱的地方。 */
+  function aewcReportEnemy(a) {
+    var best = null, bd = 30000 * 30000;
+    for (var i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || e.team === a.team) continue;
+      var d = M3.dist2(e.pos, a.pos);
+      if (d < bd) { bd = d; best = e; }
+    }
+    if (!best) return;
+    var n = 0;
+    for (i = 0; i < world.actors.length; i++) {
+      var m = world.actors[i];
+      if (!m.alive || m.team !== a.team || !m.ai || m === a) continue;
+      if (m.route) continue;                    // 航线型单位不参与空战
+      if (m.behavior === 'recon') continue;     // 侦察 / 播撒构型不接战
+      if (m.bigTarget) continue;                // 大型机不是用来格斗的
+      /* 目标比它自己的升限还高一截时不派。
+
+         派了也咬不到 —— 它只会硬爬到没有舵效的高度，
+         最后停在那儿既打不着人、也甩不掉别人。 */
+      if (m.ac && best.pos.y > ((m.ac.ceiling || 16000) + 1500)) continue;
+      if (n >= 3) break;
+      m.ai.target = best;
+      m.ai.retargetT = 6;                       // 六秒内不自己重选
+      n++;
+    }
+  }
+
   function updateLock(dt) {
     var t = player.target;
     if (!t || !t.alive) {
@@ -1856,9 +2082,25 @@ var Game = (function () {
     var lockDist = w.lockDist;
     // 光电 / 红外搜索吊舱提供的锁定距离加成
     if (player.lockRangeK) lockDist *= player.lockRangeK;
-    // ECM 吊舱开机时敌方对我的锁定被压缩（这一条作用在我锁别人上时是无效的，
-    // 真正的用处见 ai.js 里 AI 锁玩家的判定）
-    if (player.spActive > 0) lockDist *= (1 - (w.lockReduce || 0));
+
+    /* 双向压制（设定 8.3「干扰是双向的」）。
+
+       自己的干扰机在压制对方接收机的同一时刻，也在压制自己的 ——
+       这是"认知电子战吊舱开机之后你自己的雷达同时被压制"的落点。
+       强度取 ewPower（那条爬升→压制→被对抗掉的曲线），而不是
+       一个开关：干扰刚开时你自己也最瞎，对手完成对抗之后两边一起恢复。
+
+       注意这里**不再看 spActive** —— 玩家随时可以切走吊舱，
+       但辐射还在持续。用 ewPower 才不会出现"切枪即免疫"。 */
+    if (player.ewPower > 0) {
+      lockDist *= (1 - (player.ewLockReduce || 0.40) * player.ewPower);
+      // 雷达受扰时红外弹仍可发射，但锁定锥收窄到 ±20°
+      cone = Math.min(cone, 20 * Math.PI / 180);
+    }
+
+    /* EMCON-Δ：雷达关机，只剩被动手段 —— 锁定距离直接砍半。
+       这是"更难被发现"那一头的代价，与被动吊舱的 +45% 正好互为反面。 */
+    if (player.emcon) lockDist *= 0.5;
 
     /* ---------- 对空与对面是两套完全不同的判据 ----------
 
@@ -2279,8 +2521,11 @@ var Game = (function () {
 
     // 玩家
     Ent.stepAircraft(player, dt, world);
+    updateEWAuto(dt);            // 协处理器可能在你按扳机之前就开机了
     updateLock(dt);
     updateDEW(dt, player);
+    updateJamming(dt);           // 范围压制场（下游的烧穿路线）
+    updateAewc(dt);              // 预警机：通报、调度、被压制时沉默
 
     // AI
     for (var i = 0; i < world.actors.length; i++) {

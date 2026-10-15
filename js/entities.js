@@ -137,6 +137,23 @@ var Ent = (function () {
          所有槽都在装填时按不出去。这就是"齐射数"的真正含义。 */
       slotCd: {},
       spActive: 0,        // ECM 剩余生效时间
+      /* 认知电子战的闭环状态（设定集 7.3）。
+
+         ewT       本次开机已持续的时间
+         ewBurnT   对手完成对抗、重新建立跟踪的时刻（3–8 秒，开机时定）
+         ewPower   当前压制强度 0..1，由 stepAircraft 每帧算出
+         ewWid     正在干扰的是哪件吊舱（不能看 special —— 玩家会切枪）
+         suppressed 本机被敌方压制的程度 0..1（驱动雷达雪花与数据链中断）
+
+         ewPower 是**唯一**的压制出口：锁定判定读它，不读 spActive。 */
+      ewT: 0,
+      ewBurnT: 0,
+      ewPower: 0,
+      ewWid: null,
+      ewLockReduce: 0,    // 那件吊舱的 lockReduce
+      suppressed: 0,
+      rwrT: 0,            // 被主动雷达照射的剩余告警时间（见 ai.js 的 RWR 扫描）
+      rwrSrc: null,       // 正在照我的那一架
       spCharges: 0,       // DEW 充能数（构造末尾按武器初始化）
       spChargeT: 0,       // DEW 下一次充能恢复的倒计时
       gunTimer: 0,
@@ -336,7 +353,36 @@ var Ent = (function () {
         if (slots[si] === 0) ready++;               // 装完占用一枚储备
       }
     }
-    if (a.spActive > 0) a.spActive -= dt;
+    /* ---- 认知电子战：闭环结算 ----
+
+       感知 → 识别 → 建模 → 合成干扰 → 评估效果 → 修正。
+
+       设定里的 200 微秒回路不逐拍模拟，但它买来的东西是**时间**，
+       所以这里必须是一条曲线，而不是一个常数倍率：
+
+         ramp   开机后迅速爬到满（识别与建模需要一点点时间，0.22 秒）
+         burn   对手在这个时刻完成对抗、重新建立跟踪（开机时按对手水平定）
+         slide  对抗完成之后压制迅速衰减到 0 —— 这就是"攻击窗口"的长度
+
+       ewPower 是唯一的出口：AI 开火判定、防空平台判定、玩家锁定降级、
+       雷达雪花全部读它。 */
+    if (a.spActive > 0) {
+      a.ewT += dt;
+      var ewRamp = Math.min(1, a.ewT / 0.22);
+      var ewBurn = a.ewBurnT > 0 ? a.ewBurnT : 6;
+      var ewSlide = a.ewT < ewBurn ? 1
+        : Math.max(0, 1 - (a.ewT - ewBurn) / 1.1);
+      a.ewPower = ewRamp * ewSlide;
+      a.spActive -= dt;
+      if (a.spActive <= 0) {
+        a.spActive = 0;
+        a.ewPower = 0;
+        a.ewWid = null;
+        a.ewLockReduce = 0;
+      }
+    } else if (a.ewPower !== 0) {
+      a.ewPower = 0;
+    }
     if (a.flareCd > 0) a.flareCd -= dt;
     if (a.gunHeat > 0) a.gunHeat -= dt;
     if (a.gunTimer > 0) a.gunTimer -= dt;
@@ -428,6 +474,51 @@ var Ent = (function () {
     return m;
   }
 
+  /* ============================================================
+     红外导引头的自主寻的
+
+     红外弹和雷达弹的根本差别：它不需要对方"被锁定"才能发现对方 ——
+     它只是**看谁更热**。所以它可以盲射：出膛之后在自己的视场角里
+     找一个热源咬上去。
+
+     这也解释了为什么大离轴格斗弹值钱：TOR-6「环刃」的视场是 ±88°，
+     机头都不用转过去；而基础弹只有 45°，得先把机头带过去。
+
+     "更热"怎么算 —— 这里没有热力学模型，用三个现有量凑：
+       ab         加力尾焰是最大的热源（3 倍权重）
+       throttle   油门越大，尾喷温度越高
+       phys.hp    机体越大，被照到的辐射面越大（大飞机更亮）
+
+     再按离轴角和距离衰减：视场边缘、越远的目标越难咬住。
+     ============================================================ */
+  function irSignature(e) {
+    var s = (e.ab ? 3.0 : 1.0) * (0.4 + (e.throttle === undefined ? 0.7 : e.throttle));
+    var hp = (e.phys && e.phys.hp) ? e.phys.hp : 100;
+    s *= 0.6 + hp / 300;
+    return s;
+  }
+
+  /* 在导引头的视场与捕获距离内，挑"红外特征最明显"的那一架。 */
+  function irAcquire(m, world) {
+    var w = m.w;
+    var cone = w.lockCone || 0.6;
+    var maxD = (w.lockDist || 4000) * 1.5;
+    var best = null, bs = 0;
+    for (var i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || e.team === m.team) continue;
+      if (e === m.spoofed) continue;            // 刚用干扰弹骗过它的那一架不再咬
+      var to = M3.sub(e.pos, m.pos);
+      var d = M3.len(to);
+      if (d > maxD) continue;
+      var off = M3.angleBetween(m.fwd, M3.mul(to, 1 / Math.max(1, d)));
+      if (off > cone) continue;                 // 不在导引头视场里
+      var score = irSignature(e) * (1 - off / cone) / (1 + d / 1500);
+      if (score > bs) { bs = score; best = e; }
+    }
+    return best;
+  }
+
   function stepMissile(m, dt, world) {
     if (!m.alive) return;
     var w = m.w;
@@ -468,6 +559,25 @@ var Ent = (function () {
          出膛那一刻的指向就是它的一生。有 target 引用也当没有。 */
       m.target = null;
       t = null;
+    }
+
+    /* ---------- 红外弹的自主寻的 ----------
+
+       出膛时没指定目标（玩家对着大概方向盲射），或者目标刚丢出视场，
+       就在导引头的视场与捕获距离内重新挑一个**红外特征最明显**的。
+       雷达弹不走这条路 —— 它得先有人把目标"锁定"给它。
+
+       注意它跑在激光制导之前、制导段之前，所以这一帧挑中的目标
+       当帧就能被修正。 */
+    if (w.seeker === 'ir' && (!t || !m.seekerOn) && world) {
+      var acq = irAcquire(m, world);
+      if (acq) {
+        t = acq;
+        m.target = acq;
+        m.seekerOn = true;
+        m.lostTime = 0;
+        m.reDone = false;
+      }
     }
 
     /* ---------- 激光制导：弹没有导引头，靠的是载机的照射 ----------
@@ -628,12 +738,35 @@ var Ent = (function () {
     return w.life;
   }
 
+  /* ============================================================
+     反辐射：谁"正在辐射"
+     ============================================================ */
+  /* 反辐射弹的判据（`w.antiRadar`）。
+
+     这个字段曾经被从 BIN-8 上删掉过，理由写得很实在：全项目没有任何
+     地方读它，世界里既没有"雷达开机状态"、也没有预警机 ——
+     一枚只有文案的反辐射弹，实际表现和普通雷达弹毫无区别。
+
+     现在两样都有了：预警机（`aewc`）会一直辐射到被压哑为止，
+     干扰机在开机期间辐射，而 EMCON-Δ 是真的把雷达关掉了。
+     所以这条语义可以落地了。 */
+  function isRadiating(e) {
+    if (!e || !e.alive) return false;
+    if (e.aewc) return !e.aewcJammed;     // 预警机：被压哑就不再是辐射源
+    if (e.ewPower > 0) return true;       // 干扰机 / 开机的电子战吊舱
+    if (e.emcon) return false;            // 电磁静默：雷达关机
+    return false;                         // 普通战斗机不构成反辐射目标
+  }
+
   function detonate(m, t, world) {
     m.alive = false;
     explode(world.particles, m.pos, 1.0, 14);
     SFX.boom(0.75);
     if (t && t.alive && M3.dist(t.pos, m.pos) < m.prox + 14) {
-      damage(t, m.dmg, world, m.owner);
+      var dmg = m.dmg;
+      /* 反辐射弹对**正在辐射**的目标伤害翻倍 —— 它找的就是那部雷达。 */
+      if (m.w && m.w.antiRadar && isRadiating(t)) dmg *= 2;
+      damage(t, dmg, world, m.owner);
     }
   }
 
@@ -692,23 +825,30 @@ var Ent = (function () {
          等于把箔丝当成了不存在的东西。
 
          **flare 字段本身就是"被干扰的概率"**：越小越难骗。
+         这一点也曾经被理解反过 —— 公式写成 1 − flare·k，等于把
+         「抗干扰改型」TOR-4（flare 0.24，全表最低）变成了最容易
+         被骗的那一枚。数据一直是对的，是公式错了。
 
-         这一点早先被我理解反了 —— 公式写成了 1 − flare·k，
-         等于把「抗干扰改型」TOR-4（flare 0.24，全表最低）
-         变成了最容易被骗的一枚。数据一直是对的，是公式错了。
+         现在按**导引头**分流，因为两种干扰弹骗的不是同一种东西：
 
-         **但数值现状和这句话是相反的，记在这里免得下一个人被误导：**
+             ir         → flare      热焰弹
+             radar      → flareRD    箔丝（缺省回退 flare）
+             eo / laser → 0          成像导引头，两种都骗不到
 
-             雷达弹 14 枚   flare 0.30 ~ 0.85   平均约 0.66
-             红外弹 13 枚   flare 0.24 ~ 0.86   平均约 0.44
-
-         也就是说雷达弹现在**更容易**被骗，这与"多普勒滤波能滤掉
-         静止箔丝回波"的直觉相反。原因是 flare 值当初是逐个按
-         "这枚弹好不好骗"手调的，没有按导引头类型排序。
-         属于待修的数值问题 —— 先把注释改成事实描述，
-         不让它继续和代码唱反调。 */
-      var chance = m.w.flare;
-      if (Math.random() >= chance) continue;
+         `flareRD` 是一张补丁表（见 data.js 的 FLARE_RD）。它修的是
+         设定 8.3 里那句"雷达导引头有多普勒滤波，能滤掉静止的箔丝回波，
+         所以雷达弹整体比红外弹难骗"—— 在那张表出现之前，flare 值是
+         逐个手调的、没有按导引头排序，于是**雷达弹反而平均更好骗**。
+         数值现状与那句设定的矛盾到此为止。 */
+      var chance;
+      if (m.w.seeker === 'radar') {
+        chance = m.w.flareRD !== undefined ? m.w.flareRD : m.w.flare;
+      } else if (m.w.seeker === 'eo' || m.w.seeker === 'laser') {
+        chance = 0;
+      } else {
+        chance = m.w.flare;
+      }
+      if (!(Math.random() < chance)) continue;
 
       m.target = null;
       m.seekerOn = false;
@@ -905,6 +1045,67 @@ var Ent = (function () {
     }
   }
 
+  /* ============================================================
+     被动吊舱汇总
+
+     list 是 [{ wid, n }]，n 是该件占用的挂点数（左右各一 = 2）。
+     玩家的挂载由 game.js 翻译成这个形状；敌机在 missions.js 里
+     直接传 [{ wid, n: 1 }] —— 同一份实现，避免出现
+     "玩家挂上有用、NPC 挂上没用"的两套逻辑。
+
+     它不只是数值：silentLock（被动测距）会决定**敌方 RWR 是否看得到你**，
+     所以结果必须写回 actor，而不只是留在机库面板上。
+     ============================================================ */
+  function passiveEffects(list) {
+    var e = { lockResist: 0, armor: 0, lockRange: 1, flareBonus: 0, silentLock: false };
+    if (!list) return e;
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      var w = WEAPONS[it.wid];
+      if (!w || !w.passive) continue;
+      var n = it.n || 1;
+      if (w.lockResist) e.lockResist = Math.max(e.lockResist, w.lockResist);
+      if (w.armorBonus) e.armor += w.armorBonus * n;
+      if (w.lockRangeBonus) e.lockRange += w.lockRangeBonus * n;
+      if (w.flareBonus) e.flareBonus += w.flareBonus * n;
+      if (w.silentLock) e.silentLock = true;
+    }
+    e.armor = Math.min(e.armor, 0.55);
+    e.lockRange = Math.min(e.lockRange, 1.9);
+    return e;
+  }
+
+  /* ============================================================
+     电子战开机
+
+     这是**唯一**的开机入口：手动扣扳机（game.js 的 launch）、
+     电子战协处理器的自主决策、任务脚本里干扰机航线到站，
+     全部走这里。以前这段逻辑写在 launch 里，于是任何"绕过扳机"
+     的开机方式都得把它抄一遍。
+
+     ewBurnT 在这里定死是刻意的 —— 它描述的不是吊舱，而是**对手**：
+     一支信号处理能力强的部队能在 3 秒内完成对抗，差的要 8 秒。
+     这就是设定里那句"当你开启干扰吊舱时，对方雷达不会立刻致盲，
+     而是会在 3 到 8 秒内完成对抗并重新建立跟踪"。
+     ============================================================ */
+  function openEcm(actor, wid, threatSkill) {
+    var w = WEAPONS[wid];
+    if (!w || w.kind !== 'ecm' || w.passive) return false;
+    var sk = M3.clamp(threatSkill === undefined ? 0.5 : threatSkill, 0, 1);
+    actor.spActive = w.duration || 6;
+    actor.ewT = 0;
+    actor.ewBurnT = 3 + (1 - sk) * 5;
+    actor.ewPower = 0;
+    actor.ewWid = wid;
+    actor.ewLockReduce = w.lockReduce || 0;
+    /* 范围压制（下游的烧穿吊舱）：留下一个场，由 game.js 的
+       updateJamming() 每帧结算。没有 jamRadius 的吊舱是"定向"干扰，
+       只保护自己。 */
+    actor.ewFieldR = w.jamRadius || 0;
+    actor.ewFieldK = w.jamK || 0.7;
+    return true;
+  }
+
   /* ---------- 目标物（调节单元 / 中继平台 / 地面设施） ---------- */
   function makeTarget(o) {
     return {
@@ -952,10 +1153,11 @@ var Ent = (function () {
     airDensity: airDensity, qOf: qOf, ctrlFactor: ctrlFactor, turnFactor: turnFactor,
     makeAircraft: makeAircraft, stepAircraft: stepAircraft,
     makeMissile: makeMissile, stepMissile: stepMissile, effectiveLife: effectiveLife,
-    breakLock: breakLock,
+    breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects,
     fireGun: fireGun, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
     spawnParticle: spawnParticle, stepParticles: stepParticles, explode: explode,
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
+    detonate: detonate,
     makeTarget: makeTarget, stepTarget: stepTarget,
     randUnit: randUnit
   };

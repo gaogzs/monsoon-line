@@ -449,6 +449,16 @@ var HUD = (function () {
 
   function drawBlips(ctx, cx, cy, R, range, p, world) {
     var i, s;
+
+    /* 电子战压制：雷达屏幕上出雪花（设定 7.3）。
+
+       丢的是**信息**，不是飞机 —— 所以只动雷达光点，
+       目标框（drawTargets）照旧画。两个来源合并成一个"脏度"：
+
+         suppressed  被敌方干扰机压制（下游的烧穿吊舱）
+         ewPower     自己正在开机干扰别人 —— 干扰是双向的 */
+    var jam = Math.max(p.suppressed || 0, (p.ewPower || 0) * 0.8);
+
     // 导弹
     for (i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
@@ -461,8 +471,15 @@ var HUD = (function () {
     for (i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
       if (!e.alive || e === p) continue;
-      s = radarXY(p, e.pos, cx, cy, R, range);
       var friendly = (e.team === p.team);
+      /* 只对敌方光点下手：友军的敌我识别来自数据链，不受雷达干扰影响。 */
+      if (!friendly && jam > 0.02 && Math.random() < jam * 0.55) continue;
+      s = radarXY(p, e.pos, cx, cy, R, range);
+      if (!friendly && jam > 0.02) {
+        var jr = jam * 9;
+        s.x += (Math.random() - 0.5) * jr;
+        s.y += (Math.random() - 0.5) * jr;
+      }
       ctx.fillStyle = friendly ? GREEN : RED;
       if (friendly) {
         ctx.beginPath(); ctx.arc(s.x, s.y, 2.8, 0, Math.PI * 2); ctx.fill();
@@ -841,6 +858,21 @@ var HUD = (function () {
     var nm = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.name || '僚机'));
     text(ctx, nm, s.x + c + 6, s.y - c + 8, col, FS, 'left');
     text(ctx, distTxt, s.x + c + 6, s.y - c + 21, 'rgba(120,170,140,0.55)', FS, 'left');
+
+    /* 僚机的当前指令。
+
+       1/2/3 这三条指令长期对无人僚机无效（见 docs/systems/ai.md），
+       所以玩家按下去之后看不到任何变化。现在指令真的生效了，
+       就得有地方看得见它 —— 顺带把"数据链中断"这个降级状态
+       也画出来：那是强对抗环境下无人机转入自主防御的标志。 */
+    if (t.ai && t.wingIdx) {
+      var jammed = t.suppressed > 0.35;
+      var cmdTxt = t.ai.cmd === 'spread' ? 'SPREAD 散开'
+        : (t.ai.cmd === 'cover' ? 'COVER 掩护' : 'FOCUS 集火');
+      text(ctx, jammed ? 'LINK LOST 数据链中断' : cmdTxt,
+        s.x + c + 6, s.y - c + 34,
+        jammed ? '#ff8b2a' : 'rgba(120,170,140,0.55)', FS, 'left');
+    }
   }
 
   /* ============================================================
@@ -1182,6 +1214,17 @@ var HUD = (function () {
     }
     if (p.gunAmmo <= 0 && p.spAmmo <= 0 && bl) {
       text(ctx, 'WINCHESTER  弹药耗尽', W / 2, y, AMBER, F2, 'center');
+      y += U(30);
+    }
+    /* 电子战的两个状态：受扰与静默。
+       它们都是"你看不见别人 / 别人看不见你"的状态，必须一眼可辨 ——
+       否则玩家只会觉得"雷达今天有点难用"。 */
+    if (((p.suppressed || 0) > 0.05 || (p.ewPower || 0) > 0) && bl) {
+      text(ctx, 'JAMMED  雷达受扰', W / 2, y, AMBER, F2, 'center');
+      y += U(30);
+    }
+    if (p.emcon) {
+      text(ctx, 'EMCON-Δ  电磁静默', W / 2, y, CY, F2, 'center');
     }
   }
 

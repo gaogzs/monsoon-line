@@ -37,6 +37,26 @@ var AI = (function () {
     return best;
   }
 
+  /* 正在锁定长机的敌机 —— "掩护"这条指令的核心。
+
+     两个分支（wingman 的 cover、drone 的 cover）共用它。
+     它以前直接写在 wingman 的 cover 分支里面，而那条分支
+     因为僚机都是 drone 而从来没跑到过（见 docs/systems/ai.md）。
+
+     注意 `e.target === lead` 要求 **AI 每帧把 s.target 写回 a.target**
+     （update() 末尾那一行）—— 在补上那行之前，这里永远找不到人，
+     掩护会静默退化成"随便打一个最近的"。 */
+  function leadThreat(a, world) {
+    var lead = world.player;
+    if (!lead || !lead.alive) return null;
+    for (var i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || e.team === a.team) continue;
+      if (e.target === lead) return e;
+    }
+    return null;
+  }
+
   /**
    * 把"想要去的方向"翻译成操纵输入 —— 最少时间转向。
    *
@@ -345,11 +365,16 @@ var AI = (function () {
       flareT: 0,
       shootT: 0,
       burstT: 0,
+      ewResist: 0,        // 对敌方电子战的适应度（设定 7.3"对手也在学"）
       target: null,
       retargetT: M3.rnd(0, 1.2),
       formation: opt.formation || null,   // {lead, dx, dy, dz}
       wander: M3.rnd(0, 6.28),
-      cmd: opt.cmd || 'spread'
+      /* 默认指令是 focus（只打长机授权的目标），不是 spread。
+
+         无人僚机的设定是"没有自主判断力"，所以"什么都没说"时必须
+         落在最保守的那一档；spread 要由玩家按 1 显式下达。 */
+      cmd: opt.cmd || 'focus'
     };
     return a.ai;
   }
@@ -393,7 +418,16 @@ var AI = (function () {
     /* 到点：执行该点的动作，然后转到下一段。
        最后一段飞完就自行消失 —— 轰炸机不会掉头回来再打一遍。 */
     if (dist < r.arrive) {
-      if (r.phase === 'ingress') {
+      if (r.loiter) {
+        /* 盘旋型（预警机）。
+
+           轰炸机是**事件**：飞到点、扔完弹、退场。
+           预警机不是 —— 它得一直在那儿看着。所以在两个航点之间
+           来回飞，永不退场；击落它是唯一让它消失的方式。 */
+        var swap = r.wp;
+        r.wp = r.exit;
+        r.exit = swap;
+      } else if (r.phase === 'ingress') {
         if (r.onArrive) r.onArrive(a, world);
         r.phase = 'egress';
         r.wp = r.exit;
@@ -452,8 +486,15 @@ var AI = (function () {
     if (!dir) return dir;
     var ceil = (a.ac && a.ac.ceiling) || 16000;
     if (a.pos.y > ceil && dir.y > -0.08) {
-      // 已经超了：主动压回来
-      return M3.norm(M3.V(dir.x, -0.22, dir.z));
+      /* 已经超了：主动压回来 —— 而且**超得越多压得越狠**。
+
+         固定 -0.22 在低动压高度是不够的：十七公里上舵效只剩三成，
+         "想压平"这个愿望执行不出来，于是一架为了追高目标而爬上来的
+         敌机会停在既咬不到人、也甩不掉人的高度 —— smoke.js 里有一条
+         断言专门盯着这件事（判据是 ctrlFactor 而不是 q）。
+         这里按超出量线性加强，最多到 -0.45。 */
+      var over = Math.min(1, (a.pos.y - ceil) / 1500);
+      return M3.norm(M3.V(dir.x, -0.22 - 0.23 * over, dir.z));
     }
     if (a.pos.y > ceil - 1200 && dir.y > 0.08) {
       // 接近升限：不许再抬头
@@ -476,6 +517,52 @@ var AI = (function () {
     if (s.burstT > 0) s.burstT -= dt;
     if (s.flareT > 0) s.flareT -= dt;
 
+    /* ---- 雷达告警（RWR）：谁在用主动雷达锁定我 ----
+
+       AI 的"被照射感知"，决定它会不会专门回头咬那个正在照它的人。
+
+       它真正服务的是玩家的两件被动吊舱（GUS-6「明瞳」/ GUS-9「夜枭」）：
+       装上之后你的锁定属于**被动测距**，不辐射，对方收不到告警，
+       于是不会因为"被你盯上了"而优先来打你。设定里那句
+       "你不开雷达，我也不开"说的就是这件事 —— 在这段代码之前，
+       那两件吊舱的这句说明没有对应的机制。
+
+       它依赖 `e.target`：AI 每帧把 s.target 写回 a.target
+       （见 update() 末尾），否则这里读到的永远是 null。 */
+    a.rwrT = 0;
+    a.rwrSrc = null;
+    for (var ri = 0; ri < world.actors.length; ri++) {
+      var rg = world.actors[ri];
+      if (!rg.alive || rg.team === a.team || rg === a) continue;
+      if (rg.target !== a) continue;
+      if (rg.silentLock) continue;                 // 被动测距，不告警
+      if (rg.emcon) continue;                      // 完全电磁静默，更不告警
+      var rw = WEAPONS[rg.special];
+      if (!rw || rw.seeker !== 'radar') continue;  // 只有主动雷达才告警
+      a.rwrT = 0.6;
+      a.rwrSrc = rg;
+      break;
+    }
+
+    /* 对手也在学（设定 7.3）。
+
+       敌方干扰机开着的时候，我方对它的适应度逐步上升 —— 于是同一台
+       吊舱反复对你开机，压制窗口会一次比一次短。干扰机一关，适应度
+       慢慢回落（换个人、换个频道，那个优势就回来了）。
+
+       它消费在 fireAtTarget() 里：
+       `resist *= 1 - t.ewPower * lockReduce * (1 - s.ewResist)`。 */
+    var jammedBy = null;
+    for (var ji = 0; ji < world.actors.length; ji++) {
+      var je = world.actors[ji];
+      if (je.alive && je.team !== a.team && je.ewPower > 0) { jammedBy = je; break; }
+    }
+    if (jammedBy) {
+      s.ewResist = Math.min(1, (s.ewResist || 0) + dt * (0.18 + s.skill * 0.30));
+    } else if (s.ewResist > 0) {
+      s.ewResist = Math.max(0, s.ewResist - dt * 0.08);
+    }
+
     /* ---------- 1. 威胁规避优先级最高 ---------- */
     var inc = findIncoming(a, world);
     if (inc) {
@@ -495,28 +582,46 @@ var AI = (function () {
 
     /* ---------- 3. 选择目标 ---------- */
     if (s.role === 'drone') {
-      /* 无人僚机没有自主判断力：目标永远来自长机的授权。
+      /* 无人僚机没有判断力：目标来自**长机的授权**，
+         而授权规则由僚机指令决定（1/2/3，见 codex「本作的表现形式：
+         僚机指令」—— 那条说明是写给玩家的承诺，行为必须与它一致）：
 
-         长机锁定了谁，它才打谁；长机没锁定，它就一弹不发。
-         设定里写得清楚 —— 它自己看不见任何东西，全靠长机把参数喂过来。 */
+           focus   只打长机当前锁定的目标 —— 最保守，也是默认档
+           cover   优先打正在威胁长机的敌机，找不到就退回长机目标
+           spread  在编队附近自主接战（"扩大搜索扇面，自动接战"）
+
+         另有一条凌驾于指令之上的规则：**数据链中断时降级为完全自主防御**。
+         设定集与资料库都写了 —— 强对抗环境下数据链会被切断，
+         此时无人机只能规避和自卫，不能主动攻击。
+         压制来自干扰机辐射场打在它身上的 suppressed（见 entities.js）。 */
       var dLead = world.player;
-      s.target = (dLead && dLead.alive && dLead.target && dLead.target.alive)
-        ? dLead.target : null;
+      var leadOk = dLead && dLead.alive && dLead.target && dLead.target.alive;
+      if (a.suppressed > 0.35) {
+        s.target = null;                       // 自主防御：只规避，不开火
+      } else if (s.cmd === 'spread') {
+        s.target = nearestEnemy(a, world, 9000);
+      } else if (s.cmd === 'cover') {
+        s.target = leadThreat(a, world) || (leadOk ? dLead.target : null);
+      } else {
+        s.target = leadOk ? dLead.target : null;
+      }
     } else if (s.retargetT <= 0 || !s.target || !s.target.alive) {
       s.retargetT = 0.35 + (1 - s.skill) * 0.9;
       if (s.role === 'wingman' && s.cmd === 'focus' && world.player && world.player.target) {
         s.target = world.player.target;
-      } else if (s.role === 'wingman' && s.cmd === 'cover' && world.player) {
+      } else if (s.role === 'wingman' && s.cmd === 'cover') {
         // 掩护：优先打正在锁定长机的敌机
-        var threat = null;
-        for (var i = 0; i < world.actors.length; i++) {
-          var e = world.actors[i];
-          if (!e.alive || e.team === a.team) continue;
-          if (e.target === world.player) { threat = e; break; }
-        }
-        s.target = threat || nearestEnemy(a, world, 9000);
+        s.target = leadThreat(a, world) || nearestEnemy(a, world, 9000);
       } else {
-        s.target = nearestEnemy(a, world, s.role === 'wingman' ? 11000 : 15000);
+        /* 被主动雷达照射时优先咬照射者 —— "谁在照我，我先打谁"。
+
+           被动测距（silentLock）的对手不会走到这里，所以带一件
+           GUS-6 / GUS-9 就能安静地锁定别人，而不把仇恨引到自己身上。 */
+        if (a.rwrSrc && M3.dist2(a.rwrSrc.pos, a.pos) < 12000 * 12000) {
+          s.target = a.rwrSrc;
+        } else {
+          s.target = nearestEnemy(a, world, s.role === 'wingman' ? 11000 : 15000);
+        }
       }
     }
 
@@ -549,9 +654,18 @@ var AI = (function () {
       var dLead2 = world.player;
       if (dLead2 && dLead2.alive) {
         var sl = s.formation || { dx: 140, dy: 25, dz: -190 };
+        /* 指令同时改变站位 —— 这是 codex 里"分开"与"靠拢"的落点：
+
+             cover   收进到 55%（向你靠拢、贴上去）
+             spread  外拉到 160%（分开，扇面摊得更宽）
+             focus   保持原槽位
+
+           无论哪一档都仍然待在长机附近，不追出去 —— 那三条价值
+           （替长机挡弹、探路、把挂架打空）全建立在"不脱离"上。 */
+        var ek = s.cmd === 'cover' ? 0.55 : (s.cmd === 'spread' ? 1.6 : 1);
         var wpD = M3.add(dLead2.pos,
-          M3.add(M3.mul(dLead2.right, sl.dx),
-            M3.add(M3.mul(dLead2.fwd, sl.dz), M3.V(0, sl.dy, 0))));
+          M3.add(M3.mul(dLead2.right, sl.dx * ek),
+            M3.add(M3.mul(dLead2.fwd, sl.dz * ek), M3.V(0, sl.dy, 0))));
         desired = M3.norm(M3.sub(wpD, a.pos));
         var dWp = M3.dist(wpD, a.pos);
         // 落后就开加力追，到位就收油门省油
@@ -611,6 +725,14 @@ var AI = (function () {
     a.throttle = throttle;
     a.ab = ab;
 
+    /* 把 AI 的选择写回 actor 的公开字段。
+
+       世界里的其它部分一直在读它：HUD 的"谁在照射我"（RWR 环）、
+       僚机的掩护判定（leadThreat）、以及 AI 之间的相互感知。
+       少了这一行，那些地方全都静默失效 —— 它们不报错，
+       只是永远看不到东西。 */
+    a.target = s.target;
+
     /* ---------- 5. 开火 ---------- */
     if (s.mode === 'evade' || s.mode === 'extend') {
       a.firingGun = false;
@@ -657,8 +779,18 @@ var AI = (function () {
         if (a.pos.y > 18000) cone *= 0.8;
         // 越高越难锁定（动压不足）
         var lockK = 1 - Math.min(0.25, Math.max(0, (a.pos.y - 15000) / 40000));
-        // 目标带了拖曳诱饵 / 拖曳式干扰舱，锁定距离就得打折
+        /* 目标的反锁定条件有两个来源：
+
+           1. 被动吊舱（拖曳诱饵 / 静默）—— 常驻，取 lockResist
+           2. 主动电子战（ZUN-4「回声」）—— 正在干扰**且本弹是雷达制导**时
+              锁定距离被压缩。红外弹打的是点源热信号，不吃雷达干扰。
+
+           还有"对手也在学"这一层：ai.ewResist 是这名飞行员对同一台
+           干扰机的适应程度，越高，同样的压制越不管用。 */
         var resist = (t && t.lockResist) ? (1 - t.lockResist) : 1;
+        if (t && t.ewPower > 0 && spW.seeker === 'radar') {
+          resist *= (1 - t.ewPower * (t.ewLockReduce || 0) * (1 - (s.ewResist || 0)));
+        }
         var okDist = dist < spW.lockDist * lockK * resist;
         var okAng = off < cone * 0.85;
         var minR = spW.nezer ? 1400 : 700;

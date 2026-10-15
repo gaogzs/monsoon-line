@@ -55,7 +55,9 @@ function spawnEnemy(w, o) {
 
   var a = Ent.makeAircraft({
     type: ac.id,
-    team: 1,
+    /* 默认敌方（team 1）。预警机那类**我方支援单位**要显式传 team: 0 ——
+       它不打架，但也不能被自己人当成目标。 */
+    team: o.team === undefined ? 1 : o.team,
     x: o.x, y: o.y, z: o.z,
     fwd: o.fwd || M3.V(0, 0, -1),
     speed: o.speed || 300,
@@ -87,6 +89,21 @@ function spawnEnemy(w, o) {
   if (o.escort) a.ai.escort = true;
   a.behavior = o.behavior || 'pursue';
   a.wave = o.wave || 0;
+
+  /* 被动吊舱（任务脚本指定，例如下游的 ZUN-6「迷雾」）。
+
+     走 Ent.passiveEffects —— 与玩家那套**同源**。在这条路子接通之前，
+     敌机不存在任何"抗锁定"能力：他们挂什么吊舱都只是数据表里的一行字。 */
+  if (o.pods && o.pods.length) {
+    var podList = [];
+    for (var pi = 0; pi < o.pods.length; pi++) podList.push({ wid: o.pods[pi], n: 1 });
+    var podE = Ent.passiveEffects(podList);
+    a.lockResist = podE.lockResist;
+    a.armor = podE.armor;
+    a.flares += podE.flareBonus;
+    a.silentLock = podE.silentLock;
+  }
+
   w.actors.push(a);
   return a;
 }
@@ -131,11 +148,39 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
     // role 用 drone 而不是 wingman：无人机没有判断力，
     // 目标永远来自长机的授权，长机活着时也不自主接战。
     role: 'drone', skill: 0.62,
+    /* 默认指令显式写出来 —— 落在最保守的 focus（只打长机授权的目标）。
+       玩家按 1/2/3 才会切到 spread / cover。 */
+    cmd: 'focus',
     formation: { dx: slotX, dy: slotY, dz: slotZ }
   });
   a.wingIdx = idx;
   w.actors.push(a);
   w.wings[idx] = a;
+  return a;
+}
+
+/* 空中预警机。
+
+   它不是战斗机 —— 用 route 型航线，完全绕开空战 AI（见 ai.js 的
+   updateRoute）：不选目标、不规避、不追人，只在两点之间来回盘旋。
+   `loiter: true` 就是"永不退场"，击落它是唯一让它消失的方式。
+
+   它**做什么**写在 game.js 的 updateAewc() 里 —— 因为那要用到
+   bearing() / setWingCmd() / Radio，那些都在 game.js 的闭包里。 */
+function spawnAewc(w, o) {
+  var a = spawnEnemy(w, {
+    ac: o.ac,
+    team: o.team === undefined ? 0 : o.team,
+    x: o.x, y: o.y, z: o.z,
+    fwd: M3.V(0, 0, 1), speed: 220,
+    callsign: o.label || null,
+    behavior: 'recon'
+  });
+  a.aewc = true;
+  a.bigTarget = true;
+  a.radius = 20;
+  if (a.ai) a.ai.role = 'support';    // 它不是来打架的
+  a.route = { loiter: true, wp: o.a, exit: o.b, alt: o.y, arrive: 2600 };
   return a;
 }
 
@@ -198,6 +243,17 @@ MISSIONS.push({
 
     spawnWingman(w, 2, -170, 25, -260);
     spawnWingman(w, 3, 170, 25, -260);
+
+    /* 上游预警机 J-2「鹈鹕」—— SEXTANT 的载机。
+
+       在这架飞机出现之前，无线电里那个报了三关方位的人没有实体：
+       你听得到他，但战场上找不到他。现在他在你后方 25 km 来回盘旋，
+       会被干扰机压哑，也会被打下来。 */
+    spawnAewc(w, {
+      ac: 'pelican', team: 0, label: 'SEXTANT',
+      x: 0, y: 6000, z: -26000,
+      a: M3.V(7000, 0, -26000), b: M3.V(-7000, 0, -21000)
+    });
 
     // 五个测绘机组，横队
     var i, x;
@@ -643,6 +699,48 @@ MISSIONS.push({
       s.weaponPod = true;
     }
 
+    /* 下游预警机 ROK-2「石英」。
+
+      它在，下游的中队才像一支军队：由它分配目标、集中火力。
+       打掉它，剩下的人就退回各自为战 —— 他们本来也更习惯那样。
+       它自己没有任何武器，位置也在战线后方，想打它得先穿过护航。 */
+    spawnAewc(w, {
+      ac: 'quartz', team: 1, label: '石英 QUARTZ',
+      x: 0, y: 9000, z: 17500,
+      a: M3.V(6000, 0, 17500), b: M3.V(-6000, 0, 19500)
+    });
+
+    /* 下游随队干扰机 GAL-44「磁石」。
+
+       它不空战：沿固定航线飞进来、开机、掉头走 —— 与轰炸机是同一套
+       航线机制（`route`），只是到点之后干的事不同。
+
+       开机那一刻，九公里内所有人的雷达一起出雪花：玩家的光点会丢、
+       僚机会提示数据链中断、预警机会闭嘴。这就是下游教条里
+       "先让对手瞎掉，再打"的那一步 —— 而它自己的位置也因此暴露。 */
+    var jammer = spawnEnemy(w, {
+      ac: 'gal44',
+      x: -9000, y: 11000, z: 21000,
+      fwd: M3.V(0, 0, -1), speed: 340,
+      special: 'vsc', skill: 0.55,
+      callsign: '焦炬 TORCH'
+    });
+    jammer.route = {
+      phase: 'ingress',
+      wp: M3.V(-6000, 0, 11000), alt: 11000, arrive: 3000,
+      exit: M3.V(-12000, 0, 22000), exitAlt: 11000,
+      onArrive: function (a, w2) {
+        Ent.openEcm(a, 'vsc', 0.5);
+        a.spCd = WEAPONS.vsc.cd;
+        if (w2 && w2.radio) {
+          w2.radio.raw({
+            who: a.label || a.name, cls: 'enemy',
+            tx: '<i>下游干扰机开机 —— 九公里内全部被压倒。</i>', gap: 0.9
+          });
+        }
+      }
+    };
+
     /* 两架护航：一架气动设计实验室的 VAC-14 贴地跟着，
        一架高峰军工制造局的 GAL-31 在上面看着。这是下游的标准搭配 ——
        便宜的负责数量，贵的负责质量。 */
@@ -653,6 +751,10 @@ MISSIONS.push({
         x: -3000 + i * 6000, y: isHeavy2 ? 20600 : 19800, z: 11500,
         fwd: M3.V(0, 0, -1), speed: isHeavy2 ? 420 : 380,
         special: isHeavy2 ? 'dl4' : 'vbn',
+        /* 下游的教条是"先让对手瞎掉，再打"（设定集 5.1）——
+           编队里永远有一架带干扰吊舱。ZUN-6「迷雾」的锁抗让玩家
+           更难锁定这两架护航：想安静地咬它们，就得先处理那台吊舱。 */
+        pods: isHeavy2 ? ['vzu'] : null,
         skill: 0.6, callsign: downstreamCallsign(15 + i)
       });
     }
