@@ -2805,9 +2805,10 @@ var Game = (function () {
     var needModels = ['c11', 'c14', 's6', 'm27', 'ucav', 'sower', 'relay', 'cell',
       'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb',
       /* 水面舰船（SHIPS 表）—— 接入关卡之前它们也要先被自检覆盖，
-         否则模型名写错要到任务里才暴露 */
-      'orca', 'bluewhale', 'trilobite', 'ammonite', 'seascorpion', 'daplu',
-      'skori', 'diklo', 'cross', 'icecore', 'atoll'];
+         否则模型名写错要到任务里才暴露。顺序按阵营：上游 → 下游 → 其余 */
+      'orca', 'bluewhale', 'humpback', 'spermwhale', 'dolphin',
+      'trilobite', 'ammonite', 'seascorpion', 'cameroceras', 'dunkleosteus',
+      'daplu', 'skori', 'diklo', 'cross', 'icecore', 'atoll'];
     for (i = 0; i < needModels.length; i++) {
       if (!MODELS[needModels[i]]) problems.push('缺少模型 ' + needModels[i]);
     }

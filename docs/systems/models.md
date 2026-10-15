@@ -32,7 +32,7 @@
   morph: { map, spread, swept } }       // 仅 c11 有
 ```
 
-现有 **33** 个键：飞机 13 · 浮空目标 2 · 海上/地面设施 5 · **水面舰船 11** · 弹药 2：
+现有 **38** 个键：飞机 13 · 浮空目标 2 · 海上/地面设施 5 · **水面舰船 16** · 弹药 2：
 
 | key | 名称 / 类别 | span | len | 元数据 | 备注 |
 |---|---|---|---|---|---|
@@ -56,10 +56,13 @@
 | `depot` | 燃油 / 弹药补给库 | 40 | 24 | `ground` `sea` | `radius: 12` |
 | `cmdpost` | 指挥 / 通信中枢 | 22 | 18 | `ground` `sea` | `radius: 9` |
 | `station` | 第 7 号控制平台 | 88 | 88 | `ground` `sea` | `radius: 56`，地标级 |
-| `orca` | BLO-11「虎鲸」护航驱逐舰（上游） | 18.4 | 148 | `ground` `sea` | `radius: 44` |
+| `humpback` | BLO-19「座头鲸」航空母舰 / 浮岛（上游） | 40.0 | 280 | `ground` `sea` | `radius: 84`，飞行甲板 + 舰岛 |
 | `bluewhale` | BEI-2「蓝鲸」快速战斗支援舰（上游） | 26.6 | 210 | `ground` `sea` | `radius: 62`，三座补给门架 |
-| `trilobite` | BLO-2「三叶虫」导弹快艇（下游） | 8.4 | 42 | `ground` `sea` | `radius: 13`，两座四联装 |
-| `ammonite` | BLO-8「菊石」巡逻护卫舰（下游） | 15.2 | 118 | `ground` `sea` | `radius: 36` |
+| `spermwhale` | BLO-13「抹香鲸」巡洋舰（上游） | 20.4 | 168 | `ground` `sea` | `radius: 50`，四面大相控阵 |
+| `orca` | BLO-11「虎鲸」护航驱逐舰（上游） | 18.4 | 148 | `ground` `sea` | `radius: 44` |
+| `dolphin` | BLO-6「海豚」护卫舰（上游） | 14.4 | 108 | `ground` `sea` | `radius: 33` |
+| `cameroceras` | BLO-24「房角石」武库舰（下游） | 24.0 | 195 | `ground` `sea` | `radius: 58`，312 个垂发井 |
+| `dunkleosteus` | BLO-16「邓氏鱼」巡洋舰（下游） | 18.8 | 152 | `ground` `sea` | `radius: 46` |
 | `seascorpion` | BEI-9「海蝎」登陆舰（下游） | 20.4 | 132 | `ground` `sea` | `radius: 40`，艏门 + 跳板 |
 | `daplu` | DAPLU Mk.1「屿」巡逻艇（群岛国） | 6.6 | 31 | `ground` `sea` | `radius: 10` |
 | `skori` | SKORI「准绳」布缆船（管理局） | 18.4 | 102 | `ground` `sea` | `radius: 32`，艏楼绞盘 |
@@ -294,6 +297,7 @@ b.hull([
 5. **`render.js` 有 2048 顶点上限。** `pushModel()` 里 `if (nv > MAXV) return;`
    （`MAXV = 2048`）——模型顶点超限会**静默消失**，不报错。
    当前最大的是 `bluewhale`（520 顶点 / 386 面）与 `cross`（428 / 328），
+   新增的重舰都在 300 顶点以内（`cameroceras` 312 / 240 面是最大的一条），
    都是集装箱和门架堆出来的；**往舰船上继续堆货箱之前先看一眼这个数**。
 6. **`c9` 的 `sweepAlt: null` 是残留字段**，没有任何消费者，别以为它有含义。
 7. **零厚度翼面靠画家算法。** 绕序不重要（不剔除、光照取 `|dot|`），
@@ -334,7 +338,8 @@ b.hull([
 
 `preflight()` 的必需清单是：
 `c11 c14 s6 m27 ucav sower relay cell sam radar depot cmdpost station missile bomb`
-**+ 11 艘舰船** `orca bluewhale trilobite ammonite seascorpion daplu skori diklo cross icecore atoll`
+**+ 16 艘舰船** `orca bluewhale humpback spermwhale dolphin trilobite ammonite
+seascorpion cameroceras dunkleosteus daplu skori diklo cross icecore atoll`
 ——新增模型后记得往 `game.js` 的 `needModels` 数组里加，否则自检不会覆盖它。
 舰船虽然**还没有出现在任何关卡里**，也已经进了这份清单：
 模型名写错要在自检里暴露，而不是等某个任务第一次引用它的时候才炸。

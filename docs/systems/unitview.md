@@ -138,7 +138,7 @@ for (i = 0; i < nv; i++) {
 ## 详情页的内容从哪来
 
 **一个字都不新写。** `desc` 里那几段设定散文在 `data.js` 里已经写好
-（`AIRCRAFT[].desc` 14 条、`SHIPS[].desc` 11 条，全部非空），
+（`AIRCRAFT[].desc` 全部非空、`SHIPS[].desc` 16 条全部非空），
 详情页直接把它们放进右栏。参数表同理，全部现场读字段。
 
 | 区块 | 机型 | 舰船 |
@@ -247,7 +247,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 | `game.js` | `buildCodex()` 生成并挂载；`show()` 负责停；单位链接由 `bindCodexUnits()` 的事件委托接住 |
 | `codex.js` | 两个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:c11">` |
 | `css/style.css` | `.uv-*` 一族类 |
-| `tools/render-units.js` | 直接用 `renderModel()` 把 25 个单位各渲染一张 PNG |
+| `tools/render-units.js` | 直接用 `renderModel()` 把 33 个单位各渲染一张 PNG |
 | `tools/shot-unitview.js` | 生成最小页面，交给无头 Chrome 截详情页的**布局** |
 | `tools/smoke.js` | 4 条断言：详情页可生成 / 俯视图分配 / 渲染器不抛异常 / 点击链路 |
 
@@ -309,7 +309,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 ## 相关工具
 
 ```bash
-node tools/render-units.js    # 用 renderModel() 把 25 个单位的 3D 预览落成 PNG
+node tools/render-units.js    # 用 renderModel() 把 33 个单位的 3D 预览落成 PNG
 node tools/shot-unitview.js   # 无头 Chrome 截详情页的布局（需要本机有 Chrome）
 ```
 

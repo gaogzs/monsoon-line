@@ -33,7 +33,7 @@
 |---|---|---|---|
 | `CALLSIGN` | 对象 | 6 键 | `game.js`、`missions.js` |
 | `AIRCRAFT` | 数组 | **14** 条（可驾驶 6） | `entities.js` `makeAircraft`、`game.js`、`codex.js`、`ai.js`、`planform.js`、`hud.js` |
-| `SHIPS` | 数组 | **11** 条 | **目前只有 `codex.js` 的 `inv3` 图鉴**在读（见下） |
+| `SHIPS` | 数组 | **16** 条 | **目前只有 `codex.js` 的 `inv3` 图鉴**在读（见下） |
 | `WEAPONS` | 对象 | **39** 键 | `entities.js`、`game.js`、`ai.js`、`hud.js`、`codex.js` |
 | `STORE_ATTR` | 对象 | 29 键 → 注入 `fits` `perPoint` `mass` | 间接；挂载系统 |
 | `STORE_ROLE` | 对象 | 37 键 → 注入 `role` | 机库卡片、图鉴 |
@@ -430,7 +430,7 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | 装备定位一句话 | `STORE_ROLE` |
 | 下游呼号池 | `CS_DOWNSTREAM`（20 条，越界回绕） |
 | 无线电台词 | `VOICES[任务id][事件名]` |
-| **舰船的吨位 / 尺寸 / 舰种 / 要害 / 建议交战数值** | **`SHIPS`（11 条，当前只有图鉴在读）** |
+| **舰船的吨位 / 尺寸 / 舰种 / 要害 / 建议交战数值** | **`SHIPS`（16 条，当前只有图鉴在读）** |
 | **舰船外形** | 不在本表 —— 见 `js/models.js` 的 `hull()` 与 [models.md](models.md#船体-hullsecs-colside-coldeck-colbottom) |
 
 ---
