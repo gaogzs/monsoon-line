@@ -358,10 +358,16 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <p><span class="am">平流层是机炮的世纪。这不是设计选择，是空气密度决定的。</span></p>
 
 <h4>本作数值</h4>
+<p class="cx-note">机炮不是通用件。四方各有一条自己的供应线，同一个逻辑语词根下
+各家排自己的号 —— 与 <b>SUT-</b> / <b>GUT-</b> 那些家族同一套规矩。
+口径与射速决定了它们打起来是什么感觉，编号决定了它们是谁的。</p>
 <table class="cx-table">
-  <tr><th>型号</th><th>口径</th><th>射速</th><th>备弹</th><th>初速</th><th>装备</th></tr>
-  <tr><td>CEL-3</td><td>20mm 六管</td><td>3900 发/分</td><td>480</td><td>1100 m/s</td><td>DB-11 · D-14</td></tr>
-  <tr><td>CEL-7</td><td>30mm 四管</td><td>3900 发/分</td><td>1350</td><td>1020 m/s</td><td>G-6</td></tr>
+  <tr><th>型号</th><th>口径</th><th>射速</th><th>备弹</th><th>初速</th><th>装备方</th></tr>
+  <tr><td>CEL-1</td><td>20mm 六管</td><td>3900 发/分</td><td>6000</td><td>1100 m/s</td><td>分水群岛国（上游外销型）</td></tr>
+  <tr><td>CEL-2</td><td>20mm 六管</td><td>3900 发/分</td><td>6000</td><td>1100 m/s</td><td>调节场管理局（上游退役库存）</td></tr>
+  <tr><td>CEL-3</td><td>20mm 六管</td><td>3900 发/分</td><td>6000</td><td>1100 m/s</td><td>上游公约 · 全部制式机</td></tr>
+  <tr><td>CEL-7</td><td>30mm 四管</td><td>3900 发/分</td><td>14000</td><td>1020 m/s</td><td>上游公约 · G-6（专用重炮）</td></tr>
+  <tr><td>CEL-11</td><td>30mm 四管</td><td>3900 发/分</td><td>14000</td><td>1020 m/s</td><td>下游同盟 · 全部制式机</td></tr>
 </table>`
   },
 
@@ -511,6 +517,12 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <p>空军规模不大但质量极高，装备全部自研，机型谱系统一 ——
 同一用途只保留一个型号，后勤压力小到近乎奢侈。
 制约它的是人：<b>飞行员总量只有 1200 人</b>。</p>
+<p>机型谱统一到这个地步：<b>整支空军只有三家主机厂，一家守一条技术路线。</b>
+<b>高空试验局</b>造两万米的东西（平流层制空 D-14、高空高速截击 F-9）；
+<b>环带工程</b>造看不见的东西（隐形多用途 D-21、无人僚机 KA-7）——
+它也是唯一以逻辑语为签字语言的厂商；
+剩下的一线机队则全出自<b>北岸航空</b>（舰载 DB-11、强击 G-6、格斗 D-33、预警 J-2）。
+所以型号与型号之间的差别，不是四家公司的差别，是三条路线的差别。</p>
 <p>机型编号按用途分类（<b>D-</b> 战斗机、<b>F-</b> 截击机、
 <b>G-</b> 攻击机），舰载型在前缀尾部再追加一个字母。
 详见 <b>8.1 命名规则</b>。</p>
@@ -808,7 +820,7 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
   <tr><th>词根</th><th>源词</th><th>含义</th><th>在本作中的用法</th></tr>
   <tr><td><b>cav</b></td><td>carvi</td><td>雨</td><td>调节场体系代号 —— <b>CAV-7</b> 即第 7 号控制平台</td></tr>
   <tr><td><b>dil</b></td><td>dilnu</td><td>云</td><td>调节单元型号 —— <b>DIL-4</b> 型浮空平台</td></tr>
-  <tr><td><b>cel</b></td><td>cecla</td><td>发射器 / 炮</td><td>机炮 —— <b>CEL-3</b>（20mm）· <b>CEL-7</b>（30mm）</td></tr>
+  <tr><td><b>cel</b></td><td>cecla</td><td>发射器 / 炮</td><td>机炮 —— 上游 <b>CEL-3</b> / <b>CEL-7</b>、下游 <b>CEL-11</b>、分水 <b>CEL-1</b>、管理局 <b>CEL-2</b>：同一个词根，各家排自己的号</td></tr>
   <tr><td><b>sut</b></td><td>sutra</td><td>快</td><td>高机动缠斗弹 <b>SUT-11</b>「锥刺」</td></tr>
   <tr><td><b>gir</b></td><td>girzu</td><td>组 / 群</td><td>双联装大离轴格斗弹 <b>GIR-9</b>「蜂群」</td></tr>
   <tr><td><b>cla</b></td><td>clani</td><td>长</td><td>冲压远距弹 <b>CLA-17</b>「长杆」</td></tr>

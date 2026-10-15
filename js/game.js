@@ -764,8 +764,11 @@ var Game = (function () {
 
   /* 制式编号的含义（前缀取自逻辑语词根，但玩家只需要看懂中文含义） */
   var ROOTS = {
+    k1: '发射器 / 炮',
+    k2: '发射器 / 炮',
     k3: '发射器 / 炮',
     k7: '发射器 / 炮',
+    k11: '发射器 / 炮',
     v9: '组 / 群',
     v11: '快',
     v17: '长',
@@ -2809,7 +2812,7 @@ var Game = (function () {
       if (!MODELS[needModels[i]]) problems.push('缺少模型 ' + needModels[i]);
     }
 
-    var needWeapons = ['k3', 'k7', 'v11', 'v9', 'v17', 'v22', 'v25', 'v30',
+    var needWeapons = ['k1', 'k2', 'k3', 'k7', 'k11', 'v11', 'v9', 'v17', 'v22', 'v25', 'v30',
       'e4', 'l2', 'dl4', 'dl6', 'dl9'];
     for (i = 0; i < needWeapons.length; i++) {
       if (!WEAPONS[needWeapons[i]]) problems.push('缺少武器 ' + needWeapons[i]);
