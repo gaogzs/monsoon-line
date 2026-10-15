@@ -36,6 +36,7 @@
 | `spawnEnemy` | `spawnEnemy(w, o) → a` | 造一架敌机并推入 `w.actors`。`o` 字段见下表 |
 | `spawnWingman` | `spawnWingman(w, idx, slotX, slotY, slotZ) → a` | 造僚机（机型写死 `ucav`，队形相对长机），登记 `w.wings[idx]` |
 | `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets` |
+| `spawnAewc` | `spawnAewc(w, o) → a` | **空中预警机**：`spawnEnemy` + `a.aewc = true` + `route: {loiter:true, wp, exit}`。行为在 `game.js` 的 `updateAewc()` 里 |
 | `bombTheBase` | `bombTheBase(bomber, w)` | 轰炸机抵达投弹点的动作：48 个爆炸粒子 + 对 `w.baseTarget` 造成 340 伤害 |
 
 > **水面舰船还没有被这三个任务引用。** `data.js` 里的 `SHIPS` 表（11 艘，见
@@ -44,7 +45,23 @@
 > 但**有一件事要先做**：现有 `makeTarget` 只支持按正弦缓慢漂移（`o.drift`），
 > 而 40 节的导弹快艇需要一套真的航路逻辑 —— 那不在 `makeTarget` 的能力范围内。
 
-`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（缺省 `'dl6'`）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave`。
+`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（缺省 `'dl6'`）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
+
+### 空中预警机
+
+预警机是**航线型单位**（`a.route` 让 `AI.update` 完全绕开空战逻辑），
+但它与轰炸机有一处不同：`route.loiter = true` 让它**在两个航点之间来回飞、
+永不退场** —— 轰炸机是"事件"，预警机得一直在那儿。击落它是唯一让它消失的方式。
+
+`spawnAewc(w, {ac, team, label, x, y, z, a, b})` 只负责造出来与设航线；
+**它做什么**写在 `game.js` 的 `updateAewc()` 里（那里能用到 `bearing()` /
+`setWingCmd()` / `Radio`）：30 km 搜敌 → 方位通报 → 我方调度僚机 /
+敌方给下游分配目标 → 被 `suppressed` 压住时沉默。
+
+- **m1** 放了一架上游 `J-2 鹈鹕`（team 0，`label: 'SEXTANT'`）—— 无线电里
+  报了三关方位的那个人从此有了实体
+- **m3** 放了一架下游 `ROK-2 石英`（team 1），以及一架 `GAL-44 磁石` 干扰机：
+  后者用 `route.onArrive` 调 `Ent.openEcm(a, 'vsc')` 开机，然后掉头走
 
 `spawnWingman` 写死的部分：机型 `ucav`、阵营 0、`isDrone: true`、`special: 'v9'`、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
 

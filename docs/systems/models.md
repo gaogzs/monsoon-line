@@ -64,6 +64,8 @@
 | `cameroceras` | BLO-24「房角石」武库舰（下游） | 24.0 | 195 | `ground` `sea` | `radius: 58`，312 个垂发井 |
 | `dunkleosteus` | BLO-16「邓氏鱼」巡洋舰（下游） | 18.8 | 152 | `ground` `sea` | `radius: 46` |
 | `seascorpion` | BEI-9「海蝎」登陆舰（下游） | 20.4 | 132 | `ground` `sea` | `radius: 40`，艏门 + 跳板 |
+| `ammonite` | BLO-8「菊石」巡逻护卫舰（下游） | 15.2 | 118 | `ground` `sea` | `radius: 36` |
+| `trilobite` | BLO-2「三叶虫」导弹快艇（下游） | 8.4 | 42 | `ground` `sea` | `radius: 13`，两座四联装 |
 | `daplu` | DAPLU Mk.1「屿」巡逻艇（群岛国） | 6.6 | 31 | `ground` `sea` | `radius: 10` |
 | `skori` | SKORI「准绳」布缆船（管理局） | 18.4 | 102 | `ground` `sea` | `radius: 32`，艏楼绞盘 |
 | `diklo` | DIKLO「标杆」海洋测量船（管理局） | 17.2 | 62 | `ground` `sea` | `radius: 20`，**双体** |

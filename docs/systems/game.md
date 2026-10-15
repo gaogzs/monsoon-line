@@ -121,7 +121,10 @@ function loop(ts) {
 ```
 world.time += dt;  Radio.update(dt)                     ← 字幕计时
 if (player.alive) controlPlayer(dt) else SFX.gun(false)
-Ent.stepAircraft(player);  updateLock(dt);  updateDEW(dt, player)
+Ent.stepAircraft(player);  updateEWAuto(dt)             ← 协处理器可能已自主开机
+                           updateLock(dt);  updateDEW(dt, player)
+                           updateJamming(dt)            ← 范围压制场（下游的烧穿路线）
+                           updateAewc(dt)               ← 预警机：通报 / 调度 / 沉默
 for 每架 AI：AI.update → Ent.stepAircraft → updateDEW
 watchdog(dt)                                            ← 所有飞机步进之后
 导弹 / 子弹 step → resolveBullets(dt) → updateTargets(dt) → Ent.stepParticles
@@ -134,6 +137,19 @@ hits / banner 计时衰减
 ```
 
 `mission.lose()` / `mission.win()` 命中时**直接 `return`**，所以那一帧不再 `updateCamera` —— 无所谓，`finish()` 已切到 `debrief`，下一帧 `loop` 走另一条分支。
+
+### 电子战与支援单位：每帧的三个环节
+
+| 函数 | 干什么 | 为什么在这个位置 |
+|---|---|---|
+| `updateEWAuto(dt)` | 电子战协处理器的**自主决策**（设定 7.3）：被主动雷达盯上、吊舱已冷却时自己开机 | 在 `updateLock` 之前，同一帧生效。`player.ewAuto` 可关；EMCON-Δ 期间强制闭嘴 |
+| `updateJamming(dt)` | 结算**范围压制场**：先把所有 actor 的 `suppressed` 清零，再按"干扰机 → 半径内的敌人"重算 | 在所有位置更新之后 —— 压制是"此刻被照着"，不是累积状态 |
+| `updateAewc(dt)` | 预警机的活跃运用：30 km 搜敌 → 方位通报 → 调度僚机 / 分配目标 → 被压制时沉默 | 在 AI 循环之前 —— 它给下游 AI 设的 `target` 当帧就能用 |
+
+**`suppressed` 是这三套东西的共同输入**：HUD 的雷达雪花、僚机的"数据链中断"降级、预警机的沉默都读它。
+
+开机只有一个入口 `fireEcm(actor, wid)`（手动扣扳机 / 协处理器自主 / 任务脚本的干扰机航线到站），
+它内部调 `Ent.openEcm()` 写状态、再扣冷却与播报。`toggleEmcon()` 是 EMCON-Δ 的开关（`N`）。
 
 ### `render()` 的职责
 `state !== 'playing' || !world || !player` 时只 `Renderer.begin() + end()`（空镜头背景）并返回。否则：
@@ -195,6 +211,7 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
 - `document` 的 `keydown` / `keyup` 维护 `keys[e.code]` 布尔表（用 `e.code` 而非 `key`，与键盘布局无关）。`Space / Arrow* / Tab` 会被 `preventDefault()` —— `Tab` 在游戏里是切目标键，不拦就会把焦点送出画布。
 - 鼠标：`mousedown`（左键置 `mouse.left`、右键**立即** `fireSpecial()`）、`mouseup`、`contextmenu` 阻止菜单、`mousemove` 用 `getBoundingClientRect()` 换算成画布内坐标、`wheel` 微调油门（`-deltaY * 0.0007`，夹到 `[0, THR_MAX]`，`{ passive: true }`）。`window` 的 `resize` → `Renderer.resize()`。
 - **注意 `keydown` 在 `document` 上、`mousemove` 在画布上**：鼠标位置只在画布内更新，`updateMouseAim()` 直接用这个绝对坐标，不锁指针。
+- 在 `state === 'playing'` 时另有一批语义键：`H` 暂停、`M` 切瞄准模式、`F`/`Tab` 切目标、`R` 切挂载、`Enter`/右键发射、`V` 按住连投干扰弹、**`N` 切换 EMCON-Δ 电磁静默**、`1`/`2`/`3` 僚机指令。
 
 具体哪个键干什么见 [hud.md 的输入映射表](hud.md#输入映射)，下面只讲机制。
 

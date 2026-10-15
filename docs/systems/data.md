@@ -23,7 +23,7 @@
 
 **加载顺序是契约的一部分**：`codex.js` 在 `data.js` 之前求值，所以 codex.js 里凡是要读 `AIRCRAFT` / `WEAPONS` 的代码，必须包在函数体里等 `build()` 被调用时才求值。这也是图鉴条目写成 `build: function () {...}` 而不是静态字符串的原因。
 
-**IIFE 补丁表在文件里就地执行**：`STORE_ATTR` / `STORE_ROLE` / `STORE_NEEDS` / `STORE_COOLDOWN` / `MISSILE_LEAD` 都在定义后紧跟一个匿名 IIFE，把值合并进 `WEAPONS`。所以**读 `WEAPONS` 读到的已经是合并后的完整表**，不要再去别的表里查一遍。
+**IIFE 补丁表在文件里就地执行**：`STORE_ATTR` / `STORE_ROLE` / `STORE_NEEDS` / `STORE_COOLDOWN` / `MISSILE_LEAD` / `FLARE_RD` 都在定义后紧跟一个匿名 IIFE，把值合并进 `WEAPONS`。所以**读 `WEAPONS` 读到的已经是合并后的完整表**，不要再去别的表里查一遍。
 
 ---
 
@@ -32,7 +32,7 @@
 | 名字 | 类型 | 规模（当前） | 谁在读 |
 |---|---|---|---|
 | `CALLSIGN` | 对象 | 6 键 | `game.js`、`missions.js` |
-| `AIRCRAFT` | 数组 | **14** 条（可驾驶 6） | `entities.js` `makeAircraft`、`game.js`、`codex.js`、`ai.js`、`planform.js`、`hud.js` |
+| `AIRCRAFT` | 数组 | **17** 条（可驾驶 6） | `entities.js` `makeAircraft`、`game.js`、`codex.js`、`ai.js`、`planform.js`、`hud.js`、`unitview.js` |
 | `SHIPS` | 数组 | **16** 条 | **目前只有 `codex.js` 的 `inv3` 图鉴**在读（见下） |
 | `WEAPONS` | 对象 | **39** 键 | `entities.js`、`game.js`、`ai.js`、`hud.js`、`codex.js` |
 | `STORE_ATTR` | 对象 | 29 键 → 注入 `fits` `perPoint` `mass` | 间接；挂载系统 |
@@ -142,7 +142,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 
 ## SHIPS 表
 
-数组，**11** 条，覆盖四方参战势力与三个未参战国家（见设定集 8.0.1）。
+数组，**16** 条，覆盖四方参战势力与三个未参战国家（见设定集 8.0.1）。
 每条的设定散文在 `desc` 里，游戏内由 `codex.js` 的 `inv3` 图鉴展示。
 
 **这张表目前是"预置"状态**：数据、几何、资料库条目全部就位，
@@ -251,11 +251,11 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `highAltScale` | 标注"会受高空缩放" | ❌ **无人读取**（缩放由 `turnFactor()` 对所有弹统一做） |
 | `hobs` | 标注"大离轴" | ❌ 无人读取（离轴能力实际由 `lockCone` 决定） |
 | `cluster` | 标注"集束" | ❌ 无人读取 |
-| `selfBlind` | 标注"干扰是双向的" | ❌ 无人读取 |
+| `selfBlind` | 标注"干扰是双向的" | ⚠️ 字段本身无人读 —— 双向压制由 `lockReduce` + `ewPower` 实现在 `updateLock()` 里，见 [weapons.md](weapons.md) |
 
 **这四个未被读取的标记保留是有意义的**——它们是给读表人（和未来机制）的说明，但别指望写上去就生效。
 
-**被动吊舱专属字段**（`passive: true` 才有）：`lockResist` `lockRangeBonus` `flareBonus` `armorBonus`。汇总在 `game.js` 的 `passiveEffects()`：`lockResist` 取最大值，其余按挂载点数累加，`armor` 上限 0.55、`lockRange` 上限 1.9。
+**被动吊舱专属字段**（`passive: true` 才有）：`lockResist` `lockRangeBonus` `flareBonus` `armorBonus` `silentLock`。汇总在 `entities.js` 的 `Ent.passiveEffects(list)`（`game.js` 只负责把挂载点分组翻译成 `{wid,n}` 列表；**敌机的 `o.pods` 走同一个函数**）：`lockResist` 取最大值，其余按挂载点数累加，`armor` 上限 0.55、`lockRange` 上限 1.9；`silentLock` 是布尔，任一被动测距吊舱即可点亮。
 
 ### 注入字段
 
@@ -291,7 +291,7 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 
 单独放的理由是"一眼横着比较谁挂得下、谁带得多、谁更重"。`fits` 的取值只有四种：`tip` / `light` / `heavy` / `belly`。
 
-**下游专用弹（`vzu` `vgt` `vsr` `vbn` `otr` `dl4` `dl6` `dl9`）直接把 `fits: []` 写在 `WEAPONS` 里，不放进 `STORE_ATTR`**——空数组 = 玩家挂不上。
+**下游专用弹（`vzu` `vgt` `vsr` `vbn` `otr` `dl4` `dl6` `dl9` `vsc`）直接把 `fits: []` 写在 `WEAPONS` 里，不放进 `STORE_ATTR`**——空数组 = 玩家挂不上。`vsc`（ZUN-14 焦炬）是下游的**烧穿吊舱**：主动 ECM，靠 `jamRadius` / `jamK` 在 `world` 里建范围压制场（见 [game.md](game.md) 的 `updateJamming()`）。
 
 ### `STORE_ROLE`（37 键）
 
@@ -324,6 +324,31 @@ WEAPONS[k].lead = MISSILE_LEAD[k];
 理由写在源码里：无制导弹没有导引头，留一个 0 反而让人以为"它能追踪一点点"。
 
 **静默回退**：`entities.js` 里 `var lead = (w.lead === undefined) ? 0.6 : w.lead;`。也就是说漏写 `lead` 不会报错，而是悄悄拿到 **0.6**——一个"中等聪明"的弹。`smoke.js` 会拦（除 `unguided` / `seeker === 'none'` / `passive` / `gun` 之外都必须有 `lead`）。
+
+### `FLARE_RD`（14 键，只发给雷达弹）
+
+干扰弹是**热焰弹 + 箔丝**一起投的，所以同一枚弹对两种导引头其实有**两个**概率：
+
+| 字段 | 谁吃 | 场景 |
+|---|---|---|
+| `flare` | 红外导引头 | 热焰弹 |
+| `flareRD` | 雷达导引头 | 箔丝 |
+
+合并时**只往 `seeker === 'radar'` 的弹上写**（往红外弹上写箔丝概率没有意义）：
+
+```js
+if (WEAPONS[k].seeker !== 'radar') continue;
+WEAPONS[k].flareRD = FLARE_RD[k];
+```
+
+它修的是设定 8.3 里明确记着的那个"待修的数值问题"：`flare` 当初逐个手调、
+没按导引头排序，于是雷达弹平均（0.66）反而**比红外弹（0.44）更好骗**，
+与"多普勒滤波该让雷达弹更难骗"相反。现在空空的雷达弹整体压到红外弹均值
+以下（BIN-4 的 0.30 是全场最难骗的一枚），对地/反大型弹保持高值。
+
+**静默回退**：`breakLock()` 里 `w.flareRD !== undefined ? w.flareRD : w.flare`。
+`smoke.js` 会拦：所有雷达弹都必须显式给出 `flareRD`，且"空空雷达弹均值
+必须低于红外弹均值"（这条断言就是设定 8.3 从"待修"变"已修"的证据）。
 
 ---
 

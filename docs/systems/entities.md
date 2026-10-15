@@ -76,6 +76,11 @@
   special, spAmmo, spCd,
   slotCd:{},                           // { 武器id: [槽1剩余, 槽2剩余, ...] }
   spActive, spCharges, spChargeT,      // ECM 生效 / DEW 充能
+  /* 认知电子战的闭环（设定 7.3）：ewT 开机时长、ewBurnT 对手完成对抗的
+     时刻、ewPower 当前压制强度（唯一出口）、ewWid 用的哪件吊舱、
+     suppressed 自己被压制的程度、rwrT/rwrSrc 被主动雷达照射的感知 */
+  ewT, ewBurnT, ewPower, ewWid, ewLockReduce, ewFieldR, ewFieldK,
+  suppressed, rwrT, rwrSrc,
   flares, flareCd,                     // 单位是"组"
   target, lockProgress, locked, rwr,   // rwr 见坑 §7
   q, stall, dead, smokeTimer, trailTimer,
@@ -91,7 +96,7 @@
 | `radius` | `missions.js` | 敌机命中半径（8），轰炸机 22 |
 | `loadoutList` / `ammoPool` / `loadout` | `game.js` `startMission` | 挂载列表 / 各武器储备 / 原始配置 |
 | `wpIdx` / `spSalvo` | `game.js` | 当前挂载下标；`spSalvo` **写入后无人读取** |
-| `loadFactor` / `armor` / `lockResist` / `lockRangeK` | `game.js` `startMission` | 重量惩罚与被动吊舱加成，**只有玩家有** |
+| `loadFactor` / `armor` / `lockResist` / `lockRangeK` / `silentLock` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy`（敌机 `pods`） | 重量惩罚与被动吊舱加成。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
 | `gLoad` / `brake` / `hiG` | `game.js` `controlPlayer` | 高 G 倍率 / 减速板 / HUD 指示 |
 | `sweep` | `stepAircraft` | 可变后掠翼位置（仅 `ac.variableSweep`） |
 | `ai` | `AI.attach` | 见 [ai.md](ai.md) |
@@ -297,7 +302,8 @@ keydown Enter / 鼠标右键
 
 ## 7. 易踩的坑与设计取舍
 
-1. **`a.rwr` 是死字段。** 声明为"正在锁定本机的导弹/敌机"，但全项目没有任何一处写入它。导弹告警实际是 `game.js` `update()` 每帧扫描 `world.missiles` 算出来的。看到 `rwr` 别以为有现成的雷达告警系统。
+1. **`a.rwr` 曾经是死字段，现在仍不完整。** 它声明为"正在锁定本机的导弹/敌机"，但至今**没有任何一处写入它** —— 导弹告警实际是 `game.js` `update()` 每帧扫描 `world.missiles` 算出来的。
+   真正在用的"被照射感知"是 `rwrT` / `rwrSrc`（`ai.js` 每帧扫描 `world.actors` 写）：它决定 AI 会不会回头咬正在照它的人，也是被动吊舱（`silentLock`）与 EMCON-Δ 的价值所在。看到 `rwr` 别以为有现成的雷达告警系统 —— 它还是空的。
 
 2. **`damage()` 扣装甲，`hitTarget()` 不扣。** 给目标物加"减伤"要自己写，`ent.armor` 对它无效。
 

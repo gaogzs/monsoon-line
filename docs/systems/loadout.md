@@ -175,9 +175,15 @@ function canCarry(ac, w) {
 > `BIN-8` 追云**不在** `STORE_NEEDS` 里。它原来被标成"反辐射弹"、要求
 > `strike`（对地火控），于是只有攻击机和多用途机能挂 —— 而它其实是一枚
 > **对空的重型拦截弹**，最该带它的恰恰是制空 / 截击机（D-14、F-9），
-> 那些机型没有 `strike`，反而挂不上。反辐射设定既没有机制支撑，
-> 又造成这个荒谬的分配，所以整个删掉，现在只受 `fits: ['heavy']` 约束。
+> 那些机型没有 `strike`，反而挂不上。那个门槛造成的是荒谬的分配，
+> 所以整个删掉，现在只受 `fits: ['heavy']` 约束。
 > `smoke.js` 专门断言"制空/截击机必须挂得上 BIN-8"。
+>
+> **但"反辐射"这个标签本身没有删。** 它当时的另一个问题是"没有机制支撑"
+> —— 世界里既没有雷达开机状态、也没有预警机。这两样现在都有了
+> （预警机 + `ewPower` + EMCON-Δ），所以 `antiRadar` 重新写回 `WEAPONS`，
+> 由 `entities.js` 的 `isRadiating()` + `detonate()` 实现"对正在辐射的
+> 目标伤害翻倍"。**挂载门槛不复原** —— 它是对空弹，这一点没变。
 
 **默认配置也受这条约束**，`preflight()` 会检查，`smoke.js` 也会。
 
@@ -345,19 +351,25 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 | `ecm2` | ZUN-8 静默 | `lockResist` | 0.40 | 敌方对你的锁定距离 ×(1−0.40) |
 | `vzu` | ZUN-6 迷雾 | `lockResist` | 0.30 | 同上（下游，玩家挂不上） |
 | `hdp` | BAD-3 护盾 | `armorBonus` | 0.22 | 全向减伤，可叠加 |
-| `oep` | GUS-6 明瞳 | `lockRangeBonus` | 0.45 | 你的锁定距离 ×(1+0.45) |
-| `irp` | GUS-9 夜枭 | `lockRangeBonus` / `lockResist` | 0.25 / 0.15 | 同时给两项 |
+| `oep` | GUS-6 明瞳 | `lockRangeBonus` / `silentLock` | 0.45 | 锁定距离 ×(1+0.45)；**被动测距，不触发对方 RWR** |
+| `irp` | GUS-9 夜枭 | `lockRangeBonus` / `lockResist` / `silentLock` | 0.25 / 0.15 | 同时给三项 |
 | `dec` | ZUN-12 雾障 | `flareBonus` | 40 | 额外干扰弹组数（×挂载点数） |
 
-汇总由 `passiveEffects(ac, lo)` 完成：
+`silentLock` 是唯一的布尔项：装了就为真，决定**你用主动雷达锁别人时对方收不收得到告警**
+（见 [ai.md](ai.md) 的 RWR 扫描）。它是"你不开雷达，我也不开"那句设定的落点。
+
+汇总由 `Ent.passiveEffects(list)` 完成 —— `game.js` 的 `passiveEffects(ac, lo)` 只负责把
+挂载点分组翻译成 `[{wid, n}]` 再转给它，因为**敌机也要用同一份实现**
+（`missions.js` 的 `spawnEnemy` 收 `o.pods`）：
 
 ```js
-var e = { lockResist: 0, armor: 0, lockRange: 1, flareBonus: 0 };
+var e = { lockResist: 0, armor: 0, lockRange: 1, flareBonus: 0, silentLock: false };
 ...
 if (w.lockResist)     e.lockResist = Math.max(e.lockResist, w.lockResist);  // 取最大，不叠加
 if (w.armorBonus)     e.armor     += w.armorBonus * n;                      // 叠加 × 点数
 if (w.lockRangeBonus) e.lockRange += w.lockRangeBonus * n;                  // 叠加 × 点数
 if (w.flareBonus)     e.flareBonus += w.flareBonus * n;
+if (w.silentLock)     e.silentLock = true;                                  // 任一即可
 e.armor     = Math.min(e.armor, 0.55);
 e.lockRange = Math.min(e.lockRange, 1.9);
 ```
@@ -374,6 +386,9 @@ p.armor      = pe.armor;         // 全向减伤
 p.lockResist = pe.lockResist;    // 缩短敌方对我的锁定距离
 p.lockRangeK = pe.lockRange;     // 放大我的锁定距离（updateLock 里乘）
 p.flares    += pe.flareBonus;    // 基础 80 组 + 加成
+p.silentLock = pe.silentLock;    // 被动测距：不触发敌方 RWR
+p.ewAuto     = true;             // 协处理器可否自主开机（EMCON 期间强制关）
+p.emcon      = false;            // EMCON-Δ 电磁静默（N 键切换）
 ```
 
 `Ent.damage()` 里对 `armor` 再钳一次上限 **0.6**，所以被动汇总的
@@ -388,6 +403,12 @@ p.flares    += pe.flareBonus;    // 基础 80 组 + 加成
 又：`vzu` 的 `lockResist` 当初被多包了一层 `passiveEffect: {...}`，
 而汇总读的是顶层字段，于是那条加成**完全没有生效**；现在六件
 被动吊舱都写顶层。
+
+**敌机也走同一条路。** 任务脚本可以用 `spawnEnemy(w, {ac, pods: ['vzu']})`
+给 NPC 挂被动吊舱，`missions.js` 把 `pods` 翻成 `[{wid,n:1}]` 交给
+`Ent.passiveEffects()`，再把结果写到 `a.lockResist / a.armor / a.flares /
+a.silentLock` 上。在这条路接通之前，**敌机不存在任何抗锁定能力** ——
+他们挂什么吊舱都只是数据表里的一行字（m3 的下游护航机现在挂了迷雾）。
 
 ---
 

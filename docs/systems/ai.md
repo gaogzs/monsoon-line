@@ -229,7 +229,7 @@ out.yaw   = yawCmd * gain;
 | `retargetT` | `rnd(0, 1.2)` | 下一次重选目标的倒计时 |
 | `formation` | null | 实际由 `missions.js` 传 `{dx, dy, dz}` |
 | `wander` | `rnd(0, 6.28)` | 巡逻用的相位 |
-| `cmd` | `'spread'` | 僚机指令 `focus` / `cover` / `spread` |
+| `cmd` | `'focus'` | 僚机指令 `focus` / `cover` / `spread`。缺省为最保守的 `focus` |
 
 ---
 
@@ -268,13 +268,24 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 
 | 角色 / 指令 | 规则 |
 |---|---|
-| `role === 'drone'` | **完全不自选**：目标 = 长机当前锁定的目标，没锁定就是 `null` |
+| `drone` + 数据链中断 | **降级为完全自主防御**：`s.target = null`，只规避、不开火 |
+| `drone` + `focus`（默认） | 继承长机的目标；长机没锁定就是 `null` |
+| `drone` + `cover` | 优先打正在威胁长机的敌机（`leadThreat`），找不到退回长机目标 |
+| `drone` + `spread` | 自主接战：`nearestEnemy(a, world, 9000)` |
 | `wingman` + `focus` | 继承长机的目标 |
-| `wingman` + `cover` | 先找正在锁定长机的敌机，找不到退到 `nearestEnemy(a, world, 9000)` |
-| 其余（含 `enemy`） | `nearestEnemy(a, world, role === 'wingman' ? 11000 : 15000)` |
+| `wingman` + `cover` | 同 `drone + cover`（共用 `leadThreat()`） |
+| 其余（含 `enemy`） | 被主动雷达照射时优先咬照射者（12 km 内）；否则 `nearestEnemy(a, world, role === 'wingman' ? 11000 : 15000)` |
 
-> `role: 'wingman'` 的三条分支在代码里完整存在，但当前 `missions.js`
-> 的 `spawnWingman()` 一律用 `role: 'drone'`，实际跑不到它们。
+> **僚机指令（1/2/3）真的会改变行为。** 这三条写在题头、操作说明和
+> 游戏内资料库里，但实现曾经只认 `role === 'wingman'`，而 `spawnWingman()`
+> 一律用 `role: 'drone'` —— 于是按下去只有一句台词。
+> 现在 drone 也走同一套授权规则，区别只在于它**始终不脱离编队**。
+>
+> 默认指令是 **`focus`**（最保守的那一档），不是 `spread`：
+> "没有判断力"的设定要求"什么都不说"时落在最保守处。
+>
+> `leadThreat()` 依赖 `e.target === world.player` —— 所以它要求 AI
+> 每帧把 `s.target` 写回 `a.target`（见 `update()` 末尾）。
 
 **4. 行为分派**（默认 `throttle = 0.85, ab = false`）
 
@@ -304,9 +315,18 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 
 ```js
 ceil = (a.ac && a.ac.ceiling) || 16000;
-if (pos.y > ceil && dir.y > -0.08)       dir = norm(V(dir.x, -0.22, dir.z));  // 超了，压回来
+if (pos.y > ceil && dir.y > -0.08) {
+  // 超了，压回来 —— **超得越多压得越狠**（最多 -0.45）
+  over = min(1, (pos.y - ceil) / 1500);
+  dir  = norm(V(dir.x, -0.22 - 0.23 * over, dir.z));
+}
 if (pos.y > ceil - 1200 && dir.y > 0.08) dir = norm(V(dir.x,  0.08, dir.z));  // 接近，不许抬头
 ```
+
+> 固定 -0.22 在十七公里上是不够的：那里舵效只剩三成，"想压平"这个愿望
+> 执行不出来，于是一架为了追高目标而爬上来的敌机会**一路爬上去**。
+> 按超出量线性加强之后，超得越多压得越狠，配合 `smoke.js` 里那条
+> 以 `ctrlFactor` 为判据的断言，敌机才会真的留在自己那一层。
 
 **为什么要有它**：极高空 `q = ½ρv²` 掉到几千时操控权限只剩百分之十几。
 实测把玩家钉在 20 500 m 40 秒后，追击的敌机会停在这样的状态：
@@ -428,8 +448,9 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
 
 ## 无人僚机（`role: 'drone'`）
 
-与代码里保留的 `role: 'wingman'` 的差别不是参数，而是**有没有判断力**。
-当前所有僚机都由 `spawnWingman()` 生成为 drone，它只有三条规则：
+与 `role: 'wingman'` 的差别不是参数，而是**有没有判断力**。
+当前所有僚机都由 `spawnWingman()` 生成为 drone。它有三条铁律，
+外加一套由长机指令（`cmd`）决定的授权规则 —— 见上文"目标选择"：
 
 **1. 目标只能来自长机授权**
 
@@ -456,8 +477,15 @@ desired = norm(V(tan.x, climb, tan.z));      // 取切向 → 持续转圈
 
 不接管战局、不自主选目标。这不是能力不足，是它压根没有那套东西。
 
-> `tools/smoke.js` 里有四项断言：未授权时无目标、授权后继承同一目标、
-> 长机阵亡后不向敌人逼近、长机健在时不脱队。
+> `tools/smoke.js` 里有七项断言：未授权时无目标、授权后继承同一目标、
+> 长机阵亡后不向敌人逼近、长机健在时不脱队，以及三档指令
+> （`spread` 要自主接战、`cover` 要去咬威胁长机的那一架）与
+> **数据链中断时的自主防御降级**（此时即便指令是 `spread` 也不开火）。
+>
+> 数据链中断来自 `suppressed` —— 被敌方干扰机的辐射场罩住时置位，
+> 见 [game.md](game.md) 的 `updateJamming()`。这是设定 7.5
+> "强对抗环境下数据链会被切断，无人机自动降级为完全自主防御模式"
+> 那句在玩法上的落点。
 
 ---
 

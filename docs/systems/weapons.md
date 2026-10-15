@@ -279,7 +279,15 @@ cone = w.lockCone;
 if (player.pos.y > 18000) cone *= 0.78;          // 高空导引头视场收窄到 78%
 lockDist = w.lockDist;
 if (player.lockRangeK) lockDist *= player.lockRangeK;          // 光电吊舱加成
-if (player.spActive > 0) lockDist *= (1 - (w.lockReduce || 0));
+
+/* 双向压制（设定 8.3"干扰是双向的"）：自己的干扰机也在压自己的接收机。
+   强度取 ewPower —— 那条"爬升 → 压制 → 被对手对抗掉"的曲线，不是一个开关；
+   用 ewPower 而不是 spActive，切走吊舱才不会让辐射凭空消失。 */
+if (player.ewPower > 0) {
+  lockDist *= (1 - (player.ewLockReduce || 0.40) * player.ewPower);
+  cone = Math.min(cone, 20 * Math.PI / 180);     // 红外弹视场收窄到 ±20°
+}
+if (player.emcon) lockDist *= 0.5;               // EMCON-Δ：雷达关机，只剩被动手段
 ```
 
 **对空与对面是两套完全不同的判据**：
@@ -322,8 +330,11 @@ rate = 1 / (w.nezer ? 1.5
 
 按武器类型分路：
 
-1. **`kind === 'ecm'`**：不发射弹药，设 `spActive = wp.duration`、
-   重置 `spCd` 与第 0 个槽，播语音提示。冷却期间返回 `false`。
+1. **`kind === 'ecm'`**：不发射弹药 —— 转 `fireEcm()`，那是**唯一**的
+   开机入口（协处理器的自主开机 `updateEWAuto()` 也走它）。
+   `Ent.openEcm()` 写 `spActive` / `ewT` / `ewBurnT`（按**对手**技能定的
+   3–8 秒对抗窗口）/ `ewLockReduce` / 范围压制参数；`fireEcm()` 再扣
+   `spCd` 与第 0 个槽、播语音提示。冷却期间返回 `false`。
 2. **`kind === 'dew'`**：自动系统，手动发射一律返回 `false`
    （玩家按发射键会得到一句"GUS-2 是自动拦截系统"）。
 3. **弹药类**：依次检查备弹、找**一个就绪的发射槽**、交战规则。
