@@ -276,8 +276,10 @@ var UnitView = (function () {
       ['俯仰 / 滚转 / 偏航', p.pitch + ' / ' + p.roll + ' / ' + p.yaw + ' rad/s'],
       ['结构完整度', esc(p.hp)],
       ['最大挂载', a.maxLoad + ' kg'],
+      /* 预警机与重型轰炸机在数据里没有机炮（`gun: null`）。
+         以前这里会显示 "undefined" —— 那是把内部空值漏给了读者。 */
       ['机炮', (typeof WEAPONS !== 'undefined' && WEAPONS[a.gun]) ?
-        esc(WEAPONS[a.gun].name + ' ' + WEAPONS[a.gun].cn) : esc(a.gun)]
+        esc(WEAPONS[a.gun].name + ' ' + WEAPONS[a.gun].cn) : '（无）']
     ];
     var grps = a.hardpointGroups || [], seg = [];
     for (var g = 0; g < grps.length; g++) {

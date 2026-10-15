@@ -456,8 +456,12 @@ var Game = (function () {
     buildHardpointEditor(ac, lo);
 
     var sum = '<div class="ld-head">出击配置</div>';
-    sum += '<div class="ld-row"><span class="n">' + gun.name + '</span>' +
-      '<span class="a">×' + gun.ammo + '</span><span class="s">机炮</span></div>';
+    /* 没有机炮的机型（预警机、重型轰炸机）不画这一行 ——
+       `gun` 会是 undefined，直接读 gun.name 会抛异常。 */
+    if (gun) {
+      sum += '<div class="ld-row"><span class="n">' + gun.name + '</span>' +
+        '<span class="a">×' + gun.ammo + '</span><span class="s">机炮</span></div>';
+    }
     if (list.length) {
       for (k = 0; k < list.length; k++) {
         sum += '<div class="ld-row"><span class="n">' + list[k].w.name + '</span>' +
@@ -1072,7 +1076,16 @@ var Game = (function () {
       flags: {},
       objective: '', objectiveSub: '',
       roeBlocked: false, detected: false,
-      killed: 0, hitsLanded: 0, shotsFired: 0
+      killed: 0, hitsLanded: 0, shotsFired: 0,
+      /* 被摧毁的地面/海面目标数。`killed` 只数 team===1 的**飞机**，
+         设施与舰船从不进那个统计 —— 于是打掉一座平台在结算上等于没发生。
+         新关卡里有大量反舰/压制目标，必须单独记一笔。 */
+      groundKilled: 0,
+      /* 关卡时限（秒）。timeLimit 是这一关的总额度、timeLeft 是剩余；
+         0 表示没有时限。startMission 从 mission.timeLimit 落进来 ——
+         在此之前 timeLimit 声明了却全项目没人读，于是"限时任务"只有
+         简报上的一句话，没有对应的机制。 */
+      timeLimit: 0, timeLeft: 0
     };
     w.fireMissile = function (actor, target) {
       var m = launch(actor, target, w);
@@ -1300,6 +1313,10 @@ var Game = (function () {
     mission = MISSIONS[idx];
     world = newWorld();
     stats = { startTime: 0, endTime: 0 };
+
+    /* 关卡时限落到世界上。任务脚本声明 timeLimit，主循环负责倒计时与判负。 */
+    world.timeLimit = mission.timeLimit || 0;
+    world.timeLeft = world.timeLimit;
 
     var ac = AIRCRAFT[selectedAC];
     var lo = getLoadout(ac);
@@ -1831,9 +1848,26 @@ var Game = (function () {
 
     /* 干扰弹：按住 V 连续投放，一次一组。
        "组"才是战术单位 —— 真实中也是按一个程序打出去，
-       而不是一发一发抠。投放节奏由 breakLock 里的 flareCd 控制，
-       所以按住不放会自动按间隔连发，松手就停。 */
-    if (keys.KeyV) Ent.breakLock(player, world);
+       而不是一发一发抠。投放节奏由 breakLock 里的 flareCd 控制（0.45 s），
+       而同一枚弹被反复投放会越来越难骗（见 breakLock 的抗欺骗计数）。 */
+    if (keys.KeyV) {
+      if (Ent.breakLock(player, world)) {
+        /* 投放了但一枚都没骗到，而那枚弹其实已经被骗过一次 ——
+           这是"继续丢没用"的唯一信号。每 10 秒最多提醒一次，
+           否则一直按着 V 会把无线电刷满。 */
+        if (player.decoysIneffective > 0) {
+          if (player.decoyWarnT === undefined) player.decoyWarnT = 0;
+          if (player.decoyWarnT <= 0) {
+            player.decoyWarnT = 10;
+            Radio.raw({
+              who: CALLSIGN.wing2, cls: 'ally',
+              tx: '<i>诱饵没用了，长机 —— 那枚弹已经看过一次。</i>', gap: 0.7
+            });
+          }
+        }
+      }
+    }
+    if (player.decoyWarnT > 0) player.decoyWarnT -= dt;
 
     if (aimMode) {
       // 鼠标引导：飞控把机头指向瞄准点，但照样受动压与失速限制
@@ -2520,6 +2554,17 @@ var Game = (function () {
     world.time += dt;
     Radio.update(dt);
 
+    /* 关卡时限。超时由 loss 分支统一判负（见下面 mission.lose 那一段）——
+       任务脚本不需要自己写倒计时，只要在 mission 上声明 timeLimit。 */
+    if (world.timeLimit > 0 && world.timeLeft > 0) {
+      world.timeLeft -= dt;
+      if (world.timeLeft <= 0) world.timeLeft = 0;
+      if (world.timeLeft === 0 && !world.flags.timeUp) {
+        world.flags.timeUp = true;
+        Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>时间到。窗口关闭了。</b>', gap: 1.0 });
+      }
+    }
+
     if (player.alive) controlPlayer(dt);
     else SFX.gun(false);
 
@@ -2568,11 +2613,24 @@ var Game = (function () {
     else SFX.nearby(99999, 0, false);
 
     // 导弹告警
+    /* 判据：**当前锁定本机的**，或者**刚被诱饵骗掉、还在本机附近飞**的弹。
+
+       以前只认 `m.target === player`，于是撒出诱饵、导弹丢了锁的那一瞬间，
+       "滴滴滴"就没了 —— 可那枚弹并没有消失：它只是被诱饵带偏了，而且
+       盲飞期一过还可能重新咬回来（v11 / mrm / wasp 带 reAcquire）。
+       玩家听到静音就以为威胁解除，这是最危险的一类假信号。
+
+       注意排除已经失效或飞远的弹：告警不能在诱饵起作用之后一直响到
+       天荒地老，那样它也会失去意义。 */
     var warn = false;
     for (i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
-      if (m.alive && m.team !== player.team && m.target === player &&
-        M3.dist(m.pos, player.pos) < 3600) warn = true;
+      if (!m.alive || m.team === player.team) continue;
+      var md = M3.dist(m.pos, player.pos);
+      if (md >= 3600) continue;
+      var lockedOn = (m.target === player);
+      var stillAround = (m.spoofed === player && m.reLockT > 0);
+      if (lockedOn || stillAround) warn = true;
     }
     SFX.warning(warn);
 
@@ -2602,6 +2660,9 @@ var Game = (function () {
     world.killed = k;
 
     // 胜负
+    /* 时限判负在同一处兜住：声明了 timeLimit 的关卡不需要在自己的 lose()
+       里再写一遍倒计时判断，避免十个关卡十种写法。 */
+    if (world.timeLimit > 0 && world.timeLeft <= 0) { finish(false); return; }
     if (mission.lose(world)) { finish(false); return; }
     if (mission.win(world)) { finish(true); return; }
 
@@ -2900,8 +2961,11 @@ var Game = (function () {
     var acc = world.shotsFired > 0 ? world.hitsLanded / world.shotsFired : 0;
     var hull = player.alive ? player.hp / player.maxHp : 0;
     var penalty = (world.friendlyLoss || 0);
-    var score = world.killed * 1000 + Math.round(acc * 3000) + Math.round(hull * 2000)
-      + (win ? 4000 : 0) - penalty * 2500;
+    /* 地面/海面目标单独计分，权重低于一架飞机（1000）—— 否则"打设施"
+       会变成比空战更划算的刷分方式，而这类目标既不会还手也不会跑。 */
+    var gk = world.groundKilled || 0;
+    var score = world.killed * 1000 + gk * 400 + Math.round(acc * 3000)
+      + Math.round(hull * 2000) + (win ? 4000 : 0) - penalty * 2500;
 
     var rank = 'D';
     if (!win) rank = 'F';
@@ -2920,11 +2984,17 @@ var Game = (function () {
 
     var rows = [
       ['击落目标', world.killed],
+      ['地面 / 海面目标', gk],
       ['发射 / 命中', world.shotsFired + ' / ' + world.hitsLanded],
-      ['命中率', (acc * 100).toFixed(0) + '%'],
+      /* 只算机炮：hitsLanded 由子弹命中累加，导弹命中不记（见 scanShot）。
+         所以这一栏写"命中率"会让一场反舰任务的读数看起来很差 ——
+         叫"机炮精度"说的才是它真正测的东西。 */
+      ['机炮精度', (acc * 100).toFixed(0) + '%'],
       ['机体完整度', player.alive ? (hull * 100).toFixed(0) + '%' : '—'],
       ['调节单元损失', penalty],
-      ['作战时间', fmtTime(world.time)],
+      ['作战时间', world.timeLimit > 0
+        ? fmtTime(world.time) + ' / ' + fmtTime(world.timeLimit)
+        : fmtTime(world.time)],
       ['综合评定', score]
     ];
     var html = '';
@@ -2937,10 +3007,17 @@ var Game = (function () {
     var quotes = {
       m1: '「他们测绘的不是地形。是调节单元什么时候会漂到哪。」',
       m2: '「把山放在你和它之间。这句战术建议，一百年没过时。」',
-      m3: '「干井。那是我祖母的村子。一九六九年，它连着十九个月没下雨。」'
+      m3: '「冬港是我出生的地方。它是唯一一个还有水的镇子 —— 因为它在调节场的北面。」',
+      m4: '「他们不是为一场交战造的船。是为一次齐射造的。」',
+      m5: '「先让对手瞎掉，再打。这句话我们听了很多年，现在轮到我们用。」',
+      m6: '「在稀薄大气里，最会飞的人属于那支装备更差的空军。」',
+      m7: '「雾保护你，也一样保护他。」',
+      m8: '「他们不是来找我们的。他们是来炸我们身后的东西的。」',
+      m9: '「海面上漂着很多东西。有些是他们的。」',
+      m10: '「他不是来复仇的。他是来做交易的。」'
     };
     document.getElementById('dQuote').textContent = win ? quotes[mission.id] || '' :
-      '任务失败。下游的空情图仍然完整，第 7 号控制平台仍在他们的签名下运行。';
+      '任务失败。那片空域还在他们手里，而下一次出动要等下一班油。';
 
     var nb = document.getElementById('btnNext');
     /* "下一任务"只在本战役内有意义 —— 打完最后一场就该回战役选择，
@@ -3006,7 +3083,11 @@ var Game = (function () {
     for (i = 0; i < AIRCRAFT.length; i++) {
       var ac = AIRCRAFT[i];
       if (!MODELS[ac.model]) problems.push('机型 ' + ac.id + ' 引用了不存在的模型 "' + ac.model + '"');
-      if (!WEAPONS[ac.gun]) problems.push('机型 ' + ac.id + ' 引用了不存在的机炮 "' + ac.gun + '"');
+      /* 没有机炮是**合法**的（预警机、重型轰炸机在数据里就是 `gun: null`）。
+         只有"声明了机炮但数据表里没有"才是写错。 */
+      if (ac.gun && !WEAPONS[ac.gun]) {
+        problems.push('机型 ' + ac.id + ' 引用了不存在的机炮 "' + ac.gun + '"');
+      }
       // 挂载点组：组内每个点都要有坐标，且能被某种武器适配
       var grps = ac.hardpointGroups || [];
       if (!grps.length) problems.push('机型 ' + ac.id + ' 没有定义挂载点组');

@@ -382,7 +382,10 @@ var Ent = (function () {
       ctrl: { pitch: 0, roll: 0, yaw: 0 },
 
       gun: ac.gun,
-      gunAmmo: WEAPONS[ac.gun].ammo,
+      /* 没有机炮的机型（预警机、重型轰炸机）`ac.gun` 是 null。
+         这里以前直接写 WEAPONS[ac.gun].ammo，于是那一型一造出来就抛异常 ——
+         而"预警机没有任何武器"是设定里写明的事，数据迟早要对齐。 */
+      gunAmmo: (ac.gun && WEAPONS[ac.gun]) ? WEAPONS[ac.gun].ammo : 0,
       gunHeat: 0,
       firingGun: false,
 
@@ -738,7 +741,19 @@ var Ent = (function () {
       reDone: false,
       trailTimer: 0,
       seekerOn: true,
-      lostTime: 0
+      lostTime: 0,
+      /* 这一枚弹被同一次交战里的诱饵骗过几次。
+         每投一组都会被记一次（不管骗没骗到）—— 见 breakLock。 */
+      decoyTries: 0,
+      /* 被诱饵骗走之后的"盲飞"时间。
+
+         这一位取代了原来用 `reDone` 兼职的做法：那时 breakLock 把
+         `reDone = true`，于是带 reAcquire 的弹**永久**失去重捕获能力，
+         而 IR 弹那边靠 `m.spoofed` 永久排除骗过它的那一架 ——
+         一次诱饵等于让这枚弹再也咬不到你。
+
+         诱饵应该只买到**一段时间**，不是永久免疫。 */
+      reLockT: 0
     };
     m.right = M3.cross(m.up, m.fwd);
     return m;
@@ -777,7 +792,12 @@ var Ent = (function () {
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
       if (!e.alive || e.team === m.team) continue;
-      if (e === m.spoofed) continue;            // 刚用干扰弹骗过它的那一架不再咬
+
+      /* 骗过它的那一架：只在**盲飞期**内放过，之后照样可以重新咬住。
+         以前这里是无条件 `continue` —— 一次诱饵 = 这枚弹永久咬不到你，
+         而诱饵本该只买到一段时间（见 makeMissile 的 reLockT 注释）。 */
+      if (e === m.spoofed && m.reLockT > 0) continue;
+
       var to = M3.sub(e.pos, m.pos);
       var d = M3.len(to);
       if (d > maxD) continue;
@@ -793,6 +813,9 @@ var Ent = (function () {
     if (!m.alive) return;
     var w = m.w;
     m.age += dt;
+    /* 被诱饵骗走之后的盲飞计时；归零之后才重新允许捕获。
+       递减必须发生在导引段**之前**，否则捕获分支永远读不到 0。 */
+    if (m.reLockT > 0) m.reLockT -= dt;
     if (m.age > m.life) { killMissile(m, world, false); return; }
 
     // ---- 动力段 ----
@@ -837,9 +860,12 @@ var Ent = (function () {
        就在导引头的视场与捕获距离内重新挑一个**红外特征最明显**的。
        雷达弹不走这条路 —— 它得先有人把目标"锁定"给它。
 
+       **盲飞期（`reLockT`）内不寻的**：那是诱饵买到的时间。
+       这一条与下面雷达弹的重捕获共用同一个计时器。
+
        注意它跑在激光制导之前、制导段之前，所以这一帧挑中的目标
        当帧就能被修正。 */
-    if (w.seeker === 'ir' && (!t || !m.seekerOn) && world) {
+    if (w.seeker === 'ir' && (!t || !m.seekerOn) && m.reLockT <= 0 && world) {
       var acq = irAcquire(m, world);
       if (acq) {
         t = acq;
@@ -937,17 +963,36 @@ var Ent = (function () {
         return;
       }
     } else if (!t) {
-      // 无目标：直线飞
+      /* 无目标时：直线飞一会儿，然后按各自的规则重新捕获。
+
+         两种导引头走两条路，但**共用同一个盲飞计时**：
+           ir     → irAcquire（在视场与捕获距离里挑红外特征最明显的）
+           radar  → 只有 reAcquire 型才重获（BIN-4 / SUT-11 / SUT-7）
+
+         盲飞期内谁都别想重锁 —— 那正是诱饵买到的时间。 */
       m.seekerOn = false;
-      // 重新捕获
-      if (w.reAcquire && !m.reDone && world) {
-        m.reDone = true;
+
+      // 红外弹：冷却结束就允许自主寻的（irAcquire 内部会按盲飞期跳过欺骗源）
+      if (w.seeker === 'ir' && m.reLockT <= 0 && world) {
+        var acq2 = irAcquire(m, world);
+        if (acq2) {
+          m.target = acq2;
+          m.seekerOn = true;
+          m.lostTime = 0;
+          m.reDone = false;
+          t = acq2;
+        }
+      }
+
+      // 雷达弹：只有 reAcquire 型会重获，而且同样要等在盲飞期之后
+      if (!t && w.reAcquire && m.reLockT <= 0 && world) {
         var best = null, bd = 1e9;
         for (var i = 0; i < world.actors.length; i++) {
           var e = world.actors[i];
           if (!e.alive || e.team === m.team) continue;
-          // 刚刚用干扰弹骗过它的那架不再重锁 —— 但别的目标照锁不误
-          if (e === m.spoofed) continue;
+          /* 欺骗源在盲飞期后**可以被重新咬住** —— 只要它还在
+             导引头的捕获距离内。这一条以前写成"永久跳过"，
+             等于一次诱饵换来永久免疫。 */
           var d2 = M3.dist2(e.pos, m.pos);
           if (d2 < bd && d2 < 2600 * 2600) { bd = d2; best = e; }
         }
@@ -955,6 +1000,7 @@ var Ent = (function () {
           m.target = best;
           m.seekerOn = true;
           m.turn = w.turn;
+          m.lostTime = 0;
         }
       }
     }
@@ -1049,9 +1095,17 @@ var Ent = (function () {
   function breakLock(a, world) {
     if (a.flares <= 0 || a.flareCd > 0) return false;
     a.flares--;                      // 单位是"组"，一次投放一组诱饵
-    // 间隔很短：玩家按住 V 会连着丢，由他自己决定丢几组，
-    // 而不是被一个长冷却卡住（原来 1.6 s，等于一次交战只能放一发）
-    a.flareCd = 0.12;
+    /* 投放节奏。
+
+       原来是 0.12 s —— 那等于"按住 V 就以每秒八组的速度连续丢"，
+       而 `flares` 有 80 组：一枚已经咬住你的弹会在眨眼之间被
+       反复掷骰，直到骗中为止。这既不像真的诱饵，也让来袭导弹
+       失去了威胁。
+
+       现在按**一次投放一次判定**来配节奏：
+       0.45 s 的间隔给出一段可感知的"投放—观察—再投"的循环，
+       而下面的抗欺骗机制保证这不会退化成"连点必脱锁"。 */
+    a.flareCd = 0.45;
     SFX.flare();
 
     var i;
@@ -1083,7 +1137,7 @@ var Ent = (function () {
         M3.rnd(2.0, 3.2), 0.42, '#e6eef4', { drag: 1.15, grav: 0.10 });
     }
 
-    var broke = 0;
+    var broke = 0, ineffective = 0;
     for (i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
       if (!m.alive || m.target !== a) continue;
@@ -1118,15 +1172,43 @@ var Ent = (function () {
       } else {
         chance = m.w.flare;
       }
-      if (!(Math.random() < chance)) continue;
+
+      /* ---- 抗欺骗：同一枚弹，第二次投放就明显更难骗 ----
+
+         只按 `flare` 掷一次骰的话，80 组诱饵在 0.12 s 的间隔下
+         等于"必脱锁" —— 玩家连点几组就能把任何导弹打发掉，
+         而诱饵本来应该是**争取一次脱离机会**的东西。
+
+         所以每一枚弹记下自己被投过几次诱饵（`decoyTries`），
+         每投一次成功率乘 0.62：一枚 65% 的弹依次是
+         65% → 40% → 25% → 15%…… 要么第一两组就成功，
+         要么就得靠机动而不是靠继续丢。
+
+         这个计数器**不会因为一次成功而清零**：导引头一旦学会了
+         这架飞机丢诱饵的方式，重捕获之后它不会再被骗第二次。 */
+      m.decoyTries = (m.decoyTries || 0) + 1;
+      var k = Math.pow(0.62, m.decoyTries - 1);
+      // 地板：永远留一点希望，但不让"连投"变成必胜
+      chance = Math.max(0.03, chance * k);
+      if (!(Math.random() < chance)) {
+        if (!m.spoofed) ineffective++;      // 已经被骗过的弹不再重复报
+        continue;
+      }
 
       m.target = null;
       m.seekerOn = false;
       m.lostTime = 1;
-      m.reDone = true;      // 关键：否则带 reAcquire 的弹会立刻把我们锁回来
-      m.spoofed = a;        // 记住是谁骗的，重捕获时要避开它
+      /* 盲飞一段时间再允许重捕获 —— **不要**再用 reDone 兼职：
+         那一位置同时被 `reAcquire`（雷达弹）和"刚被骗过"两种语义共用，
+         结果一次诱饵就永久关掉了这枚弹的重捕获。见 makeMissile 的注释。 */
+      m.reLockT = 1.4;
+      m.spoofed = a;        // 记住是谁骗的：重捕获时优先避开它
       broke++;
     }
+    /* 把"这组诱饵没起作用"告诉上层（玩家 HUD / 无线电）。
+       返回值仍然表示**投放动作是否发生**，与命中数无关。 */
+    a.decoysIneffective = ineffective;
+    a.decoysBroke = broke;
     return true;
   }
 
@@ -1309,6 +1391,9 @@ var Ent = (function () {
     ent.alive = false;
     ent.dead = true;
     if (world) {
+      /* 设施/舰船的击毁要单独记一笔：主循环的 world.killed 只数飞机，
+         没有这一行"摧毁 3 座浮空平台"在结算上就完全不体现。 */
+      if (world.groundKilled !== undefined) world.groundKilled++;
       var s = (ent.radius || 8) / 6;
       explode(world.particles, ent.pos, s, 22 + (ent.radius | 0));
       SFX.bigHit();
@@ -1398,6 +1483,14 @@ var Ent = (function () {
       ground: !!o.ground,
       big: !!o.big,
       drift: o.drift || 0,
+      /* 航路（水面舰船用）。`wp` 是一串**海面**航点 [{x,z}…]，
+         `speed` 是米/秒（`SHIPS[].speed` 是节，接入时自己换算）。
+         有 `route` 时它优先于 `drift` —— 一条船要么沿航路走，
+         要么原地漂，不必两套叠在一起。见 stepTarget。 */
+      route: o.route || null,
+      wpIdx: 0,
+      arrive: 0,          // 航路到达阈值，在 makeTarget 末尾从 route 里取
+      heading: 0,         // 当前航向（弧度），由实际位移反推，不是设定的
       fireCd: o.fireCd === undefined ? 6 : o.fireCd,
       weapon: o.weapon || null,
       value: o.value || 100,
@@ -1407,12 +1500,61 @@ var Ent = (function () {
 
   function stepTarget(t, dt, world) {
     if (!t.alive) return;
-    if (t.drift) {
+
+    /* ---------- 航路：水面舰船真的在航行 ----------
+
+       以前只有 `drift`（正弦缓慢漂移）：浮空平台随气流飘是对的，
+       而一条 40 节的导弹快艇"原地打转"就说不通了。这一支让目标能沿
+       `route.wp` 走 —— 位置直线推进、`vel` 与 `fwd` 由**实际位移**反推。
+
+       `fwd` 走位移而不是走线段方向，是为了让渲染与 HUD 在到达航点的
+       拐弯处也能拿到连续朝向（线段方向会在换段的瞬间跳变）。 */
+    var r = t.route;
+    if (r && r.wp && r.wp.length) {
+      t.arrive = r.arrive === undefined ? Math.max(120, t.radius * 2) : r.arrive;
+      var last = r.wp.length - 1;
+      if (t.wpIdx > last) {
+        // 走完了：loop 就回绕，否则交给 onArrive 决定（默认原地停住）
+        if (r.loop) {
+          t.wpIdx = 0;
+        } else {
+          t.vel = M3.V(0, 0, 0);
+          if (r.onArrive && !t.arrived) { t.arrived = true; r.onArrive(t, world); }
+          if (r.despawn) t.alive = false;
+          return;
+        }
+      }
+      var wp = r.wp[t.wpIdx];
+      var dx = wp.x - t.pos.x, dz = wp.z - t.pos.z;
+      var d = Math.sqrt(dx * dx + dz * dz);
+      var spd = r.speed || t.speed || 12;
+      var travel = spd * dt;
+      if (d <= Math.max(t.arrive, travel)) {
+        /* 一步就能到：直接落到航点上。不做"保留剩余位移"的精确分配 ——
+           船一帧最多走十来米，分不分都对不齐，而少算这一段会让船
+           永远差一点点到不了点。 */
+        t.pos.x = wp.x; t.pos.z = wp.z;
+        t.wpIdx++;
+        var ux = d > 1e-6 ? dx / d : 0, uz = d > 1e-6 ? dz / d : 0;
+        t.vel = M3.V(ux * spd, 0, uz * spd);
+        if (d > 1e-6) t.heading = Math.atan2(dx, dz);
+      } else {
+        t.pos.x += dx / d * travel;
+        t.pos.z += dz / d * travel;
+        t.vel = M3.V(dx / d * spd, 0, dz / d * spd);
+        t.heading = Math.atan2(dx, dz);
+      }
+      var vl = M3.len(t.vel);
+      if (vl > 1e-3) t.fwd = M3.norm(t.vel);
+      /* 航行的船不做"被打坏后下沉"那一套（那是浮空平台的事），所以
+         航路分支 return —— 但 ttype 还是 ground，下沉本来也轮不到它。 */
+    } else if (t.drift) {
       t.drifting += dt;
       t.pos.x += Math.cos(t.drifting * 0.02) * t.drift * dt;
       t.pos.z += Math.sin(t.drifting * 0.017) * t.drift * 0.6 * dt;
       t.vel = M3.V(Math.cos(t.drifting * 0.02) * t.drift, 0, Math.sin(t.drifting * 0.017) * t.drift * 0.6);
     }
+
     // 缓慢下沉（被打坏的浮空平台）
     if (t.ttype === 'air' && t.hp < t.maxHp * 0.5) {
       t.pos.y -= (1 - t.hp / t.maxHp) * 1.6 * dt;

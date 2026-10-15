@@ -530,8 +530,8 @@ try {
     return origStepAircraft(a, dt, w);
   };
 
-  // 三个任务都跑一遍 —— 有些问题只在特定任务的 AI 编成下出现
-  for (const mi of [0, 1, 2]) {
+  // 全部任务都跑一遍 —— 有些问题只在特定任务的 AI 编成下出现
+  for (const mi of sandbox.MISSIONS.map((_, i) => i)) {
     try { sandbox.Game.startMission(mi); } catch (e) { continue; }
 
     const tracks = new Map();
@@ -643,7 +643,7 @@ try {
   stuckBad.forEach(fail);
   dupeInFrame.forEach(n => fail('同一帧里 ' + n + ' 出现两次'));
   if (!nanBad.length && !stuckBad.length && !dupeInFrame.length) {
-    ok('卡死检测：三任务共 ' + seen + ' 架次，最长静止 ' + worst + ' 帧，无 NaN');
+    ok('卡死检测：全部关卡共 ' + seen + ' 架次，最长静止 ' + worst + ' 帧，无 NaN');
   }
 } catch (e) {
   fail('卡死检测抛出异常 —— ' + e.message + '\n' + e.stack);
@@ -903,6 +903,113 @@ if (Ent && M3 && me && world) {
       ok('箔丝有效：雷达弹 ' + (rdRate * 100).toFixed(0) + '% 被干扰，' +
         '红外弹 ' + (irRate * 100).toFixed(0) + '%');
     }
+  }
+
+  /* ---- 抗欺骗：同一枚弹被反复投放诱饵时，一次比一次难骗 ----
+
+     只按 `flare` 掷骰的话，玩家手里的几十组诱饵等于"必脱锁"：
+     连点几组就能把任何导弹打发掉。所以每一枚弹记下自己被投过几次
+     （`m.decoyTries`），每投一次成功率乘 0.62。
+
+     这里用**同一枚弹**连续投放四次，统计各次的成功率：
+     它必须是单调下降的，而且第一次要高、第四次要低到"该换机动了"。 */
+  {
+    const pl = sandbox.Game.__player();
+    const w2 = sandbox.Game.__world();
+    const TRIALS = 500;
+    const rates = [];
+    const bad = [];
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      let lost = 0;
+      for (let i = 0; i < TRIALS; i++) {
+        const mm = Ent.makeMissile({
+          weapon: 'srm', team: 1,
+          pos: M3.V(pl.pos.x, pl.pos.y, pl.pos.z - 900),
+          fwd: M3.V(0, 0, 1), speed: 320, target: pl, owner: null
+        });
+        mm.team = 1;
+        mm.decoyTries = attempt;          // 假装它已经被投过 attempt 次
+        w2.missiles.length = 0;
+        w2.particles.length = 0;
+        w2.missiles.push(mm);
+        pl.flares = 80; pl.flareCd = 0;
+        Ent.breakLock(pl, w2);
+        if (!mm.target) lost++;
+      }
+      rates.push(lost / TRIALS);
+    }
+
+    // 单调下降（500 次采样，σ 约 2%，留 3 个百分点的余量）
+    for (let a = 1; a < rates.length; a++) {
+      if (!(rates[a] < rates[a - 1] + 0.03)) {
+        bad.push('第 ' + (a + 1) + ' 次投放（' + (rates[a] * 100).toFixed(0) +
+          '%）没有比第 ' + a + ' 次（' + (rates[a - 1] * 100).toFixed(0) + '%）更难骗');
+      }
+    }
+    if (!(rates[0] > 0.4)) {
+      bad.push('第一次投放的成功率只有 ' + (rates[0] * 100).toFixed(0) +
+        '% —— 诱饵应该至少有一次真的有用');
+    }
+    if (!(rates[3] < rates[0] * 0.6)) {
+      bad.push('第四次投放仍有 ' + (rates[3] * 100).toFixed(0) +
+        '%（第一次 ' + (rates[0] * 100).toFixed(0) + '%）—— 递减太弱，连投仍然必脱锁');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else {
+      ok('抗欺骗递减：同一枚弹连续投放的成功率 ' +
+        rates.map(r => (r * 100).toFixed(0) + '%').join(' → '));
+    }
+  }
+
+  /* ---- 诱饵只买到"一段时间"：盲飞期之后导弹仍会重新咬住 ----
+
+     这里盯的是 breakLock 的一个旧约定被拆掉之后的正确行为。
+
+     旧实现里 `breakLock` 会写 `m.reDone = true`，而这一位同时被
+     `reAcquire`（雷达弹的重捕获闸门）和"我刚被骗过"两种语义共用 ——
+     于是**一次诱饵就让这枚弹永久失去重捕获能力**；IR 弹那边靠
+     `m.spoofed` 无条件 `continue`，同样是永久免疫。
+
+     现在换成只与时间有关的 `m.reLockT`：盲飞期内谁都别想重锁，
+     归零之后雷达弹（带 reAcquire 的）可以重新咬住本机。 */
+  {
+    const pl = sandbox.Game.__player();
+    const w2 = sandbox.Game.__world();
+    const bad = [];
+
+    // 一枚 BIN-4「中继」，刚刚被本机的诱饵骗掉
+    const mm = Ent.makeMissile({
+      weapon: 'mrm', team: 1,
+      pos: M3.V(pl.pos.x, pl.pos.y, pl.pos.z + 1200),
+      fwd: M3.V(0, 0, -1), speed: 380, target: null, owner: null
+    });
+    mm.team = 1;
+    mm.spoofed = pl;
+    mm.reLockT = 1.4;
+    w2.missiles.length = 0;
+    w2.particles.length = 0;
+    w2.missiles.push(mm);
+
+    // ① 盲飞期内（跑 1 秒，还剩 0.4）：不该重新咬住
+    for (let f = 0; f < 60; f++) Ent.stepMissile(mm, 1 / 60, w2);
+    if (mm.target === pl) {
+      bad.push('盲飞期内就重新咬住了（reLockT 还剩 ' + mm.reLockT.toFixed(2) + ' s）' +
+        ' —— 诱饵等于白撒');
+    }
+    if (mm.reLockT <= 0) bad.push('跑 1 秒后 reLockT 应当仍大于 0');
+
+    // ② 跑过 1.4 秒：本机还在 2600 m 捕获圈里，应当重新咬住
+    for (let f = 0; f < 60; f++) Ent.stepMissile(mm, 1 / 60, w2);
+    if (mm.reLockT > 0) bad.push('跑了 2 秒，reLockT 仍未归零');
+    if (mm.target !== pl) {
+      bad.push('盲飞期结束后没有重新咬住本机 —— 现在变成"一次诱饵 = 永久免疫"，' +
+        '而诱饵只该买到一段时间');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('诱饵只买到一段时间：盲飞期内不重锁，1.4 s 后 BIN-4 重新咬住本机');
   }
 
   /* ---- 飞控：中心附近的前下方目标应当推杆 ---- */
@@ -1199,7 +1306,11 @@ if (Ent && M3 && me && world) {
     // 1. 第二关应当存在一架带航线的轰炸机，且基地是一个可攻击实体
     {
       const w = m2();
-      const bmb = w.actors.filter(a => a.route && a.alive);
+      /* 判据是**航线的尾炮标记**而不是"有没有 route" ——
+         预警机（spawnAewc）也是航线型单位，它会让"route 数量"多出
+         一架。tailGun 只有炸基地的那条航线写了（虽然 ROK-40 现在
+         没有机炮、尾炮是无效配置，它仍是这条航线的唯一标记）。 */
+      const bmb = w.actors.filter(a => a.route && a.route.tailGun && a.alive);
       if (bmb.length !== 2) bad.push('M2 应该有 2 架轰炸机，实际 ' + bmb.length);
       if (!w.baseTarget) bad.push('M2 没有设置基地目标');
       else if (!w.baseTarget.alive) bad.push('基地一开局就是毁的');
@@ -1208,7 +1319,7 @@ if (Ent && M3 && me && world) {
     // 2. 轰炸机不得自己选目标、不得开加力缠斗
     {
       const w = m2();
-      const bmb = w.actors.find(a => a.route && a.alive);
+      const bmb = w.actors.find(a => a.route && a.route.tailGun && a.alive);
       for (let i = 0; i < 120; i++) AI.update(bmb, 1 / 60, w);
       if (bmb.ai.target) bad.push('轰炸机自己选了目标 —— 它不该有空战逻辑');
       if (bmb.ab) bad.push('轰炸机开了加力 —— 它不追人');
@@ -1217,7 +1328,7 @@ if (Ent && M3 && me && world) {
     // 3. 飞到投弹点后应当真的伤到基地
     {
       const w = m2();
-      const bmb = w.actors.find(a => a.route && a.alive);
+      const bmb = w.actors.find(a => a.route && a.route.tailGun && a.alive);
       const hp0 = w.baseTarget.hp;
       // 直接挪到投弹点附近，省掉八十多秒的航程
       bmb.pos = M3.add(bmb.route.wp, M3.V(0, 700, 2200));
@@ -1233,7 +1344,7 @@ if (Ent && M3 && me && world) {
     // 4. 投弹两次足以摧毁基地，且摧毁后判定为失败
     {
       const w = m2();
-      const bmb = w.actors.find(a => a.route && a.alive);
+      const bmb = w.actors.find(a => a.route && a.route.tailGun && a.alive);
       Ent.damage(w.baseTarget, 100000, w, bmb);
       const ms = sandbox.MISSIONS[1];
       if (w.baseTarget.alive) bad.push('基地承受致命伤害后仍然存活');
@@ -2163,6 +2274,68 @@ if (Ent && M3 && me && world) {
 
     if (bad.length) bad.forEach(fail);
     else ok('AI 开火选弹：按目标类别与射程挑一件（3/8/12 km → srm/mrm/v17；对地弹打面目标）');
+  }
+
+  /* ---- 水面目标的航路 ----
+
+     浮空平台靠正弦 drift 随气流飘是对的，但一条 40 节的导弹快艇
+     "原地打转"说不通。所以 makeTarget 支持 route 航路，stepTarget
+     沿航点直线推进，并用**实际位移**反推 vel / fwd（渲染与 HUD 读 fwd）。
+     这条断言盯的是：位置真的在推进、fwd 是单位向量、走到终点的行为分
+     loop（回绕）与 despawn（退场）两种。 */
+  {
+    const E15 = sandbox.Ent, M15 = sandbox.M3;
+    const bad = [];
+
+    function runRoute(route, frames) {
+      const t = E15.makeTarget({
+        ttype: 'ground', model: 'dunkleosteus', label: 'T',
+        x: 0, y: 0, z: 0, hp: 800, radius: 40, ground: true, team: 1, route: route
+      });
+      const w = { time: 0 };
+      for (let i = 0; i < frames; i++) E15.stepTarget(t, 1 / 60, w);
+      return t;
+    }
+
+    /* 时间要给够：1200 m / 20 m·s⁻¹ = 60 s，再减去 arrive 阈值
+       （radius 40 → 80 m）提前到达的那一点点。 */
+    // ① 直线航行：走到 z=+1200 的航点，速度 20 m/s
+    const straight = runRoute({ wp: [{ x: 0, z: 1200 }], speed: 20 }, 60 * 70);
+    if (Math.abs(straight.pos.z - 1200) > 1) {
+      bad.push('航路：应当停在 z=1200，实际 ' + Math.round(straight.pos.z));
+    }
+    const fl = M15.len ? M15.len(straight.fwd) : Math.sqrt(
+      straight.fwd.x * straight.fwd.x + straight.fwd.y * straight.fwd.y +
+      straight.fwd.z * straight.fwd.z);
+    if (Math.abs(fl - 1) > 0.02) bad.push('航路：fwd 不是单位向量（|fwd|=' + fl.toFixed(3) + '）');
+    if (!isFinite(straight.pos.x) || !isFinite(straight.pos.z)) {
+      bad.push('航路：位置出现 NaN');
+    }
+
+    // ② loop：走完两个航点应当回绕，而不是停在终点
+    const looped = runRoute({
+      wp: [{ x: 0, z: 300 }, { x: 300, z: 300 }], speed: 30, loop: true
+    }, 60 * 60);
+    if (looped.wpIdx < 0 || looped.wpIdx > 1) {
+      bad.push('航路 loop：wpIdx 应当在 0..1 之间，实际 ' + looped.wpIdx);
+    }
+    if (Math.abs(looped.pos.z - 300) > 40 || Math.abs(looped.pos.x) > 320) {
+      bad.push('航路 loop：应当贴着两个航点来回，实际 x=' + Math.round(looped.pos.x) +
+        ' z=' + Math.round(looped.pos.z));
+    }
+
+    // ③ 非 loop：走完停在终点
+    const ended = runRoute({ wp: [{ x: 0, z: 200 }], speed: 20 }, 60 * 30);
+    if (Math.abs(ended.pos.z - 200) > 1) {
+      bad.push('航路终点：应当停在 z=200，实际 ' + Math.round(ended.pos.z));
+    }
+
+    // ④ despawn：走完且标了 despawn 就退场
+    const gone = runRoute({ wp: [{ x: 0, z: 150 }], speed: 20, despawn: true }, 60 * 30);
+    if (gone.alive) bad.push('航路 despawn：走完之后应当退场，实际还活着');
+
+    if (bad.length) bad.forEach(fail);
+    else ok('水面目标航路：沿航点推进、fwd 单位化、loop 回绕 / 非 loop 停住 / despawn 退场');
   }
 
   /* ---- BIN-8 追云：一枚对空的重型拦截弹，制空/截击机必须挂得上 ----
@@ -3421,6 +3594,64 @@ if (Ent && M3 && me && world) {
       ' 秒恢复一发（recharge ' + (w.recharge || 18) + ' 秒）');
   }
 
+  /* ---- 关卡时限：声明了 timeLimit 的关卡到点判负 ----
+
+     以前 `mission.timeLimit` 声明了却全项目没人读，"限时任务"只存在于
+     简报文本里。现在主循环倒计时并在归零时 finish(false) —— 这一条盯的
+     就是那条统一判负分支，以及"没声明时限的关卡不受影响"。 */
+  {
+    const G14 = sandbox.Game;
+    const bad = [];
+
+    // ① 1 秒时限：跑到 2 秒应当已经进了结算屏
+    G14.startMission(0);
+    const w1 = G14.__world();
+    w1.timeLimit = 1;
+    w1.timeLeft = 1;
+    for (let f = 0; f < 63 * 2; f++) pump(1);
+    if (activeScreen() !== 'scr-debrief') {
+      bad.push('1 秒时限的关卡跑到 2 秒仍未结算，当前屏幕 ' + activeScreen());
+    }
+
+    // ② 没有时限的关卡：跑够同样时间不该被时限判负，而且 HUD 不画读秒
+    G14.startMission(0);
+    const w2 = G14.__world();
+    if (w2.timeLimit !== 0 || w2.timeLeft !== 0) {
+      bad.push('未声明时限的关卡 timeLimit/timeLeft 应当是 0，实际 ' +
+        w2.timeLimit + ' / ' + w2.timeLeft);
+    }
+    for (let f = 0; f < 63 * 2; f++) pump(1);
+    const w2b = G14.__world();
+    if (w2b && w2b.timeLeft < 0) bad.push('没有时限时 timeLeft 不该变成负数');
+
+    if (bad.length) bad.forEach(fail);
+    else ok('关卡时限：声明 timeLimit 的关卡到点判负，未声明的关卡不受影响');
+  }
+
+  /* ---- 地面/海面目标计分 ----
+
+     `world.killed` 只统计 team===1 的飞机，设施与舰船从不进那个数。
+     这条盯的是 killGround 会往 groundKilled 记一笔，且结算分把它算进去。 */
+  {
+    const G15 = sandbox.Game, E15b = sandbox.Ent;
+    const bad = [];
+    G15.startMission(0);
+    const w3 = G15.__world();
+    const before = w3.groundKilled || 0;
+    const tg = E15b.makeTarget({
+      ttype: 'ground', model: 'radar', label: 'T', x: 0, y: 0, z: 0,
+      hp: 10, radius: 10, ground: true, team: 1
+    });
+    w3.targets.push(tg);
+    E15b.killGround(tg, w3);
+    if ((w3.groundKilled || 0) !== before + 1) {
+      bad.push('击毁一座设施后 groundKilled 应当 +1，实际 ' +
+        before + ' → ' + (w3.groundKilled || 0));
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('地面/海面目标计分：击毁设施计入 groundKilled（结算单列一行、权重低于飞机）');
+  }
+
   /* ============================================================
      综合压力测试
 
@@ -3640,6 +3871,10 @@ if (Ent && M3 && me && world) {
         const d = M3d.dist(a.pos, t.pos);
         const off = M3d.angleBetween(a.fwd, M3d.norm(M3d.sub(t.pos, a.pos)));
         const gw = Wd[a.gun];
+        /* 没有机炮的机型是合法的（预警机 / 重型轰炸机，`gun: null`）。
+           这条诊断只统计"有机炮的敌机该不该开火"，所以它们直接跳过 ——
+           不加这一句会在读到 gw.range 时抛异常。 */
+        if (!gw) continue;
         const gr = (a.pos.y > 18000 ? gw.highRange : gw.range);
         if (d < gr) inRange++;
         if (d < gr * 0.9 && off < 0.118) inCone++;

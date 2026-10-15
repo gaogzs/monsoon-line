@@ -1103,12 +1103,47 @@ var HUD = (function () {
        以前这里地面目标用灰蓝、锁定状态用琥珀 —— 屏外本来就看不到
        NEZ 状态，用琥珀表示"够不着"没有意义，反而让同一种色系
        承担了三种含义（说明文字、中立物、锁定）。现在只剩两种：
-       绿色是我的，红色是别人的。 */
+       绿色是我的，红色是别人的。
+
+       ---- 已锁定：额外的小修饰 ----
+
+       "当前锁定的那一架"是玩家唯一会追着看的目标，而它一旦飞出屏幕，
+       就退化成和旁边十几只箭头长得一样的东西 —— 连"我锁的是哪一架"
+       都要靠回忆。所以锁定态在屏外要能一眼认出来：
+
+         · 颜色从半透明提到**实心**（其余箭头都是压暗的陪衬）
+         · 加一圈随正弦脉动的外环 + 环内的核心点
+         · 尺寸放大（11 → 13）
+         · 读数带 `LOCK` 前缀，而不是一个裸距离
+
+       脉动用 performance.now()：这个文件里所有闪烁都是这么写的。
+       箭头画在安全矩形边界上，外环半径 +3.5 仍在 CLR 让出的余量里。 */
+    var lockPulse = 0;
     var col = isAlly ? 'rgba(79,224,138,0.52)' : 'rgba(255,77,77,0.55)';
     var sz = isLock ? 11 : (isAlly ? 8 : 9);
+    if (isLock) {
+      lockPulse = (Math.sin(performance.now() * 0.006) + 1) * 0.5;   // 0..1
+      col = isAlly ? 'rgba(79,224,138,0.98)' : 'rgba(255,96,96,0.98)';
+      sz = 13;
+    }
+    var sz0 = isLock ? 11 : (isAlly ? 8 : 9);
 
     ctx.save();
     ctx.translate(pt.x, pt.y);
+
+    if (isLock) {
+      // 外环（脉动）+ 环心亮点：先画在箭头下面，避免盖住箭头本体
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, sz0 + 3.0 + lockPulse * 2.4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.rotate(ang);
     ctx.fillStyle = col;
     ctx.beginPath();
@@ -1118,8 +1153,9 @@ var HUD = (function () {
 
     /* 读数写在**朝屏幕中心**的一侧：贴边的标记若把读数写在更外一侧，
        就又压回刚让开的仪表上了。 */
-    text(ctx, (dist / 1000).toFixed(1),
-      pt.x - dx * 20, pt.y - dy * 20 + 4, col, FS, 'center');
+    text(ctx, (isLock ? 'LOCK ' : '') + (dist / 1000).toFixed(1),
+      pt.x - dx * 20, pt.y - dy * 20 + 4, col,
+      isLock ? 'bold ' + FS : FS, 'center');
   }
 
   /* ============================================================
@@ -1294,9 +1330,17 @@ var HUD = (function () {
 
     for (var i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
-      if (!m.alive || m.target !== p) continue;
+      if (!m.alive || m.team === p.team) continue;
+      /* 和告警音同一个判据：锁定本机的**以及**刚被诱饵骗掉、
+         还在本机附近的弹，都算来袭。
 
-      var dist = M3.dist(m.pos, p.pos);
+         原来只认 `m.target === p` —— 撒一发诱饵成功之后，红色菱形
+         与距离读数一起消失，而那枚弹仍然在同一片空域里飞。
+         玩家会把"标记没了"读成"威胁没了"。 */
+      var md = M3.dist(m.pos, p.pos);
+      if (!(m.target === p || (m.spoofed === p && m.reLockT > 0))) continue;
+
+      var dist = md;
       var s = M3.project(cam, m.pos);
 
       if (s && s.x > 16 && s.x < W - 16 && s.y > 16 && s.y < H - 16) {
@@ -1436,6 +1480,17 @@ var HUD = (function () {
       'bold ' + (14 * HUDK).toFixed(1) + 'px Consolas,monospace', 'center');
     if (world.objectiveSub) {
       text(ctx, world.objectiveSub, W / 2, U(110), DIM, FS, 'center');
+    }
+
+    /* 关卡时限。只有声明了 timeLimit 的关卡才画 —— 没时限的任务
+       在目标行下面多出一行 "--:--" 只会让人以为漏看了什么。
+       最后 30 秒转琥珀色：那是"该做决定了"的颜色。 */
+    if (world.timeLimit > 0) {
+      var tl = Math.max(0, world.timeLeft);
+      var mm = Math.floor(tl / 60), ss = Math.floor(tl % 60);
+      var stamp = (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss;
+      text(ctx, 'TIME  ' + stamp, W / 2, U(128), tl <= 30 ? AMBER : DIM,
+        'bold ' + (13 * HUDK).toFixed(1) + 'px Consolas,monospace', 'center');
     }
   }
 
