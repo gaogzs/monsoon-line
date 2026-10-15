@@ -285,13 +285,28 @@ return min(nez, w.lockDist);
 - 早期这里地面目标用灰蓝、锁定状态用琥珀，结果同一色系承担了三种含义
   （说明文字、中立物、锁定），现在只剩两种：绿色是我的，红色是别人的
 
+**落点在 `offscreenRect(W, H, p)` 里**，而不是固定的页边距。屏幕四边全被
+仪表占着（上：指南针与任务目标；左：速度 / 出力带；右：高度带与动压表；
+下：雷达、武器面板、方位尺、RWR + 挂载图），贴边的箭头会横穿它们 ——
+本来只说"目标在那边"的提示，反而盖住了要读的数。所以四条边各自让开那一侧
+最宽的元件，再让**方向**决定落在矩形的哪条边上：
+
+```js
+// 方向取相机空间的横向分量；投影点的屏幕偏移就是它乘一个正数
+var c = M3.toCam(cam, t.pos);
+var pt = edgePoint(cx, cy, c.x, -c.y, offscreenRect(W, H, p));
+```
+
+方向不变、位置统一。距离读数写在**朝屏幕中心**的一侧 —— 贴边的标记若把读数
+写在外侧，就又压回刚让开的仪表上了。
+
 ### 来袭导弹
 
 导弹是唯一能真正杀死玩家的东西，而它在屏幕上只是一个小亮点，
 钻进云里就彻底看不见了。所以每一枚**以本机为目标**的导弹都会被标出：
 
 - 在屏幕内：红色菱形 + 距离（1 km 内显示米，否则显示公里）
-- 在屏幕外：贴到屏幕边缘画一个指向它的箭头 + 距离，闪烁
+- 在屏幕外：落在 `offscreenRect()` 的边界上，画一个指向它的箭头 + 距离，闪烁
 
 判断条件是 `m.target === p`（严格指向本机）。
 
@@ -394,6 +409,7 @@ HUD.banner(ctx, W, H, title, sub, alpha, col)
 HUD.hitMark(ctx, W, H, txt, alpha, col)
 HUD.computeNEZ(p, t)           // 返回不可逃逸区距离（米），非空空返回 0
 HUD.radarXY(p, wp, cx, cy, R, range)   // 世界点 → 雷达局部坐标
+HUD.offscreenRect(W, H, p)     // 屏外标记的安全矩形 {x0,y0,x1,y1}
 HUD.GREEN / AMBER / CY / RED   // 调色板，供 game.js 复用
 ```
 
@@ -542,6 +558,7 @@ ctx.strokeText(t, x, y);
 | 动压量程 / 警戒线 | `drawTapes()` 里的 `q / 60` 与 `0.2` |
 | 雷达半径与范围 | `drawRadar()` 里的 `U(104)` / `12000` |
 | 右下角布局（RWR + STORES） | `hmiLayout()` |
+| 屏外标记的安全矩形 | `offscreenRect()`（让开区）与 `edgePoint()`（落点） |
 | 俯仰刻度范围 | `drawPitchLadder()` 里的 `LIM = 40` |
 | 告警阈值 | `drawWarnings()` |
 | 颜色 | `hud.js` 顶部 `GREEN / AMBER / CY / RED / DIM` |

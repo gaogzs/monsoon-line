@@ -3491,6 +3491,108 @@ if (Ent && M3 && me && world) {
     if (drop < 15) fail('导弹急转只掉了 ' + drop.toFixed(1) + ' m/s，等于不耗能量');
     else ok('导弹急转 0.5 s 掉速 ' + drop.toFixed(0) + ' m/s（会为机动付出代价）');
   }
+
+  /* ---- HUD：屏幕外标记让开贴边仪表 ----
+
+     屏外箭头原来贴在一个固定的 54 px 页边距上，而那一圈正好是指南针、
+     速度带、雷达、武器面板的所在 —— 本来只说"目标在那边"的提示，
+     反而盖住了要读的数。落点现在收进一个"安全矩形"，这里验两件事，
+     缺一不可：
+
+       ① 矩形本身要让开四边的仪表（按文档里的布局常量独立写一遍）
+       ② 真正画出来的屏外标记都落在矩形边界上
+
+     只验①的话，把落点改回固定页边距也能过；只验②的话，
+     矩形缩到屏幕正中也算过。 */
+  {
+    const GH = sandbox.Game, RH = sandbox.Renderer, HUDH = sandbox.HUD, MH = sandbox.M3;
+    const bad = [];
+
+    GH.startMission(0);
+    pump(5);
+
+    const p = GH.__player(), w = GH.__world(), cam = RH.getCam();
+    const W = RH.W, H = RH.H;
+    if (!cam) {
+      fail('HUD 屏外标记：启动任务后拿不到相机');
+    } else {
+      const rect = HUDH.offscreenRect(W, H, p);
+      const m = Math.min(132, W * 0.15);
+      const tapeRight = m + 168;             // 空速带 + 出力带 + 读数
+      const qLeft = W - (m + 62);            // 高度带 + 动压表
+      const rows = (p.loadoutList || []).length;
+      const panelTop = H - Math.min(74, H * 0.11) - 31 - rows * 15;
+      const bearingTop = H * 0.82 - 24;
+
+      // ① 矩形要让开四边仪表
+      if (!(rect.x0 > tapeRight)) {
+        bad.push('屏外标记安全矩形的左边（' + rect.x0.toFixed(0) +
+          '）没有让开左侧速度/出力带（右缘 ' + tapeRight.toFixed(0) + '）');
+      }
+      if (!(rect.x1 < qLeft)) {
+        bad.push('屏外标记安全矩形的右边（' + rect.x1.toFixed(0) +
+          '）没有让开右侧高度带/动压表（左缘 ' + qLeft.toFixed(0) + '）');
+      }
+      if (!(rect.y0 > 116)) {
+        bad.push('屏外标记安全矩形的上边（' + rect.y0.toFixed(0) +
+          '）压在顶部指南针/任务目标上');
+      }
+      if (!(rect.y1 < Math.min(panelTop, bearingTop))) {
+        bad.push('屏外标记安全矩形的下边（' + rect.y1.toFixed(0) +
+          '）压在武器面板或方位尺上（面板顶 ' + panelTop.toFixed(0) +
+          ' / 尺顶 ' + bearingTop.toFixed(0) + '）');
+      }
+
+      // ② 五种方位各摆一个屏外目标，看箭头落在哪
+      const units = w.actors.filter(a => a.alive && a !== p);
+      if (units.length < 3) {
+        bad.push('世界里只有 ' + units.length + ' 个可摆放的单位，测不出屏外落点');
+      }
+      const dirs = [
+        MH.mul(cam.right, 1), MH.mul(cam.right, -1),
+        MH.mul(cam.up, 1), MH.mul(cam.up, -1), MH.mul(cam.fwd, -1)
+      ];
+      const n = Math.min(units.length, dirs.length);
+      for (let i = 0; i < n; i++) {
+        units[i].pos = MH.add(cam.pos, MH.mul(dirs[i], 30000));
+      }
+
+      /* HUD 里会 translate 的地方不止一处（挂载俯视图也用它），
+         所以先把俯视图关掉（drawStores 见到 p.ac 为空就返回）——
+         剩下的 translate 只有 drawOffscreen 与 drawIncomingMissiles，
+         两者共用同一套落点规则。 */
+      const realAc = p.ac;
+      p.ac = null;
+      const ctxH = RH.ctx;
+      const origTr = ctxH.translate;
+      const marks = [];
+      ctxH.translate = function (x, y) { marks.push({ x, y }); return origTr.call(this, x, y); };
+      HUDH.draw(w, p, 0, {});
+      ctxH.translate = origTr;
+      p.ac = realAc;
+
+      if (marks.length < n) {
+        bad.push('有 ' + n + ' 个目标在屏外，却只画了 ' + marks.length + ' 个屏外标记');
+      }
+      const EPS = 0.6;
+      marks.forEach((q, i) => {
+        const onEdge =
+          Math.abs(q.x - rect.x0) < EPS || Math.abs(q.x - rect.x1) < EPS ||
+          Math.abs(q.y - rect.y0) < EPS || Math.abs(q.y - rect.y1) < EPS;
+        if (!onEdge) {
+          bad.push('第 ' + (i + 1) + ' 个屏外标记不在安全矩形边界上：(' +
+            q.x.toFixed(1) + ', ' + q.y.toFixed(1) + ')，矩形 [' +
+            rect.x0.toFixed(0) + '..' + rect.x1.toFixed(0) + '] × [' +
+            rect.y0.toFixed(0) + '..' + rect.y1.toFixed(0) + ']');
+        }
+      });
+
+      if (bad.length) bad.forEach(fail);
+      else ok('屏外标记收进安全矩形：让开四边仪表，且落在矩形边界上（' +
+        Math.round(rect.x0) + '..' + Math.round(rect.x1) + ' × ' +
+        Math.round(rect.y0) + '..' + Math.round(rect.y1) + '）');
+    }
+  }
 } else {
   fail('拿不到 Ent / world，跳过干扰测试');
 }

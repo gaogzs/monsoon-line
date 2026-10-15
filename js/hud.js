@@ -729,6 +729,9 @@ var HUD = (function () {
       }
     }
 
+    // 屏外标记的落点每帧只算一次 —— 与目标数量无关
+    var offRect = offscreenRect(W, H, p);
+
     for (i = 0; i < list.length; i++) {
       var t = list[i];
       var s = M3.projectUnclamped(cam, t.pos);
@@ -737,7 +740,7 @@ var HUD = (function () {
       var isLock = (p.target === t);
 
       if (s.behind || s.x < 0 || s.x > W || s.y < 0 || s.y > H) {
-        drawOffscreen(ctx, W, H, s, t, isLock, dist, isAlly);
+        drawOffscreen(ctx, W, H, cam, t, isLock, dist, isAlly, offRect);
         continue;
       }
 
@@ -995,12 +998,73 @@ var HUD = (function () {
     return Math.min(nez, w.lockDist);
   }
 
-  function drawOffscreen(ctx, W, H, s, t, isLock, dist, isAlly) {
+  /* ============================================================
+     屏幕外标记的落点
+
+     屏外箭头原来贴在一个 54 px 的固定页边距上，而屏幕四边全被仪表占着：
+     上边是指南针与任务目标，左右是速度 / 高度 / 出力带，下边从左到右是
+     雷达、武器面板、RWR + 挂载图。箭头横穿这些仪表时，本来只说
+     "目标在那边"的提示，反而盖住了要读的数。
+
+     所以先把可落点收进一个矩形：四条边各自让开那一侧最宽的元件，
+     再让方向决定落在矩形的哪条边上。方向不变、位置统一 ——
+     "指向"是箭头的全部含义，它离中心多远只是画法。
+
+     间距全部由各元件自己的布局算出（gap / U / hmiLayout），不写死像素：
+     哪边挪了，箭头跟着挪。锁定目标那只大箭头（sz = 11）与来袭导弹的
+     箭头（尖端 14）都比 CLR 小，所以箭头本体不会越过安全线。
+     ============================================================ */
+
+  /** 屏外标记的安全矩形 —— 四条边都让开贴边的仪表 */
+  function offscreenRect(W, H, p) {
+    var CLR = U(18);                          // 让开的余量：箭头本体 + 一点呼吸
+    var m = gap(132, W, 0.15);                // 速度带 / 高度带距边的间距（与 drawTapes 同源）
+
+    // 左：空速带 + 引擎出力带（后者在空速带右边 U(104)，读数再往外）
+    var left = m + U(168) + CLR;
+    // 右：高度带 + 动压表（动压表以 x = W - m 为中心、半宽 62）
+    var right = m + U(62) + CLR;
+    // 上：指南针（含航向读数） + 两行任务目标
+    var top = U(124) + CLR;
+    // 下：武器面板（行数决定高度）与方位尺，取更靠上的那一个
+    var rows = (p && p.loadoutList) ? p.loadoutList.length : 0;
+    var panelTop = H - gap(74, H, 0.11) - U(31) - rows * U(15);
+    var bearingTop = H * 0.82 - U(24);
+    var bottom = H - Math.min(panelTop, bearingTop) + CLR;
+
+    /* 极小窗口的兜底：仪表本身就占满屏幕时，上面那套间距会把矩形算反
+       （x0 > x1）。这时退回按比例内缩，至少保证落点还落在屏内。 */
+    if (W - left - right < W * 0.40) { left = right = W * 0.30; }
+    if (H - top - bottom < H * 0.36) { top = bottom = H * 0.32; }
+
+    return { x0: left, y0: top, x1: W - right, y1: H - bottom };
+  }
+
+  /** 从屏幕中心朝 (dx, dy) 走，取与安全矩形边界的交点（dx/dy 已是单位向量） */
+  function edgePoint(cx, cy, dx, dy, r) {
+    var kx = dx > 1e-6 ? (r.x1 - cx) / dx
+      : (dx < -1e-6 ? (r.x0 - cx) / dx : Infinity);
+    var ky = dy > 1e-6 ? (r.y1 - cy) / dy
+      : (dy < -1e-6 ? (r.y0 - cy) / dy : Infinity);
+    var k = Math.min(kx, ky);
+    return { x: cx + dx * k, y: cy + dy * k };
+  }
+
+  function drawOffscreen(ctx, W, H, cam, t, isLock, dist, isAlly, rect) {
     var cx = W / 2, cy = H / 2;
-    var m = 54;
-    var px = M3.clamp(s.x, m, W - m);
-    var py = M3.clamp(s.y, m, H - m);
-    var ang = Math.atan2(py - cy, px - cx);
+
+    /* 方向取相机空间的横向分量 (x, -y)。它和投影点在屏幕上的偏移方向
+       完全一致（投影只是把两者同乘一个正数），但对"只差一点就出屏"的点
+       也稳定 —— 先把投影点夹进屏幕再求角度，会把右上角外面的目标
+       拉成"正右方"。 */
+    var c = M3.toCam(cam, t.pos);
+    var dx = c.x, dy = -c.y;
+    var l = Math.sqrt(dx * dx + dy * dy);
+    if (l < 1e-6) { dx = 0; dy = 1; }      // 正后方：方向无意义，落到正下方
+    else { dx /= l; dy /= l; }
+
+    var pt = edgePoint(cx, cy, dx, dy, rect);
+    var ang = Math.atan2(dy, dx);
 
     /* 屏幕外的箭头沿用同一套敌我语义：**友军绿、敌人红**。
 
@@ -1012,7 +1076,7 @@ var HUD = (function () {
     var sz = isLock ? 11 : (isAlly ? 8 : 9);
 
     ctx.save();
-    ctx.translate(px, py);
+    ctx.translate(pt.x, pt.y);
     ctx.rotate(ang);
     ctx.fillStyle = col;
     ctx.beginPath();
@@ -1020,7 +1084,10 @@ var HUD = (function () {
     ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    text(ctx, (dist / 1000).toFixed(1), px, py + 20, col, FS, 'center');
+    /* 读数写在**朝屏幕中心**的一侧：贴边的标记若把读数写在更外一侧，
+       就又压回刚让开的仪表上了。 */
+    text(ctx, (dist / 1000).toFixed(1),
+      pt.x - dx * 20, pt.y - dy * 20 + 4, col, FS, 'center');
   }
 
   /* ============================================================
@@ -1180,6 +1247,7 @@ var HUD = (function () {
   function drawIncomingMissiles(ctx, W, H, cam, p, world) {
     if (!world || !world.missiles || !world.missiles.length) return;
     var bl = Math.sin(performance.now() * 0.02) > -0.3;
+    var offRect = offscreenRect(W, H, p);
 
     for (var i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
@@ -1205,16 +1273,16 @@ var HUD = (function () {
         continue;
       }
 
-      // 屏幕外：贴到边缘画一个指向它的箭头
+      /* 屏幕外：落点和目标的屏外箭头用同一套安全矩形，
+         免得"来袭导弹"这条最要紧的提示反而压在仪表上。 */
       var c = M3.toCam(cam, m.pos);
       var ang = Math.atan2(-c.y, c.x);
       var dx = Math.cos(ang), dy = Math.sin(ang);
-      var pad = 58;
-      var kx = Math.abs(dx) < 1e-6 ? 1e9 : (W / 2 - pad) / Math.abs(dx);
-      var ky = Math.abs(dy) < 1e-6 ? 1e9 : (H / 2 - pad) / Math.abs(dy);
-      var kk = Math.min(kx, ky);
-      var ex = W / 2 + dx * kk;
-      var ey = H / 2 + dy * kk;
+      if (Math.abs(c.x) < 1e-6 && Math.abs(c.y) < 1e-6) {
+        dx = 0; dy = 1; ang = Math.PI / 2;    // 正后方：方向无意义，落到正下方
+      }
+      var pt = edgePoint(W / 2, H / 2, dx, dy, offRect);
+      var ex = pt.x, ey = pt.y;
 
       ctx.save();
       ctx.translate(ex, ey);
@@ -1400,6 +1468,7 @@ var HUD = (function () {
   return {
     draw: draw, banner: banner, hitMark: hitMark,
     computeNEZ: computeNEZ, radarXY: radarXY,
+    offscreenRect: offscreenRect,
     GREEN: GREEN, AMBER: AMBER, CY: CY, RED: RED
   };
 })();
