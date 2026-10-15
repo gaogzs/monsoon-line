@@ -723,6 +723,21 @@ var Ent = (function () {
   /* ============================================================
      机炮
      ============================================================ */
+
+  /* 标准正态样本（Box–Muller）。
+     一次算出两个，第二个存着下次用 —— 机炮每秒要抽两百多个数，
+     不值得为它每发建一个数组。 */
+  var gaussSpare = null;
+  function gauss() {
+    if (gaussSpare !== null) { var v = gaussSpare; gaussSpare = null; return v; }
+    var u = Math.random();
+    if (u < 1e-12) u = 1e-12;
+    var r = Math.sqrt(-2 * Math.log(u));
+    var ang = Math.PI * 2 * Math.random();
+    gaussSpare = r * Math.sin(ang);
+    return r * Math.cos(ang);
+  }
+
   function fireGun(a, world) {
     if (!a.alive || a.gunAmmo <= 0) return;
     var w = WEAPONS[a.gun];
@@ -747,10 +762,25 @@ var Ent = (function () {
     var bulletLife = gunRange / Math.max(1, w.speed);
 
     for (var i = 0; i < n; i++) {
-      var sp = M3.V(
-        M3.rnd(-1, 1) * w.spread, M3.rnd(-1, 1) * w.spread, M3.rnd(-1, 1) * w.spread
-      );
-      var dir = M3.norm(M3.add(a.fwd, sp));
+      /* ---- 炮口散布 ----
+
+         垂直于炮口轴的两个方向**各取一个独立的高斯样本**，
+         标准差就是 w.spread（弧度）。合起来是一个圆形的角散布锥。
+
+         以前是每轴取一个均匀随机数再归一化：那样"最外圈"和"正中心"
+         的弹一样密，靶纸上是一个空心方块。高斯 → 半径是瑞利分布，
+         中心密、边缘稀，才是实弹靶纸的样子。
+
+         为什么做成锥形（散布随距离线性放大）：真枪的散布本来就是
+         角度量，而这个形状正好给出想要的平衡 ——
+         一千米以内 1σ 只有两三米，机炮还是精确武器；
+         到最大射程它长成一片，打不打得中变成概率。
+         远距离那一片不靠单发精度，靠**射速**兜住：CEL-3 每秒一百多发，
+         即便最大射程上只有三成落靶，每秒仍有四十多发命中。
+         数值、算式与"射速兜底"的余量见 docs/systems/weapons.md「机炮散布」。 */
+      var dir = M3.norm(M3.add(a.fwd, M3.add(
+        M3.mul(a.right, gauss() * w.spread),
+        M3.mul(a.up, gauss() * w.spread))));
       var muzzle = M3.add(a.pos, M3.add(M3.mul(a.fwd, 6), M3.mul(a.right, (i % 2) ? 0.7 : -0.7)));
       world.bullets.push({
         kind: 'bullet', team: a.team, alive: true,

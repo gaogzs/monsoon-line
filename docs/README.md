@@ -29,7 +29,8 @@
 
 ```bash
 node tools/smoke.js                 # 唯一的自动化测试，改完代码必跑
-node tools/stamp-version.js         # 重新生成标题页的版本戳（提交前跑）
+node tools/release.js               # 发版：自动分配版本号 + 追加更新日志
+node tools/stamp-version.js         # 只刷新标题页的版本戳时间（提交前跑）
 node tools/render-planform.js       # 导出机库俯视图 PNG（本机没浏览器时看画风）
 node tools/render-ships.js          # 导出舰船外形 PNG（走游戏自己的渲染管线）
 node tools/render-units.js          # 导出单位详情页的 3D 预览 PNG
@@ -46,6 +47,8 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 |---|---|
 | [DESIGN.md](DESIGN.md) | **总设计文档** —— 架构、模块划分、数据流、关键约定、已知问题 |
 | [world/SETTING.md](world/SETTING.md) | **世界设定集** —— 可以脱离代码单独阅读 |
+| [VERSIONING.md](VERSIONING.md) | **版本号规则** —— 涨哪一位、怎么自动分配、发版流程 |
+| [../CHANGELOG.md](../CHANGELOG.md) | **更新日志** —— 玩家在游戏内「更新记录」页看到的那份，数据源在这里 |
 
 ### 核心架构
 
@@ -55,7 +58,7 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 | [systems/math3d.md](systems/math3d.md) | `js/math3d.js` | 向量、旋转、正交基、相机、投影、裁剪、射线求交 |
 | [systems/rendering.md](systems/rendering.md) | `js/render.js` | 渲染管线：画家算法、光照、天空与云、地面、粒子 |
 | [systems/audio.md](systems/audio.md) | `js/audio.js` | 程序化音效合成（WebAudio，无采样文件） |
-| [systems/tools.md](systems/tools.md) | `tools/`、`js/version.js` | 冒烟测试框架、版本戳、预览器、改名工具 |
+| [systems/tools.md](systems/tools.md) | `tools/`、`js/version.js`、`js/changelog.js` | 冒烟测试框架、发版与版本戳、预览器、改名工具 |
 
 ### 玩法系统
 

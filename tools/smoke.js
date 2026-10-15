@@ -302,6 +302,7 @@ const NAV_EXPECT = {
   codex: 'scr-codex',
   settings: 'scr-settings',
   help: 'scr-help',
+  changelog: 'scr-changelog',
   title: 'scr-title'
 };
 
@@ -321,6 +322,98 @@ for (const [go, want] of Object.entries(NAV_EXPECT)) {
   if (got === want) ok('data-go="' + go + '" → ' + want);
   else fail('data-go="' + go + '" 应激活 ' + want + '，实际 ' + got);
 }
+
+/* ============================================================
+   更新记录 / 版本号
+   —— 这一节防的是三类特别安静的故障：
+        · CHANGELOG.md 改了但忘了跑 tools/release.js，
+          于是游戏里显示的还是上一版的日志（页面照常能开，没人看得出来）
+        · 版本号逆序或重复，玩家按"最新在上"读会读错
+        · js/version.js 的版本号与日志顶部那条对不上
+   ============================================================ */
+console.log('\n== 更新记录 ==');
+{
+  const release = require('./release.js');
+  const mdText = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8');
+  const fromMd = release.parseChangelog(mdText);
+  const inGame = sandbox.CHANGELOG;
+
+  if (!inGame || !inGame.releases || !inGame.releases.length) {
+    fail('js/changelog.js 没有提供 CHANGELOG.releases');
+  } else {
+    /* 生成物必须与 CHANGELOG.md 同源 —— 忘了跑 release.js 就会在这里炸。
+
+       比的是 generateChangelogJs 产出的那份数据，不是 parseChangelog 的原始结果：
+       后者的字段顺序与生成物不同，直接比会永远不等（这个坑踩过一次）。 */
+    const a = JSON.stringify(inGame.releases);
+    const b = JSON.stringify(release.generateChangelogJs(fromMd).releases);
+    if (a !== b) {
+      fail('js/changelog.js 与 CHANGELOG.md 不同步 —— 跑一下 node tools/release.js');
+    } else {
+      ok('js/changelog.js 与 CHANGELOG.md 同源（' + fromMd.length + ' 个版本）');
+    }
+
+    // 版本号格式 + 严格递减 + 与 current 一致
+    const badFmt = [], order = [];
+    let prev = null, desc = true;
+    for (const r of inGame.releases) {
+      if (!/^v\d+\.\d+\.\d+$/.test(r.version)) badFmt.push(r.version);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date || '')) badFmt.push(r.version + ' 的日期');
+      if (!r.title) badFmt.push(r.version + ' 缺标题');
+      if (!r.commit) badFmt.push(r.version + ' 缺 <!-- commit: --> 锚点（release.js 靠它算新改动）');
+      const n = r.sections.reduce((s, x) => s + x.items.length, 0);
+      if (!n) badFmt.push(r.version + ' 一条改动都没写');
+      if (prev !== null && !(r.version < prev)) desc = false;
+      prev = r.version;
+      order.push(r.version);
+    }
+    if (badFmt.length) fail('更新日志条目有问题：' + badFmt.join('、'));
+    else ok('版本号格式 / 日期 / 锚点 / 条目：' + order.join(' > '));
+
+    if (!desc) fail('更新日志不是从新到旧排列：' + order.join(' > '));
+    else ok('更新日志按版本号递减排列');
+
+    if (inGame.current !== inGame.releases[0].version) {
+      fail('CHANGELOG.current=' + inGame.current +
+        ' 与顶部版本 ' + inGame.releases[0].version + ' 不一致');
+    } else if (sandbox.BUILD_STAMP && sandbox.BUILD_STAMP.version !== inGame.current) {
+      fail('js/version.js 的版本号 ' + sandbox.BUILD_STAMP.version +
+        ' 与更新日志顶部的 ' + inGame.current + ' 不一致');
+    } else {
+      ok('当前版本 ' + inGame.current + '：更新日志、version.js、CHANGELOG.current 三处一致');
+    }
+  }
+
+  /* 页面真的画出来了吗 —— 上一步导航循环已经点进过这一屏。
+
+     这里数的是 innerHTML 里的字符串，不是 children：
+     本测试的 DOM 桩不解析 HTML（只把 innerHTML 当字符串存下来），
+     所以按子元素数会永远得 0。断言的仍然是"每一版都画了一条"，
+     并且顺带确认每条都带版本号。 */
+  const clBody = byId.get('clBody');
+  if (!clBody) {
+    fail('index.html 缺少 #clBody');
+  } else {
+    const html = String(clBody.innerHTML || '');
+    const drawn = (html.match(/class="cl-item/g) || []).length;
+    const want = inGame && inGame.releases ? inGame.releases.length : 0;
+    if (!want) fail('更新记录页没有可显示的版本');
+    else if (drawn !== want) {
+      fail('更新记录页画出了 ' + drawn + ' 条，应该是 ' + want + ' 条');
+    } else {
+      // 每个版本号都应当出现在页面上 —— 只数条目数会漏掉"渲染到一半就断了"
+      const missing = inGame.releases
+        .map(r => r.version).filter(v => html.indexOf(v) < 0);
+      if (missing.length) fail('更新记录页漏掉了这些版本号：' + missing.join('、'));
+      else {
+        const head = byId.get('clHead');
+        ok('更新记录页渲染 ' + drawn + ' 条，版本号齐全（页眉「' +
+          (head ? String(head.textContent) : '?') + '」）');
+      }
+    }
+  }
+}
+
 
 // 回到标题，再走一遍真实流程：战役 → 简报 → 机库 → 出击
 console.log('\n== 完整流程 ==');
@@ -1674,8 +1767,28 @@ if (Ent && M3 && me && world) {
       if (got > 0 && pl2.slotCd.qsr[0] <= 0) {
         bad.push('齐射之后冷却槽没有进入装填');
       }
+
+      /* 出的几枚不能是同一个点、同一个指向 —— 完全重叠的话画面上只有
+         一条烟迹，按一下打三发和打一发看不出区别（见 game.js salvoShots）。 */
+      let fanDeg = 0, nestM = 0;
+      if (got > 1) {
+        const ms = w2.missiles.slice(w2.missiles.length - got);
+        for (let i = 1; i < ms.length; i++) {
+          fanDeg = Math.max(fanDeg, M3q.angleBetween(ms[0].fwd, ms[i].fwd) * 180 / Math.PI);
+          nestM = Math.max(nestM, M3q.dist(ms[0].pos, ms[i].pos));
+        }
+        if (fanDeg < 0.3) {
+          bad.push('齐射的 ' + got + ' 枚出膛指向几乎相同（最大夹角 ' +
+            fanDeg.toFixed(3) + '°），画面上会重叠成一发');
+        }
+        if (nestM < 0.2) {
+          bad.push('齐射的 ' + got + ' 枚从同一个点出膛（最大间距 ' +
+            nestM.toFixed(2) + ' m）');
+        }
+      }
       if (!bad.length) {
-        ok('齐射：' + qsr.name + ' 按一次出 ' + got + ' 枚，共用 1 个冷却槽');
+        ok('齐射：' + qsr.name + ' 按一次出 ' + got + ' 枚，共用 1 个冷却槽，' +
+          '出膛扇面 ' + fanDeg.toFixed(2) + '°／巢内错开 ' + nestM.toFixed(2) + ' m');
       }
     }
 
@@ -2048,7 +2161,7 @@ if (Ent && M3 && me && world) {
        ② 打出去之后**航向绝不能变** —— 无制导意味着除了重力，
           没有任何东西在影响它。这一条才算真的"一点制导都没有"。 */
   {
-    const G6 = sandbox.Game, E6 = sandbox.Ent;
+    const G6 = sandbox.Game, E6 = sandbox.Ent, M6 = sandbox.M3;
     const bad = [];
     G6.startMission(1);
     const pl = G6.__player();
@@ -2073,6 +2186,25 @@ if (Ent && M3 && me && world) {
     } else {
       ok('无锁定也能投放无制导武器（一次出膛 ' + fired + ' 枚，' +
         '锁定量 ' + pl.lockProgress.toFixed(2) + '）');
+    }
+
+    /* 火箭巢的管子是**平行**的：出膛点错开，指向只允许偏一点点。
+       无制导火箭的出膛指向就是整条弹道 —— 要是给它和导弹一样的扇面，
+       火箭巢的命中率就被悄悄改掉了（见 game.js salvoShots）。 */
+    if (fired > 1) {
+      const rs = w.missiles.slice(w.missiles.length - fired);
+      let rFan = 0, rNest = 0;
+      for (let i = 1; i < rs.length; i++) {
+        rFan = Math.max(rFan, M6.angleBetween(rs[0].fwd, rs[i].fwd) * 180 / Math.PI);
+        rNest = Math.max(rNest, M6.dist(rs[0].pos, rs[i].pos));
+      }
+      if (rFan > 2.0) {
+        bad.push('无制导火箭的出膛扇面 ' + rFan.toFixed(2) +
+          '° 太大 —— 出膛指向就是弹道，这等于改掉火箭巢的命中率');
+      }
+      if (rNest < 0.2) {
+        bad.push('火箭巢的 ' + fired + ' 枚从同一个点出膛，画面上会重叠成一发');
+      }
     }
 
     // ② 打出去的火箭必须直飞
@@ -2609,6 +2741,108 @@ if (Ent && M3 && me && world) {
     if (bad.length) bad.forEach(fail);
     else ok('机炮射程真的生效：低空 ' + Math.round(rangeLo) + ' m → 高空 ' +
       Math.round(rangeHi) + ' m（' + (rangeHi / rangeLo).toFixed(2) + ' 倍）');
+  }
+
+  /* ---- ②b 机炮散布：近距是精确武器，远距靠射速兜住 ----
+
+     三件事一起验：
+       ① 300 m 上 1σ 必须小到可以忽略（近距还要能精确点射）
+       ② 最大射程上散布必须真的长成一片（不再是一束激光）
+       ③ 那一片里的火力密度（落靶率 × 射速）还得够 —— 射速能把
+          远距离的散布补回来，但补不到"只剩噪音"那么散
+
+     统计量从 800 发落点里量。散布是角度量，所以量在哪个高度都一样
+     （highRange 只是高空的一档射程）。 */
+  {
+    const E14 = sandbox.Ent, M3b = sandbox.M3, W16 = sandbox.WEAPONS;
+    const bad = [];
+    const g = W16.k3;
+
+    /* 载机速度置零：子弹会继承机速（vel 里加了 a.vel），不清零的话
+       量到的横向偏移里混着载机本身的速度，量到的就不是散布。
+       注意 makeAircraft 里 speed 走的是 `o.speed || 300`，
+       传 0 会被顶成 300，所以只能直接改 vel。 */
+    function patternAt(R, volleys) {
+      const a = E14.makeAircraft({
+        type: 'c11', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
+        fwd: M3b.V(0, 0, 1), speed: 0
+      });
+      a.vel = M3b.V(0, 0, 0);
+      a.gun = 'k3';
+      a.gunAmmo = 1e9;
+      a.gunTimer = 0;
+      const base = M3b.add(a.pos, M3b.mul(a.fwd, 6));
+      const wd = { particles: [], bullets: [], actors: [], targets: [], missiles: [] };
+      const out = [];
+      for (let v = 0; v < volleys; v++) {
+        a.gunTimer = 0;
+        const n0 = wd.bullets.length;
+        E14.fireGun(a, wd);
+        for (let i = n0; i < wd.bullets.length; i++) {
+          const b = wd.bullets[i];
+          // 弹道走到轴向距离 R 处时，相对炮口轴的横向偏移（米）
+          out.push({
+            x: (b.pos.x - base.x) + b.vel.x / b.vel.z * R,
+            y: (b.pos.y - base.y) + b.vel.y / b.vel.z * R
+          });
+        }
+      }
+      return out;
+    }
+    // 瑞利分布：σ = sqrt(E[r²] / 2)
+    const sigmaOf = o => Math.sqrt(
+      o.reduce((s, q) => s + q.x * q.x + q.y * q.y, 0) / (2 * o.length));
+    const inTarget = (o, r) =>
+      o.filter(q => Math.sqrt(q.x * q.x + q.y * q.y) <= r).length / o.length;
+
+    const near = patternAt(300, 400);
+    const far = patternAt(g.highRange, 400);
+    const sNear = sigmaOf(near), sFar = sigmaOf(far);
+    const pFar = inTarget(far, 7.5);
+
+    if (near.length < 100) {
+      bad.push('机炮测试没打出弹来（只拿到 ' + near.length + ' 发）');
+    }
+    /* NaN 会让下面所有比较都变成 false，等于静默通过 —— 单独拦一次 */
+    if (!isFinite(sNear) || !isFinite(sFar) || !isFinite(pFar)) {
+      bad.push('机炮散布量出了 NaN（近 ' + sNear + ' / 远 ' + sFar + ' / 落靶 ' + pFar + '）');
+    }
+    if (sNear > 1.5) {
+      bad.push('300 m 上机炮 1σ 已经 ' + sNear.toFixed(2) +
+        ' m —— 近距不该散成这样，那样机炮就不是精确武器了');
+    }
+    if (sFar < 4) {
+      bad.push('最大射程上机炮 1σ 只有 ' + sFar.toFixed(2) +
+        ' m —— 散布没生效，还是一束激光');
+    }
+    if (pFar < 0.25) {
+      bad.push('最大射程上落进 7.5 m 靶的弹只有 ' + (pFar * 100).toFixed(0) +
+        '% —— 射速补不回来，极限距离点杀不成');
+    }
+
+    /* 射速兜底的量尺：把落靶率折成"每秒多少伤害"，跟最硬的一架
+       **战术机**比，要求 1.25 秒内打得掉 —— 这就是"远距离的大范围
+       散布能靠高射速弥补"这条平衡，写成一条能失败的断言。
+
+       参照目标要排除 npcOnly 的重型轰炸机（ROK-40 有 420 hp）：
+       那种东西是导弹的目标，不是拿机炮去啃的对象，把它算进来
+       量到的就不是"狗斗里机炮够不够用"。 */
+    const rps = g.rpm / 60;
+    const dps = Math.max(1, Math.round(rps * 0.033)) * rps * pFar * g.dmg;
+    const hpRef = Math.max(...sandbox.AIRCRAFT
+      .filter(x => !x.npcOnly)
+      .map(x => x.phys.hp));
+    if (dps < hpRef / 1.25) {
+      bad.push('最大射程上机炮只有 ' + Math.round(dps) + ' dmg/s（1σ ' +
+        sFar.toFixed(1) + ' m）—— 散布过大，' + hpRef +
+        ' hp 的目标要 ' + (hpRef / dps).toFixed(1) + ' 秒，射速补不回来');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('机炮散布：300 m 1σ ' + sNear.toFixed(2) + ' m（仍可精确点射）→ ' +
+      g.highRange + ' m 1σ ' + sFar.toFixed(2) + ' m，落靶 ' +
+      (pFar * 100).toFixed(0) + '%，等效 ' + Math.round(dps) + ' dmg/s（' +
+      g.rpm + ' rpm 兜住）');
   }
 
   /* ---- ③ DEW 充能必须按 recharge 计时，不能立刻补满 ---- */

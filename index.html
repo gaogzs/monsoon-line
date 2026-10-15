@@ -44,6 +44,7 @@
     <button class="btn" data-go="codex">资料库 / CODEX</button>
     <button class="btn" data-go="settings">设置</button>
     <button class="btn" data-go="help">操作说明</button>
+    <button class="btn" data-go="changelog">更新记录</button>
   </div>
   <div class="foot">点击任意处启用音频 · 建议全屏 (F11)</div>
 </section>
@@ -195,6 +196,19 @@
   <footer class="bar bottom"><button class="btn" data-go="title">返回</button></footer>
 </section>
 
+<!-- ============ 屏幕：更新记录 ============ -->
+<!-- 内容由 js/changelog.js 提供，而那是由 tools/release.js 从 CHANGELOG.md
+     生成的 —— 这屏只是一副空壳，加新版本不需要动这个文件。
+     版本号规则见 docs/VERSIONING.md。 -->
+<section id="scr-changelog" class="screen">
+  <header class="bar">
+    <span class="bar-t">更 新 记 录 / CHANGELOG</span>
+    <span class="bar-r" id="clHead">—</span>
+  </header>
+  <div class="cl-wrap" id="clBody"></div>
+  <footer class="bar bottom"><button class="btn" data-go="title">返回</button></footer>
+</section>
+
 <!-- ============ 暂停 ============ -->
 <div id="pause" class="overlay">
   <div class="pause-box wide">
@@ -229,6 +243,7 @@
 
 <!-- ============ 脚本 ============ -->
 <script src="js/version.js"></script>
+<script src="js/changelog.js"></script>
 <script src="js/math3d.js"></script>
 <script src="js/models.js"></script>
 <script src="js/planform.js"></script>

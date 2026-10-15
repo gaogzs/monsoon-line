@@ -26,15 +26,18 @@
 ```
 monsoon-line/
 ├── index.html          所有屏幕的 DOM 结构（overlay），游戏入口
+├── CHANGELOG.md        更新日志 —— 玩家在游戏内「更新记录」页看到的就是它
 ├── css/style.css       全部样式
-├── js/                 14 个模块（含自动生成的 version.js），加载顺序由 index.html 决定
+├── js/                 15 个文件（含自动生成的 version.js / changelog.js），加载顺序由 index.html 决定
 ├── docs/               你正在读的东西
 │   ├── README.md       文档索引、阅读顺序、常用命令
+│   ├── VERSIONING.md   版本号规则与发版流程
 │   ├── world/          世界设定（可单独阅读）
 │   └── systems/        各子系统设计说明（js/ 下每个模块一份）
 └── tools/
     ├── smoke.js            冒烟测试（唯一的自动化测试）
-    ├── stamp-version.js    生成 js/version.js 的版本戳
+    ├── release.js          发版：自动分配版本号 + 追加 CHANGELOG.md + 生成 js/changelog.js
+    ├── stamp-version.js    只刷新 js/version.js 的时间戳（提交前跑）
     ├── render-planform.js  俯视图 PNG 预览器（本机无浏览器时用）
     ├── render-ships.js     舰船外形 PNG 预览器（走真正的 models.js + render.js）
     ├── render-units.js     单位详情页 3D 预览 PNG（走 unitview 自己的渲染器）
@@ -52,7 +55,7 @@ monsoon-line/
 
 | # | 模块 | 职责 | 依赖 |
 |---|---|---|---|
-| 0 | `version.js` → `BUILD_STAMP` | 版本戳（**自动生成，不要手改**） | — |
+| 0 | `version.js` → `BUILD_STAMP` · `changelog.js` → `CHANGELOG` | 版本戳与更新日志（**都由 `tools/release.js` 自动生成，不要手改**） | — |
 | 1 | `math3d.js` → `M3` | 向量、罗德里格斯旋转、相机、投影、裁剪、射线求交 | — |
 | 2 | `models.js` → `MODELS` | 低多边形几何（机体、**水面舰船**、海上目标） | M3 |
 | 3 | `planform.js` → `PLANFORM` | 机库俯视识别图数据与绘制 | WEAPONS |
@@ -89,7 +92,7 @@ monsoon-line/
 `Game` 内部用字符串 `state` 表示当前屏幕，取值与 DOM 屏幕 id 一一对应：
 
 ```
-title · campaign · brief · hangar · codex · settings · help · playing · debrief
+title · campaign · brief · hangar · codex · settings · help · changelog · playing · debrief
 ```
 
 - `show(id)` 是唯一的屏幕切换入口：清掉所有 `.screen` 的 `active`，
@@ -102,6 +105,9 @@ title · campaign · brief · hangar · codex · settings · help · playing · 
   而"选哪一关"留在简报页（那里才有目标、威胁与情报）。
   战役清单由 `CAMPAIGNS`（`js/missions.js`）驱动，
   加新战役不需要动 `index.html`
+- **`changelog` 的内容一个字都不在界面代码里。** 它读全局 `CHANGELOG`
+  （`js/changelog.js`，由 `tools/release.js` 从根目录 `CHANGELOG.md` 生成），
+  所以发新版本不需要动界面。见 [6.9](#69-为什么更新日志要生成两次)
 
 **关卡索引只有一套**：`missionIdx` 始终是 `MISSIONS` 的全局下标，
 `activeCampaign` 只决定"简报页列出哪几关"和"返回回到哪一层"。
@@ -272,6 +278,33 @@ requestAnimationFrame(loop)
 改成按 `MISSIONS[i].id` 记之后，索引怎么变都不影响已有记录，
 战役进度也只是"把它名下几关的 id 数一遍"。
 
+### 6.9 为什么更新日志要生成两次
+
+玩家能看到的更新日志有两种形态，各自有各自的用处：
+
+- **`CHANGELOG.md`（根目录）** —— 给人读的。写它的地方是 pull request、
+  是 review、是"这一版到底改了什么"的讨论。格式是 Markdown，带 `###` 分类。
+- **`js/changelog.js`** —— 给游戏读的。浏览器里没有 Markdown 解析器，
+  而为了这一屏去装一个（哪怕是最小的）都违反"零依赖"这条底线。
+
+所以中间放一个 `tools/release.js`：它**读 Markdown、写 JS 对象**。
+两边都是纯数据，没有一行渲染逻辑 —— 界面只负责把 `CHANGELOG.releases` 画出来。
+
+顺手它还解决了两件本来会反复出错的麻烦事：
+
+- **版本号只有一个来源。** `CHANGELOG.md` 顶部那条是版本号的定义处；
+  `js/version.js` 与 `CHANGELOG.current` 都从它派生。三处手写必然对不上。
+- **"这一版之后有哪些提交"不需要人记。** 每个版本条目里带一个
+  `<!-- commit: xxx -->` 锚点，`release.js` 用 `git log <锚点>..HEAD`
+  取新提交，再按提交信息猜涨哪一位。锚点就是"上一版发到哪儿"的记号。
+
+代价是**多了一份生成物要同步**，而生成物一定会有人忘了重新生成。
+所以 `tools/smoke.js` 里加了一条硬断言：把 `CHANGELOG.md` 现场解析一遍，
+和要求 `js/changelog.js` 逐字段相等 —— 忘了跑 `release.js` 会在测试里炸，
+而不是在玩家屏幕上显示一份过期的日志。
+
+规则写在 [VERSIONING.md](VERSIONING.md)。
+
 ---
 
 ## 7. 性能策略
@@ -366,6 +399,12 @@ requestAnimationFrame(loop)
 | — | 新增 `tools/render-units.js` + `tools/shot-unitview.js` | 详情页有**两件事**要肉眼确认，一件工具管不了：模型画得对不对（离屏 canvas，看不见 CSS）与布局对不对（只有真浏览器能算）。前者纯 node，后者交给无头 Chrome —— 本机有 Chrome 时用它，没有就只跑前者 |
 | — | **新增战役选择层**（`CAMPAIGNS` + `#scr-campaign`） | "开始任务"原来直接进简报，等于把"打哪一场仗"和"这一场选哪一关"压在同一屏上。只有一场战役时无所谓，但已经确定以后会有别的战役 —— 那时再补这一层就要改所有返回按钮。选关仍留在简报页（那里才有目标/威胁/情报），战役只提供分组与进度。见 [6.7](#67-为什么标题与简报之间多了一层战役选择) |
 | — | 通关记录 `cleared` 从按下标改为按任务 `id` | 新战役的关卡是接着 `MISSIONS` 往后追加的，下标含义会漂移；按 id 记才不会出现"打了 A 关、B 关亮了"。见 [6.8](#68-为什么通关记录按任务-id-记不按下标) |
+| — | **齐射的每一发各自偏开出膛**（`salvoShots`：机头中线扇形展开 + 巢内横向错开） | 同一个点、同一个指向复制出来的三枚弹完全重叠，画面上只有一条烟迹，"按一下打三发"和"打一发"看不出区别 —— 齐射这个动作等于没有发生。角度那一半对有导引头的弹只能撑一两帧，所以出膛点也必须错开。见 [weapons.md](systems/weapons.md) |
+| — | **机炮加炮口散布**（角度量的高斯散布锥，远距离靠射速兜底） | 机炮原来是"每轴一个均匀随机数"的方块散布，等效 1σ 只有约 1.3 mrad —— 在最大射程上九成的弹都落进战斗机大小的靶，等于一束激光。改成圆形高斯散布锥、σ 提到 3.2 mrad：千米内仍能精确点射，最大射程上 1σ 长到 8.3 m（比飞机还大）成为一片面杀伤；那一片由 130 发/秒的射速填满，落靶率 33% 时每秒仍有四十多发命中，所以"极限距离点杀"依旧成立。见 [weapons.md](systems/weapons.md) 的「机炮散布」 |
+| — | **新增 `CHANGELOG.md` + 主菜单「更新记录」页** | 玩家从来不知道这游戏更新过什么 —— 版本戳只告诉他"部署的是哪一版"，不告诉他"这一版改了什么"。日志按提交里"换了一件事"的节点分成九个版本（v0.1.0 立项 → v1.0.0 正式发布），每个版本用开发者的口吻写一遍。见 [6.9](#69-为什么更新日志要生成两次) |
+| — | **更新日志生成两次**（`CHANGELOG.md` → `tools/release.js` → `js/changelog.js`） | 浏览器里没有 Markdown 解析器，而为了这一屏装一个（哪怕最小的）都违反"零依赖"。所以工具读 Markdown、写 JS 对象，两边都是纯数据，界面只负责画。见 [6.9](#69-为什么更新日志要生成两次) |
+| — | **新增 `docs/VERSIONING.md` + `tools/release.js`：提交自己给自己分配版本号** | 版本号原来只活在提交信息里，靠人记。现在每个版本条目带一个 `<!-- commit: xxx -->` 锚点，`release.js` 用 `git log <锚点>..HEAD` 取新提交、按提交信息判 major/minor/patch，然后把新条目追加到 `CHANGELOG.md` 顶部并刷新两个生成物。人只负责把工具生成的"待润色"标题改成人话 —— 版本号可以算，但"这批改动对玩家意味着什么"算不出来。工具只做机械的部分 |
+| — | 版本戳从标题页左上角搬到右上角 | 左上角是开机自检那几行 `.boot` 的地盘，两者都绝对定位在同一个角落，字一直是叠着印出来的；加上版本号之后第一行变长，重叠更明显 |
 
 ---
 

@@ -167,9 +167,12 @@ cd monsoon-line
 ```
 monsoon-line/
 ├── index.html          游戏入口（双击即可运行）
+├── CHANGELOG.md        更新日志（主菜单「更新记录」页读的就是它）
 ├── css/
 │   └── style.css       界面样式
 ├── js/
+│   ├── version.js      版本戳（自动生成，勿手改）
+│   ├── changelog.js    更新日志数据（自动生成，勿手改）
 │   ├── math3d.js       向量 / 罗德里格斯旋转 / 近平面裁剪 / 透视投影
 │   ├── models.js       低多边形机体 / 水面舰船 / 地面目标几何
 │   ├── codex.js        游戏内资料库（23 条目）
@@ -184,10 +187,13 @@ monsoon-line/
 │   └── game.js         状态机 / 主循环 / 无线电 / UI 绑定
 ├── docs/               文档（索引见 docs/README.md）
 │   ├── DESIGN.md       总设计文档：架构、决策理由、已知问题
+│   ├── VERSIONING.md   版本号规则：涨哪一位、怎么自动分配
 │   ├── world/          世界设定（可脱离代码单独阅读）
 │   └── systems/        渲染 / 飞行模型 / 武器 / AI / HUD / 音效
 └── tools/
     ├── smoke.js        冒烟测试（node tools/smoke.js）
+    ├── release.js      发版：自动分配版本号 + 追加更新日志
+    ├── stamp-version.js  只刷新版本戳时间
     ├── render-planform.js  机库俯视图 PNG 预览器
     ├── render-ships.js     舰船外形 PNG 预览器
     ├── render-units.js     单位详情页 3D 预览 PNG
@@ -214,6 +220,10 @@ monsoon-line/
 ## 文档
 
 - **[文档索引](docs/README.md)** —— 从这里进
+- **[更新日志](CHANGELOG.md)** —— 立项到现在的九个版本。游戏里也能看：
+  主菜单 → **更新记录**
+- **[版本号规则](docs/VERSIONING.md)** —— 每一次改动怎么自己拿到版本号、
+  `node tools/release.js` 发一次版会做哪几件事
 - **[世界设定集](docs/world/SETTING.md)** —— 可以脱离代码单独阅读：
   世界线年表、调节场工作原理、四方势力、平流层作战、兵器谱系、术语表，
   以及一节 **「真实科学与虚构的边界」**（明确区分哪些是真实大气科学，哪些是编的）
@@ -232,6 +242,17 @@ node tools/smoke.js
 这是项目唯一的自动化测试：用最小 DOM / Canvas / WebAudio 桩把所有脚本
 加载起来，跑一遍开机自检，逐个点击导航按钮，启动任务并推进 240 帧。
 **改完代码先跑它。**
+
+发一个新版本只要一条命令：
+
+```bash
+node tools/release.js
+```
+
+它会挑好版本号（大版本 / 中版本 / 小版本，规则见
+[版本号规则](docs/VERSIONING.md)）、把这一批提交追加进 `CHANGELOG.md`，
+并刷新游戏读的 `js/changelog.js` 与主菜单上的版本戳。
+剩下要你做的只有一件事：把生成的"待润色"标题改成一句人话。
 
 游戏本身还有一层**运行时自检**（`preflight()`）：模块加载失败或数据引用了
 不存在的模型/武器时，屏幕底部会弹出红色提示条列出问题。

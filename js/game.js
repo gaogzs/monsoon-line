@@ -1108,6 +1108,59 @@ var Game = (function () {
     a.spCd = sl ? Math.min.apply(null, sl) : 0;
   }
 
+  /* ============================================================
+     齐射的出膛扇面
+     ============================================================ */
+  /* 巢式武器（GIR-5 三枚 / GIR-9 两枚 / GIR-12 四枚 / PEJ-6 七枚）
+     按一下打出去的那几枚，必须各有各的出膛指向与出膛点。
+
+     以前是"同一个点、同一个指向、同一个初速"复制 n 份 —— 它们完全
+     重合：画面上只有一条烟迹、一个模型，按一下打三发和打一发看不出
+     区别，齐射这个动作等于没有发生。
+
+     现在按发射巢本来的样子把它们铺开：
+
+       ① 指向：以机头为中线左右对称地扇形展开（相邻两发差 1.8°），
+          奇偶发再上下交错 0.4 倍，最后叠一点随机抖动 ——
+          不给抖动的话每一次齐射都是同一张完全对称的图。
+       ② 出膛点：巢内横向错开 0.8 米。
+
+     ②不是装饰：带导引头的弹出膛后一两帧内就把机头掰回视线，
+     只给①的话几枚弹立刻并回同一条线；出膛点错开才会让它们在中段
+     航路上保持一整个发射巢的宽度。
+
+     ①对**无制导弹**要单独收窄（0.2°）。无制导弹的出膛指向就是它的
+     整条弹道，1.8° 的扇面等于把"七发打在同一个点"变成"七发撒在
+     半径 60 米的一圈里" —— 那是数值改动，不是视觉改动，火箭巢的
+     命中率会凭空掉一大截。火箭巢的管子本来就是平行的，该错开的
+     是管子本身（②的位置），不是指向。
+
+     偏移左右对称，平均指向仍是机头方向，命中逻辑不变；
+     单发（n ≤ 1）不做任何偏移。 */
+  var SALVO_FAN = 1.8 * Math.PI / 180;      // 制导弹：相邻两发的出膛夹角
+  var SALVO_FAN_UG = 0.2 * Math.PI / 180;   // 无制导弹：管子基本平行
+  var SALVO_VER = 0.4;                      // 上下交错量，相对 FAN
+  var SALVO_NEST = 0.8;                     // 巢内两发的横向间距（米）
+
+  function salvoShots(actor, wp, n) {
+    var base = M3.orthonormalize(actor.fwd, actor.up);
+    var fan = (wp && wp.unguided) ? SALVO_FAN_UG : SALVO_FAN;
+    var out = [];
+    for (var q = 0; q < n; q++) {
+      if (n <= 1) {
+        out.push({ fwd: base.fwd, off: M3.V(0, 0, 0) });
+        continue;
+      }
+      var k = q - (n - 1) / 2;                       // 以中线为 0 左右对称
+      var lat = k * fan + M3.rnd(-0.25, 0.25) * fan;
+      var vert = ((q % 2) ? 1 : -1) * fan * SALVO_VER;
+      var fwd = M3.rotAxis(base.fwd, base.up, lat);
+      fwd = M3.norm(M3.rotAxis(fwd, base.right, vert));
+      out.push({ fwd: fwd, off: M3.mul(base.right, k * SALVO_NEST) });
+    }
+    return out;
+  }
+
   function launch(actor, target, w) {
     var wp = WEAPONS[actor.special];
     if (!wp) return false;
@@ -1171,14 +1224,16 @@ var Game = (function () {
        武器纵列表的圆点指示、3D 挂载的下标都得改成"一点多槽"。
        共用一槽则架构完全不用动，玩家看到的也仍然是"按一下，三枚出去"。
 
-       三枚从同一点出膛，位置不做偏移 —— 它们是同一具发射巢里的弹。 */
+       出膛的那几枚各自偏开一点，见上面的 salvoShots() ——
+       同一点、同一指向出去的弹会完全重叠成一发。 */
     var nShot = Math.max(1, Math.min(wp.salvo || 1, actor.spAmmo));
+    var shots = salvoShots(actor, wp, nShot);
     for (var q = 0; q < nShot; q++) {
       var m = Ent.makeMissile({
         weapon: actor.special,
         team: actor.team,
-        pos: hp,
-        fwd: actor.fwd,
+        pos: M3.add(hp, shots[q].off),
+        fwd: shots[q].fwd,
         speed: actor.speed + 70,
         target: target || null,
         owner: actor
@@ -1314,7 +1369,7 @@ var Game = (function () {
       }
       if (e.code === 'Escape') {
         if (state === 'playing') togglePause();
-        else if (['hangar', 'codex', 'help', 'brief', 'campaign'].indexOf(state) >= 0) show('title');
+        else if (['hangar', 'codex', 'help', 'brief', 'campaign', 'changelog'].indexOf(state) >= 0) show('title');
       }
     });
     document.addEventListener('keyup', function (e) { keys[e.code] = false; });
@@ -1547,6 +1602,81 @@ var Game = (function () {
   function buildHelpPage() {
     var body = document.getElementById('helpBody');
     if (body) body.innerHTML = buildHelpHTML(false);
+  }
+
+  /* ============================================================
+     更新记录页
+
+     内容来自 js/changelog.js（全局 CHANGELOG），而那个文件由
+     tools/release.js 从根目录的 CHANGELOG.md 生成。
+     所以这里只负责画，版本号与条目一个字都不在这条代码里 ——
+     以后发新版本不需要动这个函数。
+     ============================================================ */
+
+  /* 条目里会出现 **强调** 与 `代码`。先转义再还原这两种写法 ——
+     顺序反过来的话，转义会把刚生成出来的 <b> 一起逃掉。 */
+  function clInline(s) {
+    var out = String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    out = out.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    out = out.replace(/`(.+?)`/g, '<code>$1</code>');
+    return out;
+  }
+
+  function buildChangelog() {
+    var body = document.getElementById('clBody');
+    var head = document.getElementById('clHead');
+    if (!body) return;
+
+    /* 开发时直接从源码打开、还没跑过生成脚本的情况：
+       静默降级成一句提示，不影响游戏本身（和版本戳同一种处理）。 */
+    if (typeof CHANGELOG === 'undefined' || !CHANGELOG.releases ||
+        !CHANGELOG.releases.length) {
+      if (head) head.textContent = '未生成';
+      body.innerHTML = '<div class="cl-empty">这一份还没生成更新记录。' +
+        '<br>在项目根目录跑一次 <b>node tools/release.js</b> 就有了。</div>';
+      return;
+    }
+
+    var rs = CHANGELOG.releases;
+    if (head) {
+      head.textContent = '当前 ' + (CHANGELOG.current || rs[0].version) +
+        ' · 共 ' + rs.length + ' 个版本';
+    }
+
+    var html = '';
+    for (var i = 0; i < rs.length; i++) {
+      var r = rs[i];
+      html += '<article class="cl-item' + (i === 0 ? ' cl-cur' : '') + '">';
+      html += '<div class="cl-head">';
+      html += '<span class="cl-ver">' + clInline(r.version) + '</span>';
+      html += '<span class="cl-tag t-' + ({ '大版本': 'big', '中版本': 'mid' }[r.tag] || 'small') + '">' +
+        clInline(r.tag || '') + '</span>';
+      html += '<span class="cl-date">' + clInline(r.date) + '</span>';
+      html += '<span class="cl-title">' + clInline(r.title) + '</span>';
+      if (i === 0) html += '<span class="cl-now">当前版本</span>';
+      html += '</div>';
+
+      if (r.lead) html += '<div class="cl-lead">' + clInline(r.lead) + '</div>';
+
+      for (var s = 0; s < r.sections.length; s++) {
+        var sec = r.sections[s];
+        html += '<div class="cl-sec"><div class="cl-sh">' + clInline(sec.h) + '</div><ul class="cl-list">';
+        for (var k = 0; k < sec.items.length; k++) {
+          html += '<li>' + clInline(sec.items[k]) + '</li>';
+        }
+        html += '</ul></div>';
+      }
+      html += '</article>';
+    }
+
+    /* 末尾挂一句"这一页怎么来的"，顺手把版本号规则的位置告诉下一个改代码的人。 */
+    html += '<div class="cl-foot">版本号规则见 docs/VERSIONING.md —— ' +
+      '每条提交都会由 tools/release.js 自动分配版本号并追加到这里。</div>';
+
+    body.innerHTML = html;
   }
 
   /* ============================================================
@@ -2759,12 +2889,12 @@ var Game = (function () {
   /* ============================================================
      主菜单左上角的版本戳
 
-     内容来自 js/version.js —— 那个文件由 tools/stamp-version.js
-     从 git 记录生成，每次提交前重新生成一遍。
+     内容来自 js/version.js —— 那个文件由 tools/release.js（发版）
+     或 tools/stamp-version.js（只刷时间）从 git 记录生成。
 
      为什么需要它：浏览器缓存、GitHub Pages 的重建延迟、推送失败，
      这三件事从画面上完全看不出来。而时间戳变了就说明新 commit
-     确实上线了。
+     确实上线了。版本号也一样 —— 它是 CHANGELOG.md 顶部那条。
 
      文件不在时（比如开发中直接开 index.html、或者忘了跑生成脚本）
      静默降级，不影响游戏本身。
@@ -2776,7 +2906,8 @@ var Game = (function () {
       el.innerHTML = 'BUILD <i>开发版</i>';
       return;
     }
-    el.innerHTML = 'BUILD <b>' + BUILD_STAMP.time + '</b>' +
+    var v = BUILD_STAMP.version ? BUILD_STAMP.version + ' · ' : '';
+    el.innerHTML = 'BUILD <b>' + v + BUILD_STAMP.time + '</b>' +
       '<br><i>' + BUILD_STAMP.hash + '　' + BUILD_STAMP.subject + '</i>';
   }
 
@@ -2816,6 +2947,7 @@ var Game = (function () {
         else if (go === 'codex') { buildCodex(); show('codex'); }
         else if (go === 'settings') { buildSettingsInto(document.getElementById('setWrap')); show('settings'); }
         else if (go === 'help') { buildHelpPage(); show('help'); }
+        else if (go === 'changelog') { buildChangelog(); show('changelog'); }
         else if (go === 'title') { show('title'); }
       });
     }

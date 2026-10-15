@@ -280,6 +280,10 @@ actor.spCd = Math.min.apply(null, slotArr);
 **共用同一个冷却槽**。所以每槽的冷却各自计算：连打两发之后，
 第一个槽先装填好，第二个稍后。
 
+这几发的出膛指向与出膛点各自偏开一点（`salvoShots()`）——
+同一点、同一指向出去的弹会完全重叠成一发，看不出是按了一下还是
+一下打了多发。细节见 [weapons.md](weapons.md#发射launchactor-target-w)。
+
 两个数不要混：
 
 | 名字 | 在哪 | 含义 |

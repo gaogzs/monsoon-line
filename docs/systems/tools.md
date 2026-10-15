@@ -1,6 +1,7 @@
 # 工具链与测试
 
-代码：`tools/smoke.js`（唯一的自动化测试）· `tools/stamp-version.js` + `js/version.js`（版本戳）
+代码：`tools/smoke.js`（唯一的自动化测试）· `tools/release.js` + `CHANGELOG.md` + `js/changelog.js`（发版与更新日志）
+· `tools/stamp-version.js` + `js/version.js`（版本戳）
 · `tools/render-planform.js`（离线机库俯视图预览）· `tools/render-ships.js`（离线舰船外形预览）
 · `tools/render-units.js`（离线单位 3D 预览）· `tools/shot-unitview.js`（无头 Chrome 截详情页布局）
 · `tools/lib/raster.js`（几个预览器共用的光栅器 / Canvas 桩 / PNG 编码）
@@ -12,13 +13,15 @@
 
 游戏本身**零依赖、无构建**——没有 `package.json`，没有 `node_modules`，
 双击 `index.html` 就能玩。`tools/` 全是**开发期的旁路**，跑在 Node 里，
-产物不参与游戏运行（唯一例外是 `js/version.js`）。所以这里没有 npm script，
+产物不参与游戏运行（唯二的例外是 `js/version.js` 与 `js/changelog.js`——
+那两个是游戏真的要读的数据文件）。所以这里没有 npm script，
 一律 `node tools/xxx.js`。改完代码唯一必须做的事是 `node tools/smoke.js`。
 
 | 工具 | 一句话职责 | 什么时候跑 |
 |---|---|---|
 | `smoke.js` | 在无浏览器环境把整个游戏跑起来并断言 | **每次改完代码** |
-| `stamp-version.js` | 把上一次提交写进 `js/version.js` | **每次 `git commit` 之前** |
+| `release.js` | 算下一个版本号、追加 `CHANGELOG.md`、生成 `js/changelog.js` 与 `js/version.js` | **每次发一个版本** |
+| `stamp-version.js` | 只把上一次提交写进 `js/version.js`（版本号从 `CHANGELOG.md` 顶部读） | **每次 `git commit` 之前** |
 | `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
 | `render-ships.js` | 用真正的 `models.js` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
 | `render-units.js` | 用单位详情页自己的 `renderModel()` 把 25 个单位渲染成 PNG | 改了 `unitview.js` 的渲染代码之后 |
@@ -48,7 +51,7 @@ node tools/smoke.js
 
 ```text
 == 加载脚本 ==
-  OK    13 个脚本全部加载，无语法/求值异常
+  OK    15 个脚本全部加载，无语法/求值异常
 == 初始化 ==
 [季风线] 自检通过：模块与数据引用全部一致。
   OK    开机自检通过：模块与数据引用一致
@@ -191,9 +194,10 @@ function pump(frames) {
 
 | 分组 | 在防什么回归 |
 |---|---|
-| `== 加载脚本 ==` | 13 个脚本按 `index.html` 顺序求值，任何语法错/顶层求值异常 |
+| `== 加载脚本 ==` | 15 个脚本按 `index.html` 顺序求值，任何语法错/顶层求值异常 |
 | `== 初始化 ==` | `Game.init()` 抛异常；`preflight()` 的红条；初始屏幕必须是 `scr-title` |
-| `== 导航 ==` + `== 完整流程 ==` | 六个 `data-go` 在 `game.js` 里都要有 `go === '...'` 分支，且点击后 `.active` 真的换到目标 `scr-*`；再从 title 走一遍 brief → hangar（导航失效过一次：flex item 缺 `min-height` 把 footer 顶出视口） |
+| `== 导航 ==` + `== 完整流程 ==` | 八个 `data-go` 在 `game.js` 里都要有 `go === '...'` 分支，且点击后 `.active` 真的换到目标 `scr-*`；再从 title 走一遍 brief → hangar（导航失效过一次：flex item 缺 `min-height` 把 footer 顶出视口） |
+| `== 更新记录 ==` | `js/changelog.js` 必须与 `CHANGELOG.md` **逐字段相等**（忘了跑 `release.js` 的拦网）；版本号格式 `vX.Y.Z`、日期格式、`<!-- commit: -->` 锚点、每版至少一条改动、版本号严格递减、`CHANGELOG.current` 与 `js/version.js` 的版本号一致；页面上画出的条目数 = 版本数，且每个版本号都出现在 HTML 里 |
 | `== 任务与主循环 ==` + 卡死检测：不能有飞机长时间停在原地 | `startMission(0)` 成功 + 推进 240 帧不抛异常；再让三关各跑 900 帧，查 NaN、飞机连续静止 > 60 帧、同一帧同一对象出现两次、`world.actors` 重复条目（FAIL 时打出一整串现场） |
 | `== 挂载系统 ==` | 每件武器有 `fits`/`perPoint`/`mass`；可发射武器有 `speed`/`life`；`STORE_COOLDOWN` 全覆盖；制导武器有 `lead`；挂点组是偶数点且有弹可挂；玩家出击后有 `loadoutList`/`ammoPool` 且"齐射数 = 挂点数" |
 | `== 干扰与机动 ==` | 红外/雷达弹对干扰弹的失锁率贴住 `w.flare`（含"雷达弹也吃箔丝"）；`AI.steerTo` 三条基本控制律（前下方推杆、前上方拉杆、正侧方滚转） |
@@ -273,19 +277,21 @@ function pump(frames) {
 
 ### 为什么 `js/version.js` 是自动生成的
 
-它**只有 9 行**，第一行就写着"自动生成——不要手改"。它是 `stamp-version.js`
-从 git 记录里写出来的：
+它**只有 10 行**，第一行就写着"自动生成——不要手改"。它是 `tools/release.js`
+从 git 记录里写出来的（`tools/stamp-version.js` 调的也是同一个函数）：
 
 ```js
 var BUILD_STAMP = {
-  time: '2026-10-15 08:07',          // 本地可读时间
-  iso:  '2026-10-15T08:07:40+09:00', // git 的 %cI
-  hash: 'e996405',                   // 短哈希
-  subject: "PEJ-30 改为光电制导；激光制导机制休眠保留"
+  version: "v1.0.0",                 // CHANGELOG.md 顶部那条的版本号
+  time: '2026-10-15 20:24',          // 本地可读时间
+  iso:  '2026-10-15T20:24:10+09:00', // git 的 %cI
+  hash: '09c3686',                   // 短哈希
+  subject: "舰船与飞机不再共用命名：上游改用鲸，下游改用化石"
 };
 ```
 
-四个字段全部来自 `git log -1`（`%cI` / `%h` / `%s`），时间转成本地 `YYYY-MM-DD HH:MM`。
+字段全部来自 `git log -1`（`%cI` / `%h` / `%s`），时间转成本地 `YYYY-MM-DD HH:MM`。
+`version` 是唯一的例外 —— 它来自 `CHANGELOG.md`，不是 git。
 
 **为什么必须生成而不能运行时算**：本项目没有构建步骤，页面是静态托管的，
 运行时拿不到 git 信息。也**不能用 `document.lastModified`**——那取的是 HTML 的
@@ -294,28 +300,77 @@ var BUILD_STAMP = {
 
 ### 谁来生成、什么时候必须重新生成
 
+两种跑法，产物是同一个文件：
+
 ```bash
-node tools/stamp-version.js
+node tools/release.js         # 发版：追加 CHANGELOG.md + 刷新两个生成物
+node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md 顶部读）
 ```
 
-**每次 `git commit` 之前跑一遍。** 输出形如
-`js/version.js 已更新` + 时间 + 短哈希与提交标题。
-不在 git 仓库里时它打印 `读不到 git 记录（可能不在仓库里），跳过` 并 `process.exit(0)`。
+**每次 `git commit` 之前跑一遍 `stamp-version.js`。** 输出形如
+`js/version.js 已更新` + 版本 + 时间 + 短哈希与提交标题。
+不在 git 仓库里时它打印 `读不到 git 记录（可能不在仓库里），跳过` 并退出。
 
 **注意一个细节**：脚本取的是**最后一次提交**的信息。你在提交 A 之后、提交 B 之前
 跑它，生成的 `version.js` 里记的是 A，而这个文件本身会被写进 B。所以页面上显示的
 是"这次的代码基于哪个已提交状态"——它有意的口径是**上一版**，而不是工作区里的这一版。
 
-### 标题页左上角那个时间戳的用途
+### 标题页右上角那个版本戳的用途
 
-`index.html:21` 有个 `<div id="verStamp" class="ver-stamp">`。
+`index.html` 里标题屏有个 `<div id="verStamp" class="ver-stamp">`。
 `Game.init()` 里 `stampVersion()`（`js/game.js` 内，`init()` 之前）往它填
-`BUILD 2026-10-15 08:07` 加一行 `e996405　PEJ-30 改为光电制导…`。
+`BUILD v1.0.0 · 2026-10-15 20:24` 加一行 `09c3686　舰船与飞机不再共用命名…`。
+
+（它以前在左上角，和开机自检那几行 `.boot` 叠着印；加上版本号之后第一行变长，
+重叠更明显，所以搬到了右上角。）
 
 **用途只有一个：确认部署的到底是哪一版。** 浏览器缓存、托管方的重建延迟、
 推送失败——这三件事从画面上完全看不出来，但时间戳变了就说明新的 commit
 确实上线了。文件缺失或 `BUILD_STAMP` 未定义时**静默降级**成 `BUILD 开发版`，
 不影响游戏本身（开发中直接开 `index.html` 就是这个样子）。
+
+---
+
+## tools/release.js：发版与更新日志
+
+### 解决什么问题
+
+玩家应该看得到"这游戏更新过什么"，但浏览器里没有 Markdown 解析器，
+而为了这一屏装一个（哪怕最小的）都违反"零依赖"这条底线。
+
+所以日志写两遍：**`CHANGELOG.md` 给人读，`js/changelog.js` 给游戏读**，
+中间的转换交给 `release.js`。两边都是纯数据，界面（`buildChangelog()`）
+只负责画。详见 [DESIGN.md 6.9](../DESIGN.md#69-为什么更新日志要生成两次)。
+
+### 版本号怎么算
+
+每个版本条目末尾带一个锚点：
+
+```markdown
+## [v1.0.0] 2026-10-15 · 正式发布
+<!-- commit: 09c3686 -->
+```
+
+`release.js` 读最上面那条的锚点，用 `git log <锚点>..HEAD` 取新提交，
+再按提交信息判涨哪一位（`feat!` / `[major]` / `BREAKING` → 主版本，
+`feat` / 含"新增" → 次版本，其余 → 修订）。加 `--dry` 只预览不落盘。
+规则全文在 [VERSIONING.md](../VERSIONING.md)。
+
+### 为什么不做成全自动
+
+工具只会把提交信息搬过去，**它写不出人话**：`feat: 新增战役选择层` 是提交，
+`v0.4.0 · 世界观与命名重整` 才是玩家要读的东西。一次改动往往拆成五六个提交
+（"加功能" → "修它" → "再修它" → "补文档"），玩家不需要看你的返工过程。
+
+所以分工是：**工具管机械的**（版本号、锚点、格式、生成文件），
+**人管那一句话**（合并同类项、改成标题）。生成的条目里会插一条
+`<!-- TODO: 合并同类项… -->`，看到它就说明还没润色。
+
+### 谁来保证生成物没忘
+
+`tools/smoke.js` 里加了一条硬断言：把 `CHANGELOG.md` 现场解析一遍，
+和要求 `js/changelog.js` 逐字段相等。忘了跑 `release.js` 会在测试里炸，
+而不是在玩家屏幕上显示一份过期的日志。
 
 ---
 
@@ -508,6 +563,8 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 | 压力测试时长 | 每关 1800 帧、每机型 600 帧、每武器 400 帧 |
 | 预览图尺寸 / 输出目录 / 底板色 | `render-planform.js` 顶部 `W`/`H`、`OUT`（`tools/preview/`）、`BG` |
 | 版本戳显示位置 | `index.html` 的 `<div id="verStamp">`，由 `js/game.js` 的 `stampVersion()` 填 |
+| 更新记录页的样式 | `style.css` 的 `.cl-*`；数据在 `js/changelog.js`，条目文本由 `clInline()` 还原 `**粗**` / `` `代码` `` |
+| 涨版本号的判定规则 | `release.js` 的 `levelOf()`；改它必须同步改 [VERSIONING.md](../VERSIONING.md) 第 2 节 |
 | 改名影响哪些文件 / 旧→新对照表 | `rename-aircraft.js` 的 `FILES` / `PLANES` 数组 |
 | 命名体系校验的词根表 | `smoke.js` 的 `RAFSI` / `UP_PREFIX` / `DOWN_PREFIX` |
 
@@ -536,3 +593,8 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 9. **`stamp-version.js` 记的是上一次提交，且必须在提交前跑**——
    忘了跑的话页面上还是旧时间戳，"到底部署没部署"这件事就白问了
 10. **`js/version.js` 不要手改**：它是生成物，手改等于伪造部署状态
+11. **改了 `CHANGELOG.md` 却忘了跑 `release.js`**：游戏里读的是
+    `js/changelog.js`，不会自己跟着变。`smoke.js` 里有硬断言拦这一条
+12. **`CHANGELOG.md` 的标题格式是解析契约**：`## [v1.2.3] 日期 · 标题`
+    和 `<!-- commit: xxx -->` 锚点都是 `release.js` 正则认的。
+    格式漂了会直接报错退出（宁可炸，也不要"差不多"地读出一份半截日志）

@@ -37,7 +37,7 @@
 
 ---
 ## 屏幕状态机
-`state` 是字符串，取值与 DOM 屏幕 id 一一对应（`#scr-<id>`）：`title · campaign · brief · hangar · codex · settings · help · debrief`，外加一个**没有 DOM 屏幕**的 `playing`。`show(id)` 是唯一的菜单切换入口：
+`state` 是字符串，取值与 DOM 屏幕 id 一一对应（`#scr-<id>`）：`title · campaign · brief · hangar · codex · settings · help · changelog · debrief`，外加一个**没有 DOM 屏幕**的 `playing`。`show(id)` 是唯一的菜单切换入口：
 
 ```js
 function show(id) {
@@ -66,13 +66,14 @@ function show(id) {
 | `codex` | `buildCodex(); show('codex')` |
 | `settings` | `buildSettingsInto(#setWrap); show('settings')` |
 | `help` | `buildHelpPage(); show('help')` |
+| `changelog` | `buildChangelog(); show('changelog')` |
 | `title` | `show('title')` |
 
 **先 `build*` 再 `show`**：机库/简报的内容随任务与机体变化，每次进屏幕都重新装配一遍，省掉“数据变了但界面还是旧的”这类同步问题。
 
 **为什么没有兜底 `else`**（源码注释明写）：早先的写法让任何拼错的 `data-go` 值都静默跳回标题页，出问题时完全看不出哪里错了。现在未知值**什么也不做** —— 改动时如果点了按钮没反应，第一件事就是查 `data-go` 字符串。
 
-**别的入口**：`Esc` 在 `playing` 时 `togglePause()`、在 `campaign / hangar / codex / help / brief` 时回 `show('title')`、其余状态什么也不做；`window` 的 `blur` 清空 `keys`、松开左右键并**战斗中自动暂停**（切出去不会让飞机继续飞）；暂停菜单三页签 `main / settings / help` 由 `switchPauseTab(name)` 切 `[data-ptab]` 与 `#pane-*` 的 `.on`。
+**别的入口**：`Esc` 在 `playing` 时 `togglePause()`、在 `campaign / hangar / codex / help / changelog / brief` 时回 `show('title')`、其余状态什么也不做；`window` 的 `blur` 清空 `keys`、松开左右键并**战斗中自动暂停**（切出去不会让飞机继续飞）；暂停菜单三页签 `main / settings / help` 由 `switchPauseTab(name)` 切 `[data-ptab]` 与 `#pane-*` 的 `.on`。
 
 ### 战役层（`campaign`）
 
@@ -392,12 +393,14 @@ var WD_LIMIT = 1.5;
 | 战役选择 | `buildCampaignList()` | `CAMPAIGNS[]` + `cleared`（进度） |
 | 简报 | `buildBrief()` + `buildMissionList()` + `drawMap()` | `MISSIONS[missionIdx]` + `CAMPAIGNS[activeCampaign]` |
 | 资料库 | `buildCodex()` | `CODEX[]`（条目可给 `html` 或 `build()`） |
+| 更新记录 | `buildChangelog()` | `CHANGELOG.releases[]`（`js/changelog.js`，自动生成） |
 | 结算 | `finish()` | 当场算出的 `score / rank / rows` |
 
 - `buildSettingsInto(container)` 先 `container.innerHTML = ''`，再按 `SET_GROUPS` 的组标题、`makeSetRow(item)` 逐项生成；`range / select / toggle` 三种控件各一支分支。改设置项**只需动 `SET_GROUPS` + `DEFAULTS`**，独立设置页与暂停菜单自动同步。视角用 `select`（而不是热切换）是刻意的：视角误触的代价是一瞬间失去态势感知，必须“主动选、确认”。
 - `buildHelpHTML(forPause)` 返回**两种排版**：`true` 单栏（暂停菜单，`<h4>` + `<table>`）、`false` 双栏（独立手册，两个 `.help-col`）。早期两处是两份独立 HTML，改一个忘一个。
 - 机库是**唯一让玩家做长期规划的地方**，所以 `buildHangar()` 每次都重算：`resolveLoadout` / `loadoutMass` / `passiveEffects` → 六维条显示**挂载之后**的实际值（缩水段用暗红标出并写净损失）→ 挂载点编辑器 → 俯视图 `PLANFORM.draw()`。选机体时重置 `activeHpGroup`；`loadouts[ac.id]` 只在第一次访问时按 `defaultLoadout` 初始化，之后留着玩家的改动。
 - `buildBrief()` 末尾一定调 `drawMap(m)`；地图**不画陆地** —— 战役全在纯海域上进行，画岛等于承诺一片不存在的地形。`buildCodex()` 的条目支持 `build()` 动态生成，图鉴那几条必须动态出，否则改了 `data.js` 文档就对不上。
+- `buildChangelog()` 只画不写：版本号与条目全在 `CHANGELOG`（`js/changelog.js`）里，而它是 `tools/release.js` 从根目录 `CHANGELOG.md` 生成的。**发新版本不需要改这个函数**，只改 `CHANGELOG.md` 再跑一次生成脚本。条目文本里的 `**强调**` 与 `` `代码` `` 由 `clInline()` 还原成 `<b>` / `<code>`，而且**先转义再还原** —— 顺序反过来的话，转义会把刚生成出来的标签一起逃掉。`js/changelog.js` 缺失时（开发中直接开 `index.html`）降级成一句提示，与版本戳同一种处理。
 
 ---
 ## Radio：队列与字幕
