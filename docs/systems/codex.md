@@ -100,6 +100,7 @@ var body = typeof e.build === 'function' ? e.build() : (e.html || '');
 - 可驾驶标记读 `a.npcOnly`：没有该字段 = 可驾驶，显示 `可驾驶` 徽章。所以**字段名和设定叙述都不预设玩家立场**（历史上这个字段叫 `enemyOnly`，已改名）。
 - 挂点数是从 `hardpointGroups[].pts.length` **现场数出来的**，不是另存的数字。
 - 中文名取 `a.cn`、英文绰号取 `a.nick`。注释里记了一次真实事故：早期把这两个字段写反，上游三架显示英文、新加的三架因为字段写反而显示中文，"正好颠倒"。
+- **型号名外面包了一层可点的 `<span class="cx-unit" data-unit="aircraft:<id>">`** —— 点进这一型自己的详情页。`codex.js` 只输出标记，**不绑事件**；绑定由 `game.js` 在 `#codexBody` 上做一次事件委托。理由见 [unitview.md](unitview.md#链接是怎么接上的)。
 
 ### `inv2` 的关键点
 
@@ -148,6 +149,8 @@ var order = ['上游公约', '下游同盟', '分水群岛国', '调节场管理
   放进主表会把行挤爆
 - 最后那段"舰载弹药与机载弹药共用编号"是**静态文字**，与前面的静态条目一样
   会随 `data.js` 漂移 —— 它没有读任何表
+- **编号与舰名外面包了一层可点的 `<span class="cx-unit" data-unit="ship:<id>">`**，
+  与 `inv1` 同一套约定，不需要各写一份
 
 ### 三个格式化函数的回退
 
@@ -275,6 +278,7 @@ for (const e of dyn) {
 |---|---|
 | `data.js` | `inv1` / `inv2` / `inv3` 的数据源（`AIRCRAFT` / `WEAPONS` / `SHIPS`）；`_rngTxt` 调 `missileRange()`。**加载在 codex.js 之后** |
 | `game.js` | `buildCodex()` 是唯一的消费者：建导航、渲染正文、`show('codex')` 时懒执行 |
+| `unitview.js` | 图鉴里那两个 `cx-unit` 标记的落点：`game.js` 的委托拿到 `data-unit` 后调 `UnitView.html()` / `mount()` 换成详情页。`.cx-unit` 的样式也在那一族里 |
 | `index.html` | 提供 `#scr-codex` / `#codexNav` / `#codexBody` 三个锚点，以及入口按钮 `data-go="codex"` |
 | `css/style.css` | `.cx-table` `.cx-title` `.cx-sub` `.cx-text` `.cx-note` `.cx-cat` `.cx-item` `.cx-fly`，以及 `<span class="am">` / `cy` / `rd` 三个强调色 |
 | `tools/smoke.js` | 断言动态条目可生成且 ≥200 字符；导航按钮 `data-go="codex"` → `scr-codex` |

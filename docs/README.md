@@ -30,7 +30,10 @@
 ```bash
 node tools/smoke.js                 # 唯一的自动化测试，改完代码必跑
 node tools/stamp-version.js         # 重新生成标题页的版本戳（提交前跑）
-node tools/render-planform.js       # 导出俯视图 PNG（本机没浏览器时看画风）
+node tools/render-planform.js       # 导出机库俯视图 PNG（本机没浏览器时看画风）
+node tools/render-ships.js          # 导出舰船外形 PNG（走游戏自己的渲染管线）
+node tools/render-units.js          # 导出单位详情页的 3D 预览 PNG
+node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要本机有 Chrome）
 ```
 
 ---
@@ -72,6 +75,7 @@ node tools/render-planform.js       # 导出俯视图 PNG（本机没浏览器�
 | [systems/hud.md](systems/hud.md) | `js/hud.js` | 平显：布局、各仪表、输入映射与设置系统 |
 | [systems/models.md](systems/models.md) | `js/models.js` | 低多边形几何与机型模型（含可变后掠翼） |
 | [systems/planform.md](systems/planform.md) | `js/planform.js` | 机库俯视识别图与挂载可视化 |
+| [systems/unitview.md](systems/unitview.md) | `js/unitview.js` | **单位详情页** —— 实时 3D 预览、俯视图、参数表 |
 | [systems/data.md](systems/data.md) | `js/data.js` | **静态数据表总览** —— 各表字段契约与静默回退 |
 | [systems/codex.md](systems/codex.md) | `js/codex.js` | 游戏内资料库与动态条目 |
 

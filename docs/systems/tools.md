@@ -2,7 +2,8 @@
 
 代码：`tools/smoke.js`（唯一的自动化测试）· `tools/stamp-version.js` + `js/version.js`（版本戳）
 · `tools/render-planform.js`（离线机库俯视图预览）· `tools/render-ships.js`（离线舰船外形预览）
-· `tools/lib/raster.js`（两个预览器共用的光栅器 / Canvas 桩 / PNG 编码）
+· `tools/render-units.js`（离线单位 3D 预览）· `tools/shot-unitview.js`（无头 Chrome 截详情页布局）
+· `tools/lib/raster.js`（几个预览器共用的光栅器 / Canvas 桩 / PNG 编码）
 · `tools/rename-aircraft.js`（一次性批量改名）
 
 ---
@@ -20,7 +21,9 @@
 | `stamp-version.js` | 把上一次提交写进 `js/version.js` | **每次 `git commit` 之前** |
 | `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
 | `render-ships.js` | 用真正的 `models.js` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
-| `lib/raster.js` | 供上面两个预览器共用的光栅器与 PNG 编码 | —（被 require） |
+| `render-units.js` | 用单位详情页自己的 `renderModel()` 把 25 个单位渲染成 PNG | 改了 `unitview.js` 的渲染代码之后 |
+| `shot-unitview.js` | 无头 Chrome 截详情页的**布局**（需要本机有 Chrome） | 改了详情页的 HTML 结构或 CSS 之后 |
+| `lib/raster.js` | 供上面几个预览器共用的光栅器与 PNG 编码 | —（被 require） |
 | `rename-aircraft.js` | 按表把旧机型编号全库替换成新编号 | 只在改命名规范时，一次性的 |
 
 `lib/` 这一层的由来：`render-planform.js` 最初把光栅器和 PNG 编码内联在自己文件里，
@@ -408,6 +411,51 @@ node tools/render-ships.js
   都在支持范围内
 - **它不写任何断言**，只是把图落盘。看的人负责判断"像不像"——
   这是这类工具的共同性质，别指望 CI 能替你判断画风
+
+---
+
+## tools/render-units.js 与 tools/shot-unitview.js
+
+这两个是**单位详情页**的验证工具。为什么要两个：详情页有两件事要肉眼确认，
+而它们需要的环境完全不同。
+
+| | `render-units.js` | `shot-unitview.js` |
+|---|---|---|
+| 验证什么 | **模型**画得对不对（旋转预览的画面） | **布局**对不对（左右分栏、参数表、字号） |
+| 靠什么 | 离屏 canvas + `lib/raster.js`（纯 node） | 真的无头 Chrome |
+| 看到的 | 3D 预览那一个矩形 | 整页 |
+| 依赖 | 无 | 本机装了 Chrome / Edge（或设 `CHROME_PATH`） |
+| 输出 | `tools/preview/unit-<air\|ship>-<id>.png`（25 张） | `tools/preview/shot-unit-<id>.png`（默认 4 张） |
+
+### render-units.js
+
+```bash
+node tools/render-units.js
+```
+
+它直接调 `UnitView.renderModel(cvs, model, yaw, pitch)` —— 就是详情页里那个
+函数的本体，所以**它验证的是那一份独立渲染代码**（见
+[unitview.md](unitview.md#关键决策为什么不复用-renderjs-的-renderer)，
+它和 `render.js` 是两份实现，不能靠 `render-ships.js` 替代验证）。
+
+### shot-unitview.js
+
+```bash
+node tools/shot-unitview.js              # 默认四个：有/无俯视图的飞机各一 + 两种舰船
+node tools/shot-unitview.js ship:manta   # 指定单位（ship: 前缀表示舰船）
+```
+
+它生成一个**最小页面**：只加载详情页需要的 7 个模块，刻意**不加载 `game.js`**
+（那个文件在 `load` 时会启动整个游戏），再把 `UnitView.html()` 的结果插进去。
+
+Chromium 的参数里有两个是必须的：
+
+- `--virtual-time-budget=4000` —— 让页面先"跑"几秒。3D 预览靠
+  `requestAnimationFrame` 出第一帧，不等就截到一张空画布
+- `--window-size=1400,1050` —— 详情页是左右分栏 + 下方长参数表，
+  窗口太窄会把右栏挤成一列，看不出真实比例
+
+**它找不到 Chrome 就直接报错退出**，不会生成一堆空壳页面 —— 后者最难查。
 
 ---
 

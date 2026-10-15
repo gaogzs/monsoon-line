@@ -179,6 +179,7 @@ monsoon-line/
 │   ├── entities.js     飞行模型 / 动压缩放 / 导弹比例导引
 │   ├── ai.js           追击转弯控制律 / 导弹规避 / 编队
 │   ├── hud.js          平显 / 雷达 / 锁定框 / 动压表 / RWR
+│   ├── unitview.js     单位详情页：实时 3D 预览 / 俯视图 / 参数表
 │   ├── missions.js     三个任务的战场生成与触发器
 │   └── game.js         状态机 / 主循环 / 无线电 / UI 绑定
 ├── docs/               文档（索引见 docs/README.md）
@@ -188,7 +189,9 @@ monsoon-line/
 └── tools/
     ├── smoke.js        冒烟测试（node tools/smoke.js）
     ├── render-planform.js  机库俯视图 PNG 预览器
-    └── render-ships.js     舰船外形 PNG 预览器
+    ├── render-ships.js     舰船外形 PNG 预览器
+    ├── render-units.js     单位详情页 3D 预览 PNG
+    └── shot-unitview.js    无头 Chrome 截详情页布局
 ```
 
 `js/` 下的文件按 `index.html` 中的顺序用经典 `<script>` 标签加载，
@@ -244,6 +247,10 @@ node tools/smoke.js
 海面上还有 **11 艘水面舰船**（模型、数据、图鉴、设定已就位，
 但还没有出现在任何关卡里）：四方的军船与勤务船，加上三个未参战国家
 停在这片海上的民用与科学船。见 [世界设定集 8.0.1 节](docs/world/SETTING.md)。
+
+资料库里的**每个单位都能点进去**看一页自己的详情：转子实时 3D 预览、
+矢量俯视识别图、设定全文与完整参数表 —— 25 个单位（14 机型 + 11 舰船）全覆盖。
+见 [单位详情页文档](docs/systems/unitview.md)。
 
 已知问题清单见 [设计文档第 8 节](docs/DESIGN.md#8-已知问题与待改进)。
 

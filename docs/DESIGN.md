@@ -27,7 +27,7 @@
 monsoon-line/
 ├── index.html          所有屏幕的 DOM 结构（overlay），游戏入口
 ├── css/style.css       全部样式
-├── js/                 13 个模块（含自动生成的 version.js），加载顺序由 index.html 决定
+├── js/                 14 个模块（含自动生成的 version.js），加载顺序由 index.html 决定
 ├── docs/               你正在读的东西
 │   ├── README.md       文档索引、阅读顺序、常用命令
 │   ├── world/          世界设定（可单独阅读）
@@ -37,7 +37,9 @@ monsoon-line/
     ├── stamp-version.js    生成 js/version.js 的版本戳
     ├── render-planform.js  俯视图 PNG 预览器（本机无浏览器时用）
     ├── render-ships.js     舰船外形 PNG 预览器（走真正的 models.js + render.js）
-    ├── lib/raster.js       上面两个预览器共用的光栅器 / Canvas 桩 / PNG 编码
+    ├── render-units.js     单位详情页 3D 预览 PNG（走 unitview 自己的渲染器）
+    ├── shot-unitview.js    无头 Chrome 截详情页布局（验证 CSS）
+    ├── lib/raster.js       几个预览器共用的光栅器 / Canvas 桩 / PNG 编码
     ├── rename-aircraft.js  机型批量改名
     └── preview/            预览器输出的 PNG
 ```
@@ -61,8 +63,15 @@ monsoon-line/
 | 8 | `entities.js` → `Ent` | 实体、飞行模型、导弹、粒子 | M3, WEAPONS |
 | 9 | `ai.js` → `AI` | 控制律与行为 | M3, WEAPONS, Ent |
 | 10 | `hud.js` → `HUD` | 平显 | M3, WEAPONS |
-| 11 | `missions.js` → `MISSIONS` | 三关的战场生成与触发器 | Ent, AI |
-| 12 | `game.js` → `Game` `Radio` | 状态机、主循环、UI 绑定、设置 | 全部 |
+| 11 | `unitview.js` → `UnitView` | 单位详情页：实时 3D 预览、俯视图、参数表 | M3, MODELS, PLANFORM, AIRCRAFT, SHIPS |
+| 12 | `missions.js` → `MISSIONS` | 三关的战场生成与触发器 | Ent, AI |
+| 13 | `game.js` → `Game` `Radio` | 状态机、主循环、UI 绑定、设置 | 全部 |
+
+> `unitview.js` 插在 `hud.js` 与 `missions.js` 之间，只是因为它**必须在
+> `models.js` / `planform.js` / `data.js` 之后**才能访问 `MODELS` / `PLANFORM` /
+> `AIRCRAFT` / `SHIPS`，而它本身与 `hud` / `missions` 都没有关系。
+> 它带一份**独立的 3D 渲染代码**，为什么不复用 `render.js` 见
+> [unitview.md](systems/unitview.md#关键决策为什么不复用-renderjs-的-renderer)。
 
 > **加载顺序只有一个权威来源：`index.html`。**
 > `tools/smoke.js` 从那里解析顺序，不手工维护 ——
@@ -352,6 +361,9 @@ requestAnimationFrame(loop)
 | — | **新增 11 艘水面舰船**（模型 / 数据 / 图鉴 / 设定各一份） | 战役舞台是纯海域，而海面上在此之前只有浮台。四方与三个未参战国各自的船补上之后，"这场战争里海军到底在做什么"才有一个能看的答案 —— 也是"**排水量最大的船不属于任何交战方**"这条设定的落点。见 [SETTING.md 8.0.1](world/SETTING.md) |
 | — | **舰船先做出来、不进关卡**（`SHIPS` 表 + `preflight` 清单已就位，`missions.js` 未引用） | 船的几何、数据与资料库条目可以独立验证完（模型进自检、图鉴进冒烟测试），而"它们上场之后怎么动"是另一件事 —— 现有 `makeTarget` 只支持正弦漂移，40 节的快艇需要一套航路逻辑，那要单独设计。先做能独立完成的那一半 |
 | — | 新增 `tools/render-ships.js` + `tools/lib/raster.js` | 舰船外形必须肉眼确认，而新预览器**直接走游戏自己的 `models.js` + `render.js`**（投影、光照、画家算法、配色全部是实机那一套），比再造一个 2D 预览器可信。光栅器抽到 `lib/` 共用，但**没有去动**已经被验证过的 `render-planform.js` |
+| — | **图鉴新增单位详情页**（`js/unitview.js`）：实时旋转 3D 预览 + 矢量俯视图 + 设定全文 + 参数表 | 图鉴原来只有横向对照表，"这一型到底长什么样、当初为什么这么设计"读不到。25 个单位（14 机型 + 11 舰船）全部可点进去，**设定一个字都不新写** —— 直接复用 `data.js` 里已有的 `desc`。见 [unitview.md](systems/unitview.md) |
+| — | 详情页的 3D 预览**自带一份渲染代码**，不复用 `render.js` 的 `Renderer` | `Renderer` 是单例，而游戏主循环**在资料库页面里照样每帧跑** `Renderer.begin()`/`end()` —— 把单例指向预览 canvas，下一帧就会被清空。复用要么改主循环加例外、要么把 `Renderer` 重构为多实例，两样都不划算。代价（`LIGHT` 与亮度公式要跟着 render.js 改）写在 [unitview.md](systems/unitview.md#关键决策为什么不复用-renderjs-的-renderer) 里 |
+| — | 新增 `tools/render-units.js` + `tools/shot-unitview.js` | 详情页有**两件事**要肉眼确认，一件工具管不了：模型画得对不对（离屏 canvas，看不见 CSS）与布局对不对（只有真浏览器能算）。前者纯 node，后者交给无头 Chrome —— 本机有 Chrome 时用它，没有就只跑前者 |
 | — | **新增战役选择层**（`CAMPAIGNS` + `#scr-campaign`） | "开始任务"原来直接进简报，等于把"打哪一场仗"和"这一场选哪一关"压在同一屏上。只有一场战役时无所谓，但已经确定以后会有别的战役 —— 那时再补这一层就要改所有返回按钮。选关仍留在简报页（那里才有目标/威胁/情报），战役只提供分组与进度。见 [6.7](#67-为什么标题与简报之间多了一层战役选择) |
 | — | 通关记录 `cleared` 从按下标改为按任务 `id` | 新战役的关卡是接着 `MISSIONS` 往后追加的，下标含义会漂移；按 id 记才不会出现"打了 A 关、B 关亮了"。见 [6.8](#68-为什么通关记录按任务-id-记不按下标) |
 

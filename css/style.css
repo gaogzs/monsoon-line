@@ -324,6 +324,42 @@ table.score tr.hi td:last-child{ color:var(--amber); font-weight:700; }
 .cx-table tr:hover td{ background:#0d1720; }
 
 /* ============================================================
+   单位详情页（js/unitview.js）
+   从两个图鉴条目里点单位名进来。
+   ============================================================ */
+.cx-unit{ cursor:pointer; display:inline-block; }
+.cx-unit:hover{ color:#dbe8f2; }
+.cx-unit:hover b{ color:var(--cy); text-decoration:underline; }
+
+.uv-head{ margin-bottom:18px; }
+.uv-back{ font-family:var(--mono); font-size:11px; color:var(--txt-d);
+  letter-spacing:1px; padding:3px 9px; border:1px solid var(--line2); margin-bottom:12px; }
+.uv-back:hover{ color:var(--amber); border-color:var(--amber-d); }
+.uv-title{ font-size:26px; color:var(--amber); letter-spacing:2px; margin:5px 0 3px; }
+.uv-title .uv-nick{ font-family:var(--mono); font-size:13px; color:var(--txt-d); letter-spacing:2px; }
+.uv-sub{ font-family:var(--mono); font-size:12px; color:var(--txt-d); letter-spacing:2px; }
+
+.uv-body{ display:grid; grid-template-columns:minmax(320px,480px) 1fr; gap:26px; margin-bottom:8px; }
+.uv-left{ display:flex; flex-direction:column; gap:14px; }
+.uv-right{ min-width:0; }
+.uv-desc{ max-width:640px; }
+.uv-desc p:first-child{ margin-top:0; }
+
+.uv-panel{ border:1px solid var(--line); background:#060b10; }
+.uv-cap{ font-family:var(--mono); font-size:10.5px; color:var(--txt-d); letter-spacing:2px;
+  padding:6px 9px; border-bottom:1px solid var(--line); }
+.uv-3d{ display:block; width:100%; height:250px; cursor:grab; }
+.uv-plan{ display:block; width:100%; height:auto; }
+.uv-noplan{ font-size:12px; color:var(--txt-d); line-height:1.9; padding:16px 12px; }
+.uv-tiny{ font-size:11px; color:var(--txt-d); line-height:1.8; font-family:var(--mono); }
+.uv-tiny code{ color:var(--cy); }
+
+.uv-h4{ font-family:var(--mono); font-size:13px; color:var(--amber); letter-spacing:2px;
+  margin:22px 0 8px; border-bottom:1px solid var(--line); padding-bottom:5px; }
+.uv-para th{ width:150px; }
+.uv-neutral{ color:var(--amber); }
+
+/* ============================================================
    操作说明
    ============================================================ */
 .help-wrap{ flex:1 1 auto; display:grid; grid-template-columns:1fr 1fr; gap:34px;

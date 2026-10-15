@@ -3042,6 +3042,124 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 单位详情页：生成 · 俯视图分配 · 3D 渲染 · 点击链路 ----
+     这一组覆盖 js/unitview.js。它自带一份独立的 3D 渲染代码
+     （不复用 Renderer，理由见那个文件的头部注释），所以必须单独断言。 */
+  {
+    const UV = sandbox.UnitView;
+    const ctx2dOf = () => ctx2d();
+    const fakeCanvas = () => ({ width: 320, height: 200, style: {}, getContext: ctx2dOf });
+
+    if (!UV) {
+      fail('UnitView 未加载（js/unitview.js 没进 index.html 或求值失败）');
+    } else {
+
+      /* 1. 每个有设定的单位都要能生成详情页 */
+      const cases = [];
+      for (const a of sandbox.AIRCRAFT) cases.push(['aircraft', a.id, a]);
+      for (const s of sandbox.SHIPS) cases.push(['ship', s.id, s]);
+      let bad = 0;
+      for (const [kind, id] of cases) {
+        try {
+          const h = UV.html(kind, id);
+          if (!h || h.length < 400) {
+            fail('详情页 ' + kind + ':' + id + ' 只有 ' + (h ? h.length : 0) + ' 字符');
+            bad++; continue;
+          }
+          if (h.indexOf('uvCanvas') < 0) { fail('详情页 ' + kind + ':' + id + ' 没有 3D 预览画布'); bad++; }
+          if (h.indexOf('data-unit-back') < 0) { fail('详情页 ' + kind + ':' + id + ' 没有返回按钮'); bad++; }
+          if (h.indexOf('uv-para') < 0) { fail('详情页 ' + kind + ':' + id + ' 没有参数表'); bad++; }
+        } catch (err) {
+          fail('详情页 ' + kind + ':' + id + ' 抛异常 —— ' + err.message);
+          bad++;
+        }
+      }
+      if (!bad) {
+        ok('全部 ' + cases.length + ' 个单位的详情页可生成（' +
+          sandbox.AIRCRAFT.length + ' 机型 + ' + sandbox.SHIPS.length + ' 舰船）');
+      }
+
+      /* 2. 俯视图只在真有数据的那几型上出现 ——
+          给没有数据的型号留一个空画布，玩家会以为是坏了 */
+      {
+        const P = sandbox.PLANFORM.planes;
+        const withPlan = sandbox.AIRCRAFT.filter(a => P[a.model]);
+        const without = sandbox.AIRCRAFT.filter(a => !P[a.model]);
+        let b2 = 0;
+        for (const a of withPlan) {
+          if (UV.html('aircraft', a.id).indexOf('uvPlan') < 0) {
+            fail(a.id + ' 有俯视图数据，详情页却没画'); b2++;
+          }
+        }
+        for (const a of without) {
+          if (UV.html('aircraft', a.id).indexOf('uvPlan') >= 0) {
+            fail(a.id + ' 没有俯视图数据，详情页却给了画布'); b2++;
+          }
+        }
+        for (const s of sandbox.SHIPS) {
+          if (UV.html('ship', s.id).indexOf('uvPlan') >= 0) {
+            fail(s.cn + ' 是舰船，不该有俯视图'); b2++;
+          }
+        }
+        if (!b2) {
+          ok('俯视图只出现在有数据的 ' + withPlan.length + ' 型上，' +
+            without.length + ' 型与全部舰船显示"无数据"');
+        }
+      }
+
+      /* 3. 3D 渲染器对每一个模型都要能出帧（桩 canvas 不画像素，只要求不抛异常） */
+      {
+        let b3 = 0;
+        const keys = Object.keys(sandbox.MODELS);
+        for (const k of keys) {
+          try { UV.renderModel(fakeCanvas(), sandbox.MODELS[k], 0.7, 0.30); }
+          catch (err) { fail('renderModel(' + k + ') 抛异常 —— ' + err.message); b3++; }
+        }
+        if (!b3) ok('3D 预览渲染器跑完 ' + keys.length + ' 个模型无异常');
+      }
+
+      /* 4. 点击链路：图鉴条目 → 单位链接 → 详情 → 返回 ——
+          桩的 innerHTML 不解析 HTML，所以拿不到真的 .cx-unit 元素；
+          这里手工构造一个只实现 getAttribute 的假元素来喂事件委托。 */
+      {
+        const nav = byId.get('codexNav');
+        const body = byId.get('codexBody');
+        const items = nav ? nav.children.filter(c => /cx-item/.test(c.className || '')) : [];
+        const invIdx = sandbox.CODEX.findIndex(e => e.title === '机型图鉴');
+        if (!body || invIdx < 0 || !items[invIdx]) {
+          fail('找不到机型图鉴导航项，点击链路无法验证');
+        } else {
+          items[invIdx].fire('click');
+          const listHTML = body.innerHTML || '';
+          if (listHTML.indexOf('data-unit="aircraft:c11"') < 0) {
+            fail('机型图鉴里没有可点的单位链接');
+          }
+          if (typeof body.onclick !== 'function') {
+            fail('codexBody 上没有挂单位链接的事件委托');
+          } else {
+            body.onclick({
+              target: { getAttribute: k => (k === 'data-unit' ? 'aircraft:c11' : null), parentNode: null }
+            });
+            const detailHTML = body.innerHTML || '';
+            if (detailHTML.indexOf('uvCanvas') < 0 || detailHTML.indexOf('实时预览') < 0) {
+              fail('点单位链接之后没有进详情页');
+            } else {
+              body.onclick({
+                target: { getAttribute: k => (k === 'data-unit-back' ? 'aircraft' : null), parentNode: null }
+              });
+              const backHTML = body.innerHTML || '';
+              if (backHTML.indexOf('data-unit="aircraft:c11"') < 0) {
+                fail('详情页的返回按钮没有回到原图鉴');
+              } else {
+                ok('点击链路通畅：机型图鉴 → 单位详情 → 返回图鉴');
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   // 切换挂载：既不能崩，也不能靠切枪跳过装填
   {
     const p = sandbox.Game.__player();

@@ -891,7 +891,9 @@ CODEX.push({
   build: function () {
     var h = '<p class="cx-note">这里收录分水群岛上空的全部作战机型。' +
       '带 <b>可驾驶</b> 标记的是本战役中可用的机体；其余型号在资料库里' +
-      '只作识别用 —— 非作战单位与海上设施不在此列。</p>';
+      '只作识别用 —— 非作战单位与海上设施不在此列。' +
+      '<br><b>点型号名进详情页</b> —— 那里有这一型的实时 3D 预览、' +
+      '矢量俯视识别图、设定全文与完整参数。</p>';
 
     h += '<table class="cx-table"><tr><th>型号</th><th>阵营</th><th>定位</th>' +
       '<th>最大速度</th><th>俯仰率</th><th>结构</th><th>挂点</th><th>翼型</th></tr>';
@@ -903,9 +905,11 @@ CODEX.push({
         // nick 是英文绰号、cn 是中文名。这里要中文 ——
         // 早期版本写成了 a.nick，于是上游三架显示英文外号、
         // 而我新加的三架因为字段写反反而显示中文，正好颠倒。
-        '<td><b>' + a.name + '</b>' +
+        // 外层 span 可点：进这一型自己的详情页（见 js/unitview.js）
+        '<td><span class="cx-unit" data-unit="aircraft:' + a.id + '">' +
+        '<b>' + a.name + '</b>' +
         (a.npcOnly ? '' : ' <span class="cx-fly">可驾驶</span>') +
-        '<br><span class="d">' + a.cn + ' ' + a.nick + '</span></td>' +
+        '<br><span class="d">' + a.cn + ' ' + a.nick + '</span></span></td>' +
         '<td>' + (a.faction || '—') + '</td>' +
         '<td>' + a.role + '</td>' +
         '<td>' + a.phys.vMax + ' m/s</td>' +
@@ -1035,7 +1039,9 @@ CODEX.push({
       '<br><b>排水量</b>是满载值；<b>主尺度</b>是长 × 宽 × 吃水（米）；' +
       '<b>编制</b>是舰员人数。' +
       '<br>带 <b>不该打</b> 标记的三条船没有战术价值，' +
-      '攻击它们只会把中立的一方推到对面去。</p>';
+      '攻击它们只会把中立的一方推到对面去。' +
+      '<br><b>点编号或舰名进详情页</b> —— 那里有这一型的实时 3D 预览、' +
+      '设定全文与完整参数。</p>';
 
     /* 势力顺序写死 —— 先参战四方，再未参战三方。
        顺序在这里是叙事，不是数据。 */
@@ -1049,8 +1055,9 @@ CODEX.push({
         s = SHIPS[si];
         if (s.faction !== order[oi]) continue;
         rows += '<tr>' +
-          '<td><b>' + s.hull + '</b><br><span class="d">' + s.cn + ' ' + s.name + '</span>' +
-          (s.neutral ? ' <span class="cx-fly">不该打</span>' : '') + '</td>' +
+          '<td><span class="cx-unit" data-unit="ship:' + s.id + '">' +
+          '<b>' + s.hull + '</b><br><span class="d">' + s.cn + ' ' + s.name + '</span>' +
+          (s.neutral ? ' <span class="cx-fly">不该打</span>' : '') + '</span></td>' +
           '<td>' + s.cls + '</td>' +
           '<td>' + s.role + '</td>' +
           '<td>' + s.disp + ' t</td>' +
