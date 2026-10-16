@@ -107,296 +107,250 @@ var AI = (function () {
     return null;
   }
 
-  /**
-   * 把"想要去的方向"翻译成操纵输入 —— 最少时间转向。
-   *
-   * 真实飞控与战雷式鼠标瞄准都是这个逻辑，分两步：
-   *   ① 先滚转，把目标滚进机体的俯仰平面（让它出现在"正上"方向）
-   *   ② 滚转一对齐，立刻全力拉杆做最大过载转向
-   *
-   * 反过来做（边滚边死拉杆）会让升力矢量指向斜下方，
-   * 飞机一边转一边掉高度，还转不快。
-   *
-   * 返回 {pitch, roll, yaw}，pitch>0 抬头、roll>0 右滚。
-   * st 可选，提供一个带 rollLock 字段的对象用于滚转方向锁存。
-   */
-  /* 鼠标的这些界限都按**屏幕归一化距离**定（1 = 屏幕边缘，
-     屏幕角落约 1.41），所以与 FOV 无关。 */
-  /* 满杆点：鼠标到这个屏幕半径时杆量给足。比它更靠近中心就整体缩杆，
-     而且是平方衰减 —— 中心附近掉得极快（见 steerTo 里的 gain）。 */
-  var AIM_FULL_MAG = 0.35;
-
-  /* 推杆自己的幅度轴 —— 比滚转的柔和区**宽得多**。
-
-     为什么需要两条轴：滚转/偏航的"柔和"要的是细腻（稍微一动就给
-     一点点），所以 AIM_BLEND_MAG 取得很小(0.225)。但推杆是完全不同
-     的一件事 —— 玩家"略微朝正下方"想让机头压下去，那个"略微"通常
-     已经是屏幕纵向 15% 上下，用 0.225 的轴算出来 pushW 只剩 0.16，
-     等于没推。
-
-     实测（真实游戏，鼠标从中心往下移）：
-       dy=40px  aimMag=0.111  pitch=-0.045  roll=0.024
-       dy=60px  aimMag=0.167  pitch=-0.023  roll=0.157   ← 推杆已经快没了
-       dy=90px  aimMag=0.250  pitch= 0.000  roll=0.510
-     换成 0.5 之后同样位置 pushW 分别是 0.87 / 0.74 / 0.50。 */
-  var AIM_PUSH_AXIS = 0.85;
-
-  /* "柔和转向"与"快速转向"之间的过渡轴。
-
-     刻意取得很小（0.225，约合屏幕纵向 22%）：有意把鼠标稳在中心附近
-     就是柔和转向；一旦离开这片区域，很快过渡到完全滚转。
-
-       AIM_FULL_MAG(0.35) 管"力气多大"—— 靠近中心整体缩杆，平方衰减
-       AIM_BLEND_MAG(0.225) 管"力气怎么分"—— 滚转占比，smoothstep 过渡
-     两者分开，因为"想省力"和"想转得猛"不是一回事。 */
-  var AIM_BLEND_MAG = 0.225;
-
   /* ============================================================
-     关于三个"方向"，这里必须分清楚，否则很容易写出看着对、
-     飞起来不对的判据：
+     steerTo —— 把"想要去的方向"翻译成三轴杆量
 
-       世界方向   哪边是上，飞机和镜头共用同一个世界
-       镜头方向   追尾机位的相机上方向**恒为世界上方**（会随俯仰
-                  倾斜，但永远不会倒过来）。所以"鼠标在屏幕下方"
-                  对应的是**世界下方**，和机体姿态无关。
-       机体方向   a.fwd / a.up / a.right，会随滚转翻过来
+     返回 {pitch, roll, yaw}，pitch>0 抬头、roll>0 右滚、yaw>0 右偏。
+     st 可选：一个持久对象（玩家 / AI 实体本身），存上一帧的计划
+     （planAlpha / rollLock / 瞄准角速度），让决策有惯性、不来回跳。
 
-     于是同一个鼠标位置，落到机体坐标里是不同的方向：
+     三个参考系必须分清：
+       机体系   a.fwd / a.right / a.up，随滚转翻过来
+       镜头系   追尾镜头不滚转，up 恒为世界 up —— 所以"相对镜头改平"
+                就是机翼相对世界水平：right.y = 0 且 up.y > 0
+       世界系   desired 本身就在这里
 
-       姿态        屏幕下方 → 机体系 ux     屏幕右 → 机体系 ux
-       正飞              -0.169                  0.000
-       左滚 90°          -0.000                 -0.169
-       倒飞              +0.169                 -0.000
-       右滚 90°          -0.000                 +0.169
+     ---------- 一个连续的代价函数，而不是几套规则拼起来 ----------
 
-     "推杆"是绕机体 right 轴转，让机头朝**机体下方**。所以判据只有
-     一条：ux < 0（目标确实在机体下方）。倒飞时 ux 自动变正，
-     不需要特殊处理 —— 但也**绝不能用 |ux| 或 |up.y|** 去判，
-     那会把倒飞误当成正飞。
+     目标在机体横截面上的方位 φ = atan2(rx, ux)：0 = 座舱正上方，
+     ±π = 机腹正下方。离轴角 θ = 机头与目标的夹角。
+
+     飞控在每一帧沿一条弧考虑"再滚多少 δ"（见下面的候选弧），滚完之后目标方位变成 φ−δ，
+     剩下的离轴角按这个方位拆给俯仰和偏航：
+         俯仰需求 θ·cos(φ−δ)   正 = 拉杆，负 = 推杆（推杆权限只有一半）
+         偏航需求 θ·sin(φ−δ)
+     三根轴各自要花的时间按**这架飞机此刻的真实角速率**算
+     （phys × 动压舵效），合成耗时 T(δ)。再加两项：
+         姿态代价   λ(θ)·(滚完之后的坡度)²   —— θ 越小 λ 越大
+         负 G 代价  推杆另外扣一点（飞行员扛不住、机翼也先失速）
+
+     于是从小到大推鼠标时会自然经过这几段（以左下方为例）：
+         很小   姿态代价压倒一切 → 不滚，推杆 + 左偏航
+         变大   滚转开始划算 → 慢慢左倾，推杆减少、偏航变成斜的
+         越过   滚到目标方位越过机体横轴 → cos 过零，推杆连续地变成拉杆
+         很大   δ → φ，偏航 → 0，纯拉杆 —— 用升力矢量去转
+     没有任何阈值或开关 —— α 是离轴角的一个连续函数，交叉点由物理算出。
+
+     鼠标停住（θ → 0）时只剩姿态代价，最小值就是"滚回镜头水平"，
+     飞机会以一个温和的滚转速率自己改平 —— 不会再带着坡度一直飞。
+
+     低动压、重挂载时各轴角速率按比例变，分配也跟着变。
      ============================================================ */
-  function steerTo(a, desired, out, st) {
-    var fx = M3.dot(desired, a.fwd);
-    var rx = M3.dot(desired, a.right);
-    var ux = M3.dot(desired, a.up);
+  var STEER_LAMBDA0 = 1.6;          // θ=0 时的姿态代价系数（秒 / rad²）
+  var STEER_THETA0 = 0.10;          // 姿态代价随 θ 衰减的特征角（≈6°）
+  var STEER_NEG_G = 0.35;           // 推杆附加代价（秒 / rad）
+  var STEER_ALPHA_RATE = 0.11;      // α 每帧向目标走的比例（60 fps 下约 0.15 s）
+  var STEER_YAW_W = 2.0;            // 偏航耗时加权 —— 侧滑本身就不舒服
+  var STEER_PUSH_K = 0.5;           // 与 entities.js 的 PITCH_DOWN_K 一致
 
-    var off0 = Math.acos(M3.clamp(fx, -1, 1));
-    var mag0 = M3.clamp(off0 * 2.3, 0, 1);
+  /* 执行层增益（1/s）。飞机在这里没有转动惯量 —— 杆量直接就是角速率 ——
+     所以"误差 × 增益 ÷ 最大角速率"就是一个无过冲的一阶收敛：
+     机头会以时间常数 1/K 停在目标上，不会来回摆。 */
+  var K_ROLL = 5.0, K_PITCH = 3.2, K_YAW = 3.2;
+  var LEVEL_ROLL_CAP = 0.35;        // 纯改平时的滚转杆量上限（不快不慢）
 
-    /* ---------- 靠近中心时整体缩杆（没有死区） ----------
+  // 没有 phys 的调用方（测试桩、临时实体）按一架中等战斗机算
+  var STEER_DEF_PHYS = { pitch: 0.7, roll: 3.0, yaw: 0.3 };
 
-       鼠标越靠近画面中心，所有转向杆量越小，而且是**平方衰减** ——
-       中心附近掉得极快：
+  function wrapPi(x) {
+    while (x > Math.PI) x -= Math.PI * 2;
+    while (x < -Math.PI) x += Math.PI * 2;
+    return x;
+  }
 
-          半径 0.35（满杆点） → gain 1.00
-          半径 0.175          → gain 0.25
-          半径 0.05           → gain 0.02
+  /* 瞄准方向的角速度前馈（只在调用方给了 dt 时启用 —— 也就是玩家）。
 
-       刻意不做成死区：死区里"完全不动"会让飞机带着歪斜姿态一直飞，
-       而硬边界的另一侧又突然满杆。平方衰减两头都平滑，
-       鼠标在中心时杆量趋近于 0，飞机自然就稳住当前姿态，
-       但玩家真要微调也还留得下一点点。
+     鼠标在拖动时，瞄准点相对机头的**误差**其实不大（几度），
+     但它在以每秒几十度的速度移动。只看误差的话，飞控会以为这是
+     一次"小修正"，用推杆 + 偏航去侧滑着追，永远不压坡度。
+     所以先估计瞄准方向自己的角速度，再往前看一小段：
+         规划用 STEER_LEAD_PLAN —— 决定"要不要滚过去拉"
+         执行用 STEER_LEAD_EXEC —— 抵消比例控制的稳态滞后，
+                                   机头在持续转弯时也能压在准星上
+     AI 的 desired 会在不同分支之间跳，不适合求导，所以不传 dt。 */
+  var STEER_LEAD_PLAN = 1.2;
+  var STEER_LEAD_EXEC = 1 / 3.2;    // = 1 / K_PITCH
+  var STEER_RATE_MAX = 1.6;         // rad/s，估计值上限
+  /* 角速度估计的低通时间常数（秒）。必须明显慢于一帧：鼠标增量是
+     成块到达的，一次 40 px 的轻推落在一帧里就是几百 °/s，若直接拿去
+     前瞻 1.2 s，飞控会以为玩家在急转、立刻滚过去。0.25 s 之后，
+     一次性的轻推只留下几度的前瞻，持续拖动才会累积成真正的转弯需求。 */
+  var STEER_RATE_TAU = 0.25;
 
-       注意 gain 乘的是**所有**分支的输出，包括推杆那一支。 */
-    var aimMag = (st && st.aimMag !== undefined) ? st.aimMag : null;
-    var gain = 1;
-    if (aimMag !== null) {
-      var kk = M3.clamp(aimMag / AIM_FULL_MAG, 0, 1);
-      gain = kk * kk;
+  function leadDir(d, axis, w, t) {
+    if (w < 1e-4) return d;
+    return M3.norm(M3.rotAxis(d, axis, w * t));
+  }
+
+  function steerTo(a, desired, out, st, dt) {
+    var desPlan = desired, desExec = desired;
+    if (st && dt > 0) {
+      if (st.prevDesired) {
+        var cr = M3.cross(st.prevDesired, desired);
+        var sn = M3.len(cr);
+        var wRaw = sn > 1e-7 ? Math.min(Math.asin(Math.min(1, sn)) / dt, STEER_RATE_MAX) : 0;
+        var vRaw = sn > 1e-7 ? M3.mul(cr, wRaw / sn) : M3.V(0, 0, 0);
+        var kR = 1 - Math.exp(-dt / STEER_RATE_TAU);
+        st.aimRate = st.aimRate ? M3.lerpV(st.aimRate, vRaw, kR) : M3.mul(vRaw, kR);
+      }
+      st.prevDesired = desired;
+      if (st.aimRate) {
+        var wA = M3.len(st.aimRate);
+        if (wA > 1e-4) {
+          var ax = M3.mul(st.aimRate, 1 / wA);
+          desPlan = leadDir(desired, ax, wA, STEER_LEAD_PLAN);
+          desExec = leadDir(desired, ax, wA, STEER_LEAD_EXEC);
+        }
+      }
     }
 
-    /* ============================================================
-       滚转 / 偏航 按鼠标幅度渐变分配
+    // 规划几何（带前瞻）
+    var fx = M3.dot(desPlan, a.fwd);
+    var rx = M3.dot(desPlan, a.right);
+    var ux = M3.dot(desPlan, a.up);
+    var theta = Math.acos(M3.clamp(fx, -1, 1));
+    var lateral = Math.sqrt(rx * rx + ux * ux);
+    // 正后方 / 正前方时方位退化 —— 当作在座舱正上方（拉杆）
+    var phi = lateral > 1e-5 ? Math.atan2(rx, ux) : 0;
 
-       **为什么不用"纯物理最优"**：按各轴角速度算耗时确实能得出
-       一个最快解，但那个解在鼠标刚离开中心时给的是几乎**纯偏航** ——
-       机头转过去而机身还是平的。听起来合理，手感却很怪：玩家想
-       "稍微往左转"，期待的是飞机稍微往左倾一点、转完接着平飞，
-       而不是机身纹丝不动地横着飘；等鼠标再挪远一点，那个解又会
-       突然切到满滚转，中间没有过渡。
+    // 执行几何（短前馈）
+    var ex = M3.dot(desExec, a.fwd);
+    var erx = M3.dot(desExec, a.right);
+    var eux = M3.dot(desExec, a.up);
+    var thetaE = Math.acos(M3.clamp(ex, -1, 1));
+    var phiE = Math.sqrt(erx * erx + eux * eux) > 1e-5 ? Math.atan2(erx, eux) : 0;
 
-       所以这里不按耗时分配，而是按幅度渐变：
+    /* ---- 这架飞机此刻每根轴能转多快（rad/s） ----
+       与 entities.js stepAircraft 的公式一致；ctrlAuth 是它上一帧存下的
+       舵效（动压 × 失速）。gLoad 只放大俯仰，这里不计 —— 它是玩家的选择。 */
+    var p = a.phys || STEER_DEF_PHYS;
+    var auth = (a.ctrlAuth === undefined) ? 1 : a.ctrlAuth;
+    var wP = Math.max(1e-3, p.pitch * auth);
+    var wR = Math.max(1e-3, p.roll * M3.clamp(auth * 1.8, 0.28, 1));
+    var wY = Math.max(1e-3, p.yaw * auth);
 
-           滚转量 = 满杆 × blend        blend 随鼠标幅度线性 0 → 1
-           偏航量 = 侧向误差 × (1 - blend)
+    /* ---- 当前坡度（相对镜头水平），右倾为正 ----
+       机头接近竖直时坡度无意义，姿态代价按水平分量衰减掉。 */
+    var bank = Math.atan2(-a.right.y, a.up.y);
+    var horiz = Math.sqrt(Math.max(0, 1 - a.fwd.y * a.fwd.y));
+    var lam = STEER_LAMBDA0 * Math.exp(-theta / STEER_THETA0) * horiz;
 
-       鼠标刚离开中心 → 一点点滚转 + 偏航补足，机身轻微侧倾、转向柔和
-       鼠标推到满杆   → 完全滚转对齐，偏航归零，动作干脆
-       ============================================================ */
+    /* ---- 候选滚转只在一条弧上取 ----
+       弧的一端是"改回镜头水平"（δL = −坡度），另一端是"把目标滚到
+       座舱正上方"（δ = φ）。δ(α) = δL + α·(φ − δL)，α ∈ [0, 1]。
 
-    /* 滚转对齐所需的角度：把目标在机体横向平面里的分量转到正上方。 */
-    var rollErr = Math.atan2(-rx, ux);            // ∈ [-π, π]
-
-    // 目标接近正下方时 rx 会左右抖，导致满左滚/满右滚来回跳。
-    // 用一次锁存钉住转向，等转过半圈再解锁。
+       为什么不在整圈上枚举：整圈里还有第三个局部最优 —— 往**反方向**
+       滚，把目标放到机腹正下方纯推杆。它在物理上成立，但会让左下方的
+       鼠标先引出一个右滚，再在某个幅度突然跳成左滚，正是要消掉的那种
+       切换感。限制在这条弧上，从"推杆 + 偏航"到"纯拉杆"就是同一族解，
+       α 随幅度单调连续地从 0 走到 1。 */
+    var dL = wrapPi(-bank);
+    var span = wrapPi(phi - dL);
+    /* 目标接近机腹正下方时 span ≈ ±π，左右两边几乎一样远，
+       会逐帧来回翻。锁存上一帧选的方向，直到明显偏离才放开。 */
     if (st) {
-      if (Math.abs(rollErr) > 2.55) {
-        if (!st.rollLock) st.rollLock = (rollErr >= 0) ? 1 : -1;
-        rollErr = st.rollLock * 3.14;
+      if (Math.abs(span) > 2.6) {
+        if (!st.rollLock) st.rollLock = span >= 0 ? 1 : -1;
+        if ((span >= 0 ? 1 : -1) !== st.rollLock) span += st.rollLock * Math.PI * 2;
       } else {
         st.rollLock = 0;
       }
     }
 
-    /* 这里**没有推杆分支**。
-
-       目标在下方时不做"直接压杆"，而是走同一套滚转对齐 ——
-       机体会滚转半圈变成倒飞，然后仰起去咬目标。这不是绕远：
-       推杆权限只有拉杆的一半（见 entities.js 的俯仰不对称），
-       而且俯冲攻击在空战里本来就该靠滚转把机腹对准目标。
-
-       更重要的是它统一了所有方向的手感 —— 不管鼠标指向哪里，
-       飞机都是"滚转过去、然后拉"，玩家不需要记两套行为。 */
-
-    /* ---------- 滚转 / 偏航 按鼠标幅度插值过渡 ----------
-
-       两种模式要靠鼠标幅度平滑地互相转化，中间不能有切换感：
-
-         鼠标在中心附近 → 少量滚转 + 偏航补足（轻微侧倾，转向柔和）
-         鼠标推向屏幕边缘 → 滚转占比升到 100%
-                            （狗斗时能完全滚转对准任何方向，偏航归零）
-
-       过渡轴取 0.225（smoothstep），也就是鼠标一到屏幕纵向 22% 附近
-       就基本完成过渡 —— 有意把鼠标稳在中心附近才是柔和转向，
-       一旦离开就很快变成完全滚转。smoothstep 两端导数为 0，
-       所以两头都不会有"忽然开始变"的拐点。
-
-       注意与 gain 的分工：
-         gain（AIM_FULL_MAG = 0.35，平方）管"力气多大"
-         blend（AIM_BLEND_MAG = 0.225，smoothstep）管"力气怎么分" */
-    var blend = 1;
-    if (aimMag !== null) {
-      var tb = M3.clamp(aimMag / AIM_BLEND_MAG, 0, 1);
-      blend = tb * tb * (3 - 2 * tb);       // smoothstep
+    /* 沿弧的代价：α = 0 是"保持（回到）水平，推拉杆 + 偏航"，
+       α = 1 是"滚到目标在头顶，纯拉杆"。 */
+    function cost(al, th) {
+      var d = dL + al * span;
+      var b = phi - d;
+      var pNeed = th * Math.cos(b);
+      var yNeed = th * Math.sin(b);
+      var tr = Math.abs(d) / wR;
+      var tp = pNeed >= 0 ? pNeed / wP : -pNeed / (wP * STEER_PUSH_K);
+      var ty = Math.abs(yNeed) / wY * STEER_YAW_W;
+      var bankAfter = wrapPi(bank + d);
+      var lm = STEER_LAMBDA0 * Math.exp(-th / STEER_THETA0) * horiz;
+      return Math.sqrt(tr * tr + tp * tp + ty * ty) + lm * bankAfter * bankAfter +
+        (pNeed < 0 ? STEER_NEG_G * -pNeed : 0);
     }
 
-    /* ---------- 目标在下方：推杆 ↔ 滚转仰起 用同一个轴插值 ----------
+    /* ---- 不取 argmin，而是求"交叉角" θc ----
 
-       目标落在机腹一侧时有两条路：
-         直接推杆                 —— 立刻见效，适合小幅修正
-         滚转半圈（倒飞）后仰起   —— 绕远但快，是狗斗里的标准动作
+       沿这条弧取最小值本来是最直接的做法，但偏航比滚转慢一个量级，
+       "滚一半、靠偏航"的中间态永远最贵 —— 代价面是两个盆地，
+       最优解会在某个幅度从 α≈0 一下跳到 α≈1。那正是要消掉的切换感。
 
-       两者之间同样不能有切换点，所以用同一个 blend：
-           鼠标在中心附近 → pushW 接近 1，几乎全推杆
-           离开中心       → pushW 归零，交给滚转 + 仰起
-
-       ---------- 但推杆有个几何前提：机体得相对镜头正着飞 ----------
-
-       追尾机位下相机的上方向就是世界正上方，所以"相对镜头正着飞"
-       就是**机体 up 朝上**（机翼大致水平）。这正是 a.up.y 接近 +1。
-
-       为什么必须有这个前提："推杆"是绕机体 right 轴转，只有机体正着
-       时它才真的是"把机头压下去"。侧飞时 up 指向水平，绕 right 转
-       其实是**水平转向**；而且鼠标在屏幕下方对应的世界方向正好落进
-       机体的"下半空间"，会被误判成推杆。那种情况下玩家要的只是常规的
-       柔和转向 —— 略微滚转 + 略微偏航，鼠标移到哪边就朝哪边。
-
-       不用绝对值：倒飞（up.y ≈ -1）不算"相对镜头正着飞"，
-       那时鼠标往下该走常规滚转，而不是推杆。
-
-       判据用的是**相对镜头**，不是相对世界 —— 追尾机位有俯仰角
-       （低头看飞机），camUp 并不等于世界正上方。玩家对象带进来
-       aimUpright = dot(机体 up, 镜头 up)。用 a.up.y 的话，镜头俯得
-       深一点就会把一个"相对镜头正着飞"的飞机误判成不正。
-
-       AI 没有镜头这一层，退回世界 up（它们的控制律本来就不经过镜头）。 */
-    /* 目标在机体横向平面里偏向哪一侧：+1 = 正上，0 = 正侧方，-1 = 正下。
-       方位判定（推杆锥）和俯仰段都要用，所以先算。 */
-    var lateral = Math.sqrt(rx * rx + ux * ux);
-    var up = lateral > 1e-4 ? M3.clamp(ux / lateral, -1, 1) : 1;
-
-    var upright = (st && st.aimUpright !== undefined) ? st.aimUpright : a.up.y;
-
-    /* 推杆区是"正下方 ±60° 的锥"，用方位角判定。
-
-       up 是目标在机体横向平面里相对机体上方的位置：
-           up = -1  正下方
-           up =  0  正侧方
-       所以 up < -0.5 正好对应"正下方 ±60°以内"。
-
-       范围内：柔和时纯推杆（不带滚转），滚转权重随幅度逐渐升上来；
-       范围外：完全不推，交给滚转对齐。
-       这条边界是**离散**的，和滚转/偏航那种连续过渡不同 ——
-       按用户的模型，策略切换本来就是一个离散决定。 */
-    var downCone = (up < -0.5);
-
-    /* 推杆权重用立方衰减（"后降"），不是 smoothstep。
-
-       推杆的**强度**要到离轴角 25°（屏幕纵向约 46%）才封顶，而
-       smoothstep 在中段掉得太快 —— 两者刚好错开，结果永远在还没
-       推满的时候就被滚转接走。立方曲线把大部分幅度都留给推杆：
-
-           aimMag   0.25  →  pushW 0.98
-           aimMag   0.47  →  pushW 0.84   ← 推杆强度刚封顶，权重仍高
-           aimMag   0.70  →  pushW 0.44
-           aimMag   0.85+ →  pushW 0        （交给滚转） */
-    var pushW = 0;
-    if (downCone && upright > 0.7) {
-      var tp = M3.clamp(aimMag === null ? 1 : aimMag / AIM_PUSH_AXIS, 0, 1);
-      pushW = 1 - tp * tp * tp;
-    }
-
-    /* 走推杆的时候**不能同时滚转**。
-
-       目标落在机体正下方时 rollErr 会给出 ±π（要滚 180° 才能把它
-       转到机体上方），所以一边推杆一边还在缓慢滚转 —— 手感就是
-       "鼠标往下推，飞机却先侧着慢慢转"，完全不是压机头。
-
-       乘 (1 - pushW)：推杆权重越高，滚转越少；纯推杆时滚转为 0。 */
-    var rollCmd = M3.clamp(-rollErr * 2.8, -1, 1) * blend * (1 - pushW);
-
-    // 还没被滚转消掉的侧向分量，用偏航补上
-    var yawErr = Math.atan2(rx, fx);
-    var yawCmd = 0;
-    if (fx < -0.45) {
-      // 目标在正后方：偏航是唯一有效手段，不参与混合
-      yawCmd = M3.clamp(rx * 1.8, -1, 1);
-    } else if (blend < 0.99) {
-      yawCmd = M3.clamp(yawErr * 1.6, -1, 1) * (1 - blend);
-    }
-
-    /* ---------- ② 俯仰：对齐度越高，拉得越满 ---------- */
-    var off = Math.acos(M3.clamp(fx, -1, 1));     // 机头与目标的夹角
-
-    var mag = M3.clamp(off * 2.3, 0, 1);
-    var pitchCmd;
-    if (up >= 0) {
-      // 已在上半平面：拉杆量随对齐度迅速升满
-      pitchCmd = mag * (0.55 + 0.45 * Math.sqrt(up));
+       所以只用两个端点：求出 θc，使"保持水平去修"与"滚过去拉"
+       在这架飞机此刻的角速率下耗时相同；然后 α 在 0.5θc → 1.5θc 之间
+       用 smoothstep 连续过渡。θc 本身来自物理 —— 低动压、滚转慢、
+       偏航强的飞机，它会自己变大或变小 —— 但 α 对鼠标幅度是连续的。 */
+    var thC;
+    var gLo = cost(0, 0) - cost(1, 0);
+    if (Math.abs(span) < 1e-3) {
+      thC = 0;
+    } else if (gLo >= 0) {
+      thC = 0;                                  // 连"保持水平"都比滚过去贵（已经大坡度）
     } else {
-      // 还在下半平面：交给滚转去解决，只保留很小的杆量维持姿态
-      pitchCmd = mag * 0.18 * (1 + up);
+      var lo = 0, hi = Math.PI;
+      if (cost(0, hi) - cost(1, hi) < 0) {
+        thC = 1e9;                              // 永远不值得滚过去
+      } else {
+        for (var it = 0; it < 22; it++) {
+          var mid = 0.5 * (lo + hi);
+          if (cost(0, mid) - cost(1, mid) < 0) lo = mid; else hi = mid;
+        }
+        thC = 0.5 * (lo + hi);
+      }
+    }
+    var alpha;
+    // 弧长为零时 α 无意义，沿用上一帧，免得把计划状态冲掉
+    if (Math.abs(span) < 1e-3) alpha = (st && st.planAlpha !== undefined) ? st.planAlpha : 0;
+    else if (thC <= 0) alpha = 1;
+    else if (thC >= 1e8) alpha = 0;
+    else {
+      var u = M3.clamp(theta / thC - 0.5, 0, 1);
+      alpha = u * u * (3 - 2 * u);
     }
 
-    /* 目标在下方时按 pushW 把"推杆"混进来：
-       pushW = 1 → 纯推杆；pushW = 0 → 完全不推，交给滚转后仰起。
-       两者共用同一个 blend，所以从中心往外推鼠标时，
-       动作会自己从"压杆"平滑过渡到"滚半圈再拉"。 */
-    if (pushW > 0.01) pitchCmd = pitchCmd * (1 - pushW);
-
-    /* 推杆那一份**不乘 gain**。
-
-       gain 是"靠近中心整体缩杆"，用来防止小幅鼠标造成大动作；
-       但推杆本身就已经是柔和动作，再压一遍就彻底看不见了 ——
-       实测乘完只剩 -0.009，角速度 0.4°/s，和不动没区别。
-       所以滚转/偏航照旧缩杆，推杆单独给足。 */
-    out.pitch = pitchCmd * gain;
-    if (pushW > 0.01) {
-      /* 推杆的**强度**由方位决定：目标越接近正下方，机头压得越狠。
-
-         这里原来乘的是 mag0 = clamp(off0 × 2.3, 0, 1)，也就是用
-         **离轴角**定量。但两者刚好错开：off0 要到 25° 才封顶，而
-         25° 离轴角对应的 aimMag 已经是 0.875 —— 那时 pushW 早就归零，
-         推杆**永远到不了满幅度**（实测峰值只有 -0.28）。
-
-         改用方位 up（-1 = 正下方，0 = 正侧方）：
-             正下方  → 强度 1.00
-             锥边缘  → 强度 0.70（up = -0.5）
-         鼠标幅度只管 pushW（推杆 vs 滚转的比例），不再管推杆多狠。 */
-      var pushAmt = 0.4 + 0.6 * M3.clamp(-up, 0, 1);
-      out.pitch -= pushAmt * pushW;
+    /* 时间上再平滑一次（约 0.15 s）。偏航比滚转慢一个量级，
+       所以"一半滚、一半偏航"这种中间态在代价上确实偏贵，最优解在
+       某个幅度会从"推杆 + 偏航"一侧换到"滚过去拉"一侧。物理上这是对的，
+       但不能是一帧之内的跳变 —— 平滑之后它是一个看得见的、渐进的滚入。 */
+    if (st) {
+      var aPrev = (st.planAlpha === undefined) ? 0 : st.planAlpha;
+      alpha = aPrev + (alpha - aPrev) * STEER_ALPHA_RATE;
+      st.planAlpha = alpha;
     }
-    out.roll = rollCmd * gain;
-    out.yaw = yawCmd * gain;
+    var delta = dL + alpha * span;
+
+    // ---- 执行 ----
+    // 滚转：纯改平时限速，真要转向时放开
+    var tl = M3.clamp(theta / 0.09, 0, 1);
+    var cap = LEVEL_ROLL_CAP + (1 - LEVEL_ROLL_CAP) * tl * tl * (3 - 2 * tl);
+    var rollCmd = M3.clamp(delta * K_ROLL / wR, -cap, cap);
+
+    /* 俯仰 / 偏航按**滚完之后**的方位分配，并随剩余滚转量淡入：
+       还要滚 90° 以上时不拉不推（边滚边死拉会把升力甩到斜下方），
+       滚到位时就是当前的真实误差。 */
+    var bPlan = phiE - delta;
+    var prog = Math.max(0, Math.cos(delta));
+    var eP = thetaE * Math.cos(bPlan) * prog;
+    var eY = thetaE * Math.sin(bPlan) * prog;
+    var pitchCmd = eP >= 0 ? eP * K_PITCH / wP : eP * K_PITCH / (wP * STEER_PUSH_K);
+    var yawCmd = eY * K_YAW / wY;
+
+    out.pitch = M3.clamp(pitchCmd, -1, 1);
+    out.roll = rollCmd;
+    out.yaw = M3.clamp(yawCmd, -1, 1);
     return out;
   }
 

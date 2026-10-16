@@ -125,7 +125,9 @@
 | `route` | `missions.js`（轰炸机） | 走 `AI.updateRoute`，不参与空战 |
 | `recon` / `flee` / `bigTarget` / `weaponPod` / `isAce` / `wave` / `behavior` / `wingIdx` | `missions.js` | 任务脚本自用标签 |
 | `wdPrev` / `wdStill` | `game.js` `watchdog` | 看门狗状态（见 §5.6） |
-| `aimX` / `aimDown` / `aimMag` / `aimUpright` | `game.js` `updateMouseAim` | 鼠标引导输入，被 `AI.steerTo` 读取 |
+| `aimDir` | `game.js` `updateMouseAim` | 鼠标引导的世界瞄准方向，HUD 画准星用 |
+| `planAlpha` / `rollLock` / `prevDesired` / `aimRate` | `AI.steerTo` | 飞控跨帧状态 |
+| `ctrlAuth` | `stepAircraft` | 当前舵效（动压 × 失速），steerTo 与 FCS 表读取 |
 
 ### 3.2 导弹 / 炸弹 `m`（`kind: 'missile'`）
 

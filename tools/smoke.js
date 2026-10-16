@@ -1059,45 +1059,61 @@ if (Ent && M3 && me && world) {
     else ok('无动力制导弹会修正弹道：' + rep.join(' · ') + '；集束弹面杀伤生效');
   }
 
-  /* ---- 飞控：中心附近的前下方目标应当推杆 ---- */
+  /* ---- 飞控（AI.steerTo）：连续控制分配 ---- */
   {
     const AI = sandbox.AI;
-    const a = {
-      fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0)
-    };
-    const out = { pitch: 0, roll: 0, yaw: 0 };
-
-    /* 目标：机头前方、略微偏下。**鼠标停在中心附近** ——
-       推杆与滚转仰起现在是靠鼠标幅度插值的，只有幅度小的时候
-       才走推杆。 */
-    const d1 = M3.norm(M3.V(0, -0.15, 0.99));
-    const near = {
+    const D = Math.PI / 180;
+    const level = () => ({
       fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
-      rollLock: 0, aimX: 0, aimDown: 0.15, aimMag: 0.15
-    };
+      phys: { pitch: 0.76, roll: 3.0, yaw: 0.30 }, ctrlAuth: 1
+    });
+
+    // 小幅前下方：保持水平，直接推杆，不滚
+    const near = level();
     const o1 = { pitch: 0, roll: 0, yaw: 0 };
-    AI.steerTo(near, d1, o1, near);
+    AI.steerTo(near, M3.norm(M3.V(0, -0.15, 0.99)), o1, near);
     if (o1.pitch >= -0.005) {
-      fail('中心附近 + 前下方没有推杆（pitch=' + o1.pitch.toFixed(3) + '）');
+      fail('小幅前下方没有推杆（pitch=' + o1.pitch.toFixed(3) + '）');
     } else if (Math.abs(o1.roll) > 0.20) {
-      fail('轻微下压触发了大幅滚转（roll=' + o1.roll.toFixed(3) +
-        '）—— 会变成滚筒，而不是俯冲');
+      fail('轻微下压触发了大幅滚转（roll=' + o1.roll.toFixed(3) + '）—— 会变成滚筒，而不是俯冲');
     } else {
-      ok('中心附近 + 前下方 → 推杆（pitch=' + o1.pitch.toFixed(2) +
-        ' roll=' + o1.roll.toFixed(2) + '）');
+      ok('小幅前下方 → 推杆（pitch=' + o1.pitch.toFixed(2) + ' roll=' + o1.roll.toFixed(2) + '）');
     }
 
-    // 目标：正前方偏上，仍应拉杆
-    const d2 = M3.norm(M3.V(0, 0.4, 0.92));
-    AI.steerTo(a, d2, out, null);
+    // 前上方：拉杆
+    const out = { pitch: 0, roll: 0, yaw: 0 };
+    AI.steerTo(level(), M3.norm(M3.V(0, 0.4, 0.92)), out, null);
     if (out.pitch <= 0.05) fail('前上方的目标没有让飞机抬头（pitch=' + out.pitch.toFixed(3) + '）');
     else ok('前上方目标 → 拉杆抬头（pitch=' + out.pitch.toFixed(2) + '）');
 
-    // 目标：正左方，应当滚转
-    const d3 = M3.norm(M3.V(-1, 0, 0));
-    AI.steerTo(a, d3, out, null);
-    if (Math.abs(out.roll) < 0.4) fail('正侧方目标没有触发滚转（roll=' + out.roll.toFixed(3) + '）');
-    else ok('正侧方目标 → 滚转对齐（roll=' + out.roll.toFixed(2) + '）');
+    // 正左方：滚过去（左滚为负）
+    AI.steerTo(level(), M3.norm(M3.V(-1, 0, 0)), out, null);
+    if (out.roll > -0.4) fail('正左方目标没有触发左滚（roll=' + out.roll.toFixed(3) + '）');
+    else ok('正左方目标 → 左滚对齐（roll=' + out.roll.toFixed(2) + '）');
+
+    /* 带着 60° 右坡度、瞄准点就在机头上：必须自己改平，而且不能太猛。
+       以前鼠标居中时杆量整体缩到零，飞机会一直带着坡度飞。 */
+    const bk = level();
+    bk.up = M3.rotAxis(bk.up, bk.fwd, -60 * D);
+    bk.right = M3.rotAxis(bk.right, bk.fwd, -60 * D);
+    AI.steerTo(bk, M3.clone(bk.fwd), out, bk);
+    if (out.roll > -0.2) fail('60° 坡度、瞄准点在机头上时没有改平（roll=' + out.roll.toFixed(3) + '）');
+    else if (out.roll < -0.5) fail('改平太猛（roll=' + out.roll.toFixed(3) + '），应当是温和的回正');
+    else ok('坡度 + 瞄准点居中 → 温和改平（roll=' + out.roll.toFixed(2) + '）');
+
+    /* 左下方：随离轴角增大，滚转量应当单调增加（同一族解，没有先右滚再跳成左滚）。
+       不带 st 测的是静态分配。 */
+    let prevR = 0.05, mono = true, seq = [];
+    [2, 6, 12, 20, 30, 45, 70].forEach(th => {
+      const t = th * D, ph = -135 * D;
+      const o = { pitch: 0, roll: 0, yaw: 0 };
+      AI.steerTo(level(), M3.V(Math.sin(t) * Math.sin(ph), Math.sin(t) * Math.cos(ph), Math.cos(t)), o, null);
+      if (o.roll > prevR + 1e-6) mono = false;
+      prevR = o.roll;
+      seq.push(o.roll.toFixed(2));
+    });
+    if (!mono) fail('左下方目标的滚转量随离轴角不单调：' + seq.join(' → '));
+    else ok('左下方：滚转量随离轴角单调增加 ' + seq.join(' → '));
   }
 
   /* ---- 机库的选装面板 ---- */
@@ -1629,167 +1645,68 @@ if (Ent && M3 && me && world) {
     else ok('反辐射：对预警机与开机中的干扰机伤害翻倍，对静默/普通目标不翻倍');
   }
 
-  /* ---- 鼠标幅度 → 转向方式：全程插值，没有切换点 ----
+  /* ---- 闭环：拖动瞄准点时，坡度随转弯需求连续增加 ----
 
-     同一个鼠标幅度轴（blend）同时管三件事：
-       滚转占比   0 → 1
-       偏航补足   1 → 0
-       推杆权重   1 → 0（只在目标落在机体下方时有意义）
-
-     于是三种动作串成一条连续的谱：
-       中心附近 → 推杆俯下 / 少量滚转 + 偏航
-       离开中心 → 滚转半圈（倒飞）→ 仰起，偏航归零
-
-     这条断言锁的就是"谱"是连续的 —— 中间任何一点都不能突变。 */
+     模拟玩家以恒定角速度把瞄准点往左下方拖（战雷式：鼠标位移转动
+     世界里的瞄准方向）。飞机按 stepAircraft 的同一套旋转积分。
+     锁住几件事：
+       · 稳态坡度随拖动速度**单调**增加 —— 慢拖平飞推杆 + 偏航，
+         快拖滚过去拉杆，中间连续，没有"先右滚再跳成左滚"
+       · 持续转弯中机头误差很小（前馈生效，机炮能对准）
+       · 杆量逐帧变化有界（没有一帧之内的切换）
+       · 停止拖动后自己改平 */
   {
     const M3 = sandbox.M3, AI = sandbox.AI;
+    const D = Math.PI / 180, dt = 1 / 60;
     const bad = [];
-
-    /* 给定 FOV 与鼠标纵向位置 k（0 = 屏幕中心，1 = 底边），返回 ctrl。
-       dir 由屏幕位置算出；aimMag 直接取 k（正下方时径向距离就等于 k）。 */
-    function ctrlAt(FOV, k, rollDeg) {
-      const H = 720;
-      const focal = (H / 2) / Math.tan(FOV / 2 * Math.PI / 180);
-      const cy = -(k * (H / 2)) / focal;
-      const dir = M3.norm(M3.V(0, cy, 1));
-
-      const r = (rollDeg || 0) * Math.PI / 180;
-      const fwd = M3.V(0, 0, 1);
-      const o = M3.orthonormalize(fwd, M3.rotAxis(M3.V(0, 1, 0), fwd, r));
+    function drag(rate, hold) {
       const a = {
-        fwd: fwd, up: o.up, right: M3.norm(M3.cross(o.up, fwd)),
-        ctrl: { pitch: 0, roll: 0, yaw: 0 },
-        rollLock: 0, aimX: 0, aimDown: k, aimMag: k
+        fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
+        phys: { pitch: 0.76, roll: 3.0, yaw: 0.30 }, ctrlAuth: 1, ctrl: {}
       };
-      AI.steerTo(a, dir, a.ctrl, a);
-      return a.ctrl;
-    }
-
-    // ① 中心附近：推杆方向（pitch 为负），滚转很小
-    for (const k of [0.10, 0.15]) {
-      const c = ctrlAt(56, k);
-      if (!(c.pitch < 0 && Math.abs(c.roll) < 0.20)) {
-        bad.push('中心附近（' + (k * 100) + '%）目标在下方时没有推杆（pitch=' +
-          c.pitch.toFixed(3) + ' roll=' + c.roll.toFixed(3) + '）');
-      }
-    }
-
-    /* ② 推杆的范围比滚转的柔和区宽得多，所以这里要取屏幕很深处。
-
-       推杆轴 AIM_PUSH_AXIS = 0.85（滚转/偏航是 0.225）——
-       0.5~0.6 那一带本来就还在推杆，不该拿去当"已交给滚转"的证据。 */
-    for (const k of [0.95, 1.1]) {
-      const c = ctrlAt(56, k);
-      if (!(Math.abs(c.roll) > 0.5 && c.pitch >= -0.05)) {
-        bad.push('屏幕深处（' + (k * 100) + '%）仍未转给滚转（pitch=' +
-          c.pitch.toFixed(3) + ' roll=' + c.roll.toFixed(3) + '）');
-      }
-    }
-
-    // ③ 全程连续：滚转单调增、俯仰不出现跳变
-    {
-      let prevRoll = -1, mono = true, maxJump = 0, prevPitch = null;
-      for (let k = 0.05; k <= 0.9 + 1e-9; k += 0.05) {
-        const c = ctrlAt(56, k);
-        if (Math.abs(c.roll) < prevRoll - 1e-6) mono = false;
-        prevRoll = Math.abs(c.roll);
-        if (prevPitch !== null) {
-          maxJump = Math.max(maxJump, Math.abs(c.pitch - prevPitch));
+      let prev = null, maxRJump = 0, steadyBank = 0, steadyErr = 0, endBank = 0;
+      const T = hold + 3;
+      for (let t = 0; t < T; t += dt) {
+        const off = Math.min(rate * t, rate * hold) * D / Math.SQRT2;
+        const d = M3.norm(M3.V(-Math.sin(off) * Math.cos(off), -Math.sin(off), Math.cos(off) * Math.cos(off)));
+        AI.steerTo(a, d, a.ctrl, a, dt);
+        const c = a.ctrl;
+        if (prev && t > 0.3) maxRJump = Math.max(maxRJump, Math.abs(c.roll - prev));
+        prev = c.roll;
+        const bank = Math.atan2(-a.right.y, a.up.y) / D;
+        if (Math.abs(t - (hold - 0.2)) < dt / 2) {
+          steadyBank = bank;
+          steadyErr = Math.acos(M3.clamp(M3.dot(d, a.fwd), -1, 1)) / D;
         }
-        prevPitch = c.pitch;
+        endBank = bank;
+        const pk = c.pitch >= 0 ? 1 : 0.5;
+        let g = -a.phys.pitch * pk * dt * c.pitch;
+        a.fwd = M3.rotAxis(a.fwd, a.right, g); a.up = M3.rotAxis(a.up, a.right, g);
+        g = -a.phys.roll * dt * c.roll;
+        a.right = M3.rotAxis(a.right, a.fwd, g); a.up = M3.rotAxis(a.up, a.fwd, g);
+        g = a.phys.yaw * dt * c.yaw;
+        a.fwd = M3.rotAxis(a.fwd, a.up, g); a.right = M3.rotAxis(a.right, a.up, g);
+        const B = M3.orthonormalize(a.fwd, a.up);
+        a.fwd = B.fwd; a.up = B.up; a.right = B.right;
       }
-      if (!mono) bad.push('滚转占比随鼠标幅度不是单调上升 —— 中间有切换感');
-      // 采样间隔 0.05，推杆段的俯仰本身变化就快（可到 0.13），
-      // 这里只拦真正的"跳变"，不是陡峭。
-      if (maxJump > 0.22) {
-        bad.push('俯仰杆量在相邻采样点之间跳变过大（' + maxJump.toFixed(3) + '）');
-      }
+      return { steadyBank, steadyErr, maxRJump, endBank };
     }
-
-    /* ④ 推杆的几何前提：机体必须**相对镜头正着飞**（up.y > 0.7）
-
-       追尾机位下相机上方向就是世界上方，所以"正着飞"就是机体 up 朝上。
-       没有这个前提的话，侧飞时鼠标在屏幕下方对应的世界方向会落进机体
-       的下半空间，被误判成推杆 —— 而那姿态下绕 right 轴转是水平转向。
-
-       也不能用 |up.y|：倒飞（up.y ≈ -1）不算"相对镜头正着飞"。 */
-    {
-      const DOWN = M3.norm(M3.V(0, -0.15, 0.99));
-      function poseAt(rollDeg) {
-        const r = (rollDeg || 0) * Math.PI / 180;
-        const fwd = M3.V(0, 0, 1);
-        const o = M3.orthonormalize(fwd, M3.rotAxis(M3.V(0, 1, 0), fwd, r));
-        const a = {
-          fwd: fwd, up: o.up, right: M3.norm(M3.cross(o.up, fwd)),
-          ctrl: { pitch: 0, roll: 0, yaw: 0 },
-          rollLock: 0, aimX: 0, aimDown: 0.12, aimMag: 0.12
-        };
-        AI.steerTo(a, DOWN, a.ctrl, a);
-        return a.ctrl;
-      }
-      const pushes = c => c.pitch < -0.01 && Math.abs(c.roll) < 0.10;
-
-      if (!pushes(poseAt(0))) bad.push('正着飞时鼠标略微向下没有推杆');
-      for (const d of [90, -90, 180]) {
-        if (pushes(poseAt(d))) {
-          bad.push('滚转 ' + d + '° 时鼠标略微向下误触发了推杆' +
-            ' —— 那姿态下绕 right 轴转是水平转向，不是压机头');
-        }
-      }
-
-      /* 判据必须是"相对镜头"，不能是"相对世界"。
-
-         追尾机位有俯仰角（低头看飞机），camUp ≠ 世界正上方。
-         镜头俯 60° 且飞机相对镜头平飞时，a.up.y 只有 cos60° = 0.50，
-         用世界判据会被误判成"不正"。这里直接喂 aimUpright = 1，
-         模拟"相对镜头正着飞"，必须仍然推杆。 */
-      {
-        const p = 60 * Math.PI / 180;
-        const camUp = M3.V(0, Math.cos(p), Math.sin(p));
-        const fwd = M3.V(0, 0, 1);
-        const dir = M3.norm(M3.add(M3.mul(camUp, -1), M3.mul(fwd, 0.2)));
-        const a = {
-          fwd: fwd, up: camUp, right: M3.norm(M3.cross(camUp, fwd)),
-          ctrl: { pitch: 0, roll: 0, yaw: 0 },
-          rollLock: 0, aimX: 0, aimDown: 0.12, aimMag: 0.12,
-          aimUpright: 1                    // 相对镜头是正着的
-        };
-        AI.steerTo(a, dir, a.ctrl, a);
-        if (!(a.ctrl.pitch < -0.01 && Math.abs(a.ctrl.roll) < 0.10)) {
-          bad.push('镜头大俯角时，相对镜头正着飞却没有推杆' +
-            '（a.up.y = ' + camUp.y.toFixed(2) + '，说明判据用成了世界方向）');
-        }
-      }
-    }
-
-    /* ⑤ 靠近中心整体缩杆（gain，平方衰减）
-
-       只对**滚转 / 偏航**成立 —— 推杆那一份是刻意不缩杆的：
-       推杆本身就已经是柔和动作，再压一遍就完全看不见了。
-       所以这里用一个偏侧方的目标（不走推杆分支）来测。 */
-    {
-      const SIDE = M3.V(1, 0, 0);              // 正右方，与推杆无关
-      function sideAt(mag) {
-        const a = {
-          fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
-          ctrl: { pitch: 0, roll: 0, yaw: 0 },
-          rollLock: 0, aimX: mag, aimDown: 0, aimMag: mag
-        };
-        AI.steerTo(a, SIDE, a.ctrl, a);
-        return Math.abs(a.ctrl.roll) + Math.abs(a.ctrl.yaw);
-      }
-      const base = sideAt(0.35), near = sideAt(0.05);
-      if (base > 0.05 && near > base * 0.05) {
-        bad.push('靠近中心时滚转/偏航没有急剧减少（' + near.toFixed(4) +
-          ' vs 满杆 ' + base.toFixed(3) + '）');
-      }
-    }
-
+    const rates = [4, 8, 10, 12, 16, 25];
+    const res = rates.map(r => drag(r, 3));
+    let prevB = 1;
+    res.forEach((r, i) => {
+      if (r.steadyBank > prevB + 2) bad.push('稳态坡度不单调：' + rates[i] + '°/s 时 ' + r.steadyBank.toFixed(0) + '°，比更慢的拖动还小');
+      prevB = r.steadyBank;
+      if (r.steadyErr > 1.0) bad.push(rates[i] + '°/s 持续转弯时机头误差 ' + r.steadyErr.toFixed(2) + '°（前馈没生效）');
+      if (r.maxRJump > 0.5) bad.push(rates[i] + '°/s 时滚转杆量单帧跳变 ' + r.maxRJump.toFixed(2));
+      if (Math.abs(r.endBank) > 8) bad.push(rates[i] + '°/s 拖完停住 3 s 后仍带 ' + r.endBank.toFixed(0) + '° 坡度（没有改平）');
+    });
+    if (res[0].steadyBank < -10) bad.push('慢拖（4°/s）就压了 ' + res[0].steadyBank.toFixed(0) + '° 坡度 —— 小修正应当保持水平');
+    if (res[res.length - 1].steadyBank > -100) bad.push('快拖（25°/s）只压了 ' + res[res.length - 1].steadyBank.toFixed(0) + '° 坡度 —— 应当滚过去拉');
     if (bad.length) bad.forEach(fail);
-    else ok('鼠标幅度 → 转向方式全程插值：中心推杆、离开中心转为滚转仰起');
+    else ok('闭环拖动：稳态坡度 ' + res.map((r, i) => rates[i] + '°/s→' + r.steadyBank.toFixed(0) + '°').join(' ') +
+      '；最大机头误差 ' + Math.max.apply(null, res.map(r => r.steadyErr)).toFixed(2) + '°');
   }
-
-
 
   /* ---- 两组挂架挂同一种武器：槽下标不能撞 ----
      slotCd 是按**武器**建的（长度 = 该武器占用的挂点总数），
@@ -2602,76 +2519,38 @@ if (Ent && M3 && me && world) {
     }
   }
 
-  /* ---- 真实游戏里：鼠标略微朝正下方必须是推杆 ----
+  /* ---- 真实链路：鼠标位移 → 瞄准方向 → 飞控 → 机头 ----
 
-     这条走的是完整链路（鼠标事件 → updateAim → steerTo → ctrl），
-     所以能抓到离线单测看不到的问题。
-
-     踩过一次坑：推杆一度和滚转共用 AIM_BLEND_MAG = 0.225 那条窄轴，
-     结果玩家"略微朝正下方"（屏幕纵向 15% 上下）时 pushW 只剩 0.16，
-     推杆几乎为零，看到的只有缓慢滚转。推杆现在有自己更宽的轴。 */
+     走完整链路（mousemove 事件 → aimYaw/aimPitch → steerTo → ctrl → 镜头），
+     能抓到离线单测看不到的问题：事件没接上、镜头没跟瞄准方向、
+     或者机头根本收敛不到准星上（旧版的毛病：镜头跟机头，准星跟着跑）。 */
   {
-    const G = sandbox.Game, R = sandbox.Renderer;
+    const G = sandbox.Game, R = sandbox.Renderer, M3 = sandbox.M3;
     const bad = [];
-    G.startMission(0);
-    const pl = G.__player();
-    for (let f = 0; f < 120; f++) pump(1);        // 先稳定飞一会儿
-
     const cvEl = sandbox.document.getElementById('cv');
 
-    /* 每个采样点都重新开始任务。
+    G.startMission(0);
+    const pl = G.__player();
+    for (let f = 0; f < 60; f++) pump(1);           // 稳定 + 初始化瞄准方向
 
-       连续采样绝对不行：飞机一直在按上一帧的杆量滚转，姿态一漂，
-       "正下方"就不再是正下方了，量到的是姿态漂移而不是操控律。
-       （第一版连续采样，峰值量成了 -0.28，而真实峰值是 -0.65。） */
-    function sample(dy) {
-      G.startMission(0);
-      const pp = G.__player();
-      for (let f = 0; f < 100; f++) pump(1);
-      cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2 + dy });
-      pump(1);
-      return { pitch: pp.ctrl.pitch, roll: pp.ctrl.roll, yaw: pp.ctrl.yaw };
-    }
+    // ① 轻轻往下拖 40 px（≈5°）：推杆，不滚
+    cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2, movementX: 0, movementY: 40 });
+    pump(1);
+    const near = { pitch: pl.ctrl.pitch, roll: pl.ctrl.roll };
+    if (near.pitch > -0.07) bad.push('鼠标轻轻往下拖时推杆太弱（pitch=' + near.pitch.toFixed(3) + '）');
+    if (Math.abs(near.roll) > 0.08) bad.push('轻微下压带了滚转（roll=' + near.roll.toFixed(3) + '）');
 
-    const near = sample(40);
-
-    // ① 柔和朝正下方：推杆要够明显（俯仰角速度至少 3°/s，即 pitch ≤ -0.07）
-    if (near.pitch > -0.07) {
-      bad.push('鼠标略微朝正下方时推杆太弱（pitch=' + near.pitch.toFixed(3) +
-        '，角速度约 ' + (near.pitch * 44).toFixed(1) + '°/s）');
-    }
-    // ② 柔和推杆时不能带滚转
-    if (Math.abs(near.roll) > 0.06) {
-      bad.push('柔和推杆时带了滚转（roll=' + near.roll.toFixed(3) +
-        '）—— 那会让机头先侧着转，不像压机头');
-    }
-
-    // ③ 推杆必须真的能推到接近满（峰值约 -0.65，角速度 ~28°/s）
-    let peak = 0, peakAt = 0;
-    for (let d = 20; d <= 240; d += 20) {
-      const c = sample(d);
-      if (c.pitch < peak) { peak = c.pitch; peakAt = d; }
-    }
-    if (peak > -0.55) {
-      bad.push('推杆峰值太低（' + peak.toFixed(3) + ' @' + peakAt +
-        'px，角速度约 ' + (peak * 44).toFixed(1) + '°/s）—— 还没推满就被滚转接走了');
-    }
-
-    /* ④ 推到屏幕底部：推杆必须退场
-
-       这里只断言"推杆退了"，不断言滚转有多大 —— 因为 pump 100 帧之后
-       飞机已经在俯冲，"世界下方"不再落在机体下方，rollErr 和俯仰段
-       都会自然变小。那是姿态本身的结果，不是操控律的问题。 */
-    {
-      const wide = sample(350);
-      if (wide.pitch < -0.05) {
-        bad.push('推到屏幕底部时推杆还没退场（pitch=' + wide.pitch.toFixed(3) + '）');
-      }
-    }
+    // ② 停手 3 s：机头收敛到准星上，镜头也跟着瞄准方向
+    for (let f = 0; f < 180; f++) pump(1);
+    const err = Math.acos(M3.clamp(M3.dot(pl.aimDir, pl.fwd), -1, 1)) * 180 / Math.PI;
+    if (err > 0.6) bad.push('停手 3 s 后机头离准星仍有 ' + err.toFixed(2) + '°（追不上准星）');
+    const cam = R.getCam();
+    const camErr = cam ? Math.acos(M3.clamp(M3.dot(cam.fwd, pl.aimDir), -1, 1)) * 180 / Math.PI : 99;
+    if (camErr > 12) bad.push('镜头没有跟瞄准方向（相差 ' + camErr.toFixed(1) + '°）');
 
     if (bad.length) bad.forEach(fail);
-    else ok('真实链路：略微朝正下方即推杆（峰值 ' + peak.toFixed(3) + ' @' +
-      peakAt + 'px，柔和段 roll ' + near.roll.toFixed(3) + '）');
+    else ok('真实链路：轻拖即推杆（pitch=' + near.pitch.toFixed(2) + ' roll=' + near.roll.toFixed(2) +
+      '），停手后机头误差 ' + err.toFixed(2) + '°，镜头偏差 ' + camErr.toFixed(1) + '°');
   }
 
   /* ---- 切枪不该丢掉锁定 ----

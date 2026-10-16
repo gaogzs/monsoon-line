@@ -82,6 +82,13 @@ var Game = (function () {
   var activeHpGroup = null;
   var keys = {}, mouse = { left: false, right: false, x: 0, y: 0 };
   var aimMode = true;              // true = 鼠标引导（指令增稳），false = 键盘直控
+  /* 战雷式瞄准方向：世界坐标里的一根方向，用偏航 / 俯仰两个角存。
+     鼠标**位移**转动它（指针锁定，没有屏幕边界），镜头跟着它走，
+     飞控再去追它 —— 所以机头最终会稳稳压在准星上，而不是追一个
+     跟着镜头一起跑的屏幕点。aimInit = false 时下一帧从机头重新取。 */
+  var aimYaw = 0, aimPitch = 0, aimInit = false;
+  var AIM_SENS = 0.0022;           // rad / 像素
+  var AIM_PITCH_LIM = 89 * Math.PI / 180;
   var last = 0;
   /* 机位现在由设置项 S.camMode 决定，没有热切换键 ——
      切换机位会让玩家瞬间失去态势感知，必须主动确认。
@@ -112,7 +119,13 @@ var Game = (function () {
   /* ============================================================
      屏幕管理
      ============================================================ */
+  /* 离开飞行（菜单、暂停、战报）时交还鼠标指针 */
+  function releasePointer() {
+    if (document.pointerLockElement === cv && document.exitPointerLock) document.exitPointerLock();
+  }
+
   function show(id) {
+    if (id !== 'playing') releasePointer();
     /* 离开战斗界面时必须清掉通讯记录。
        那些行的淡出是靠战斗循环里的 Radio.update() 推进的，
        一旦回到菜单就再没人管它们 —— 于是最后几条会永远挂在屏幕上。
@@ -1398,7 +1411,8 @@ var Game = (function () {
 
     mission.spawn(world);
 
-    // 初始镜头
+    // 初始镜头；瞄准方向下一帧从机头重新取
+    aimInit = false;
     camFwd = M3.clone(p.fwd);
     camUp = M3.V(0, 1, 0);
     camPos = M3.add(p.pos, M3.V(0, 30, -110));
@@ -1453,6 +1467,11 @@ var Game = (function () {
 
     cv.addEventListener('mousedown', function (e) {
       SFX.unlock();
+      // 鼠标引导要锁定指针：瞄准方向由位移驱动，指针跑出窗口就断了
+      if (state === 'playing' && aimMode && !paused && document.pointerLockElement !== cv &&
+          cv.requestPointerLock) {
+        try { cv.requestPointerLock(); } catch (err) { /* 不支持就退回普通指针，照样能用 */ }
+      }
       if (e.button === 0) mouse.left = true;
       if (e.button === 2) { mouse.right = true; fireSpecial(); }
     });
@@ -1466,6 +1485,14 @@ var Game = (function () {
       var r = cv.getBoundingClientRect();
       mouse.x = e.clientX - r.left;
       mouse.y = e.clientY - r.top;
+      /* 鼠标位移转动瞄准方向。没拿到指针锁时 movementX/Y 照样有，
+         只是指针会碰到窗口边缘 —— 能飞，但锁定后才是完整的手感。 */
+      if (state === 'playing' && aimMode && !paused && aimInit) {
+        var fovK = (S.fov || 56) / 56;      // 放大视野时灵敏度跟着降，屏幕上的手感一致
+        aimYaw += (e.movementX || 0) * AIM_SENS * fovK;
+        aimPitch = M3.clamp(aimPitch - (e.movementY || 0) * AIM_SENS * fovK,
+          -AIM_PITCH_LIM, AIM_PITCH_LIM);
+      }
     });
 
     cv.addEventListener('wheel', function (e) {
@@ -1678,6 +1705,7 @@ var Game = (function () {
     paused = !paused;
     document.getElementById('pause').classList.toggle('on', paused);
     if (paused) {
+      releasePointer();
       SFX.silence();
       SFX.warning(false);
       SFX.gun(false);
@@ -1785,65 +1813,36 @@ var Game = (function () {
   /* ============================================================
      玩家控制
      ============================================================ */
-  /** 鼠标引导：把屏幕上的瞄准点转成世界方向，再交给追击转弯控制律 */
-  function updateMouseAim() {
-    var cam = Renderer.getCam();
-    if (!cam) return;
-    var mx = mouse.x - Renderer.W / 2;
-    var my = mouse.y - Renderer.H / 2;
-    var dead = 5;
-    if (Math.abs(mx) < dead) mx = 0;
-    if (Math.abs(my) < dead) my = 0;
+  /** 当前瞄准方向（世界坐标单位向量） */
+  function aimDirNow() {
+    var cp = Math.cos(aimPitch);
+    return M3.V(Math.sin(aimYaw) * cp, Math.sin(aimPitch), Math.cos(aimYaw) * cp);
+  }
 
-    // 屏幕点 → 相机空间 → 世界方向
-    var cx = mx / cam.focal;
-    var cy = -my / cam.focal;
-    var dir = M3.norm(M3.V(
-      cam.fwd.x + cam.right.x * cx + cam.up.x * cy,
-      cam.fwd.y + cam.right.y * cx + cam.up.y * cy,
-      cam.fwd.z + cam.right.z * cx + cam.up.z * cy
-    ));
+  /** 从机头重新取瞄准方向（重生、切换飞控模式时） */
+  function resetAim() {
+    var f = player.fwd;
+    aimYaw = Math.atan2(f.x, f.z);
+    aimPitch = M3.clamp(Math.asin(M3.clamp(f.y, -1, 1)), -AIM_PITCH_LIM, AIM_PITCH_LIM);
+    aimInit = true;
+  }
 
-    /* 把鼠标的纵向位置也交给 steerTo。
-
-       为什么不让它自己按目标方向的 ux 判断：ux 取决于 FOV。
-       鼠标能指到的最大下方角度只有**半个 FOV** ——
-       FOV 56° 时是 28°，归一化后 ux 最小只有 -0.47；
-       FOV 38° 时只有 19°，最小 -0.33。用固定的 ux 阈值，
-       要么在某些 FOV 下永远够不到（这正是"移到屏幕底部还是俯下"的原因），
-       要么在另一些 FOV 下过早触发。
-
-       直接看鼠标在屏幕上的位置就没有这个耦合。 */
-    /* 鼠标的屏幕位置，交给 steerTo。
-
-       分工是刻意的：
-         · **方向**判断用机体坐标（在 steerTo 里算的 ux）——
-           "鼠标是不是指向机腹那一侧"本身就是个机体问题。
-         · **幅度**判断用屏幕位置 —— 它是归一化的（±1 = 屏幕边缘），
-           天然与 FOV 无关，不必再去换算角度。 */
-    player.aimX = (mouse.x - Renderer.W / 2) / (Renderer.W * 0.5);
-    player.aimDown = (mouse.y - Renderer.H / 2) / (Renderer.H * 0.5);
-    player.aimMag = Math.sqrt(player.aimX * player.aimX +
-      player.aimDown * player.aimDown);
-
-    /* "相对镜头是不是正着飞"—— 机体 up 与**镜头** up 的一致度。
-
-       注意不能用 a.up.y（相对世界）。追尾机位有俯仰角（低头看飞机），
-       camUp 并不等于世界正上方：
-           镜头俯 60°、飞机相对镜头平飞时，a.up.y = cos60° = 0.50，
-           用世界判据会把它误判成"不正"，而它明明是正着的。
-
-       俯仰越大这个差别越明显，所以只能按镜头算。 */
-    var camNow = Renderer.getCam();
-    if (camNow) player.aimUpright = M3.dot(player.up, camNow.up);
-
-    // 传 player 自身作为锁存容器（提供 rollLock / aimMag）
-    AI.steerTo(player, dir, player.ctrl, player);
+  /** 鼠标引导：把世界瞄准方向交给飞控（AI.steerTo）。
+      传 dt 是为了让飞控估计瞄准方向自己的角速度 —— 鼠标拖动中的转弯
+      需要前馈，否则只看误差会误以为是小修正（见 steerTo 的说明）。 */
+  function updateMouseAim(dt) {
+    if (!aimInit) resetAim();
+    var dir = aimDirNow();
+    // 传 player 自身作为状态容器（planAlpha / rollLock / 瞄准角速度）
+    AI.steerTo(player, dir, player.ctrl, player, dt);
     player.aimDir = dir;
   }
 
   function toggleAimMode() {
     aimMode = !aimMode;
+    aimInit = false;
+    player.aimDir = null;
+    if (!aimMode && document.pointerLockElement === cv && document.exitPointerLock) document.exitPointerLock();
     cv.style.cursor = aimMode ? 'none' : 'default';
     Radio.raw({
       who: CALLSIGN.player, cls: 'ally',
@@ -1884,7 +1883,7 @@ var Game = (function () {
 
     if (aimMode) {
       // 鼠标引导：飞控把机头指向瞄准点，但照样受动压与失速限制
-      updateMouseAim();
+      updateMouseAim(dt);
       var kp = (keys.KeyW ? 1 : 0) + (keys.KeyS ? -1 : 0);
       var kr = (keys.KeyD ? 1 : 0) + (keys.KeyA ? -1 : 0);
       var ky = (keys.KeyE ? 1 : 0) + (keys.KeyQ ? -1 : 0);
@@ -2480,7 +2479,14 @@ var Game = (function () {
       var CAM_PITCH_LIM = 89 * Math.PI / 180;
       var SIN_LIM = Math.sin(CAM_PITCH_LIM);
 
-      var hx = p.fwd.x, hz = p.fwd.z;
+      /* 鼠标引导时镜头跟**瞄准方向**，不跟机头 —— 这是战雷式操纵的另一半：
+         准星永远在画面中心，机头标记去追它；镜头若跟机头，准星就会跟着
+         机头一起跑，机头永远追不上。键盘直控时仍跟机头。
+         跟瞄准方向时平滑放快：它本来就是玩家直接拖的，慢了像在拖泥。 */
+      var lookAim = aimMode && aimInit && p.alive;
+      var lookDir = lookAim ? aimDirNow() : p.fwd;
+      var yawRate = lookAim ? 14 : 1.2, pitchRate = lookAim ? 14 : 9;
+      var hx = lookDir.x, hz = lookDir.z;
       var hlen = Math.sqrt(hx * hx + hz * hz);
 
       // ① 偏航：最短角差平滑。接近垂直时水平投影塌缩，此时沿用上一帧。
@@ -2489,16 +2495,16 @@ var Game = (function () {
         var dYaw = tYaw - camYawBase;
         while (dYaw > Math.PI) dYaw -= Math.PI * 2;
         while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-        camYawBase += dYaw * (1 - Math.exp(-1.2 * dt));
+        camYawBase += dYaw * (1 - Math.exp(-yawRate * dt));
         if (camYawBase > Math.PI) camYawBase -= Math.PI * 2;
         if (camYawBase < -Math.PI) camYawBase += Math.PI * 2;
       }
 
       // ② 俯仰：先钳位，再平滑
-      var camPitchAng = Math.atan2(p.fwd.y, Math.max(hlen, 1e-4));
+      var camPitchAng = Math.atan2(lookDir.y, Math.max(hlen, 1e-4));
       camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
       if (camPitchSmooth === null) camPitchSmooth = camPitchAng;
-      camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-9 * dt));
+      camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-pitchRate * dt));
 
       var cpc = Math.cos(camPitchSmooth), cps = Math.sin(camPitchSmooth);
       var camDir = M3.V(Math.sin(camYawBase) * cpc, cps, Math.cos(camYawBase) * cpc);
@@ -2897,8 +2903,11 @@ var Game = (function () {
 
     // ---- 鼠标引导的瞄准环 ----
     if (aimMode && player.alive && S.camMode !== 2) {
-      var ax = M3.clamp(mouse.x, 14, Renderer.W - 14);
-      var ay = M3.clamp(mouse.y, 14, Renderer.H - 14);
+      // 准星画在瞄准方向的投影上（跟镜头时就是画面中心）
+      var aimS = (player.aimDir && Renderer.getCam())
+        ? M3.project(Renderer.getCam(), M3.add(player.pos, M3.mul(player.aimDir, 1400))) : null;
+      var ax = M3.clamp(aimS ? aimS.x : Renderer.W / 2, 14, Renderer.W - 14);
+      var ay = M3.clamp(aimS ? aimS.y : Renderer.H / 2, 14, Renderer.H - 14);
       var qk = M3.clamp(player.q / 22, 0, 1);
       var acol = player.q < 12 ? 'rgba(255,77,77,0.95)'
         : (player.q < 20 ? 'rgba(255,176,58,0.95)' : 'rgba(79,224,138,0.95)');

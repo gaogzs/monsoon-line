@@ -204,19 +204,34 @@ var HUD = (function () {
   function drawBoresight(ctx, W, H, p) {
     var cx = W / 2, cy = H / 2;
 
-    // 机头参考（十字）
-    ctx.strokeStyle = GREEN; ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(cx - 26, cy); ctx.lineTo(cx - 9, cy);
-    ctx.moveTo(cx + 9, cy); ctx.lineTo(cx + 26, cy);
-    ctx.moveTo(cx, cy - 18); ctx.lineTo(cx, cy - 7);
-    ctx.stroke();
+    /* 机头参考（十字）。鼠标引导时镜头跟的是瞄准方向，画面中心是准星，
+       不是机头 —— 那时不画这个固定十字，机头位置看下面的机头标记。 */
+    var aimFollow = !!p.aimDir;
+    if (!aimFollow) {
+      ctx.strokeStyle = GREEN; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(cx - 26, cy); ctx.lineTo(cx - 9, cy);
+      ctx.moveTo(cx + 9, cy); ctx.lineTo(cx + 26, cy);
+      ctx.moveTo(cx, cy - 18); ctx.lineTo(cx, cy - 7);
+      ctx.stroke();
+    }
 
     // 速度矢量（小圆 + 三根短须）
     var s = null;
     if (Renderer.getCam()) {
       var ahead = M3.add(p.pos, M3.mul(p.fwd, 1400));
       s = M3.project(Renderer.getCam(), ahead);
+    }
+    /* 机头 → 准星的细线：机炮沿机头打，标记压进准星环里才是真的对准了。
+       离得很近时不画，免得准星中间常驻一截短线。 */
+    if (s && aimFollow && Renderer.getCam()) {
+      var as = M3.project(Renderer.getCam(), M3.add(p.pos, M3.mul(p.aimDir, 1400)));
+      if (as && Math.hypot(as.x - s.x, as.y - s.y) > 24) {
+        ctx.strokeStyle = 'rgba(102,217,255,0.35)'; ctx.lineWidth = 1;
+        ctx.setLineDash([3, 5]);
+        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(as.x, as.y); ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
     if (s) {
       ctx.strokeStyle = CY; ctx.lineWidth = 1.4;
@@ -263,6 +278,7 @@ var HUD = (function () {
        收油门之后速度是慢慢掉的，俯冲时速度很高也不代表在加油门。 */
     var ex = x + U(104);
     thrTape(ctx, ex, top, hgt, p.throttle, p.ab, p.brake);
+    ctrlGauges(ctx, ex + U(62), top, hgt, p);
     // 高 G：正在拉过载时给个明确的提示，掉速才不至于莫名其妙
     if (p.hiG) {
       var gcol = Math.sin(performance.now() * 0.02) > 0 ? RED : AMBER;
@@ -417,6 +433,52 @@ var HUD = (function () {
     text(ctx, Math.round(k * 100) + '%', x + 24, top + hgt / 2 + 5, col, FB, 'left');
     if (brake) text(ctx, 'BRK', x, y0 + 16, CY, FS, 'center');
     else if (ab) text(ctx, 'A/B', x, y0 + 16, AMBER, FS, 'center');
+  }
+
+  /* 飞控舵量表 P / R / Y —— 飞控**此刻给出的**杆量，不是玩家的输入。
+
+     贴在出力带右下方（出力读数在带子中线，下半段是空的）。
+     每根都是双极的：中线 = 0，向上 = 抬头 / 右滚 / 右偏。
+     底色是这根轴此刻的**可用权限**（动压舵效 × 失速），所以低速时
+     底色会缩短，一眼看得出"杆打满了也转不动"；俯仰向下那半边
+     再乘 0.5，和 stepAircraft 里推杆只有一半权限一致。
+     滚转有保底舵效（ctrlFactor × 1.8，最低 0.28），这里也照算。 */
+  function ctrlGauges(ctx, x0, top, hgt, p) {
+    var c = p.ctrl || { pitch: 0, roll: 0, yaw: 0 };
+    var auth = (p.ctrlAuth === undefined) ? 1 : p.ctrlAuth;
+    var gh = hgt * 0.40;                      // 单根高度
+    var y1 = top + hgt;                       // 与出力带底边对齐
+    var yc = y1 - gh / 2;
+    var gw = U(22);                           // 两根之间的间距
+    var axes = [
+      { k: 'P', v: c.pitch, up: auth, dn: auth * 0.5 },
+      { k: 'R', v: c.roll, up: M3.clamp(auth * 1.8, 0.28, 1), dn: M3.clamp(auth * 1.8, 0.28, 1) },
+      { k: 'Y', v: c.yaw, up: auth, dn: auth }
+    ];
+    for (var i = 0; i < 3; i++) {
+      var A = axes[i];
+      var x = x0 + i * gw;
+      var v = M3.clamp(A.v || 0, -1, 1);
+      // 可用权限底色
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(x - 3, yc - gh / 2 * A.up, 6, gh / 2 * A.up + gh / 2 * A.dn);
+      // 轴线与 0 / ±1 刻度
+      ctx.strokeStyle = DIM; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, yc - gh / 2); ctx.lineTo(x, yc + gh / 2);
+      ctx.moveTo(x - 7, yc); ctx.lineTo(x + 7, yc);
+      ctx.moveTo(x - 4, yc - gh / 2); ctx.lineTo(x + 4, yc - gh / 2);
+      ctx.moveTo(x - 4, yc + gh / 2); ctx.lineTo(x + 4, yc + gh / 2);
+      ctx.stroke();
+      // 杆量条：从 0 往上下长；超过可用权限的部分（杆打满也给不出来）变琥珀
+      var lim = v >= 0 ? A.up : A.dn;
+      var sat = Math.abs(v) > 0.98 || Math.abs(v) > lim + 1e-3;
+      ctx.fillStyle = sat ? AMBER : GREEN;
+      var hh = gh / 2 * Math.abs(v);
+      ctx.fillRect(x - 2, v >= 0 ? yc - hh : yc, 4, Math.max(1, hh));
+      text(ctx, A.k, x, y1 + 16, DIM, FS, 'center');
+    }
+    text(ctx, 'FCS', x0 + gw, yc - gh / 2 - 10, DIM, FS, 'center');
   }
 
   /* ============================================================

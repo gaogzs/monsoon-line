@@ -565,6 +565,9 @@ var Ent = (function () {
     var ctrl = ctrlFactor(a.pos.y, a.speed, a.ac);
     a.stall = a.speed < p.vStall;
     if (a.stall) ctrl *= 0.34;
+    /* 存下来给两处读：AI.steerTo 按它估计每根轴此刻能转多快，
+       HUD 的 P/R/Y 舵量表用它画"可用权限"底色。下一帧才被读到，差一帧无所谓。 */
+    a.ctrlAuth = ctrl;
 
     // ---- 姿态：对机体基向量施加局部旋转 ----
     var pIn = M3.clamp(a.ctrl.pitch, -1, 1);

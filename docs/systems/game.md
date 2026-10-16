@@ -241,21 +241,11 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
 
 具体哪个键干什么见 [hud.md 的输入映射表](hud.md#输入映射)，下面只讲机制。
 
-### 鼠标引导机头 `updateMouseAim()`
-1. 取 `Renderer.getCam()`；鼠标相对屏幕中心的偏移带 **5 px 死区**。
-2. 屏幕点 → 相机空间 → 世界方向：`cx = mx / cam.focal, cy = -my / cam.focal`，再拼 `dir = norm(fwd + right*cx + up*cy)`。
-3. 同时把**归一化的屏幕位置**记到玩家身上：
-
-   ```js
-   player.aimX    = (mouse.x - W/2) / (W*0.5);
-   player.aimDown = (mouse.y - H/2) / (H*0.5);
-   player.aimMag  = hypot(aimX, aimDown);
-   player.aimUpright = dot(player.up, cam.up);
-   ```
-
-   分工是刻意的：**方向**用机体坐标判（`AI.steerTo` 内部算的 `ux`），**幅度**用屏幕位置判 —— 屏幕位置是归一化的，天然与 FOV 无关。早期用固定 `ux` 阈值，而鼠标能指到的最大下方角只有半个 FOV（56° 时 28°，38° 时 19°），于是“移到屏幕底部还是不俯冲”随 FOV 变化。
-4. `player.aimUpright` 必须拿**镜头**的 `up` 比，不能用 `a.up.y`（世界）：追尾机位有俯仰角，镜头俯 60°、飞机相对镜头平飞时 `a.up.y = cos60° = 0.5`，用世界判据会把它误判成“不正”。
-5. `AI.steerTo(player, dir, player.ctrl, player)` —— 与 AI 同一套控制律（见 [ai.md](ai.md)），玩家自己也当锁存容器用（`rollLock / aimMag`）；最后 `player.aimDir = dir`。`toggleAimMode()`（`M`）只切布尔 `aimMode` 与画布光标，两条路径共用同一个 `player.ctrl`。
+### 鼠标引导机头 `updateMouseAim(dt)`（战雷式）
+1. 瞄准方向存在世界坐标里：`aimYaw / aimPitch`（俯仰限 ±89°）。`mousemove` 用 `movementX/Y × AIM_SENS × FOV/56` 转动它；点击画布时 `requestPointerLock()`，菜单 / 暂停时 `releasePointer()` 交还指针。
+2. `aimInit = false`（重生、`M` 切模式）时下一帧 `resetAim()` 从机头重新取。
+3. `AI.steerTo(player, aimDirNow(), player.ctrl, player, dt)` —— 传 `dt` 启用瞄准角速度前馈（见 [ai.md](ai.md)）；`player.aimDir` 供 HUD 画准星与机头连线。
+4. 追尾镜头（`S.camMode === 0`）在鼠标引导时跟 `aimDir` 而不跟机头，平滑系数 14；键盘直控时仍跟机头。这样准星固定在画面中心、机头标记去追它，机头才能真正收敛到准星上。
 
 ### 键盘直控与油门轴
 `controlPlayer(dt)`：
