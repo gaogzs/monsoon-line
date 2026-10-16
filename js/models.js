@@ -1985,10 +1985,108 @@ var MODELS = (function () {
     for (k = 0; k < extra.length; k++) m.f.push(extra[k]);
   }
 
+  /* ============================================================
+     翼面插进机体
+
+     尾翼、垂尾（以及部分主翼）都是单独一块薄板，翼根点按机身"名义宽度"
+     手填 —— 而机身尾段在收窄，于是翼根和机身之间常常露一道缝。
+     这里统一把每块翼面的翼根沿"翼尖 → 翼根"方向往里延伸，
+     直到翼根中点落进机体内部，再多插 15 cm。穿模无所谓，
+     只要 x 不越过中线（不从另一侧穿出来）。
+     可变后掠翼的顶点由 morph 驱动，跳过。
+     ============================================================ */
+  function bodyFaces(m, skip) {
+    var r = [];
+    for (var fi = 0; fi < m.f.length; fi++) if (!skip[fi]) r.push(fi);
+    return r;
+  }
+
+  // (x, y, z) 是否在机体内部：竖直方向上下都有机体表面
+  function insideBody(m, faces, x, y, z) {
+    var lo = null, hi = null;
+    for (var n = 0; n < faces.length; n++) {
+      var idx = m.f[faces[n]].i;
+      for (var t = 1; t < idx.length - 1; t++) {
+        var A = m.v[idx[0]], B = m.v[idx[t]], Cc = m.v[idx[t + 1]];
+        var d = (B[2] - Cc[2]) * (A[0] - Cc[0]) + (Cc[0] - B[0]) * (A[2] - Cc[2]);
+        if (Math.abs(d) < 1e-9) continue;
+        var w1 = ((B[2] - Cc[2]) * (x - Cc[0]) + (Cc[0] - B[0]) * (z - Cc[2])) / d;
+        var w2 = ((Cc[2] - A[2]) * (x - Cc[0]) + (A[0] - Cc[0]) * (z - Cc[2])) / d;
+        var w3 = 1 - w1 - w2;
+        if (w1 < 0 || w2 < 0 || w3 < 0) continue;
+        var yy = w1 * A[1] + w2 * B[1] + w3 * Cc[1];
+        if (yy <= y && (lo === null || yy > lo)) lo = yy;
+        if (yy >= y && (hi === null || yy < hi)) hi = yy;
+      }
+    }
+    return lo !== null && hi !== null;
+  }
+
+  function rootFins(m) {
+    var use = {}, fi, k, morph = {};
+    if (m.morph && m.morph.map) {
+      for (k = 0; k < m.morph.map.length; k++) if (m.morph.map[k] >= 0) morph[k] = true;
+    }
+    for (fi = 0; fi < m.f.length; fi++) {
+      for (k = 0; k < m.f[fi].i.length; k++) use[m.f[fi].i[k]] = (use[m.f[fi].i[k]] || 0) + 1;
+    }
+    var fins = [], skip = {};
+    for (fi = 0; fi < m.f.length; fi++) {
+      var f = m.f[fi];
+      if ((f.c !== C.wing && f.c !== C.wing2) || f.i.length !== 4) continue;
+      var ok = true;
+      for (k = 0; k < 4; k++) if (use[f.i[k]] > 1 || morph[f.i[k]]) ok = false;
+      if (ok) { fins.push(fi); skip[fi] = true; }
+    }
+    if (!fins.length) return;
+    var body = bodyFaces(m, skip);
+    var rad = function (v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1]); };
+    for (var n = 0; n < fins.length; n++) {
+      var ids = m.f[fins[n]].i;
+      // 翼根 = 离机身轴线（x=0, y=0）最近的那条边
+      var best = 0, bestR = 1e9;
+      for (k = 0; k < 4; k++) {
+        var rr = rad(m.v[ids[k]]) + rad(m.v[ids[(k + 1) % 4]]);
+        if (rr < bestR) { bestR = rr; best = k; }
+      }
+      var r0 = ids[best], r1 = ids[(best + 1) % 4];
+      var t0 = ids[(best + 3) % 4], t1 = ids[(best + 2) % 4];   // 各自对应的翼尖点
+      var P0 = m.v[r0], P1 = m.v[r1], T0 = m.v[t0], T1 = m.v[t1];
+      var dir = function (P, T) {
+        var dx = P[0] - T[0], dy = P[1] - T[1], dz = P[2] - T[2];
+        var l = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+        return [dx / l, dy / l, dz / l];
+      };
+      var d0 = dir(P0, T0), d1 = dir(P1, T1);
+      var side = P0[0] + P1[0] >= 0 ? 1 : -1;
+      var mx = (P0[0] + P1[0]) / 2, my = (P0[1] + P1[1]) / 2, mz = (P0[2] + P1[2]) / 2;
+      var dm = [(d0[0] + d1[0]) / 2, (d0[1] + d1[1]) / 2, (d0[2] + d1[2]) / 2];
+      if (insideBody(m, body, mx, my, mz)) continue;          // 已经插进去了
+      var found = -1;
+      for (var e = 0.05; e <= 1.5 + 1e-9; e += 0.05) {
+        var x = mx + dm[0] * e;
+        if (x * side < 0.02) break;                           // 不越过中线
+        if (insideBody(m, body, x, my + dm[1] * e, mz + dm[2] * e)) { found = e; break; }
+      }
+      if (found < 0) continue;
+      var ext = found + 0.15;
+      // 再插 15 cm，但同样不越过中线
+      var lim = function (P, dd) {
+        var e2 = ext;
+        if (dd[0] * side < 0) e2 = Math.min(e2, (Math.abs(P[0]) - 0.02) / Math.abs(dd[0]));
+        return Math.max(0, e2);
+      };
+      var e0 = lim(P0, d0), e1 = lim(P1, d1);
+      P0[0] += d0[0] * e0; P0[1] += d0[1] * e0; P0[2] += d0[2] * e0;
+      P1[0] += d1[0] * e1; P1[1] += d1[1] * e1; P1[2] += d1[2] * e1;
+    }
+  }
+
   for (var mk in M) {
     if (!Object.prototype.hasOwnProperty.call(M, mk)) continue;
     var mm = M[mk];
     if (!mm || !mm.v || mm.ground || mm.sea) continue;
+    rootFins(mm);
     seatCanopies(mm);
   }
 
