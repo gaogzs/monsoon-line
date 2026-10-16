@@ -855,11 +855,54 @@ var Ent = (function () {
       a.trailTimer -= dt;
       if (a.trailTimer <= 0) {
         a.trailTimer = 0.028;
-        var nzz = M3.add(a.pos, M3.mul(a.fwd, -10));
+        var nzl = nozzlesOf(a.model);
+        var nzz;
+        if (nzl.length) {
+          a.abIdx = ((a.abIdx || 0) + 1) % nzl.length;
+          var nz = nzl[a.abIdx];
+          nzz = M3.add(a.pos, M3.add(M3.mul(a.right, nz[0]),
+            M3.add(M3.mul(a.up, nz[1]), M3.mul(a.fwd, nz[2] - 0.6))));
+        } else {
+          nzz = M3.add(a.pos, M3.mul(a.fwd, -10));
+        }
         spawnParticle(world.particles, nzz, M3.mul(a.vel, 0.02),
           M3.rnd(0.10, 0.22), M3.rnd(1.1, 2.0), '#ffb14a', { grow: true, drag: 2.5 });
       }
     }
+  }
+
+  /* 模型上的喷口位置（机体坐标 [x, y, z]），按模型缓存。
+
+     加力尾焰以前一律从"机身中心往后 10 米"喷出 —— G-6 的发动机吊在
+     两侧机翼下，火却从机尾中线冒出来。现在直接从模型里找：
+     喷口色（C.nozzle）的面按共用顶点分组，每组取横向中心与最靠后的 z。 */
+  var NOZZLE_CACHE = {};
+  var NOZZLE_HEX = '#333a42';
+  function nozzlesOf(mk) {
+    if (NOZZLE_CACHE[mk]) return NOZZLE_CACHE[mk];
+    var m = (typeof MODELS !== 'undefined') ? MODELS[mk] : null, out = [];
+    if (m) {
+      var groups = [];
+      for (var fi = 0; fi < m.f.length; fi++) {
+        var f = m.f[fi];
+        if (f.c !== NOZZLE_HEX) continue;
+        var hit = null;
+        for (var gi = 0; gi < groups.length && !hit; gi++) {
+          for (var k = 0; k < f.i.length; k++) if (groups[gi].vs[f.i[k]]) { hit = groups[gi]; break; }
+        }
+        if (!hit) { hit = { vs: {} }; groups.push(hit); }
+        for (k = 0; k < f.i.length; k++) hit.vs[f.i[k]] = true;
+      }
+      for (gi = 0; gi < groups.length; gi++) {
+        var sx = 0, sy = 0, n = 0, mz = 1e9;
+        for (var vi in groups[gi].vs) {
+          var v = m.v[vi]; sx += v[0]; sy += v[1]; n++;
+          if (v[2] < mz) mz = v[2];
+        }
+        if (n) out.push([sx / n, sy / n, mz]);
+      }
+    }
+    return (NOZZLE_CACHE[mk] = out);
   }
 
   /* ============================================================
@@ -1929,7 +1972,7 @@ var Ent = (function () {
     /* 挂点适配与 NPC 的挂载分配 —— game.js 的 pushStores 渲染实体挂载时
        要用同一份规则，不能再抄一遍。 */
     hostile: hostile,
-    fitsKind: fitsKind, mountPlan: mountPlan, storePos: storePos, storeHy: storeHy, surfaceBelow: surfaceBelow, STORE_HY: STORE_HY,
+    fitsKind: fitsKind, mountPlan: mountPlan, storePos: storePos, storeHy: storeHy, nozzlesOf: nozzlesOf, surfaceBelow: surfaceBelow, STORE_HY: STORE_HY,
     forEachStoreSlot: forEachStoreSlot, storeForSlot: storeForSlot,
     /* 选弹与"当前触发武器" —— game.js 的 syncWeapon（玩家换弹）与 ai.js
        的开火选弹都走 setWeapon，判据同源。 */
