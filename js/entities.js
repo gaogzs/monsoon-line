@@ -1560,13 +1560,17 @@ var Ent = (function () {
        注意 spawnParticle 的签名是 (list, pos, vel, life, size, ...) ——
        这里原来把 size 写成了 3.2（米），直径六米多，比飞机还大，
        所以整团火直接把机体盖住了。 */
-    /* 火光放在这一轮最后一发的炮口上，并且**跟着飞机走**（速度 = 机体速度）：
-       以前给的是 0.15 倍机速，飞机 300 m/s 往前冲，火光一生成就往后拖十几米。 */
-    var mz = gunMuzzle(a, a.gunSide);
-    spawnParticle(world.particles, mz, M3.clone(a.vel),
-      0.055, 0.55, '#fff2c0', { grow: true });
-    spawnParticle(world.particles, mz, M3.mul(a.vel, 0.9),
-      0.10, 0.95, '#ffd070', { grow: true });
+    /* 火光画在这一轮**每个**出过弹的炮口上，并且跟着飞机走（速度 = 机体速度）。
+       一轮常常是 2 发（左右各一），只画"最后一发"的话 gunSide 翻两次回到原位，
+       火光就永远停在同一侧。 */
+    var sides = n >= 2 ? [0, 1] : [a.gunSide];
+    for (var si = 0; si < sides.length; si++) {
+      var mz = gunMuzzle(a, sides[si]);
+      spawnParticle(world.particles, mz, M3.clone(a.vel),
+        0.055, 0.55, '#fff2c0', { grow: true });
+      spawnParticle(world.particles, mz, M3.mul(a.vel, 0.9),
+        0.10, 0.95, '#ffd070', { grow: true });
+    }
   }
 
   /* 炮口位置（side 0 = 左，1 = 右）。子弹出膛与火光共用这一份。 */
