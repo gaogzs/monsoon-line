@@ -588,7 +588,7 @@ var HUD = (function () {
         s.x += (Math.random() - 0.5) * jr;
         s.y += (Math.random() - 0.5) * jr;
       }
-      ctx.fillStyle = friendly ? GREEN : RED;
+      ctx.fillStyle = friendly ? GREEN : (e.team > 1 ? 'rgba(160,170,178,0.8)' : RED);
       if (friendly) {
         ctx.beginPath(); ctx.arc(s.x, s.y, 2.8, 0, Math.PI * 2); ctx.fill();
       } else {
@@ -883,13 +883,11 @@ var HUD = (function () {
       if (isAlly) {
         drawAllyMark(ctx, s, t, dist);
       } else {
-        /* 先画基础框（红色小框 + 名称/距离），锁定时再把大框叠上去。
-
-           以前是**二选一**：一旦锁定，目标原本的小框和标签就整个消失，
-           只剩一个空心大框。玩家会突然"看不见"这个目标的身份和距离 ——
-           而这恰恰是他最需要这些信息的时刻。 */
-        drawPlainMark(ctx, s, t, dist);
+        /* 锁定时只画大框：大框自己带呼号 / 机型 / 距离 / 高度差，
+           两份标签叠在一起反而谁都读不清。未锁定画基础框。
+           中立（team 2）用灰色 —— 它不是敌人，红色会让人想去打它。 */
         if (isLock) drawLockBox(ctx, s, t, p, dist, world);
+        else drawPlainMark(ctx, s, t, dist, t.team > 1);
       }
     }
   }
@@ -999,7 +997,7 @@ var HUD = (function () {
      红框旁边照样写清"谁在开、开的是什么" —— 一眼扫过去也要能
      判断该先打谁。标签只在较近时才画，否则满屏都是字。
      ============================================================ */
-  function drawPlainMark(ctx, s, t, dist) {
+  function drawPlainMark(ctx, s, t, dist, neutral) {
     var isGnd = t.kind === 'target';
     var sz = isGnd ? 8 : 11;
 
@@ -1011,7 +1009,7 @@ var HUD = (function () {
 
        尺寸仍然保留差别（地面设施画小一点）：那是**识别**用的，
        告诉你"这是个固定设施"，不是用来区分敌我的。 */
-    var col = 'rgba(255,77,77,0.68)';
+    var col = neutral ? 'rgba(160,170,178,0.62)' : 'rgba(255,77,77,0.68)';
 
     ctx.strokeStyle = col;
     ctx.lineWidth = 1.2;
@@ -1119,10 +1117,14 @@ var HUD = (function () {
       ly += 14;
     }
 
+    /* 包线状态写在框的**正下方**居中：它是"现在能不能打"的判断，
+       该和框本身挨在一起，而不是混在右侧的数据列里。
+       让开锁定进度环（半径 max(w,h)+10）。 */
+    var envY = s.y + Math.max(w, h) + 24;
     if (inNez) {
-      text(ctx, 'NEZ', tx, ly, RED, 'bold 12px Consolas,monospace', 'left');
+      text(ctx, 'NEZ', s.x, envY, RED, 'bold 12px Consolas,monospace', 'center');
     } else if (env && !outMax) {
-      text(ctx, 'IN RNG', tx, ly, AMBER, 'bold 12px Consolas,monospace', 'left');
+      text(ctx, 'IN RNG', s.x, envY, AMBER, 'bold 12px Consolas,monospace', 'center');
     }
 
     // 锁定进度环
@@ -1264,7 +1266,8 @@ var HUD = (function () {
        脉动用 performance.now()：这个文件里所有闪烁都是这么写的。
        箭头画在安全矩形边界上，外环半径 +3.5 仍在 CLR 让出的余量里。 */
     var lockPulse = 0;
-    var col = isAlly ? 'rgba(79,224,138,0.52)' : 'rgba(255,77,77,0.55)';
+    var neutral = !isAlly && t.team > 1;
+    var col = isAlly ? 'rgba(79,224,138,0.52)' : (neutral ? 'rgba(160,170,178,0.50)' : 'rgba(255,77,77,0.55)');
     var sz = isLock ? 11 : (isAlly ? 8 : 9);
     if (isLock) {
       lockPulse = (Math.sin(performance.now() * 0.006) + 1) * 0.5;   // 0..1

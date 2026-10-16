@@ -2024,26 +2024,27 @@ var STORE_ATTR = {
    fin：  'strake' 长边条翼（格斗） / 'small' 小弹翼（中远）
           / 'cruise' 平直弹翼（巡航弹）/ 'bomb' 炸弹尾翼
    boost：尾部助推段（超远程 / 反舰）
-   rack： 一个挂架上**看得见**的弹数 —— 不是 perPoint（那是弹库）
+   rack： 一个挂架上**看得见**的弹数 —— 只给单次齐射多发的武器（= salvo），
+          单发武器哪怕一个挂点装好几发也画成一枚（perPoint 是弹库，不是外观）
    nest： 'tube' 圆筒火箭巢 / 'box' 方形发射巢；cells 是管口数
    3D（MODELS.store / MODELS.round）与识别图（PLANFORM.drawStore）读同一份。
    ============================================================ */
 var STORE_LOOK = {
   /* 格斗 */
-  srm:  { len: 2.7, dia: 0.13, fin: 'strake', rack: 2 },
-  trm:  { len: 2.9, dia: 0.13, fin: 'strake', rack: 2 },
+  srm:  { len: 2.7, dia: 0.13, fin: 'strake' },
+  trm:  { len: 2.9, dia: 0.13, fin: 'strake' },
   hos:  { len: 2.6, dia: 0.14, fin: 'strake' },
   otr:  { len: 2.8, dia: 0.14, fin: 'small' },
   dl6:  { len: 2.9, dia: 0.14, fin: 'strake' },
   qsr:  { len: 2.2, dia: 0.11, fin: 'strake', nest: 'box', cells: 3 },
   swm:  { len: 1.9, dia: 0.10, fin: 'strake', nest: 'box', cells: 4 },
   /* 中距 */
-  wasp: { len: 3.2, dia: 0.16, fin: 'small', rack: 3 },
+  wasp: { len: 3.2, dia: 0.16, fin: 'small' },
   v9:   { len: 3.0, dia: 0.15, fin: 'strake', rack: 2 },
-  v11:  { len: 3.4, dia: 0.17, fin: 'small', rack: 2 },
-  mrm:  { len: 3.7, dia: 0.18, fin: 'small', rack: 2 },
+  v11:  { len: 3.4, dia: 0.17, fin: 'small' },
+  mrm:  { len: 3.7, dia: 0.18, fin: 'small' },
   dl4:  { len: 3.6, dia: 0.18, fin: 'small' },
-  vbn:  { len: 3.6, dia: 0.18, fin: 'small', rack: 2 },
+  vbn:  { len: 3.6, dia: 0.18, fin: 'small' },
   /* 远程 */
   arm:  { len: 4.2, dia: 0.24, fin: 'small' },
   v17:  { len: 4.4, dia: 0.24, fin: 'small' },
