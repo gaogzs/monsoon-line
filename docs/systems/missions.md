@@ -43,7 +43,7 @@
 > **水面舰船一律走 `spawnShip`。** `data.js` 里的 `SHIPS` 表（16 艘，见
 > [SETTING.md 8.0.1](../world/SETTING.md)）提供 `model` / `hp` / `radius` /
 > `value` / `label`，任务里只写"哪条船、在哪、由谁指挥"（全文件约 25 处调用）。
-> 简报与台词里的舰船编号必须取自 `SHIPS[].hull`（`BLO-` / `BEI-`）——
+> 简报与台词里的舰船称呼必须取自 `SHIPS[].hull`（「虎鲸级」这类级名，不写字母数字编号）——
 > v1.4.1 把 m4 / m9 里编造的 `CON-*` 编号全部改了回来。
 > 舰船用 `ttype: 'ground'`、`ground: true`（**不要**新造 `ttype:'ship'`：
 > 渲染按 `MODELS[t.model]` 查表，`ttype` 只影响 HUD 文案与受损下沉分支）。

@@ -688,9 +688,9 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
    所以这里的兵力结构是反的：战斗舰艇很少，支援船很多，
    而排水量最大的那几条船不属于任何交战方。
 
-   编号规则见设定集 8.1：**船体编号是名词，弹药编号是动词**。
-   `BLO-`（bloti 船）与 `BEI-`（beiblo 货船）是船体；
-   民用船与管理局的船不挂制式编号，只挂船名。
+   命名规则见设定集 8.0.1：上下游两支海军的军舰**不挂字母数字编号**，
+   一律按级名称呼（`hull: '虎鲸级'`）—— 字母前缀会让两边的船看起来
+   像同一支海军的编号体系。民用船与管理局的船只挂船名。
 
    下表里的 hp / radius / value / vials / neutral 是**给关卡接入用的**
    —— 当前没有任何代码读取它们，与 `MODELS` 的 span / sea 同一个性质。
@@ -701,7 +701,7 @@ var SHIPS = [
   {
     id: 'orca',
     model: 'orca',
-    hull: 'BLO-11',
+    hull: '虎鲸级',
     name: 'Orca',
     cn: '虎鲸',
     cls: '护航驱逐舰',
@@ -732,7 +732,7 @@ var SHIPS = [
   {
     id: 'bluewhale',
     model: 'bluewhale',
-    hull: 'BEI-2',
+    hull: '蓝鲸级',
     name: 'Bluewhale',
     cn: '蓝鲸',
     cls: '快速战斗支援舰',
@@ -762,7 +762,7 @@ var SHIPS = [
   {
     id: 'humpback',
     model: 'humpback',
-    hull: 'BLO-19',
+    hull: '座头鲸级',
     name: 'Humpback',
     cn: '座头鲸',
     cls: '航空母舰（浮岛）',
@@ -790,7 +790,7 @@ var SHIPS = [
   {
     id: 'spermwhale',
     model: 'spermwhale',
-    hull: 'BLO-13',
+    hull: '抹香鲸级',
     name: 'Spermwhale',
     cn: '抹香鲸',
     cls: '巡洋舰',
@@ -817,7 +817,7 @@ var SHIPS = [
   {
     id: 'dolphin',
     model: 'dolphin',
-    hull: 'BLO-6',
+    hull: '海豚级',
     name: 'Dolphin',
     cn: '海豚',
     cls: '护卫舰',
@@ -846,7 +846,7 @@ var SHIPS = [
   {
     id: 'trilobite',
     model: 'trilobite',
-    hull: 'BLO-2',
+    hull: '三叶虫级',
     name: 'Trilobite',
     cn: '三叶虫',
     cls: '导弹快艇',
@@ -874,7 +874,7 @@ var SHIPS = [
   {
     id: 'ammonite',
     model: 'ammonite',
-    hull: 'BLO-8',
+    hull: '菊石级',
     name: 'Ammonite',
     cn: '菊石',
     cls: '巡逻护卫舰',
@@ -903,7 +903,7 @@ var SHIPS = [
   {
     id: 'seascorpion',
     model: 'seascorpion',
-    hull: 'BEI-9',
+    hull: '海蝎级',
     name: 'Seascorpion',
     cn: '海蝎',
     cls: '登陆舰',
@@ -931,7 +931,7 @@ var SHIPS = [
   {
     id: 'cameroceras',
     model: 'cameroceras',
-    hull: 'BLO-24',
+    hull: '房角石级',
     name: 'Cameroceras',
     cn: '房角石',
     cls: '武库舰',
@@ -962,7 +962,7 @@ var SHIPS = [
   {
     id: 'dunkleosteus',
     model: 'dunkleosteus',
-    hull: 'BLO-16',
+    hull: '邓氏鱼级',
     name: 'Dunkleosteus',
     cn: '邓氏鱼',
     cls: '巡洋舰',

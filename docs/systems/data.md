@@ -174,7 +174,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 |---|---|---|---|
 | `id` | string | 内部键，**同时是 `MODELS` 的键与预览图文件名** | `inv3`、`tools/render-ships.js` |
 | `model` | string | `MODELS` 的键（当前 16 条与 `id` 一一对应，但保留这个字段以便多艘复用同一模型）；**`spawnShip` 按它查表** | `spawnShip`、`inv3`、渲染 |
-| `hull` | string | 制式编号或船名前缀（`BLO-11` / `BEI-2` / `MV SOUTHERN CROSS`）；任务简报与台词里的舰船编号必须取自这里（v1.4.1 把编造的 `CON-*` 编号全部改回 `BLO-` / `BEI-`） | `inv3` |
+| `hull` | string | 军舰的级名或船名（`虎鲸级` / `蓝鲸级` / `MV SOUTHERN CROSS`）；任务简报与台词里的舰船称呼必须取自这里。上下游军舰不挂字母数字编号 | `inv3` |
 | `name` / `cn` | string | 英文舰名 / 中文舰名 | `inv3` |
 | `cls` | string | 舰种（护航驱逐舰 / 导弹快艇 / 布缆船…） | `inv3` |
 | `faction` / `operator` | string | 阵营 / 实际使用方 | `inv3`（按 `faction` 分组） |

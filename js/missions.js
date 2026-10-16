@@ -532,7 +532,7 @@ MISSIONS.push({
     'BAD-9「高墙」远程防空导弹（4 个阵地，射程 9 km）',
     'ROK-40「巨砾」轰炸机 ×2（直扑前进基地）',
     '测控平台全毁后：GAL-31「玄武岩」×4 / ROK-27「片岩」×2 从北面进场',
-    '海面：BLO-8「菊石」（舰空弹）/ BLO-2「三叶虫」快艇',
+    '海面：菊石级（舰空弹）/ 三叶虫级快艇',
     '地形：海面，无地形遮蔽可用'
   ],
   intel: `云底 <b>900 m</b> · 云顶 3400 m · 中继平台高度 <b>4000 m</b><br>
@@ -1103,13 +1103,13 @@ MISSIONS.push({
   objectives: [
     '摧毁下游水面编队全部舰艇（5 艘）',
     '摧毁 2 座雷达浮台',
-    '注意：编队内四型舰艇，BLO-24「房角石」级武库舰是核心目标',
-    '海面有 BLO-6「海豚」级护卫舰在己方一侧 —— 不要误击'
+    '注意：编队内四型舰艇，房角石级武库舰是核心目标',
+    '海面有海豚级护卫舰在己方一侧 —— 不要误击'
   ],
   threats: [
-    'BLO-24「房角石」级武库舰（312 个垂发井）',
-    'BLO-16「邓氏鱼」级巡洋舰 ×1 / BLO-8「菊石」级 ×2',
-    'BLO-2「三叶虫」级导弹快艇（40 节，贴海机动）',
+    '房角石级武库舰（312 个垂发井）',
+    '邓氏鱼级巡洋舰 ×1 / 菊石级 ×2',
+    '三叶虫级导弹快艇（40 节，贴海机动）',
     'BAD-9「高墙」舰空弹（邓氏鱼与两条菊石，射程 9 km）',
     'ROK-27「片岩」×2（BOX-14「坍方」反舰弹）/ VAC-14「砂岩」×1（TUM-7「碎石」）—— 会去打你的船'
   ],
@@ -1119,8 +1119,8 @@ MISSIONS.push({
     对方舰空弹的锁定与被照高度有关 —— 贴海进入可以缩短他们的反应时间`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: 0, z: 8000, type: 'enemy', label: '武库舰 BLO-24' },
-    { x: -14000, z: 16000, type: 'enemy', label: '巡洋舰 BLO-16' },
+    { x: 0, z: 8000, type: 'enemy', label: '武库舰 房角石级' },
+    { x: -14000, z: 16000, type: 'enemy', label: '巡洋舰 邓氏鱼级' },
     { x: 14000, z: 16000, type: 'enemy', label: '菊石级 ×2' },
     { x: -26000, z: 11000, type: 'sam', label: '雷达浮台' },
     { x: 26000, z: 11000, type: 'sam', label: '雷达浮台' },
@@ -1138,31 +1138,31 @@ MISSIONS.push({
 
     /* 下游水面编队 —— 这一关的目标。
 
-       BLO-24 房角石是核心：312 个垂发井装的是对海齐射，不是防空 ——
+       房角石级是核心：312 个垂发井装的是对海齐射，不是防空 ——
        它自己只有两座近防炮（weapon: null）。防空圈是周围画的：
        邓氏鱼与两条菊石都带 BAD-9 舰空弹（SHIPS 表的 arms）。
        想打武库舰，得先穿过它们。 */
     spawnShip(w, {
-      model: 'cameroceras', label: '房角石 BLO-24',
+      model: 'cameroceras', label: '房角石级',
       x: 0, z: 16000, hp: 1800,
       weapon: null
     });
     spawnShip(w, {
-      model: 'dunkleosteus', label: '邓氏鱼 BLO-16',
+      model: 'dunkleosteus', label: '邓氏鱼级',
       x: -14000, z: 12000, hp: 900, weapon: 'dl9', fireCd: 4,
       route: { wp: [{ x: -14000, z: 12000 }, { x: -14000, z: 24000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
-      model: 'ammonite', label: '菊石 BLO-8 A',
+      model: 'ammonite', label: '菊石级 A',
       x: 13000, z: 13000, hp: 420, weapon: 'dl9',
       route: { wp: [{ x: 13000, z: 13000 }, { x: 24000, z: 6000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
-      model: 'ammonite', label: '菊石 BLO-8 B',
+      model: 'ammonite', label: '菊石级 B',
       x: 20000, z: 9000, hp: 420, weapon: 'dl9'
     });
     spawnShip(w, {
-      model: 'trilobite', label: '三叶虫 BLO-2 A',
+      model: 'trilobite', label: '三叶虫级 A',
       x: -6000, z: 24000, hp: 240,
       route: { wp: [{ x: -6000, z: 24000 }, { x: 12000, z: 26000 }], speed: 20, loop: true }
     });
@@ -1705,14 +1705,14 @@ MISSIONS.push({
 <p><span class="am">代价是：你自己也看不见。这一次的雷达光点是真的会丢。</span></p>`,
 
   objectives: [
-    '摧毁 2 艘 BEI-9「海蝎」级登陆舰',
-    '摧毁 BLO-16「邓氏鱼」级巡洋舰（防空圈核心）',
+    '摧毁 2 艘 海蝎级登陆舰',
+    '摧毁 邓氏鱼级巡洋舰（防空圈核心）',
     '压制或击落 GAL-44 干扰机',
     '尽量保持在 1500 m 以下 —— 雷达暴露意味着被锁定'
   ],
   threats: [
-    'BLO-16「邓氏鱼」级巡洋舰（舰空弹 ×8，编队旗舰）',
-    'BEI-9「海蝎」级登陆舰 ×2（武装薄弱、结构脆弱）',
+    '邓氏鱼级巡洋舰（舰空弹 ×8，编队旗舰）',
+    '海蝎级登陆舰 ×2（武装薄弱、结构脆弱）',
     'GAL-44「磁石」干扰机（SAV-14 压制场）',
     'BAD-9 舰空弹（低空进入可缩短反应时间）'
   ],
@@ -1722,7 +1722,7 @@ MISSIONS.push({
     低云会削弱光电与红外导引 —— 也可以被你利用`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: -2000, z: 12000, type: 'enemy', label: '巡洋舰 BLO-16' },
+    { x: -2000, z: 12000, type: 'enemy', label: '巡洋舰 邓氏鱼级' },
     { x: 8000, z: 16000, type: 'enemy', label: '登陆舰 ×2' },
     { x: -9000, z: 18000, type: 'relay', label: '干扰机' }
   ],
@@ -1736,11 +1736,11 @@ MISSIONS.push({
     spawnWingman(w, 2, -180, 12, -280);
     spawnWingman(w, 3, 180, 12, -280);
 
-    /* 巡洋舰在正面画防空圈 —— 邓氏鱼（BLO-16），下游唯一的巡洋舰。
-       原来这里放的是房角石（BLO-24），而它是武库舰，不是巡洋舰；
+    /* 巡洋舰在正面画防空圈 —— 邓氏鱼（邓氏鱼级），下游唯一的巡洋舰。
+       原来这里放的是房角石（房角石级），而它是武库舰，不是巡洋舰；
        "96 单元垂发"则是上游抹香鲸的数字。 */
     spawnShip(w, {
-      model: 'dunkleosteus', label: '邓氏鱼 BLO-16',
+      model: 'dunkleosteus', label: '邓氏鱼级',
       x: -2000, z: 12000, hp: 1600,
       route: { wp: [{ x: -2000, z: 12000 }, { x: 6000, z: 14000 }], speed: 13, loop: true },
       weapon: 'dl9', fireCd: 4
@@ -1748,12 +1748,12 @@ MISSIONS.push({
 
     /* 两条登陆舰 —— 这一关的目标。它们武装薄弱，跑得也慢。 */
     spawnShip(w, {
-      model: 'seascorpion', label: '海蝎 BEI-9 A',
+      model: 'seascorpion', label: '海蝎级 A',
       x: 8000, z: 16000, hp: 500,
       route: { wp: [{ x: 8000, z: 16000 }, { x: -2000, z: 18000 }], speed: 9, loop: true }
     });
     spawnShip(w, {
-      model: 'seascorpion', label: '海蝎 BEI-9 B',
+      model: 'seascorpion', label: '海蝎级 B',
       x: 11000, z: 14000, hp: 500,
       route: { wp: [{ x: 11000, z: 14000 }, { x: 2000, z: 12000 }], speed: 9, loop: true }
     });
@@ -2086,15 +2086,15 @@ MISSIONS.push({
 而你要做的是让那个计划来不及开始。</p>`,
 
   objectives: [
-    '在时限内摧毁 3 艘 BEI-9「海蝎」级登陆舰',
+    '在时限内摧毁 3 艘 海蝎级登陆舰',
     '清除护航的快艇与护卫舰',
     '时限：<b>300 秒</b> —— 火网展开之前，必须把三条登陆舰留在海上',
     '只要有一条走到登陆点（z > 38 km）任务即失败'
   ],
   threats: [
-    'BEI-9「海蝎」级登陆舰 ×3（目标）',
-    'BLO-8「菊石」级巡逻护卫舰 ×2',
-    'BLO-2「三叶虫」级导弹快艇 ×4',
+    '海蝎级登陆舰 ×3（目标）',
+    '菊石级巡逻护卫舰 ×2',
+    '三叶虫级导弹快艇 ×4',
     'ROK-27「片岩」×2（一架带 SAV-6 吊舱，一架挂 BOX-14 反舰弹）',
     'VAC-14「砂岩」攻击机 ×1（低空压着船团头顶）',
     '时限 300 秒'
@@ -2125,7 +2125,7 @@ MISSIONS.push({
     var i;
     for (i = 0; i < 3; i++) {
       spawnShip(w, {
-        model: 'seascorpion', label: '海蝎 BEI-9 ' + (i + 1),
+        model: 'seascorpion', label: '海蝎级 ' + (i + 1),
         x: (i - 1) * 2500, z: 12000 + i * 1800, hp: 520,
         route: {
           wp: [{ x: (i - 1) * 2500, z: 12000 + i * 1800 },
@@ -2138,7 +2138,7 @@ MISSIONS.push({
     // 两艘护卫舰
     for (i = 0; i < 2; i++) {
       spawnShip(w, {
-        model: 'ammonite', label: '菊石 BLO-8 ' + (i ? 'B' : 'A'),
+        model: 'ammonite', label: '菊石级 ' + (i ? 'B' : 'A'),
         x: (i - 0.5) * 16000, z: 18000 + i * 4000, hp: 420,
         route: {
           wp: [{ x: (i - 0.5) * 16000, z: 18000 + i * 4000 },
@@ -2154,7 +2154,7 @@ MISSIONS.push({
     for (i = 0; i < 4; i++) {
       var sx = (i < 2) ? -1 : 1;
       spawnShip(w, {
-        model: 'trilobite', label: '三叶虫 BLO-2 ' + (i + 1),
+        model: 'trilobite', label: '三叶虫级 ' + (i + 1),
         x: sx * (9000 + (i % 2) * 3000), z: 8000 + (i % 2) * 6000, hp: 240,
         route: {
           wp: [{ x: sx * (9000 + (i % 2) * 3000), z: 8000 + (i % 2) * 6000 },
@@ -2281,14 +2281,14 @@ MISSIONS.push({
 
   objectives: [
     '击落 ROK-2「石英」预警机',
-    '摧毁 BLO-16「邓氏鱼」级巡洋舰（下游编队旗舰、舰上指挥所）',
+    '摧毁 邓氏鱼级巡洋舰（下游编队旗舰、舰上指挥所）',
     '击落 GAL-31「玄武岩」—— 呼号「冬港」',
     '清除 ROK-27 / GAL-31 护航编队'
   ],
   threats: [
     'GAL-31「玄武岩」×1（冬港本人，skill 极高）',
     'ROK-2「石英」预警机',
-    'BLO-16「邓氏鱼」级旗舰（舰空弹只够自保，在正中央）',
+    '邓氏鱼级旗舰（舰空弹只够自保，在正中央）',
     'GAL-31 / ROK-27 双层护航 ×6',
     'DAR-4「砾石」中距弹 / BIN-9「双生」双导引头格斗弹'
   ],
@@ -2298,7 +2298,7 @@ MISSIONS.push({
     <span class="am">冬港的 GAL-31 在 18 600 m，比你的起步高度高一层</span>`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: 0, z: 18000, type: 'enemy', label: '旗舰 BLO-16' },
+    { x: 0, z: 18000, type: 'enemy', label: '旗舰 邓氏鱼级' },
     { x: -12000, z: 14000, type: 'enemy', label: '护航' },
     { x: 12000, z: 14000, type: 'enemy', label: '护航' },
     { x: 0, z: 34000, type: 'site', label: '石英 QUARTZ' }
@@ -2317,13 +2317,13 @@ MISSIONS.push({
     w.wings[2].pos.y = 17000;
     w.wings[3].pos.y = 17000;
 
-    /* 指挥舰：邓氏鱼（BLO-16），下游分水编队的旗舰（SHIPS 表的 role）。
+    /* 指挥舰：邓氏鱼（邓氏鱼级），下游分水编队的旗舰（SHIPS 表的 role）。
        它带 8 发 BAD-9 舰空弹 —— 只够自保，够不到一万七千米的你；
        真正的防空靠护航与预警机，所以它是一个"必须在护航被撕开、
        自己降下来之后才能碰到"的目标。
-       早先这里写的是房角石（BLO-24，武库舰）。 */
+       早先这里写的是房角石（房角石级，武库舰）。 */
     spawnShip(w, {
-      model: 'dunkleosteus', label: '邓氏鱼 BLO-16',
+      model: 'dunkleosteus', label: '邓氏鱼级',
       x: 0, z: 18000, hp: 2000, weapon: 'dl9', fireCd: 5
     });
 

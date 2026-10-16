@@ -56,16 +56,16 @@
 | `depot` | 燃油 / 弹药补给库 | 40 | 24 | `ground` `sea` | `radius: 12` |
 | `cmdpost` | 指挥 / 通信中枢 | 22 | 18 | `ground` `sea` | `radius: 9` |
 | `station` | 第 7 号控制平台 | 88 | 88 | `ground` `sea` | `radius: 56`，地标级 |
-| `humpback` | BLO-19「座头鲸」航空母舰 / 浮岛（上游） | 40.0 | 280 | `ground` `sea` | `radius: 84`，飞行甲板 + 舰岛 |
-| `bluewhale` | BEI-2「蓝鲸」快速战斗支援舰（上游） | 26.6 | 210 | `ground` `sea` | `radius: 62`，三座补给门架 |
-| `spermwhale` | BLO-13「抹香鲸」巡洋舰（上游） | 20.4 | 168 | `ground` `sea` | `radius: 50`，四面大相控阵 |
-| `orca` | BLO-11「虎鲸」护航驱逐舰（上游） | 18.4 | 148 | `ground` `sea` | `radius: 44` |
-| `dolphin` | BLO-6「海豚」护卫舰（上游） | 14.4 | 108 | `ground` `sea` | `radius: 33` |
-| `cameroceras` | BLO-24「房角石」武库舰（下游） | 24.0 | 195 | `ground` `sea` | `radius: 58`，312 个垂发井 |
-| `dunkleosteus` | BLO-16「邓氏鱼」巡洋舰（下游） | 18.8 | 152 | `ground` `sea` | `radius: 46` |
-| `seascorpion` | BEI-9「海蝎」登陆舰（下游） | 20.4 | 132 | `ground` `sea` | `radius: 40`，艏门 + 跳板 |
-| `ammonite` | BLO-8「菊石」巡逻护卫舰（下游） | 15.2 | 118 | `ground` `sea` | `radius: 36` |
-| `trilobite` | BLO-2「三叶虫」导弹快艇（下游） | 8.4 | 42 | `ground` `sea` | `radius: 13`，两座四联装 |
+| `humpback` | 座头鲸级航空母舰 / 浮岛（上游） | 40.0 | 280 | `ground` `sea` | `radius: 84`，飞行甲板 + 舰岛 |
+| `bluewhale` | 蓝鲸级快速战斗支援舰（上游） | 26.6 | 210 | `ground` `sea` | `radius: 62`，三座补给门架 |
+| `spermwhale` | 抹香鲸级巡洋舰（上游） | 20.4 | 168 | `ground` `sea` | `radius: 50`，四面大相控阵 |
+| `orca` | 虎鲸级护航驱逐舰（上游） | 18.4 | 148 | `ground` `sea` | `radius: 44` |
+| `dolphin` | 海豚级护卫舰（上游） | 14.4 | 108 | `ground` `sea` | `radius: 33` |
+| `cameroceras` | 房角石级武库舰（下游） | 24.0 | 195 | `ground` `sea` | `radius: 58`，312 个垂发井 |
+| `dunkleosteus` | 邓氏鱼级巡洋舰（下游） | 18.8 | 152 | `ground` `sea` | `radius: 46` |
+| `seascorpion` | 海蝎级登陆舰（下游） | 20.4 | 132 | `ground` `sea` | `radius: 40`，艏门 + 跳板 |
+| `ammonite` | 菊石级巡逻护卫舰（下游） | 15.2 | 118 | `ground` `sea` | `radius: 36` |
+| `trilobite` | 三叶虫级导弹快艇（下游） | 8.4 | 42 | `ground` `sea` | `radius: 13`，两座四联装 |
 | `daplu` | DAPLU Mk.1「屿」巡逻艇（群岛国） | 6.6 | 31 | `ground` `sea` | `radius: 10` |
 | `skori` | SKORI「准绳」布缆船（管理局） | 18.4 | 102 | `ground` `sea` | `radius: 32`，艏楼绞盘 |
 | `diklo` | DIKLO「标杆」海洋测量船（管理局） | 17.2 | 62 | `ground` `sea` | `radius: 20`，**双体** |
