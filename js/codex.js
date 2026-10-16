@@ -1213,14 +1213,17 @@ CODEX.push({
       '<br><b>单点</b>是一个挂载点能带的发数；' +
       '同一种武器挂到多个组上，弹药与齐射数会一起累加。' +
       '<br>被动吊舱不占扳机，装上就一直在起作用 —— ' +
-      '它们让"少带一枚弹"变成真实的取舍。</p>';
+      '它们让"少带一枚弹"变成真实的取舍。' +
+      '<br><b>点编号进详情页</b> —— 那里有这件武器挂在挂架上的 3D 预览、' +
+      '矢量识别图、设定与完整参数。</p>';
 
     var cats = [
       { t: '空空导弹', k: 'aam' },
       { t: '反大型 / 反舰', k: 'asm' },
       { t: '空地导弹', k: 'agm' },
       { t: '炸弹与火箭', k: 'bomb' },
-      { t: '吊舱', k: 'ecm' }
+      { t: '吊舱', k: 'ecm' },
+      { t: '定向能', k: 'dew' }
     ];
 
     for (var ci = 0; ci < cats.length; ci++) {
@@ -1235,7 +1238,7 @@ CODEX.push({
         for (var fi = 0; fi < w.fits.length; fi++) fits.push(_hpKind(w.fits[fi]));
 
         rows += '<tr>' +
-          '<td><b>' + w.name + '</b></td>' +
+          '<td><span class="cx-unit" data-unit="weapon:' + id + '"><b>' + w.name + '</b></span></td>' +
           '<td>' + w.cn + '</td>' +
           '<td>' + (w.role || '—') + '</td>' +
           '<td>' + _rngTxt(w) + '</td>' +
@@ -1267,7 +1270,7 @@ CODEX.push({
       w = WEAPONS[id];
       if (w.fits && w.fits.length) continue;          // 只列敌方专用
       if (w.kind === 'gun') continue;
-      h += '<tr><td><b>' + w.name + '</b></td><td>' + w.cn + '</td>' +
+      h += '<tr><td><span class="cx-unit" data-unit="weapon:' + id + '"><b>' + w.name + '</b></span></td><td>' + w.cn + '</td>' +
         '<td>' + (w.role || '—') + '</td>' +
         '<td>' + _seekerLabel(w) + '</td>' +
         '<td>' + (w.cd ? w.cd + 's' : '—') + '</td>' +

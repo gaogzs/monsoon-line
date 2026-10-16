@@ -1458,15 +1458,14 @@ var MODELS = (function () {
       var n = lk.cells || 3;
       if (lk.nest === 'tube') {
         b.tube(V(0, -r, -L / 2), V(0, -r, L / 2), r, r, 10, C.green, C.darker);
-        b.tube(V(0, -r, L / 2), V(0, -r, L / 2 + 0.25), r, r * 0.55, 10, C.green2, C.darker);
         b.tube(V(0, -r, -L / 2 - 0.2), V(0, -r, -L / 2), r * 0.55, r, 10, C.green2, null);
-        // 管口蜂窝：中心一根 + 外圈一圈（只画伸出的管头）
-        var cr = r * 0.22;
-        b.tube(V(0, -r, L / 2 + 0.25), V(0, -r, L / 2 + 0.3), cr, cr, 6, C.black, C.black);
+        // 平头前端：中心一根 + 外圈一圈管口，伸出端面一点
+        var cr = r * 0.24;
+        b.tube(V(0, -r, L / 2), V(0, -r, L / 2 + 0.06), cr, cr, 6, C.black, C.black);
         for (i = 0; i < n - 1; i++) {
           var th = i / (n - 1) * Math.PI * 2;
           var cx = Math.cos(th) * r * 0.62, cy = -r + Math.sin(th) * r * 0.62;
-          b.tube(V(cx, cy, L / 2 - 0.02), V(cx, cy, L / 2 + 0.04), cr, cr, 6, C.black, C.black);
+          b.tube(V(cx, cy, L / 2), V(cx, cy, L / 2 + 0.06), cr, cr, 6, C.black, C.black);
         }
       } else {
         // 方巢：n 个小格排成一行（n=4 时 2×2）

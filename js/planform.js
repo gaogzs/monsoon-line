@@ -374,7 +374,7 @@ var PLANFORM = (function () {
     var n = lk.rack || 1;
     if (n === 1) { drawRound(g, x, y, lk, L, D); return; }
     // 多联挂梁：中间一道横梁 + 并排的弹（三联：中间那枚靠后半个身位，读作"下挂"）
-    var gap = D * (n === 3 ? 1.5 : 2.0);
+    var gap = D * (n === 3 ? 1.5 : 3.0);
     var offs = n === 2 ? [-gap / 2, gap / 2] : [-gap, 0, gap];
     g.beginPath();
     g.moveTo(x + offs[0], y + L * 0.05);
@@ -859,5 +859,37 @@ var PLANFORM = (function () {
     paint(g, 0, 0, W, H, ac, loadout, { active: activeGroup, cd: cd });
   }
 
-  return { planes: P, draw: draw, paint: paint };
+  /* 单件挂载的放大图（武器单页用）：机头朝上居中，带长度标尺。 */
+  function paintStore(g, W, H, w) {
+    var lk = w.look;
+    var lenM = lk ? lk.len + (lk.nest ? 0.3 : 0) : (STORE_LEN[w.kind] || 3.0);
+    var k = (H * 0.70) / lenM;
+    var hw = storeHalfW(w, k);
+    if (hw * 2 > W * 0.6) k *= (W * 0.6) / (hw * 2);
+    var L = storeLen(w, k);
+    var cx = W / 2, cy = H / 2;
+    g.save();
+    g.strokeStyle = '#4fe08a';
+    drawStore(g, cx, cy, w, k, { line: 1.8 });
+    // 长度标尺
+    var rx = cx + storeHalfW(w, k) + 28;
+    g.strokeStyle = 'rgba(143,168,184,0.55)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(rx, cy - L / 2); g.lineTo(rx, cy + L / 2);
+    g.moveTo(rx - 5, cy - L / 2); g.lineTo(rx + 5, cy - L / 2);
+    g.moveTo(rx - 5, cy + L / 2); g.lineTo(rx + 5, cy + L / 2);
+    g.stroke();
+    g.fillStyle = 'rgba(143,168,184,0.85)';
+    g.font = '13px Consolas,monospace';
+    g.textAlign = 'left';
+    g.fillText(lenM.toFixed(1) + ' m', rx + 9, cy + 4);
+    if (lk && (lk.rack > 1 || lk.nest)) {
+      g.textAlign = 'center';
+      g.fillText(lk.nest ? (lk.cells + ' 管发射巢') : (lk.rack + ' 联挂架'), cx, cy + L / 2 + 26);
+    }
+    g.restore();
+  }
+
+  return { planes: P, draw: draw, paint: paint, paintStore: paintStore };
 })();

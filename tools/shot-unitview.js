@@ -10,7 +10,7 @@
  * 最小页面，交给无头 Chrome 截一张图。它用的是**真正的 css/style.css
  * 与真正的 js/unitview.js**，所以截出来的就是游戏里的样子。
  *
- * 用法：node tools/shot-unitview.js [单位id ...]
+ * 用法：node tools/shot-unitview.js [单位id | ship:id | weapon:id ...]
  *      不带参数 = 截默认的四个（有/无俯视图的飞机各一 + 两种舰船）
  * 输出：tools/preview/shot-unit-<id>.png
  * 需要：本机装了 Chrome（或设 CHROME_PATH 指向可执行文件）
@@ -93,7 +93,10 @@ function main() {
 
   const args = process.argv.slice(2);
   const jobs = args.length
-    ? args.map(a => ({ kind: a.indexOf('ship:') === 0 ? 'ship' : 'aircraft', id: a.replace(/^ship:/, '') }))
+    ? args.map(a => {
+      const m = /^(ship|weapon):(.+)$/.exec(a);
+      return m ? { kind: m[1], id: m[2] } : { kind: 'aircraft', id: a };
+    })
     : DEFAULTS;
 
   let n = 0;

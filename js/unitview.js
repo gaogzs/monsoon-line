@@ -240,6 +240,9 @@ var UnitView = (function () {
       for (i = 0; i < list.length; i++) if (list[i].id === id) {
         return { kind: 'ship', rec: list[i], model: MODELS[list[i].model], modelKey: list[i].model };
       }
+    } else if (kind === 'weapon') {
+      var w = (typeof WEAPONS !== 'undefined') ? WEAPONS[id] : null;
+      if (w) return { kind: 'weapon', rec: w, model: MODELS.store(w), modelKey: null };
     }
     return null;
   }
@@ -323,6 +326,36 @@ var UnitView = (function () {
     return paraTable(rows);
   }
 
+  var KIND_LABEL = {
+    aam: '空空导弹', asm: '反大型 / 反舰', agm: '空地导弹', bomb: '炸弹与火箭',
+    ecm: '吊舱', dew: '定向能吊舱'
+  };
+
+  function weaponParams(w) {
+    var pod = w.kind === 'ecm' || w.kind === 'dew';
+    var fits = (w.fits || []).map(function (f) {
+      return (typeof _hpKind === 'function') ? _hpKind(f) : f;
+    });
+    var rows = [
+      ['类别', esc(KIND_LABEL[w.kind] || w.kind)],
+      w.role ? ['定位', esc(w.role)] : null,
+      (!pod && typeof _seekerLabel === 'function') ? ['导引', esc(_seekerLabel(w))] : null,
+      (!pod && typeof _rngTxt === 'function') ? ['射程', _rngTxt(w)] : null,
+      (!pod && w.speed) ? ['速度', w.speed + ' m/s' + (w.boost ? '（助推 +' + w.boost + '）' : '')] : null,
+      (!pod && w.turn) ? ['转弯率', w.turn + ' rad/s'] : null,
+      (!pod && w.dmg) ? ['战斗部', w.dmg] : null,
+      (!pod && w.salvo > 1) ? ['齐射', '一按 ' + w.salvo + ' 发'] : null,
+      (!pod && w.perPoint) ? ['单挂点', '×' + w.perPoint] : null,
+      w.cd ? ['冷却', w.cd + ' s'] : null,
+      w.mass ? ['质量', w.mass + ' kg'] : null,
+      ['可挂', fits.length ? esc(fits.join(' / ')) : '（下游制式 · 玩家无法挂载）'],
+      (w.needs && w.needs.length && typeof _capLabel === 'function')
+        ? ['机体要求', esc(w.needs.map(_capLabel).join(' / '))] : null,
+      w.look ? ['外形', '长 ' + w.look.len + ' m · 弹径 ' + Math.round(w.look.dia * 1000) + ' mm'] : null
+    ];
+    return paraTable(rows);
+  }
+
   /* ============================================================
      详情页 HTML
 
@@ -333,6 +366,7 @@ var UnitView = (function () {
     var u = findUnit(kind, id);
     if (!u) return '<div class="cx-note">找不到单位 ' + esc(id) + '。</div>';
     var r = u.rec;
+    if (u.kind === 'weapon') return weaponHtml(kind, r);
     var isAir = u.kind === 'aircraft';
 
     /* 标题读法按装备类型分：
@@ -395,6 +429,24 @@ var UnitView = (function () {
     h += '<h4 class="uv-h4">' + (isAir ? '飞行性能与挂载' : '舰艇参数') + '</h4>';
     h += isAir ? aircraftParams(r) : shipParams(r);
 
+    return h;
+  }
+
+  /* 武器单页：版式与机型页相同 —— 左栏 3D + 矢量图，右栏设定，下面参数表 */
+  function weaponHtml(kind, w) {
+    var h = '<div class="uv-head">' +
+      '<span class="cx-unit uv-back" data-unit-back="' + esc(kind) + '">← 返回挂载图鉴</span>' +
+      '<div class="uv-title">' + esc(w.name) + ' <span class="uv-nick">' + esc(w.cn) + '</span></div>' +
+      '<div class="uv-sub">' + esc([KIND_LABEL[w.kind], w.role].filter(Boolean).join(' · ')) + '</div>' +
+      '</div>';
+    h += '<div class="uv-body"><div class="uv-left">';
+    h += '<div class="uv-panel"><div class="uv-cap">实时预览 · 挂架上的样子 · 拖动可改变视角</div>' +
+      '<canvas class="uv-3d" id="uvCanvas"></canvas></div>';
+    h += '<div class="uv-panel"><div class="uv-cap">矢量识别图</div>' +
+      '<canvas class="uv-plan" id="uvPlan"></canvas></div>';
+    h += '</div><div class="uv-right"><div class="uv-desc cx-text">' +
+      (w.desc ? '<p>' + w.desc + '</p>' : '<p>（暂无设定）</p>') + '</div></div></div>';
+    h += '<h4 class="uv-h4">武器参数</h4>' + weaponParams(w);
     return h;
   }
 
@@ -486,7 +538,15 @@ var UnitView = (function () {
        按新宽高比变（默认 height 还是 150），读回来的已经是扁画布的比，
        最后算出 640×150 —— 俯视图只剩中间一小条。 */
     var plan = document.getElementById('uvPlan');
-    if (plan && typeof PLANFORM !== 'undefined' && PLANFORM.planes[u.rec.model]) {
+    if (plan && u.kind === 'weapon' && typeof PLANFORM !== 'undefined' && PLANFORM.paintStore) {
+      plan.width = 640;
+      plan.height = 300;
+      var pg = plan.getContext('2d');
+      pg.fillStyle = BG;
+      pg.fillRect(0, 0, 640, 300);
+      grid(pg, 640, 300);
+      PLANFORM.paintStore(pg, 640, 300, u.rec);
+    } else if (plan && typeof PLANFORM !== 'undefined' && PLANFORM.planes[u.rec.model]) {
       plan.width = 640;
       plan.height = 440;
       PLANFORM.draw(plan, u.rec, {}, null);
