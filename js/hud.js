@@ -2,7 +2,7 @@
    hud.js —— 平视显示 / 雷达 / 告警
    本作特有的两件东西：
      · Q 表（动压 kPa）—— 高空的第一生命线
-     · 锁定框上的 NEZ 实环 —— 不可逃逸区是每帧解出来的
+     · 锁定框的发射包线三档色（射程外 / 射程内 / NEZ）—— 每帧按双方态势估算
    ============================================================ */
 'use strict';
 
@@ -228,7 +228,8 @@ var HUD = (function () {
       ctx.stroke();
     }
 
-    // 机炮准星（带重力与提前量的示意环）
+    /* 屏幕中央的双圈：固定的装饰准星环，不随目标或武器变化。
+       真正的机炮提前量圈画在目标附近，发射包线看锁定框的颜色。 */
     var gunR = 46;
     ctx.strokeStyle = DIM; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.arc(cx, cy, gunR, 0, Math.PI * 2); ctx.stroke();
@@ -961,18 +962,20 @@ var HUD = (function () {
     var w = 30, h = 30;
     if (t.kind === 'target') { w = 46; h = 34; }
 
-    // NEZ 实环：目标处于不可逃逸区内时收成实心小圈
-    var nez = computeNEZ(p, t);
-    var inNez = dist < nez;
+    /* 发射包线分三档，框的颜色跟着走：
 
-    /* 用颜色区分"锁上了但还打不着"和"已经进了不可逃逸区"：
+         淡橙  最大射程之外 —— 打出去够不着
+         橙色  最大射程之内 —— 能追上，但目标掉头还能跑掉
+         红色  不可逃逸区（NEZ）—— 发射就有意义
 
-         橙色 = 锁定了，但还在 NEZ 之外
-         红色 = 进了 NEZ，发射就有意义
-
+       非对空弹（对地 / 对海）没有包线，一律按橙色。
        **不要用绿色**。绿色在 HUD 里的语义是"友军 / 正常状态"，
        拿它标一个敌人，玩家会下意识以为那是友机 —— 这比颜色突变更糟。 */
-    ctx.strokeStyle = inNez ? RED : AMBER;
+    var env = computeEnvelope(p, t);
+    var inNez = !!env && dist < env.nez;
+    var outMax = !!env && dist > env.rmax;
+    var FAR = 'rgba(255,176,58,0.45)';
+    ctx.strokeStyle = inNez ? RED : (outMax ? FAR : AMBER);
     ctx.lineWidth = inNez ? 2.4 : 2;
 
     // 四角括号
@@ -998,7 +1001,7 @@ var HUD = (function () {
     var tx = s.x + w + 8, ty = s.y - h;
     var label = t.label || (t.name || '目标');
     // 数据块的颜色跟着框走，保持一致
-    var col = inNez ? RED : AMBER;
+    var col = inNez ? RED : (outMax ? FAR : AMBER);
 
     text(ctx, label, tx, ty + 10, col, 'bold 12px Consolas,monospace', 'left');
     var ly = ty + 24;
@@ -1029,6 +1032,8 @@ var HUD = (function () {
 
     if (inNez) {
       text(ctx, 'NEZ', tx, ly, RED, 'bold 12px Consolas,monospace', 'left');
+    } else if (env && !outMax) {
+      text(ctx, 'IN RNG', tx, ly, AMBER, 'bold 12px Consolas,monospace', 'left');
     }
 
     // 锁定进度环
@@ -1041,22 +1046,44 @@ var HUD = (function () {
     }
   }
 
-  /** NEZ 估算：导弹总冲换算出的"目标最优逃逸也甩不掉"的距离 */
-  function computeNEZ(p, t) {
-    var w = WEAPONS[p.special];
-    if (!w || w.kind !== 'aam') return 0;
-    if (t.kind !== 'air') return 0;
+  /** 发射包线：{ rmax, nez }，非对空弹给 null。
 
-    // 目标逃逸能力（真空速差 + 可用过载）
-    var tSpd = t.speed || 200;
-    var closing = Math.max(60, p.speed - t.fwd.y * 0 + tSpd * 0.4);
-    // 导弹有效动力距离
+     rmax  导弹动力段能追上**按当前航向飞**的目标的距离
+     nez   目标立刻掉头逃逸也甩不掉的距离（不可逃逸区）
+
+     两者都不超过锁定距离 —— 锁不上的东西谈不上射程。 */
+  function computeEnvelope(p, t) {
+    var w = WEAPONS[p.special];
+    if (!w || w.kind !== 'aam') return null;
+    if (t.kind !== 'air') return null;
+
+    /* 导弹动力段能飞多远 —— 与机库里的 missileRange()（data.js）同一套分段：
+       先从载机速度加速到 speed，再匀速飞完剩下的动力时间。
+       区别是这里的初速用**本机当前速度**：飞得越快，同一枚弹打得越远。 */
     var powerK = (p.pos.y > 18000 && w.scramjet) ? 0.26 : 1;
-    var effRange = w.speed * w.life * powerK;
-    // 目标能在导弹到达前跑掉的距离
-    var escape = tSpd * (w.life * powerK) * 0.42;
-    var nez = Math.max(400, effRange - escape - closing * 1.1);
-    return Math.min(nez, w.lockDist);
+    var life = w.life * powerK;
+    var v0 = Math.min(w.speed, (p.speed || 0) + 70);
+    var tAcc = w.boost ? Math.min(life, Math.max(0, (w.speed - v0) / w.boost)) : 0;
+    var effRange = v0 * tAcc + 0.5 * (w.boost || 0) * tAcc * tAcc +
+      w.speed * Math.max(0, life - tAcc);
+
+    /* 目标沿视线的背离分量：迎头为负（送上门来），尾追为正。 */
+    var tSpd = t.speed || 200;
+    var los = M3.norm(M3.sub(t.pos, p.pos));
+    var away = t.fwd ? M3.dot(t.fwd, los) : 0;
+
+    // 最大射程：目标保持当前航向
+    var rmax = Math.max(400, effRange - tSpd * life * away * 0.8);
+    // NEZ：再扣掉"掉头逃逸"的余量
+    var nez = Math.max(400, effRange - tSpd * life * (0.30 + 0.25 * away));
+    rmax = Math.min(rmax, w.lockDist);
+    nez = Math.min(nez, rmax);
+    return { rmax: rmax, nez: nez };
+  }
+
+  function computeNEZ(p, t) {
+    var e = computeEnvelope(p, t);
+    return e ? e.nez : 0;
   }
 
   /* ============================================================
@@ -1594,7 +1621,7 @@ var HUD = (function () {
 
   return {
     draw: draw, banner: banner, hitMark: hitMark,
-    computeNEZ: computeNEZ, radarXY: radarXY,
+    computeNEZ: computeNEZ, computeEnvelope: computeEnvelope, radarXY: radarXY,
     offscreenRect: offscreenRect,
     GREEN: GREEN, AMBER: AMBER, CY: CY, RED: RED
   };
