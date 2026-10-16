@@ -261,7 +261,7 @@ var MODELS = (function () {
          后掠  翼尖 (4.3, -4.8)   翼展  8.6 m
        翼尖后移 3.5 米、翼展收掉近一半，一眼就能看出机翼在动。 */
     var PIVOT = V(1.2, -0.16, 1.0);          // 翼根枢轴
-    var R_SPAN = 6.6;                        // 翼尖到枢轴的距离
+    var R_SPAN = 8.0;                        // 翼尖到枢轴的距离（加大：舰载机要低速升力）
     function sweepPt(deg, chordF, chordB) {
       var r = deg * Math.PI / 180;
       var ex = PIVOT.x + R_SPAN * Math.cos(r);
@@ -275,8 +275,8 @@ var MODELS = (function () {
         V(PIVOT.x, PIVOT.y, PIVOT.z - chordB)
       ];
     }
-    var SP = sweepPt(20, 2.2, 1.6);          // 展开位
-    var SW = sweepPt(62, 1.7, 1.1);          // 后掠位
+    var SP = sweepPt(20, 2.8, 2.0);          // 展开位
+    var SW = sweepPt(62, 2.2, 1.4);          // 后掠位
 
     var addWingPts = function (pts) {
       var a = b.vt(pts[0]), c = b.vt(pts[1]), d = b.vt(pts[2]), e = b.vt(pts[3]);
@@ -322,12 +322,12 @@ var MODELS = (function () {
     b.tube(V(0.45, 0, -9.9), V(0.45, 0, -10.6), 0.42, 0.40, 8, C.nozzle, C.darker);
     b.tube(V(-0.45, 0, -9.9), V(-0.45, 0, -10.6), 0.42, 0.40, 8, C.nozzle, C.darker);
 
-    // 翼下挂架
-    b.box(3.1, -0.62, -0.4, 0.16, 0.34, 3.0, C.dark);
-    b.box(-3.1, -0.62, -0.4, 0.16, 0.34, 3.0, C.dark);
+    // 翼套挂架（固定翼段上；活动翼段不挂东西）
+    b.box(1.85, -0.58, -0.6, 0.16, 0.30, 2.4, C.dark);
+    b.box(-1.85, -0.58, -0.6, 0.16, 0.30, 2.4, C.dark);
 
     return done(b, {
-      span: 15.2, len: 20.5,
+      span: 17.6, len: 20.5,
       morph: { map: morphMap, spread: morphSpread, swept: morphSwept }
     });
   })();
@@ -1677,11 +1677,14 @@ var MODELS = (function () {
       { z: -9.4, w: 0.90, h: 0.78 }
     ], C.body, C.body3);
 
-    // 前掠翼：翼根靠后、翼尖向前
-    b.wing(V(1.34, -0.24, -3.4), V(7.4, -0.52, 3.2),
-      V(7.4, -0.52, 1.4), V(1.34, -0.24, 0.6), C.wing);
-    b.wingM(V(1.34, -0.24, -3.4), V(7.4, -0.52, 3.2),
-      V(7.4, -0.52, 1.4), V(1.34, -0.24, 0.6), C.wing);
+    /* 前掠翼：翼根靠后、翼尖向前。
+       顶点顺序必须是 翼根前缘 → 翼尖前缘 → 翼尖后缘 → 翼根后缘。
+       以前写成"翼根后缘 → 翼尖前缘 → …"，四边形自交成蝴蝶结，
+       看上去翼尖和翼根是断开的。顺带整体后移约 2 米，让升力中心落在重心附近。 */
+    b.wing(V(1.40, -0.24, -1.4), V(7.4, -0.52, 1.8),
+      V(7.4, -0.52, 0.2), V(1.34, -0.24, -5.0), C.wing);
+    b.wingM(V(1.40, -0.24, -1.4), V(7.4, -0.52, 1.8),
+      V(7.4, -0.52, 0.2), V(1.34, -0.24, -5.0), C.wing);
 
     // 双垂尾（内倾，前掠机的常见布局）
     b.wing(V(0.62, 1.00, -5.6), V(-0.90, 3.30, -8.0),

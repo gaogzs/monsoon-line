@@ -84,10 +84,13 @@ var AIRCRAFT = [
        同时也是机库俯视识别图上 Group 引线的锚点 —— 单一数据源。
        kind 决定这一组能挂什么，见文件末尾的挂载属性补丁。 */
     hardpointGroups: [
-      { id: 'A', label: '翼尖', kind: 'tip', pts: [{ x: 7.5, y: -2.8 }, { x: -7.5, y: -2.8 }] },
-      { id: 'B', label: '翼下内侧', kind: 'heavy', pts: [{ x: 3.2, y: -0.3 }, { x: -3.2, y: -0.3 }] },
-      { id: 'C', label: '翼下外侧', kind: 'light', pts: [{ x: 5.6, y: -2.4 }, { x: -5.6, y: -2.4 }] },
-      { id: 'D', label: '翼根', kind: 'light', pts: [{ x: 1.95, y: -1.8 }, { x: -1.95, y: -1.8 }] }
+      /* 变后掠翼的活动翼段上不挂东西 —— 挂架得跟着机翼转、还要保持顺气流，
+         现实里只有极少数机型这么做，而且代价很大。所以 DB-11 的挂载全在
+         机身和固定的翼套（翼根）上：机身两侧前后各一对、机腹一对、翼套下一对。 */
+      { id: 'A', label: '机身前侧', kind: 'light', pts: [{ x: 0.85, y: 2.6 }, { x: -0.85, y: 2.6 }] },
+      { id: 'B', label: '翼套', kind: 'heavy', pts: [{ x: 1.85, y: -0.6 }, { x: -1.85, y: -0.6 }] },
+      { id: 'C', label: '机身后侧', kind: 'light', pts: [{ x: 0.85, y: -4.6 }, { x: -0.85, y: -4.6 }] },
+      { id: 'D', label: '机腹', kind: 'belly', pts: [{ x: 0.45, y: -1.0 }, { x: -0.45, y: -1.0 }] }
     ],
     defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' },
     desc: `
@@ -218,8 +221,9 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: 'k3',
     maxLoad: 5200,
     hardpointGroups: [
-      { id: 'A', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 4.1, y: -1.2 }, { x: -4.1, y: -1.2 }] },
-      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.9, y: -2.6 }, { x: -5.9, y: -2.6 }] }
+      // 挂在三角翼中段下面 —— 以前落在前缘之前，弹体整个悬在翼外
+      { id: 'A', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 3.0, y: -3.0 }, { x: -3.0, y: -3.0 }] },
+      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.0, y: -5.3 }, { x: -5.0, y: -5.3 }] }
     ],
     defaultLoadout: { A: 'hva', B: 'mrm' }
   },
@@ -281,12 +285,10 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: 'k3',
     maxLoad: 5000,
     hardpointGroups: [
-      { id: 'A', label: '翼下内侧', kind: 'heavy', pts: [{ x: 3.0, y: 0.4 }, { x: -3.0, y: 0.4 }] },
-      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.4, y: 1.6 }, { x: -5.4, y: 1.6 }] },
-      /* 翼尖在这型机上比翼根**高**（前掠翼 + 上反），默认的 tip 高度 -0.35
-         会把整枚弹压进翼面里。hy 是按机体下表面量的（见 models.md）。 */
-      { id: 'C', label: '翼尖', kind: 'tip', hy: -0.85,
-        pts: [{ x: 7.4, y: 2.4 }, { x: -7.4, y: 2.4 }] }
+      // 跟着后移后的前掠翼走：每个挂点落在该处翼弦的中段
+      { id: 'A', label: '翼下内侧', kind: 'heavy', pts: [{ x: 3.0, y: -1.8 }, { x: -3.0, y: -1.8 }] },
+      { id: 'B', label: '翼下外侧', kind: 'light', pts: [{ x: 5.2, y: -0.3 }, { x: -5.2, y: -0.3 }] },
+      { id: 'C', label: '翼尖', kind: 'tip', pts: [{ x: 7.4, y: 1.0 }, { x: -7.4, y: 1.0 }] }
     ],
     defaultLoadout: { A: 'wasp', B: 'qsr', C: 'irp' }
   },

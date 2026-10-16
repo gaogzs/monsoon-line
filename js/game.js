@@ -406,6 +406,16 @@ var Game = (function () {
   /* ============================================================
      机库
      ============================================================ */
+  function setHangarMode(sortie) {
+    var launch = document.getElementById('btnLaunch');
+    var back = document.getElementById('btnHangarBack');
+    if (launch && launch.style) launch.style.display = sortie ? '' : 'none';
+    if (back && back.setAttribute) {
+      back.setAttribute('data-go', sortie ? 'brief' : 'title');
+      back.textContent = sortie ? '返回简报' : '返回主菜单';
+    }
+  }
+
   function buildHangar() {
     var list = document.getElementById('acList');
     list.innerHTML = '';
@@ -3363,7 +3373,13 @@ var Game = (function () {
       btns[i].addEventListener('click', function () {
         SFX.unlock(); SFX.click();
         var go = this.getAttribute('data-go');
-        if (go === 'hangar') { buildHangar(); show('hangar'); }
+        if (go === 'hangar') {
+          /* 只有从简报页进来才是"选机出击"；从主菜单进来只是逛机库，
+             没有选定的任务，出击按钮不该出现，返回也该回主菜单。 */
+          var sortie = !!(this.closest && this.closest('#scr-brief'));
+          setHangarMode(sortie);
+          buildHangar(); show('hangar');
+        }
         else if (go === 'campaign') {
           /* 战役屏没有"当前战役"的概念，每次进来都重新渲染进度；
              按下哪一张卡由 buildCampaignList 里的监听决定。 */

@@ -182,13 +182,14 @@ var UnitView = (function () {
       }
 
       for (i = 0; i < np; i++) sumZ += cZ[idx[i]];
-      if (!faceList[m]) faceList[m] = { i: [], d: 0, c: 0, hex: '' };
+      if (!faceList[m]) faceList[m] = { i: [], d: 0, c: 0, hex: '', s: 0 };
       var rec = faceList[m];
       rec.i.length = 0;
       for (i = 0; i < np; i++) rec.i.push(idx[i]);
       rec.d = sumZ / np;
       rec.c = bright;
       rec.hex = f.c;
+      rec.s = f.s ? 1 : 0;
       m++;
     }
     if (!m) return;
@@ -196,7 +197,14 @@ var UnitView = (function () {
     /* ---- 排序：远的先画（画家算法，与 render.js 同一套） ---- */
     order.length = 0;
     for (i = 0; i < m; i++) order.push(faceList[i]);
-    order.sort(function (a, b) { return b.d - a.d; });
+    /* 挂载分层：挂载总在机体下方。逐面按平均深度排序时，一整块机翼的中心
+       常常比翼下那枚弹更远 —— 于是先画了机翼、后画弹，弹"透"了出来。
+       相机在上方时先画挂载再画机体，在下方时反过来；接近水平时只按深度。 */
+    var layer = pitch > 0.12 ? 1 : (pitch < -0.12 ? -1 : 0);
+    order.sort(function (a, b) {
+      if (layer && a.s !== b.s) return layer * (b.s - a.s);
+      return b.d - a.d;
+    });
 
     /* ---- 填充 ---- */
     for (i = 0; i < order.length; i++) {
@@ -349,7 +357,7 @@ var UnitView = (function () {
       for (i = 0; i < m.f.length; i++) {
         var idx = m.f[i].i, ni = [];
         for (var j = 0; j < idx.length; j++) ni.push(idx[j] + off);
-        out.f.push({ i: ni, c: m.f[i].c });
+        out.f.push({ i: ni, c: m.f[i].c, s: 1 });   // s: 挂载层（排序用）
       }
     });
     return out;
