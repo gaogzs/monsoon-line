@@ -416,7 +416,7 @@ spawn()
 
 6. **`escort` 标签的含义因关而异。** m1 的护航 `a.ai.escort = true`，被排除在目标计数与胜利条件外；m3 的两架护航没有这个标签，属于"必须全部击落"的 `team 1` 单位（`win()` 只看 `team === 1 && alive`）。
 
-7. **飞完航线的单位会"自灭"。** `AI.updateRoute` 在最后一段飞完后直接 `a.alive = false`，而 `game.js` 的击落统计是 `team === 1 && !alive` 计数——逃生成功的轰炸机也会被算成"击落"。结算面板的 `world.killed` 因此会偏高。
+7. **飞完航线的单位会"自灭"。** `AI.updateRoute` 在最后一段飞完后直接 `a.alive = false`，而 `game.js` 的击落统计是 `team === 1 && !alive` 计数——以前逃生成功的轰炸机也会被算成"击落"；现在 `updateRoute` 离场时会标 `a.escaped`，`killCredit()` 不给它记功。
 
 8. **`sower` 与 `ace` 只换了 `phys`，没换 `ac`。** 两者都由 `spawnEnemy` 以默认机型 `m27` 创建，之后覆写 `model` 与 `phys`；`a.ac` 仍然指向 ROK-27 条目，所以 `ctrlFloor` / `ctrlFull` 来自 ROK-27。改这两架的气动时记得 `ctrlFactor` 读的是 `a.ac`。
 

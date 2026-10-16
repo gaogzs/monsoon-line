@@ -1075,6 +1075,9 @@ var Game = (function () {
       objective: '', objectiveSub: '',
       roeBlocked: false, detected: false,
       killed: 0, hitsLanded: 0, shotsFired: 0,
+      /* 友军的击落单独记：进战报，但不进综合评定（见 finish）。
+         killed 只数玩家自己的。 */
+      wingKilled: 0, shipKilled: 0,
       /* 被摧毁的地面/海面目标数。`killed` 只数 team===1 的**飞机**，
          设施与舰船从不进那个统计 —— 于是打掉一座平台在结算上等于没发生。
          新关卡里有大量反舰/压制目标，必须单独记一笔。 */
@@ -2712,11 +2715,18 @@ var Game = (function () {
     // 清理
     compact();
 
-    // 统计
-    var k = 0;
+    // 统计：按击杀者分开记功（Ent.kill 写的 killedBy）
+    var k = 0, kw = 0, ks = 0;
     for (i = 0; i < world.actors.length; i++) {
-      if (world.actors[i].team === 1 && !world.actors[i].alive) k++;
+      var deadA = world.actors[i];
+      if (deadA.team !== 1 || deadA.alive) continue;
+      var credit = killCredit(deadA);
+      if (credit === 'player') k++;
+      else if (credit === 'wing') kw++;
+      else if (credit === 'ship') ks++;
     }
+    world.wingKilled = kw;
+    world.shipKilled = ks;
     if (k > world.killed) {
       hits.push({ txt: 'KILL  ' + k, t: 1.1, col: HUD.AMBER });
       SFX.confirm();
@@ -3013,6 +3023,17 @@ var Game = (function () {
     ctx.restore();
   }
 
+  /* 一架敌机算谁的。没有记录击杀者的（自己失速撞海、被逼进海面）
+     算玩家的 —— 这和以前"所有敌机阵亡都算玩家"的口径一致。 */
+  function killCredit(a) {
+    if (a.escaped) return 'none';   // 飞完航线离场（ai.js updateRoute），没被打下来
+    var kb = a.killedBy;
+    if (!kb || kb.isPlayer) return 'player';
+    if (kb.kind === 'target') return kb.team === 0 ? 'ship' : 'other';
+    if (kb.team === 0) return 'wing';
+    return 'other';             // 敌方误伤自己人：谁的功也不算
+  }
+
   /* ============================================================
      结算
      ============================================================ */
@@ -3048,6 +3069,8 @@ var Game = (function () {
 
     var rows = [
       ['击落目标', world.killed],
+      /* 友军战果：只展示，不进上面的 score。 */
+      ['友军击落', (world.wingKilled || 0) + (world.shipKilled || 0)],
       ['地面 / 海面目标', gk],
       ['发射 / 命中', world.shotsFired + ' / ' + world.hitsLanded],
       /* 只算机炮：hitsLanded 由子弹命中累加，导弹命中不记（见 scanShot）。
@@ -3070,7 +3093,7 @@ var Game = (function () {
 
     var quotes = {
       m1: '「他们测绘的不是地形。是调节单元什么时候会漂到哪。」',
-      m2: '「把山放在你和它之间。这句战术建议，一百年没过时。」',
+      m2: '「海上没有山可以躲。你能躲进去的，只有云底和浪头之间那几百米。」',
       m3: '「冬港是我出生的地方。它是唯一一个还有水的镇子 —— 因为它在调节场的北面。」',
       m4: '「他们不是为一场交战造的船。是为一次齐射造的。」',
       m5: '「先让对手瞎掉，再打。这句话我们听了很多年，现在轮到我们用。」',

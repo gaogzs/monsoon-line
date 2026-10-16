@@ -520,8 +520,9 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
 - 命中与近炸按 `m.team` 过滤，所以我方舰艇的弹伤不到玩家与僚机。
 - **"发射！"无线电与 `SFX.missileFar()` 只在 `tgt === player` 时触发**；
   告警音 / RWR 由主循环按 `m.target` 判，打僚机的弹不会让玩家听到告警。
-- 舰艇打下的敌机照样计入 `world.killed`（主循环数的是所有阵亡的 team 1 飞机，不看是谁打的），
-  也会弹出 `KILL` 提示。
+- 舰艇打下的敌机记在 `world.shipKilled`，僚机 / 无人机打下的记在 `world.wingKilled`；
+  两者在战报里合并成「友军击落」一行，**不进** `world.killed`（综合评定只算玩家自己的），也不弹 `KILL` 提示。
+  击杀者来自 `Ent.kill` 写的 `killedBy`（被打残后坠海的取 `lastHitBy`），归属判定在 `game.js` 的 `killCredit()`。
 - 断言入口：`Game.__updateTargets`（`smoke.js` 用它单推一帧，确认我方舰艇不朝玩家打）。
 
 ---

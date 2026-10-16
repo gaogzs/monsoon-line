@@ -484,6 +484,7 @@ var AI = (function () {
         r.alt = r.exitAlt === undefined ? r.alt : r.exitAlt;
       } else {
         a.alive = false;
+        a.escaped = true;      // 飞完航线离场，不是被击落：战报不给任何人记功
         return;
       }
     }

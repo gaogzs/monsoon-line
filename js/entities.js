@@ -1545,6 +1545,7 @@ var Ent = (function () {
     // 附加装甲吊舱（JDA-3 护盾）的全向减伤。只有玩家会带，上限 60%。
     if (ent.armor) amt *= (1 - M3.clamp(ent.armor, 0, 0.6));
     ent.hp -= amt;
+    if (source) ent.lastHitBy = source;   // 坠毁也能追到是谁打残的（战报分开记功）
     if (ent.hp <= 0) {
       kill(ent, world, false, source);
       return true;
@@ -1561,6 +1562,9 @@ var Ent = (function () {
       explode(world.particles, ent.pos, s, ent.phys && ent.phys.hp > 150 ? 26 : 20);
       SFX.boom(ent.phys && ent.phys.hp > 150 ? 1.5 : 1.1);
     }
+    /* 记下击杀者：战报按"玩家 / 僚机 / 友舰"分开记功。没有直接来源的
+       （被打残后坠海、失速撞海）算最后一个命中它的人。 */
+    ent.killedBy = source || ent.lastHitBy || null;
     if (source && source.kills !== undefined) source.kills++;
   }
 

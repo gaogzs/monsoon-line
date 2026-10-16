@@ -3701,6 +3701,35 @@ if (Ent && M3 && me && world) {
     else ok('地面/海面目标计分：击毁设施计入 groundKilled（结算单列一行、权重低于飞机）');
   }
 
+  /* ---- 友军战果分开记 ----
+
+     僚机、友舰打下的敌机进 wingKilled / shipKilled（战报单列），
+     不进 world.killed —— 后者是综合评定的依据，只算玩家自己的。 */
+  {
+    const G16 = sandbox.Game, E16 = sandbox.Ent;
+    const bad = [];
+    G16.startMission(0);
+    const w4 = G16.__world(), pl4 = G16.__player();
+    const foes = w4.actors.filter(a => a.team === 1 && a.alive).slice(0, 4);
+    const wing = { team: 0, kind: 'air', isPlayer: false };
+    const ship = { team: 0, kind: 'target' };
+    if (foes.length < 4) bad.push('m1 开局的敌机不足 4 架，测不了');
+    else {
+      const k0 = w4.killed, kw0 = w4.wingKilled, ks0 = w4.shipKilled;
+      E16.damage(foes[0], 1e6, w4, pl4);
+      E16.damage(foes[1], 1e6, w4, wing);
+      E16.damage(foes[2], 1e6, w4, ship);
+      E16.damage(foes[3], 1, w4, wing);           // 被僚机打残、随后坠海
+      E16.kill(foes[3], w4, true);
+      pump(1);
+      if (w4.killed - k0 !== 1) bad.push('玩家击落应当 +1，实际 +' + (w4.killed - k0));
+      if (w4.wingKilled - kw0 !== 2) bad.push('僚机击落（含打残坠海）应当 +2，实际 +' + (w4.wingKilled - kw0));
+      if (w4.shipKilled - ks0 !== 1) bad.push('友舰击落应当 +1，实际 +' + (w4.shipKilled - ks0));
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('友军战果分开记：僚机 / 友舰击落单列，不计入玩家的 killed（综合评定）');
+  }
+
   /* ============================================================
      综合压力测试
 
