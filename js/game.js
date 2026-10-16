@@ -3327,8 +3327,9 @@ var Game = (function () {
       return;
     }
     var v = BUILD_STAMP.version ? BUILD_STAMP.version + ' · ' : '';
-    el.innerHTML = 'BUILD <b>' + v + BUILD_STAMP.time + '</b>' +
-      '<br><i>' + BUILD_STAMP.hash + '　' + BUILD_STAMP.subject + '</i>';
+    // 只显示版本与时间；提交号与提交信息放进悬停提示，不占菜单版面
+    el.innerHTML = 'BUILD <b>' + v + BUILD_STAMP.time + '</b>';
+    el.title = BUILD_STAMP.hash + '　' + BUILD_STAMP.subject;
   }
 
   function init() {
