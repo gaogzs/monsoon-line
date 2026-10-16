@@ -112,7 +112,7 @@ var AI = (function () {
 
      返回 {pitch, roll, yaw}，pitch>0 抬头、roll>0 右滚、yaw>0 右偏。
      st 可选：一个持久对象（玩家 / AI 实体本身），存上一帧的计划
-     （planAlpha / rollLock / 瞄准角速度），让决策有惯性、不来回跳。
+     （planAlpha / lastRollCmd / 瞄准角速度），让决策有惯性、不来回跳。
 
      三个参考系必须分清：
        机体系   a.fwd / a.right / a.up，随滚转翻过来
@@ -255,17 +255,26 @@ var AI = (function () {
        切换感。限制在这条弧上，从"推杆 + 偏航"到"纯拉杆"就是同一族解，
        α 随幅度单调连续地从 0 走到 1。 */
     var dL = wrapPi(-bank);
-    var span = wrapPi(phi - dL);
-    /* 目标接近机腹正下方时 span ≈ ±π，左右两边几乎一样远，
-       会逐帧来回翻。锁存上一帧选的方向，直到明显偏离才放开。 */
-    if (st) {
-      if (Math.abs(span) > 2.6) {
-        if (!st.rollLock) st.rollLock = span >= 0 ? 1 : -1;
-        if ((span >= 0 ? 1 : -1) !== st.rollLock) span += st.rollLock * Math.PI * 2;
-      } else {
-        st.rollLock = 0;
-      }
+    /* 倒飞附近（|坡度| > 150°）往左改平和往右改平一样远，dL 会在 ±π 之间
+       逐帧翻号。规则只有一条：**不要反着正在进行的滚转**。如果上一帧
+       已经在往某边滚，就沿那边改平（必要时 dL ± 2π），而不是滚过倒飞点
+       那一刻突然掉头、再从另一边转一大圈。 */
+    var lastR = (st && st.lastRollCmd) || 0;
+    if (Math.abs(bank) > 2.6 && Math.abs(lastR) > 0.05) {
+      var side = lastR > 0 ? 1 : -1;
+      if ((dL >= 0 ? 1 : -1) !== side) dL += side * Math.PI * 2;
     }
+    /* 弧的另一端：把目标滚到头顶要滚 φ。目标接近机腹正下方（|φ| > 150°）时
+       左滚右滚一样远，同样按"不反着正在进行的滚转"选边。
+       弧直接取两端之差、不再取模 —— 两端各自已经选好了边，取模反而
+       可能把它绕成长的那一边。 */
+    var dT = phi;
+    if (Math.abs(phi) > 2.6 && Math.abs(lastR) > 0.05) {
+      var sideT = lastR > 0 ? 1 : -1;
+      if ((phi >= 0 ? 1 : -1) !== sideT) dT += sideT * Math.PI * 2;
+    }
+    var span = dT - dL;
+    if (Math.abs(span) > Math.PI * 1.5) span -= (span > 0 ? 1 : -1) * Math.PI * 2;
 
     /* 沿弧的代价：α = 0 是"保持（回到）水平，推拉杆 + 偏航"，
        α = 1 是"滚到目标在头顶，纯拉杆"。 */
@@ -332,6 +341,17 @@ var AI = (function () {
     }
     var delta = dL + alpha * span;
 
+    /* 滚转有没有必要：两种理由取大者。
+         改平的理由 —— 机头越接近竖直，"机翼水平"越没有意义
+                       （坡度在那里只是数值噪声）
+         转向的理由 —— 离轴角越大越需要把升力矢量对过去
+       两者都弱（机头竖直 + 误差只有几度）时不滚，交给俯仰 / 偏航直接修。
+       否则机头指着正下方时飞机会追着一个噪声坡度原地转好几圈。 */
+    var hw = M3.clamp((horiz - 0.15) / 0.45, 0, 1);
+    var tw = M3.clamp(theta / 0.14, 0, 1);
+    var needRoll = Math.max(hw * hw * (3 - 2 * hw), tw * tw * (3 - 2 * tw));
+    delta *= needRoll;
+
     // ---- 执行 ----
     // 滚转：纯改平时限速，真要转向时放开
     var tl = M3.clamp(theta / 0.09, 0, 1);
@@ -350,6 +370,7 @@ var AI = (function () {
 
     out.pitch = M3.clamp(pitchCmd, -1, 1);
     out.roll = rollCmd;
+    if (st) st.lastRollCmd = rollCmd;
     out.yaw = M3.clamp(yawCmd, -1, 1);
     return out;
   }

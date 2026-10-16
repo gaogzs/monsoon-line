@@ -90,6 +90,7 @@ var HUD = (function () {
     drawBoresight(ctx, W, H, p);
     drawTapes(ctx, W, H, p, S);
     drawRadar(ctx, W, H, p, world);
+    drawEnginePanel(ctx, W, H, p);
     drawThreatRing(ctx, W, H, p, world);
     drawTargets(ctx, W, H, cam, p, world);
     drawLaserStatus(ctx, W, H, p, world);
@@ -272,18 +273,8 @@ var HUD = (function () {
     text(ctx, (p.speed * 3.6).toFixed(0), x - 46, cy + 5, '#eaf4fb', FB, 'right');
     text(ctx, (p.speed * 1.9438).toFixed(0) + ' KT', x - 46, cy + 21, DIM, FS, 'right');
 
-    /* ---------- 速度带右侧：引擎出力 ----------
-       与空速带并排、同高、同一套刻度语言，左侧因此读起来是一列
-       （速度 → 出力）。两个量必须分开读：速度是**结果**、出力是**输入** ——
-       收油门之后速度是慢慢掉的，俯冲时速度很高也不代表在加油门。 */
-    var ex = x + U(104);
-    thrTape(ctx, ex, top, hgt, p.throttle, p.ab, p.brake);
-    ctrlGauges(ctx, ex + U(62), top, hgt, p);
-    // 高 G：正在拉过载时给个明确的提示，掉速才不至于莫名其妙
-    if (p.hiG) {
-      var gcol = Math.sin(performance.now() * 0.02) > 0 ? RED : AMBER;
-      text(ctx, 'HI-G', ex, top - U(30), gcol, FB, 'center');
-    }
+    /* 引擎出力带与 FCS 舵量表不在这里 —— 它们挪到了雷达右侧，
+       见 drawEnginePanel()。 */
 
     /* ---------- 右：高度 ---------- */
     var x2 = W - m;
@@ -380,7 +371,11 @@ var HUD = (function () {
     text(ctx, label, x, top - 10, DIM, FS, 'center');
   }
 
-  /* 引擎出力带 —— 量程固定 0–100%，军推 = 80%。
+  /* 引擎出力带 —— 军推 = 100%，加力超出到 125%（油门轴上限 1.25）。
+
+     为什么是 125%：本作各机加力把最高速度抬高约 25%（vMax / vMil ≈ 1.24–1.29），
+     油门轴的加力段也正好是 1.0 → 1.25。读数直接就是"油门杆 × 100"，
+     不用换算；军推在 100% 这一点上，"有没有开加力"一眼就能看出。
 
      为什么不用上面那个 tape()：tape 是**滚动带**，指针永远钉在中心，
      它读得出"数值是多少"，读不出"现在在不在加力区、还剩多少余量"。
@@ -389,37 +384,40 @@ var HUD = (function () {
 
      刻度线长度、标签字号、指针形状、顶部标签全部照抄 tape()，
      所以它和空速带/高度带看起来仍然是同一套仪表。
-     数值约定沿用原来那个左下角油门条：军推 80%、加力琥珀、减速板青色。
+     颜色约定：加力琥珀、减速板青色。
 
      为什么搬到这里：它原来贴在屏幕左下角，而那正是雷达圆心，
      雷达在 drawTapes 之后绘制，于是它一直被盖住、玩家根本看不到。
      注意它显示的是**油门杆位置**，不是速度，也不是推力 —— 三者都不同。 */
   function thrTape(ctx, x, top, hgt, thr, ab, brake) {
     var y0 = top + hgt;
-    var k = M3.clamp(thr / 1.25, 0, 1);      // 1.25 = game.js 的 THR_MAX
+    var pct = M3.clamp(thr, 0, 1.25) * 100;   // 1.25 = game.js 的 THR_MAX
+    var k = pct / 125;                         // 带子满量程 = 125%
     var col = brake ? CY : (ab ? AMBER : GREEN);
+    var yMil = y0 - hgt * (100 / 125);
 
-    // 加力区（80%–100%）底色
+    // 加力区（100%–125%）底色
     ctx.fillStyle = 'rgba(255,176,58,0.10)';
-    ctx.fillRect(x - 5, top, 10, hgt * 0.2);
+    ctx.fillRect(x - 5, top, 10, yMil - top);
 
     ctx.strokeStyle = DIM; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, y0); ctx.stroke();
 
-    // 刻度：每 10% 短刻，每 20% 长刻并标数字
-    for (var v = 0; v <= 100; v += 10) {
-      var y = y0 - (v / 100) * hgt;
-      var isMaj = (v % 20 === 0);
+    // 刻度：每 10% 短刻，每 25% 长刻并标数字（0 / 25 / 50 / 75 / 100 / 125）
+    for (var v = 0; v <= 125; v += 5) {
+      var isMaj = (v % 25 === 0);
+      if (!isMaj && v % 10 !== 0) continue;
+      var y = y0 - (v / 125) * hgt;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x - (isMaj ? 14 : 7), y);
       ctx.stroke();
-      if (isMaj) text(ctx, String(v), x - 18, y + 4, DIM, FS, 'right');
+      if (isMaj) text(ctx, String(v), x - 18, y + 4, v > 100 ? AMBER : DIM, FS, 'right');
     }
 
-    // 军推上限（80%）
+    // 军推上限（100%）
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    ctx.fillRect(x - 8, y0 - hgt * 0.8, 16, 1.5);
+    ctx.fillRect(x - 8, yMil, 16, 1.5);
 
     // 指针：当前出力
     var py = y0 - k * hgt;
@@ -429,15 +427,37 @@ var HUD = (function () {
     ctx.closePath(); ctx.fill();
 
     text(ctx, 'THR', x, top - 10, DIM, FS, 'center');
-    // 读数固定在带子的垂直中心，和空速的 km/h 读数同高，两列读起来齐
-    text(ctx, Math.round(k * 100) + '%', x + 24, top + hgt / 2 + 5, col, FB, 'left');
+    // 读数固定在带子的垂直中心
+    text(ctx, Math.round(pct) + '%', x + 24, top + hgt / 2 + 5, col, FB, 'left');
     if (brake) text(ctx, 'BRK', x, y0 + 16, CY, FS, 'center');
     else if (ab) text(ctx, 'A/B', x, y0 + 16, AMBER, FS, 'center');
   }
 
+
+  /* ---------- 雷达右侧：引擎出力 + FCS 舵量表 ----------
+     以前贴在空速带右边，正好压在屏幕左侧中段；现在和雷达并排坐在左下。
+     竖向范围：底边停在武器面板那一行（GUN）之上，所以不论屏幕多窄都
+     不会碰到它 —— GUN 是武器面板里唯一伸进左半屏的元素。
+     雷达几何必须与 drawRadar 一致。 */
+  function drawEnginePanel(ctx, W, H, p) {
+    var R = Math.min(U(104), Math.min(W, H) * 0.13);
+    var rcx = R + U(28), rcy = H - R - U(32);
+    var ex = rcx + R + U(52);                         // 左侧要留给 0–100 刻度数字
+    var y1 = Math.min(rcy + R, H - gap(74, H, 0.11) - U(48));
+    var hgt = Math.min(R * 1.9, U(190));
+    var top = y1 - hgt;
+    thrTape(ctx, ex, top, hgt, p.throttle, p.ab, p.brake);
+    ctrlGauges(ctx, ex + U(62), top, hgt, p);
+    // 高 G：正在拉过载时给个明确的提示，掉速才不至于莫名其妙
+    if (p.hiG) {
+      var gcol = Math.sin(performance.now() * 0.02) > 0 ? RED : AMBER;
+      text(ctx, 'HI-G', ex, top - U(30), gcol, FB, 'center');
+    }
+  }
+
   /* 飞控舵量表 P / R / Y —— 飞控**此刻给出的**杆量，不是玩家的输入。
 
-     贴在出力带右下方（出力读数在带子中线，下半段是空的）。
+     贴在出力带右侧、与它底边对齐（出力读数在带子中线，下半段是空的）。
      每根都是双极的：中线 = 0，向上 = 抬头 / 右滚 / 右偏。
      底色是这根轴此刻的**可用权限**（动压舵效 × 失速），所以低速时
      底色会缩短，一眼看得出"杆打满了也转不动"；俯仰向下那半边
@@ -446,7 +466,7 @@ var HUD = (function () {
   function ctrlGauges(ctx, x0, top, hgt, p) {
     var c = p.ctrl || { pitch: 0, roll: 0, yaw: 0 };
     var auth = (p.ctrlAuth === undefined) ? 1 : p.ctrlAuth;
-    var gh = hgt * 0.40;                      // 单根高度
+    var gh = hgt * 0.62;                      // 单根高度
     var y1 = top + hgt;                       // 与出力带底边对齐
     var yc = y1 - gh / 2;
     var gw = U(22);                           // 两根之间的间距
@@ -609,9 +629,11 @@ var HUD = (function () {
     if (S && S.pitchLadder === false) return;
 
     var cx = W / 2;
-    var horiz = M3.V(p.fwd.x, 0, p.fwd.z);
+    /* 水平参考取**镜头**的朝向而不是机头：机头翻过竖直时它的水平投影会塌缩，
+       刻度整套消失；镜头俯仰有限位（追尾镜头还有软限幅），永远有方向。 */
+    var horiz = M3.V(cam.fwd.x, 0, cam.fwd.z);
     var hl = M3.len(horiz);
-    if (hl < 0.10) return;                 // 接近垂直姿态，水平参考没有意义
+    if (hl < 0.10) return;                 // 镜头接近竖直，水平参考没有意义
     horiz = M3.mul(horiz, 1 / hl);
 
     var R = 24000;                         // 投影用的远距离（在 far 之内）
@@ -623,8 +645,13 @@ var HUD = (function () {
        又把画面切得七零八落。范围收到这里之后，垂直方向只占中间约
        三分之二，四周留出干净的视野给目标与警告。 */
     var LIM = 40;
+    /* 镜头大仰角 / 大俯角时，往视线那一侧把刻度延伸到 ±85° ——
+       否则镜头一越过 40° + 半个视场，整套刻度会一下子全部出画，
+       画面上什么参照都没有。 */
+    var camP = Math.asin(M3.clamp(cam.fwd.y, -1, 1)) * 180 / Math.PI;
+    var LO = camP < -25 ? -85 : -LIM, HI = camP > 25 ? 85 : LIM;
 
-    for (var d = -LIM; d <= LIM; d += 5) {
+    for (var d = LO; d <= HI; d += 5) {
       var ang = d * Math.PI / 180;
       var ca = Math.cos(ang), sa = Math.sin(ang);
       var dir = M3.V(horiz.x * ca, sa, horiz.z * ca);
