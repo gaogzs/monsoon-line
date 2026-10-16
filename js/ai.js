@@ -30,7 +30,7 @@ var AI = (function () {
     var best = null, bd = (maxR || 16000) * (maxR || 16000);
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (!e.alive || e.team === a.team) continue;
+      if (!e.alive || !Ent.hostile(e, a)) continue;
       var d = M3.dist2(e.pos, a.pos);
       if (d < bd) { bd = d; best = e; }
     }
@@ -101,7 +101,7 @@ var AI = (function () {
     if (!lead || !lead.alive) return null;
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (!e.alive || e.team === a.team) continue;
+      if (!e.alive || !Ent.hostile(e, a)) continue;
       if (e.target === lead) return e;
     }
     return null;
@@ -498,7 +498,7 @@ var AI = (function () {
     var i;
     for (i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (!e.alive || e.team === a.team) continue;
+      if (!e.alive || !Ent.hostile(e, a)) continue;
       var d = M3.dist(e.pos, a.pos);
       if (d > r.tailGun || d > best) continue;
       // 必须在尾后锥内
@@ -584,7 +584,7 @@ var AI = (function () {
     a.rwrSrc = null;
     for (var ri = 0; ri < world.actors.length; ri++) {
       var rg = world.actors[ri];
-      if (!rg.alive || rg.team === a.team || rg === a) continue;
+      if (!rg.alive || !Ent.hostile(rg, a) || rg === a) continue;
       if (rg.target !== a) continue;
       if (rg.silentLock) continue;                 // 被动测距，不告警
       if (rg.emcon) continue;                      // 完全电磁静默，更不告警
@@ -606,7 +606,7 @@ var AI = (function () {
     var jammedBy = null;
     for (var ji = 0; ji < world.actors.length; ji++) {
       var je = world.actors[ji];
-      if (je.alive && je.team !== a.team && je.ewPower > 0) { jammedBy = je; break; }
+      if (je.alive && Ent.hostile(je, a) && je.ewPower > 0) { jammedBy = je; break; }
     }
     if (jammedBy) {
       s.ewResist = Math.min(1, (s.ewResist || 0) + dt * (0.18 + s.skill * 0.30));
@@ -779,6 +779,25 @@ var AI = (function () {
     desired = clampCeiling(a, desired);
 
     steerTo(a, desired, ctrl, a);
+
+    /* 机头过高时的改出：不滚转，沿最短的方向把机头压回地平线。
+
+       追高目标时敌机会以很大的仰角冲过升限。到了那个高度舵效只剩一成多，
+       steerTo 又会同时打滚转 —— 而机头竖直时滚转只是原地打转，俯仰的方向
+       跟着一直变，于是它 40 秒都压不下机头，以约 160 m/s 挂在 15 公里上
+       （剩余推力大于重力，掉不下来）。以前这件事被关卡里的中立飞机掩盖了：
+       敌机一直在低空追它，根本不会冲高。
+
+       方向：正飞（up 朝上）就推杆，倒飞就拉杆 —— 两种都是机头直接朝下。
+       一律拉杆会翻过顶点，在一成多的舵效下要转一百多度，40 秒都翻不完。
+
+       要有记忆：只在阈值上判断会在线附近来回摆 —— 压到线下，steerTo 接管
+       又抬回去。一旦开始改出，就压到机头低于 0.2 才交还。 */
+    if (a.fwd.y > 0.5 && desired.y < 0.3) s.vertRecover = true;
+    if (s.vertRecover) {
+      if (a.fwd.y < 0.2) s.vertRecover = false;
+      else { ctrl.pitch = (a.up.y >= 0) ? -1 : 1; ctrl.roll = 0; }
+    }
 
     // 硬性保护：撞地前强行拉起
     if (a.pos.y < 420 && a.fwd.y < 0.05) {

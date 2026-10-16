@@ -19,7 +19,7 @@
 | `AI.update` | `(a, dt, world)` | 每帧决策 + 操纵 + 开火；带 `a.route` 的单位转 `updateRoute()` |
 | `AI.steerTo` | `(a, desired, out, st) → out` | 控制律；`out` 是 `{pitch, roll, yaw}`，就地写入后返回 |
 | `AI.findIncoming` | `(a, world) → missile \| null` | 4.2 km 内、以本机为目标的敌弹 |
-| `AI.nearestEnemy` | `(a, world, maxR) → actor \| null` | 最近敌机；`maxR` 默认 16 000 m |
+| `AI.nearestEnemy` | `(a, world, maxR) → actor \| null` | 最近敌机（按 `Ent.hostile`：0 与 1 互为敌，2 是中立、不算）；`maxR` 默认 16 000 m |
 | `AI.leadTo` | `(a, t) → 单位方向` | 对目标的提前量指向（折扣固定 0.85） |
 | `AI.strafeTarget` | `(a, t, world) → {dir, throttle, ab}` | 对地指向（当前只是 `leadTo` + 0.9 油门） |
 
@@ -281,6 +281,16 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 > `world.actors`，`world.targets` 对 AI 完全不存在 —— 所以"敌机来炸你的
 > 前进基地"这件事在代码里根本没有落点，下游的随队攻击机只能是摆设。
 > 判据与玩家锁定循环一致：0 与 1 互为敌，2 是中立（没人主动打它）。
+>
+> **空中也是同一条规矩**（`Ent.hostile(a, b)`）。v1.4.2 第一次把几架飞机改成中立之后，
+> 空中选敌仍按"不同队即敌"，下游敌机会去追中立的潮线、潮线被打伤后还手 ——
+> 看起来像敌人互相攻击。现在 `nearestEnemy`、`leadThreat`、尾炮、RWR、电子战
+> 判定、玩家锁定循环、预警机报告全都走 `Ent.hostile`；弹丸碰撞**不**走它，
+> 流弹仍会误伤中立。
+>
+> **机头过高的改出**：`fwd.y > 0.5` 且不想爬升时进入改出 —— 不滚转，正飞推杆、
+> 倒飞拉杆，直到 `fwd.y < 0.2`（`s.vertRecover`）。没有这一段，冲过升限的敌机
+> 会在一成多的舵效下边滚转边拉杆，挂在 15 公里上压不下机头。
 > 只有真带着能用的对面弹（有导引头、还有弹）的飞机才会去挑，射程取
 > 它自己那几件里最远的一件。
 

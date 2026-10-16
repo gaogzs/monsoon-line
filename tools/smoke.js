@@ -3841,6 +3841,47 @@ if (Ent && M3 && me && world) {
     else ok('全部 ' + tried + ' 件可发射武器各打一发，无异常、无 NaN');
   }
 
+  /* ---- 中立飞机（team 2）：谁都不主动打它，玩家也锁不到 ----
+
+     v1.4.2 把关卡里的几架飞机改成中立之后，空战 AI 仍按"不同队即敌"
+     选目标，于是下游敌机去追群岛国的潮线、潮线被打伤后还手 ——
+     看起来像敌人在互相攻击。这里把中立飞机拉到敌机身边，确认没人选它。 */
+  {
+    const G = sandbox.Game, M3d = sandbox.M3;
+    G.startMission(0);
+    const pl = G.__player();
+    const w = G.__world();
+    const neutral = w.actors.find(a => a.team === 2 && a.alive);
+    if (!neutral) {
+      fail('关卡 0 里找不到中立飞机，中立检查无法进行');
+    } else {
+      const bad = [];
+      for (let f = 0; f < 600; f++) {
+        // 每帧把中立机贴到第一架活着的敌机旁边
+        const foe = w.actors.find(a => a.team === 1 && a.alive);
+        if (foe) {
+          neutral.pos = M3d.add(foe.pos, M3d.V(400, 0, 400));
+          neutral.hp = neutral.maxHp;
+        }
+        pump(1);
+        w.actors.forEach(a => {
+          if (!a.alive || !a.ai) return;
+          if (a.ai.target === neutral) bad.push(a.name + ' 选中了中立机');
+          if (a === neutral && a.ai.target) bad.push('中立机选中了 ' + a.ai.target.name);
+        });
+        if (bad.length) break;
+      }
+      // 玩家的锁定循环：把所有能选的目标轮一遍，不该出现中立机
+      const kd = docListeners['keydown'] || [];
+      for (let i = 0; i < 20; i++) {
+        kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} }));
+        if (pl.target === neutral) { bad.push('玩家锁定循环里出现了中立机'); break; }
+      }
+      if (bad.length) fail('中立飞机被当成了目标：' + bad[0]);
+      else ok('中立飞机不进 AI 选敌、也不进玩家锁定循环（10 s 贴身 + 轮选 20 次）');
+    }
+  }
+
   /* ---- 诊断：AI 追到极高空会不会卡住 ---- */
   {
     const G = sandbox.Game, M3d = sandbox.M3, q = sandbox.Ent;

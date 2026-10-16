@@ -1181,7 +1181,7 @@ var Game = (function () {
     var best = -1, bd = 1e12;
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (!e.alive || e.team === actor.team || !e.ai) continue;
+      if (!e.alive || !Ent.hostile(e, actor) || !e.ai) continue;
       var d = M3.dist2(e.pos, actor.pos);
       if (d < bd) { bd = d; best = e.ai.skill; }
     }
@@ -1529,7 +1529,7 @@ var Game = (function () {
     var air = [], surf = [];
     for (var i = 0; i < world.actors.length; i++) {
       var a = world.actors[i];
-      if (a.alive && a.team !== player.team) air.push(a);
+      if (a.alive && Ent.hostile(a, player)) air.push(a);   // 中立飞机不进锁定循环
     }
     for (i = 0; i < world.targets.length; i++) {
       // 只把真正的敌方目标纳入锁定循环；中立的调节单元不可被选为目标
@@ -1977,7 +1977,7 @@ var Game = (function () {
     if (!pod) return;
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (!e.alive || e.team === player.team) continue;
+      if (!e.alive || !Ent.hostile(e, player)) continue;
       if (e.target !== player) continue;                  // 它没在锁我
       if (M3.dist2(e.pos, player.pos) > 8000 * 8000) continue;
       fireEcm(player, pod);
@@ -2016,7 +2016,7 @@ var Game = (function () {
       if (r <= 0) continue;
       for (j = 0; j < world.actors.length; j++) {
         var e = world.actors[j];
-        if (!e.alive || e.team === a.team || e === a) continue;
+        if (!e.alive || !Ent.hostile(e, a) || e === a) continue;
         var d = M3.dist(e.pos, a.pos);
         if (d > r) continue;
         // 越靠中心越强；乘 ewPower 是为了让"关机"自动归零
@@ -2059,7 +2059,7 @@ var Game = (function () {
     var best = null, bd = 30000 * 30000;
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (!e.alive || e.team === a.team) continue;
+      if (!e.alive || !Ent.hostile(e, a)) continue;
       var d = M3.dist2(e.pos, a.pos);
       if (d < bd) { bd = d; best = e; }
     }
@@ -2087,7 +2087,7 @@ var Game = (function () {
     var best = null, bd = 30000 * 30000;
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (!e.alive || e.team === a.team) continue;
+      if (!e.alive || !Ent.hostile(e, a)) continue;
       var d = M3.dist2(e.pos, a.pos);
       if (d < bd) { bd = d; best = e; }
     }

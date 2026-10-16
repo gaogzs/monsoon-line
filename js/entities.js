@@ -1641,6 +1641,14 @@ var Ent = (function () {
     return false;
   }
 
+  /* 敌我判据：0 与 1 互为敌，2 是中立 —— 谁都不主动去打它，它也不打别人。
+     导弹选目标那几处早就是这条规矩（`g.team > 1` 跳过），
+     空中 AI、玩家锁定、预警机报告统一走这里。
+     弹丸碰撞**不**走它：流弹照样会误伤中立，和水面中立船一致。 */
+  function hostile(a, b) {
+    return a.team !== b.team && a.team < 2 && b.team < 2;
+  }
+
   function kill(ent, world, groundImpact, source) {
     if (!ent.alive) return;
     ent.alive = false;
@@ -1838,6 +1846,7 @@ var Ent = (function () {
     makeAircraft: makeAircraft, stepAircraft: stepAircraft,
     /* 挂点适配与 NPC 的挂载分配 —— game.js 的 pushStores 渲染实体挂载时
        要用同一份规则，不能再抄一遍。 */
+    hostile: hostile,
     fitsKind: fitsKind, mountPlan: mountPlan, storePos: storePos, STORE_HY: STORE_HY,
     forEachStoreSlot: forEachStoreSlot, storeForSlot: storeForSlot,
     /* 选弹与"当前触发武器" —— game.js 的 syncWeapon（玩家换弹）与 ai.js
