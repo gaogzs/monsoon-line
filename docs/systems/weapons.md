@@ -104,14 +104,16 @@ rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
 
 | 标记 | 被谁读 | 含义 |
 |---|---|---|
-| `reAcquire` | `entities.js` `stepMissile` | 丢失后自动重新捕获一次（锥刺 / 蜂刺 / 中继） |
+| `reAcquire` | `entities.js` `stepMissile` | **雷达弹**丢失后在 2.6 km 内重新捕获最近的敌机（盲飞期 `reLockT` 之后）。红外弹不靠它，走 `irAcquire()` 自主寻的 |
+| `antiRadar` | `entities.js` `detonate` | 对**正在辐射**的目标（预警机、开机的干扰机）伤害 ×2 |
+| `npcFits` | `entities.js` `fitsKind` / `mountPlan` | NPC 的挂点适配表（写在字面量里，不经 `STORE_ATTR`）；缺省退回 `fits` |
 | `nezer` | `ai.js`（最小发射距离 1400）、`game.js`（锁定 1.5 s） | 冲压弹：NEZ 大但近距无力 |
 | `scramjet` | `entities.js` `effectiveLife`、`hud.js` | 18 km 以上动力段骤减 |
 | `highAltImmune` | `entities.js` | 转弯下限抬到 0.78（仅 SPO-9） |
 | `ballistic` | `entities.js` | 无动力，走自由落体弹道 |
 | `unguided` | `entities.js`、`game.js` | 无制导，不找目标、走线段命中检测 |
 | `passive` | `game.js`、`ui` | 被动吊舱：不占扳机、不进入武器纵列 |
-| `duration` / `lockReduce` | `game.js` `launch` / `updateLock` | ECM 生效时间与锁定压缩 |
+| `duration` / `lockReduce` | `entities.js` `openEcm`（→ `spActive` / `ewLockReduce`，再由 `ai.js` 的锁定距离读） | ECM 生效时间与锁定压缩 |
 | `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | `game.js` `updateDEW`、`entities.js` `stepAircraft` | 定向能吊舱 |
 | **`hobs`** | **无** | 数据侧标注"大离轴"，实际离轴能力就是 `lockCone` |
 | **`highAltScale`** | **无** | 数据侧标注；`turnFactor` 是无条件应用的 |

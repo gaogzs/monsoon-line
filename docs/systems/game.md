@@ -1,8 +1,8 @@
 # 主控、状态机与 UI 装配
 
-代码：`js/game.js`（2676 行） · 导出全局对象 `Game` 与 `Radio`
+代码：`js/game.js`（3358 行） · 导出全局对象 `Game` 与 `Radio`
 
-> 这是加载顺序的**最后一个模块**，也是唯一“看得见全部其它模块”的地方。它干四件事：切屏幕、跑主循环、装配所有 DOM 界面、把玩家输入翻译成 `Ent` / `AI` 能吃的指令。启动靠 `index.html` 末尾的 `window.addEventListener('load', ...)` → `Game.init()`，所以它必须最后一个加载。输入映射表与设置项清单在 [hud.md](hud.md#输入映射)，本文只讲它们**背后怎么实现**。
+> 这是加载顺序的**最后一个模块**，也是唯一“看得见全部其它模块”的地方。它干四件事：切屏幕、跑主循环、装配所有 DOM 界面、把玩家输入翻译成 `Ent` / `AI` 能吃的指令。启动靠 `js/game.js` 文件末尾（IIFE 之外）的 `window.addEventListener('load', ...)` → `Game.init()`，所以它必须最后一个加载。输入映射表与设置项清单在 [hud.md](hud.md#输入映射)，本文只讲它们**背后怎么实现**。
 
 ---
 ## 模块定位与对外接口
@@ -23,8 +23,9 @@
 | `startMission` | `startMission(idx)` | 用 `MISSIONS[idx]` 起一局。出击、重试、下一关都走它 |
 | `__player` | `__player()` | 返回当前 `player`，未开局为 `null` |
 | `__world` | `__world()` | 返回当前 `world`，未开局为 `null` |
+| `__pushStores` | `__pushStores(a)` | 直接暴露内部的 `pushStores`：断言要能单独喂一架飞机进来，数它画了几个挂载 |
 
-后两个是**给 `tools/smoke.js` 做断言用的调试口**，不是玩法接口。局内状态全部藏在 IIFE 闭包里：`state / paused / world / player / mission / missionIdx / activeCampaign / selectedAC / loadouts / activeHpGroup / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared / S`。
+后三个是**给 `tools/smoke.js` 做断言用的调试口**，不是玩法接口。局内状态全部藏在 IIFE 闭包里：`state / paused / world / player / mission / missionIdx / activeCampaign / selectedAC / loadouts / activeHpGroup / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared / S`。
 
 ### `Radio` 的导出
 
@@ -167,7 +168,7 @@ Renderer.begin()
 pushModel 目标物（MODELS[t.model]）→ 飞机（含 sweep）→ pushStores(a) → 导弹 → Renderer.flush()
 drawTracers()                     ← game.js 自己的曳光，加色混合，画在模型之上
 Renderer.drawParticles(world.particles);  Renderer.end()
-HUD.draw(world, player, 0, S)     ← 在 end() 之后，所以不跟着抖
+HUD.draw(world, player, 0, S)     ← 在 end() 之后，所以不跟着抖；dt 传的是 0（渲染不推进 HUD 的计时）
 banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标引导的 CMD 瞄准环
 ```
 
@@ -236,7 +237,7 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
 - `document` 的 `keydown` / `keyup` 维护 `keys[e.code]` 布尔表（用 `e.code` 而非 `key`，与键盘布局无关）。`Space / Arrow* / Tab` 会被 `preventDefault()` —— `Tab` 在游戏里是切目标键，不拦就会把焦点送出画布。
 - 鼠标：`mousedown`（左键置 `mouse.left`、右键**立即** `fireSpecial()`）、`mouseup`、`contextmenu` 阻止菜单、`mousemove` 用 `getBoundingClientRect()` 换算成画布内坐标、`wheel` 微调油门（`-deltaY * 0.0007`，夹到 `[0, THR_MAX]`，`{ passive: true }`）。`window` 的 `resize` → `Renderer.resize()`。
 - **注意 `keydown` 在 `document` 上、`mousemove` 在画布上**：鼠标位置只在画布内更新，`updateMouseAim()` 直接用这个绝对坐标，不锁指针。
-- 在 `state === 'playing'` 时另有一批语义键：`H` 暂停、`M` 切瞄准模式、`F`/`Tab` 切目标、`R` 切挂载、`Enter`/右键发射、`V` 按住连投干扰弹、**`N` 切换 EMCON-Δ 电磁静默**、`1`/`2`/`3` 僚机指令。
+- 在 `state === 'playing'` 时另有一批语义键：`H` 暂停、`M` 切瞄准模式、`F`/`Tab` 切目标、`R` 切挂载、`Enter`/右键发射、`V` 按住连投干扰弹、**`N` 切换 EMCON-Δ 电磁静默**、`1`/`2`/`3` 僚机指令（分别 `setWingCmd('spread' / 'focus' / 'cover')`）。`1/2/3` 与 `N` 额外要求 `player` 存在。`Esc` 在局内同样走 `togglePause()`，在菜单屏则回标题。
 
 具体哪个键干什么见 [hud.md 的输入映射表](hud.md#输入映射)，下面只讲机制。
 

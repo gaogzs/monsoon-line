@@ -175,7 +175,7 @@ monsoon-line/
 │   ├── changelog.js    更新日志数据（自动生成，勿手改）
 │   ├── math3d.js       向量 / 罗德里格斯旋转 / 近平面裁剪 / 透视投影
 │   ├── models.js       低多边形机体 / 水面舰船 / 地面目标几何
-│   ├── codex.js        游戏内资料库（23 条目）
+│   ├── codex.js        游戏内资料库（24 条目）
 │   ├── data.js         机型 / 舰船 / 武器 / 呼号 / 无线电台词
 │   ├── audio.js        全程序化音效合成（WebAudio）
 │   ├── render.js       天空 / 地面 / 深度排序面绘制 / 粒子
@@ -192,6 +192,7 @@ monsoon-line/
 │   └── systems/        渲染 / 飞行模型 / 武器 / AI / HUD / 音效
 └── tools/
     ├── smoke.js        冒烟测试（node tools/smoke.js）
+    ├── probe-missions.js  可完成性探针：逐关验证清空敌人后能赢
     ├── release.js      发版：自动分配版本号 + 追加更新日志
     ├── stamp-version.js  只刷新版本戳时间
     ├── render-planform.js  机库俯视图 PNG 预览器
@@ -221,7 +222,7 @@ monsoon-line/
 ## 文档
 
 - **[文档索引](docs/README.md)** —— 从这里进
-- **[更新日志](CHANGELOG.md)** —— 立项到现在的九个版本。游戏里也能看：
+- **[更新日志](CHANGELOG.md)** —— 立项到现在的十四个版本（v0.1.0 → v1.4.1）。游戏里也能看：
   主菜单 → **更新记录**
 - **[版本号规则](docs/VERSIONING.md)** —— 每一次改动怎么自己拿到版本号、
   `node tools/release.js` 发一次版会做哪几件事

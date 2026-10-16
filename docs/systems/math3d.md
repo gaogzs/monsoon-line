@@ -87,7 +87,7 @@ function orthonormalize(fwd, up) {
 }
 ```
 
-顺序是 **`up × fwd = right`**，与文件头 `right × up = fwd` 一致。退化参考轴按 `|f.y| > 0.9` 挑一个**不平行**的坐标轴：垂直爬升时 `fwd ≈ (0,1,0)`，必须改挑 `V(1,0,0)`。`entities.js:305` 有一处刻意调用：机头立起来时直接用 `orthonormalize(a.fwd, M3.V(0,1,0))` 重建基。
+顺序是 **`up × fwd = right`**，与文件头 `right × up = fwd` 一致。退化参考轴按 `|f.y| > 0.9` 挑一个**不平行**的坐标轴：垂直爬升时 `fwd ≈ (0,1,0)`，必须改挑 `V(1,0,0)`。`entities.js` 的 `stepAircraft()` 里有一处刻意调用：机头立起来时直接用 `orthonormalize(a.fwd, M3.V(0,1,0))` 重建基。
 
 ### 方向插值 `slerpDir`
 

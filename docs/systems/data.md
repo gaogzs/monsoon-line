@@ -1,10 +1,10 @@
 # 静态数据表总览
 
-代码：`js/data.js` · 主要消费方：`entities.js`（装配飞机）、`game.js`（机库 / 自检 / 发射）、`codex.js`（图鉴）、`missions.js`（呼号）、`ai.js`（升限）
+代码：`js/data.js` · 主要消费方：`entities.js`（装配飞机）、`game.js`（机库 / 自检 / 发射）、`codex.js`（图鉴）、`missions.js`（呼号 / 舰船数值）、`unitview.js`（单位详情页）、`ai.js`（升限）
 
 一句话职责：**data.js 只放纯数据与纯函数**——不碰 DOM、不碰 Canvas、不产生运行时状态。
 机体的运行时对象由 `entities.js` 的 `makeAircraft()` 现场派生；挂载配置的派生（`getLoadout` / `resolveLoadout`）在 `game.js`；
-**水面舰船（`SHIPS`）目前是纯数据，没有任何运行时派生**（见 [SHIPS 表](#ships-表)）。
+水面舰船（`SHIPS`）由 `missions.js` 的 `spawnShip()` 按 `model` 查表、交给 `Ent.makeTarget()` 生成目标（见 [SHIPS 表](#ships-表)）。
 
 > 武器机制与编号体系见 [weapons.md](weapons.md)，挂载点机制见 [loadout.md](loadout.md)。
 > 本文只讲**表结构与字段契约**：每张表有什么字段、缺了会怎样、谁在读它。
@@ -15,7 +15,7 @@
 
 | 项 | 事实 |
 |---|---|
-| 文件 | `js/data.js`，2026 行，全中文注释 |
+| 文件 | `js/data.js`，2726 行，全中文注释 |
 | 加载位置 | `index.html` 里紧随 `codex.js` 之后、`entities.js` 之前（`version.js` 不计入模块表） |
 | 模块形式 | 经典 `<script>` + 全局 `var`，没有 `export`、没有构造函数 |
 | 依赖 | **零**。只用到 `Math`（`45 * Math.PI / 180` 这类） |
@@ -33,8 +33,8 @@
 |---|---|---|---|
 | `CALLSIGN` | 对象 | 6 键 | `game.js`、`missions.js` |
 | `AIRCRAFT` | 数组 | **17** 条（可驾驶 6） | `entities.js` `makeAircraft`、`game.js`、`codex.js`、`ai.js`、`planform.js`、`hud.js`、`unitview.js` |
-| `SHIPS` | 数组 | **16** 条 | **目前只有 `codex.js` 的 `inv3` 图鉴**在读（见下） |
-| `WEAPONS` | 对象 | **39** 键 | `entities.js`、`game.js`、`ai.js`、`hud.js`、`codex.js` |
+| `SHIPS` | 数组 | **16** 条 | `missions.js` `spawnShip`、`codex.js` `inv3`、`unitview.js`、`game.js` `preflight` |
+| `WEAPONS` | 对象 | **43** 键 | `entities.js`、`game.js`、`ai.js`、`hud.js`、`codex.js` |
 | `STORE_ATTR` | 对象 | 29 键 → 注入 `fits` `perPoint` `mass` | 间接；挂载系统 |
 | `STORE_ROLE` | 对象 | 37 键 → 注入 `role` | 机库卡片、图鉴 |
 | `STORE_NEEDS` | 对象 | 9 键 → 注入 `needs` | `canCarry`、`preflight` |
@@ -45,7 +45,8 @@
 | `missileRange(w)` | 函数 | — | 机库卡片、图鉴 |
 | `canCarry(ac,w)` | 函数 | — | `game.js`、`preflight` |
 | `loadoutPenalty(lf)` | 函数 | — | `game.js` 面板 + `entities.js` 物理 |
-| `VOICES` | 对象 | 3 个任务 | `game.js` 的 `Radio` |
+| `FLARE_RD` | 对象 | 15 键 → 注入 `flareRD`（只给雷达弹） | `breakLock()` |
+| `VOICES` | 对象 | 11 个任务（`m1`–`m10` + `sk1`） | `game.js` 的 `Radio` |
 
 规模数字会随内容增长，以上是核对 `data.js` 时的值——数错不会报错，只当参考。
 
@@ -65,7 +66,7 @@ var CALLSIGN = {
 | `player` | 玩家 HUD 名、结算页呼号、无线电发言者 | `game.js` 出击/结算/无线电 |
 | `wing2` / `wing3` | 事件台词里的僚机发言者 | `game.js` 事件分支 |
 | `wing<idx>` | **动态拼键**：`missions.js` 用 `CALLSIGN['wing' + idx]`（idx = 2 / 3）取名 | `missions.js` `spawnWingman` |
-| `awacs` / `enemy` / `ace` | **三个都无代码读取**：`SEXTANT` 与冬港的名字写死在 `VOICES` 的 `who` 里，敌机呼号走 `CS_DOWNSTREAM` | — |
+| `awacs` / `enemy` / `ace` | **三个都无代码读取**（全仓 grep `CALLSIGN.awacs` 等为零）：`SEXTANT` 与冬港的名字写死在 `VOICES` 的 `who` 和 `game.js` 的 `Radio.raw` 里，敌机呼号走 `CS_DOWNSTREAM` | — |
 
 **契约**：键缺失不会崩溃，但会渲染成字符串 `"undefined"`——读法都是直接拼进 innerHTML / textContent。
 `wing<idx>` 尤其隐蔽：它用的是**动态键名**，加/改僚机编号时要同时看 `missions.js`。
@@ -74,7 +75,9 @@ var CALLSIGN = {
 
 ## AIRCRAFT 表
 
-数组，14 条。6 条可驾驶（`c11 c14 s6 c9 c21 c33`），8 条NPC（带 `npcOnly: true`：`ucav m27 gal31 vac14 rok40 k8 spray a2`）。
+数组，17 条。6 条可驾驶（`c11 c14 s6 c9 c21 c33`），11 条 NPC（带 `npcOnly: true`：`ucav m27 gal31 vac14 rok40 k8 spray a2 pelican quartz gal44`）。
+
+**`model` 不必等于 `id`**：NPC 机型借用现成几何——`k8` 用 `c14`，`a2` / `pelican` 用 `sower`，`quartz` / `gal44` 用 `rok40`。
 
 ### 字段清单
 
@@ -93,7 +96,7 @@ var CALLSIGN = {
 | `variableSweep` | bool | — | 只有 `c11` 有；`entities.js` 据此做变后掠翼插值 |
 | `stats` | 对象 | ✅ | 机库六维条；键见下，缺某个维度会算出 `NaN` 宽度 |
 | `phys` | 对象 | ✅ | **飞行模型的唯一来源**；`preflight` 只检查 `phys.vMax` |
-| `gun` | string | ✅ | 必须是 `WEAPONS` 的键；`makeAircraft` 里 `WEAPONS[ac.gun].ammo` **无保护**，缺了就抛异常 |
+| `gun` | string \| `null` | ✅ | `WEAPONS` 的键，或 `null` 表示没有机炮（`rok40` `pelican` `quartz`）。`makeAircraft` 与 `ai.js` 开火段都已判空（v1.4.1 修过 `ai.js` 里 `WEAPONS[a.gun].range` 对 `null` 抛异常）；`preflight` 只在非空时检查键存在 |
 | `maxLoad` | number | ✅ | 挂载重量分母；`game.js` 里回退成 `5000` |
 | `hardpointGroups` | 数组 | ✅ | 缺了机库选装面板为空、`preflight` 报「没有定义挂载点组」 |
 | `defaultLoadout` | 对象 | ✅ | 缺了 `preflight` 不报，但 AI 取不到默认武器（见下） |
@@ -152,35 +155,48 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 ## SHIPS 表
 
 数组，**16** 条，覆盖四方参战势力与三个未参战国家（见设定集 8.0.1）。
-每条的设定散文在 `desc` 里，游戏内由 `codex.js` 的 `inv3` 图鉴展示。
+每条的设定散文在 `desc` 里，游戏内由 `codex.js` 的 `inv3` 图鉴与 `unitview.js` 的单位详情页展示。
 
-**这张表目前是"预置"状态**：数据、几何、资料库条目全部就位，
-但 `missions.js` 里一个 `spawnTarget` 都还没引用它。这是有意的 ——
-先把船做出来并进自检，再决定它们在关卡里扮演什么角色。
+**这张表已经接进关卡**：`missions.js` 的 `spawnShip(w, o)` 按 `o.model` 在 `SHIPS` 里查表
+（查不到静默回退 `SHIPS[0]`），把 `hp` / `radius` / `value` / `label` 交给 `Ent.makeTarget()`；
+任务里只写"哪条船、在哪、由谁指挥"，以及可选的 `route` / `team` / `weapon`，`o.*` 给了就覆盖表值。
+全文件约 25 处调用。这样做的理由写在源码注释里：**数值不从任务里另抄一份**，
+资料库、详情页、关卡读的是同一张表。
+
+`team: 2` 用于未参战方（南十字 / 冰芯 / 环礁、DAPLU、DIKLO 等背景单位）：
+`cycleTarget` 只收 team 1，所以玩家锁不到它们，它们只是"在场"。
 
 ### 字段清单
 
 | 字段 | 类型 | 含义 | 谁在读 |
 |---|---|---|---|
 | `id` | string | 内部键，**同时是 `MODELS` 的键与预览图文件名** | `inv3`、`tools/render-ships.js` |
-| `model` | string | `MODELS` 的键（当前 11 条与 `id` 一一对应，但保留这个字段以便多艘复用同一模型） | `inv3`、渲染 |
-| `hull` | string | 制式编号或船名前缀（`BLO-11` / `MV SOUTHERN CROSS`） | `inv3` |
+| `model` | string | `MODELS` 的键（当前 16 条与 `id` 一一对应，但保留这个字段以便多艘复用同一模型）；**`spawnShip` 按它查表** | `spawnShip`、`inv3`、渲染 |
+| `hull` | string | 制式编号或船名前缀（`BLO-11` / `BEI-2` / `MV SOUTHERN CROSS`）；任务简报与台词里的舰船编号必须取自这里（v1.4.1 把编造的 `CON-*` 编号全部改回 `BLO-` / `BEI-`） | `inv3` |
 | `name` / `cn` | string | 英文舰名 / 中文舰名 | `inv3` |
 | `cls` | string | 舰种（护航驱逐舰 / 导弹快艇 / 布缆船…） | `inv3` |
 | `faction` / `operator` | string | 阵营 / 实际使用方 | `inv3`（按 `faction` 分组） |
 | `role` | string | 一句话定位 | `inv3` |
-| `disp` / `dim` / `speed` / `crew` | number / number[] | 满载吨位 t / 主尺度 `[长, 宽, 吃水]` m / 航速 kn / 编制人数 | `inv3` |
-| `hp` / `radius` / `value` | number | **建议的交战数值**：结构值 / 受击半径 / 任务价值分 | **没人读** |
-| `vials` | string[] | 要害列表（打哪里收益最大） | `inv3`；接入关卡时作为判定点建议 |
+| `disp` / `dim` / `speed` / `crew` | number / number[] | 满载吨位 t / 主尺度 `[长, 宽, 吃水]` m / 航速 **kn** / 编制人数 | `inv3`、`unitview` |
+| `hp` / `radius` / `value` | number | 交战数值：结构值 / 受击半径 / 任务价值分 | `spawnShip`（任务可用 `o.hp` 等覆盖） |
+| `vials` | string[] | 要害列表（打哪里收益最大） | `inv3`（目前只展示，没有分区判定） |
 | `arms` | string[] | 舰载武备用**自然语言**描述（不给新编号，见下） | `inv3` |
 | `neutral` | bool | 未参战方（南十字 / 冰芯 / 环礁），`value` 一律为 0 | `inv3`（渲染成"不该打"徽章） |
-| `label` | string | HUD 建议标签（舰名，不带"3"这种下标） | **没人读**；接入关卡时传给 `spawnTarget` |
+| `label` | string | HUD 标签（舰名，不带"3"这种下标） | `spawnShip`（`o.label \|\| s.label \|\| s.cn`） |
 | `desc` | HTML string | 资料库正文 | `inv3` |
 
-**`hp` / `radius` / `value` / `label` 现在没有任何代码读取** —— 这是刻意的：
-它们要等 `missions.js` 真的把船放进去才有意义，先写好是为了让接入时
-不必再回来设计数值。这与 `MODELS` 里的 `span` / `sea` 是同一个性质（见
-[models.md](models.md#易踩的坑与设计取舍)）。
+### 航速：表里是节，`route` 里是米/秒
+
+`SHIPS[].speed` 是**节**（展示值），而 `makeTarget` 的 `route.speed` 要**米/秒**。
+`spawnShip` **故意不替调用方换算**：航速是任务要做的决定（停在原地的支援舰和
+40 节冲过来的快艇是两回事），所以任务里直接写米/秒，需要按表换算时自己乘 0.514。
+
+`route` 有两种用法（都由 `entities.js` 的 `stepTarget` 航路分支执行，优先于 `drift`）：
+
+- `{ wp: [a, b], speed, loop: true }` —— 在两点间往返巡航，大部分舰船都是这种；
+- `{ wp: [...], speed, loop: false }` —— 真的航路，走到终点为止（m9 的登陆舰就是这样往北开）。
+
+不给 `route` 就是锚泊目标（只剩 `drift`）。
 
 ### 为什么 `arms` 是文字而不是武器编号
 
@@ -190,27 +206,27 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 进气与翼面），射程与战斗部都不一样，同一个编号会误导。
 
 于是 `arms` 用文字："32 单元舰空弹垂发"、"反舰导弹 ×8"。
-要真的接进战斗，得先决定舰载弹是复用 `WEAPONS` 条目还是新增 ——
-那是接入关卡时的事，不在本表的范围内。
+`arms` 不参与战斗：舰船在关卡里开不开火、打什么，由任务调用 `spawnShip` 时传的
+`o.weapon`（`WEAPONS` 的键）决定，与 `arms` 的文字无关。
 
 ### 与 `AIRCRAFT` 的结构性差异
 
 | | `AIRCRAFT` | `SHIPS` |
 |---|---|---|
-| 消费方 | 装配飞机、机库、图鉴、AI | 目前只有图鉴 |
-| 是否参与飞行模型 | 是（`phys` 直接拷进敌机） | 否（船没有 `phys`，也还没有航路逻辑） |
-| 性能字段 | `phys.vMax` 等 9 个数 | ✅ 没有 —— 只有 `speed`（节）一个展示值 |
+| 消费方 | 装配飞机、机库、图鉴、AI | `spawnShip`、图鉴、单位详情页、自检 |
+| 是否参与飞行模型 | 是（`phys` 直接拷进敌机） | 否（船没有 `phys`；移动走 `makeTarget` 的 `route` / `drift`） |
+| 性能字段 | `phys.vMax` 等 9 个数 | 没有 —— 只有 `speed`（节）一个展示值，实际航速由任务的 `route.speed`（m/s）给 |
 | 唯一必填的几何字段 | `model` | `model` + `id`（预览器按 `id` 命名文件） |
 
 **船没有 `phys` 是有意的**：`makeTarget()` 生成的目标物本来就不跑飞行模型，
-它们只有位置与漂移。要让 40 节的快艇真的跑起来，得给 `entities.js` 补一套
-航路逻辑（现有 `drift` 只支持按正弦缓慢漂移），那是独立的一件事。
+只有位置、`drift` 漂移和 `route` 航路。航路是直线推进，`vel` 与 `fwd` 由实际位移反推，
+不需要转弯率、加速度这类参数。
 
 ---
 
 ## WEAPONS 表
 
-对象，39 键。**对象键是内部代号**（`v11` `k3` `dl4`…），玩家看到的永远是 `name`。改键名要动多个文件，别改。
+对象，43 键。**对象键是内部代号**（`v11` `k3` `dl4`…），玩家看到的永远是 `name`。改键名要动多个文件，别改。
 
 `kind` 取值（当前分布）：
 
@@ -221,7 +237,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `asm` | 3 | 反大型 / 反舰 | `sat` `v22` `vsr` |
 | `agm` | 5 | 对地 | `asl` `v25` `lcm`… |
 | `bomb` | 3 | 炸弹 / 火箭 | `rkt` `clb` `v30` |
-| `ecm` | 7 | 吊舱（主动 + 被动） | `e4` `ecm2`… |
+| `ecm` | 8 | 吊舱（主动 `e4` `vsc` + 被动 6 件） | `e4` `ecm2` `vzu`… |
 | `dew` | 1 | 定向能 | `l2` |
 
 ### 字段清单（按"谁有"分层）
@@ -238,7 +254,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `target` | `air` / `ground` / `ship` / `none` | `updateLock` 分"对空导引头"与"对面投放包线"两套判据 |
 | `desc` | 简介（可含 HTML） | 机库卡片、图鉴 |
 | `model` | `MODELS` 的键，**只有挂载物与飞出去的弹读它** | 缺省回退 `MODELS.missile`。吊舱一律写 `'pod'` —— 跟着导弹用 `'missile'` 的话两类挂载在画面上分不出来 |
-| `stat` | `{dmg,spd,trn,rng,ecm}` 0..1 | ⚠️ **当前没有任何代码读取**，是给未来界面留的 |
+| `stat` | `{dmg,spd,trn,rng,ecm}` 0..1 | ⚠️ **当前没有任何代码读取**（grep `.stat` 在 data.js 之外为零），是给未来界面留的 |
 
 **飞行参数（可发射武器才有）：** `speed`（最大速度 m/s）、`boost`（助推加速度 m/s²）、`life`（动力段秒）、`vsLife`（总寿命秒）、`turn`（最大转向率 rad/s）。`smoke.js` 要求非 `passive` 且非 `ecm`/`dew` 的武器必须有 `speed` 与 `life`。
 
@@ -321,7 +337,7 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 
 ### `STORE_ROLE`（37 键）
 
-一句话定位。机甲机炮（`k1` `k2` `k3` `k7` `k11`）没有条目，所以它们没有 `role`；图鉴/卡片用 `(w.role || '—')` 兜底。
+一句话定位。机炮（`k1` `k2` `k3` `k7` `k11`）与下游烧穿吊舱 `vsc` 没有条目，所以它们没有 `role`；图鉴/卡片用 `(w.role || '—')` 兜底。
 
 ### `STORE_NEEDS`（9 键）
 
@@ -351,7 +367,7 @@ WEAPONS[k].lead = MISSILE_LEAD[k];
 
 **静默回退**：`entities.js` 里 `var lead = (w.lead === undefined) ? 0.6 : w.lead;`。也就是说漏写 `lead` 不会报错，而是悄悄拿到 **0.6**——一个"中等聪明"的弹。`smoke.js` 会拦（除 `unguided` / `seeker === 'none'` / `passive` / `gun` 之外都必须有 `lead`）。
 
-### `FLARE_RD`（14 键，只发给雷达弹）
+### `FLARE_RD`（15 键，只发给雷达弹）
 
 干扰弹是**热焰弹 + 箔丝**一起投的，所以同一枚弹对两种导引头其实有**两个**概率：
 
@@ -414,7 +430,7 @@ var tAcc = Math.min(w.life, Math.max(0, (w.speed - v0) / w.boost));
 ## VOICES（无线电台词）
 
 ```js
-VOICES = { m1: { start: [...], tally: [...] }, m2: {...}, m3: {...} }
+VOICES = { m1: { start: [...], tally: [...] }, m2: {...}, ..., m10: {...}, sk1: {...} }   // 11 个任务
 ```
 
 每个事件是**数组**，元素 `{ who, cls, tx, gap }`：
@@ -442,9 +458,17 @@ if (!v || !v[evt]) return;      // 找不到就静默返回
 | m1 | `start` / `tally` `kill1` `kill2` `kill3` `lowQ` | `game.js` 开局、`missions.js` M1 `tick` |
 | m2 | `start` / `spotted` `relayDown` `radarDown` `ambush` `baseHit` `baseLow` `baseLost` | M2 `tick` |
 | m3 | `start` / `aceAppears` `bossHit` `bossPhase2` `aceKill` | M3 `tick` |
-| 全部 | `allyDown` | `game.js` 统一触发 |
+| m4 | `start` / `spotted` `hubHit` | M4 `tick` |
+| m5 | `start` / `spotted` `radarDown` | M5 `tick` |
+| m6 | `start` / `contact` `lowQ` `half` | M6 `tick` |
+| m7 | `start` / `spotted` `landersDown` | M7 `tick` |
+| m8 | `start` / `fleetHit` `shipLost` | M8 `tick` |
+| m9 | `start` / `windowClosing` `lastOne` | M9 `tick`（时间到的那句是 `game.js` 用 `Radio.raw` 直接发的） |
+| m10 | `start` / `contact` `aewDown` `cpDown` `bossPhase2` `aceKill` | M10 `tick` |
+| sk1 | `start` | `game.js` 开局 |
+| 全部 | `allyDown` | `game.js` 统一触发 —— **但只有 `m1` 定义了这个事件**，其余任务里僚机阵亡这句会静默跳过 |
 
-**已定义但当前无人播的事件**：`m1.win` `m1.lose` `m1.playerHit`、`m2.win` `m2.lose`、`m3.win` `m3.lose` —— 数组都写好了，但 `finish()` 里没有 `Radio.play(..., 'win'/'lose')`，`playerHit` 也只在 `SFX` 里有同名音效（`audio.js`），无线电侧没有调用点。**这是一批"写好没接上"的台词**，改动前先确认是不是有意保留。
+**已定义但当前无人播的事件**：每个任务（含 `sk1`）的 `win` / `lose`，以及 `m1.playerHit` —— 数组都写好了，但 `finish()` 里没有 `Radio.play(..., 'win'/'lose')`，`playerHit` 也只在 `SFX` 里有同名音效（`audio.js`），无线电侧没有调用点。**这是一批"写好没接上"的台词**，改动前先确认是不是有意保留。
 
 ---
 
@@ -481,7 +505,8 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | 装备定位一句话 | `STORE_ROLE` |
 | 下游呼号池 | `CS_DOWNSTREAM`（20 条，越界回绕） |
 | 无线电台词 | `VOICES[任务id][事件名]` |
-| **舰船的吨位 / 尺寸 / 舰种 / 要害 / 建议交战数值** | **`SHIPS`（16 条，当前只有图鉴在读）** |
+| **舰船的吨位 / 尺寸 / 舰种 / 要害 / 交战数值** | **`SHIPS`（16 条，`spawnShip` 按 `model` 查表）** |
+| 某关里某条船的位置 / 航路 / 阵营 / 武器 | `missions.js` 里那次 `spawnShip` 调用（`route.speed` 是 m/s） |
 | **舰船外形** | 不在本表 —— 见 `js/models.js` 的 `hull()` 与 [models.md](models.md#船体-hullsecs-colside-coldeck-colbottom) |
 
 ---
@@ -497,12 +522,13 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 7. **`makeAircraft` 查不到机型就回退 `AIRCRAFT[0]`**，HUD 上的名字会张冠李戴而不报错。
 8. **`AIRCRAFT[].nick` 缺失会抛异常**（机库 `ac.nick.toUpperCase()`）。
 9. **下游弹故意不在 `STORE_COOLDOWN`**，保留 `WEAPONS` 里的原始 `cd`；不要把这条"补全"——那会改变 NPC 的开火节奏。
-10. **`SHIPS` 里除 `id` / `model` / `faction` / `cn` / `hull` 之外的字段基本都没人读**。
-    `inv3` 图鉴读的字段比游戏逻辑多，所以**在 `SHIPS` 里删字段不会立刻报错，
-    只会让图鉴少一列或显示 `undefined`**。往里面加字段同理：加完要顺手在
-    `inv3` 里决定要不要显示它，否则它只对读源码的人可见。
+10. **`SHIPS` 的展示字段（`cls` / `disp` / `dim` / `crew` / `arms` / `vials` / `desc`）只有图鉴与详情页读**，
+    删了不会立刻报错，只会显示 `undefined`；`hp` / `radius` / `value` / `label` 则被 `spawnShip`
+    读进关卡，改了会直接改变战斗。`spawnShip` 查不到 `model` 会**静默回退 `SHIPS[0]`**（逆戟鲸），
+    与 `makeAircraft` 回退 `AIRCRAFT[0]` 是同一类坑。
 11. **`SHIPS[].id` 同时被 `tools/render-ships.js` 当作输出文件名**（`ship-<id>.png`）。
     改 `id` 会让旧预览图变成孤儿 —— 重跑一次预览器即可，但别以为文件名是自动的。
+12. **`SHIPS[].speed` 是节、`route.speed` 是米/秒**，`spawnShip` 不换算。把表值直接抄进 `route` 会让船快将近一倍。
 
 ## 与其它模块的依赖关系
 
@@ -511,7 +537,8 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | `entities.js` | 读 `AIRCRAFT` / `WEAPONS` 装配飞机与导弹；读 `loadoutPenalty()`。**不读 `SHIPS`** |
 | `game.js` | 机库、`preflight`、`launch`、`passiveEffects`、`resolveLoadout` 的展示侧 |
 | `codex.js` | `build()` 里遍历 `AIRCRAFT` / `WEAPONS` / **`SHIPS`** 生成三份图鉴 |
-| `missions.js` | `Ent.makeAircraft` 传 `type`；用 `downstreamCallsign()` 取敌机呼号；**尚未引用 `SHIPS`** |
+| `unitview.js` | 遍历 `AIRCRAFT` + `SHIPS` 生成单位详情页 |
+| `missions.js` | `Ent.makeAircraft` 传 `type`；用 `downstreamCallsign()` 取敌机呼号；`spawnShip()` 按 `model` 读 `SHIPS` |
 | `ai.js` | 读 `AIRCRAFT[].ceiling` |
 | `planform.js` / `hud.js` | 读 `hardpointGroups` 画俯视图与挂载条 |
 | `tools/smoke.js` | 从 `index.html` 解析加载顺序，然后对上述各表做一致性断言 |

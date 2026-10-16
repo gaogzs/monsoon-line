@@ -1,6 +1,6 @@
 # 低多边形机体与舰船模型
 
-代码：`js/models.js`（1496 行）· 全局对象 `MODELS`
+代码：`js/models.js`（1781 行）· 全局对象 `MODELS`
 
 约定（文件头注释）：**机头（舰艏）朝 +z，右翼（右舷）朝 +x，座舱（桅顶）朝 +y**，单位米。
 面不做背面剔除，靠画家算法排序绘制（见 [rendering.md](rendering.md#画家算法)）。
@@ -76,11 +76,16 @@
 | `bomb` | 炸弹小模型 | 1.4 | 2.2 | — | |
 | `pod` | 吊舱小模型（干扰 / 光电 / 对抗） | 1.1 | 2.9 | — | 挂载物里**唯一不是弹药**的东西：短、粗、钝头，尾端散热格栅 |
 
-> `span` / `len` / `air` / `sea` 这些元数据**目前没有任何消费者**，
-> 只有 `radius` 与 `ground` 在 `missions.js` 里被显式重抄一遍。详见"易踩的坑"。
+> `span` / `len` / `air` / `sea` 这些元数据**目前没有任何消费者**；
+> `radius` 与 `ground` 也不会自动传到目标上——设施由 `spawnTarget` 手抄，舰船由 `spawnShip` 从 `SHIPS` 表取。详见"易踩的坑"。
+>
+> **机型与模型不是一一对应**：`AIRCRAFT` 17 条只用到 13 个飞机模型，
+> 5 个 NPC 机型借用现成几何——`k8` → `c14`，`a2` / `pelican` → `sower`，
+> `quartz` / `gal44` → `rok40`。所以本表没有 `k8` / `a2` / `pelican` / `quartz` / `gal44` 这几个键；
+> 要给它们独立外形，得新增 `M.xxx` 并改 `AIRCRAFT[].model`。
 >
 > 舰船的 `span` 是**船宽**、`len` 是**舰长**（沿用同一对字段，没有为船另起名字），
-> `radius` 是受击半径。11 艘船的存在理由见 `data.js` 的 `SHIPS` 表与设定集 8.0.1 节。
+> `radius` 是受击半径。16 艘船的存在理由见 `data.js` 的 `SHIPS` 表与设定集 8.0.1 节。
 
 ### 构造器 `MB`（文件内部使用，加新模型时要用）
 
@@ -200,13 +205,13 @@ return done(b, { span: 15.2, len: 20.5,
 
 消费端在 `render.js:321-338`：`sw = clamp(opts.sweep, 0, 1)`，对被映射的顶点做
 `A + (B-A)*sw` 线性插值（不改 `model.v`）。`opts.sweep` 来自
-`entities.js:267`：
+`entities.js:582`：
 
 ```js
 a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
 ```
 
-即 170 m/s 全展开、420 m/s 全后掠。`game.js:2215` 只在遍历飞机
+即 170 m/s 全展开、420 m/s 全后掠。`game.js:2809` 只在遍历飞机
 （`world.actors`，含敌机）时传 `sweep`；目标物与导弹传的是空 `{}`。
 
 **为什么重做过**：先前那版只差 18°（2.6° → 20.5°），翼尖后移 2.7 米，
@@ -275,9 +280,9 @@ b.hull([
 | 翼型 / 翼位置 | 该机型里的 `b.wing(...)` / `b.wingM(...)` 四点坐标 |
 | 可变后掠的角度 | `sweepPt(20, ...)` / `sweepPt(62, ...)`（`SP` / `SW`） |
 | 后掠枢轴与翼展 | `PIVOT` / `R_SPAN` |
-| 后掠触发的速度区间 | `entities.js:267` 的 `(a.speed - 170) / 250` |
+| 后掠触发的速度区间 | `entities.js:582` 的 `(a.speed - 170) / 250` |
 | 模型尺寸元数据 | `done(b, { span, len })`（舰船的 `span` 是船宽） |
-| 目标受击半径 | `done(...)` 里的 `radius`（同时要在 `missions.js` 里再传一次） |
+| 目标受击半径 | `done(...)` 里的 `radius` **不生效**；设施看 `spawnTarget` 传的值，舰船看 `SHIPS[].radius` |
 | 圆柱 / 喷口圆周分段 | `tube(a, b, ra, rb, seg, ...)` 的 `seg`（常见 6 / 8 / 10 / 12） |
 | 海上平台大小 | `seaBase(b, w, d)` 的调用参数 |
 | 舰船外形肉眼检查 | `node tools/render-ships.js` → `tools/preview/ship-*.png`（走真正的 `render.js`） |
@@ -294,8 +299,10 @@ b.hull([
    与公式算出的实际翼展 14.8（展开）/ 8.6（后掠）都不一致，
    `DESIGN.md` 变更记录又写成"15.6 → 10.1 m"——**三处数字互相对不上**，改之前先确认以哪个为准。
 4. **`air` / `ground` / `sea` / `radius` 不会自动传到目标对象上。**
-   `makeTarget()` 只从传入的 `o` 读 `radius` / `ground`；`missions.js` 是把
-   `radius: 30`、`ground: true` 这类值**手抄**进 `spawnTarget(...)` 的。
+   `makeTarget()` 只从传入的 `o` 读 `radius` / `ground`；`missions.js` 对设施是把
+   `radius: 30`、`ground: true` 这类值**手抄**进 `spawnTarget(...)` 的，
+   对舰船则由 `spawnShip()` 从 `SHIPS[].radius` 取、`ground: true` 写死——
+   所以船的 `MODELS[x].radius` 与 `SHIPS[x].radius` 是两份数，**生效的是后者**。
    `sea: true` 目前**全工程无人读取**，只是文档性标记。
 5. **`render.js` 有 2048 顶点上限。** `pushModel()` 里 `if (nv > MAXV) return;`
    （`MAXV = 2048`）——模型顶点超限会**静默消失**，不报错。
@@ -329,15 +336,15 @@ b.hull([
 | 模块 | 怎么用 |
 |---|---|
 | `render.js` | `pushModel(model, P, fwd, up, opts)` 读 `model.v` / `model.f`，按 `model.morph` 插值 `opts.sweep` |
-| `game.js` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 **27** 个必需模型 |
+| `game.js` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 **32** 个必需模型（另有 `AIRCRAFT[].model` 逐条单独检查） |
 | `entities.js` | 用 `ent.radius` 做受击判定与爆炸规模（`radius` 最终来自任务传入） |
-| `missions.js` | `spawnTarget({ model, radius, ground, ... })` 决定用哪个模型、多大、是否贴海面 |
+| `missions.js` | `spawnTarget({ model, radius, ground, ... })` 决定设施用哪个模型、多大；`spawnShip({ model, ... })` 按 `model` 查 `SHIPS` 放船 |
 | `data.js` | `AIRCRAFT[].model` 与 `SHIPS[].model` 里的字符串就是 `MODELS` 的键（如 `'c11'` / `'ammonite'`） |
 
 `MODELS.missile` 是**兜底模型**：`game.js` 的 `pushOneStore()`（挂载物，
-`game.js:2660`）与 `render()` 里的导弹段（`game.js:2764`）在按 model 名
+`game.js:2712`）与 `render()` 里的导弹段（`game.js:2816`）在按 model 名
 查不到时回退到它，所以挂载 / 弹药至少能画出一枚弹的形状。
-**注意目标物与飞机没有这个兜底** —— `game.js:2746` / `2754` 查不到就
+**注意目标物与飞机没有这个兜底** —— `game.js:2798` / `2806` 查不到就
 `continue`，那一帧什么都不画（自检会先报错）。
 
 挂载物这一路对**敌我 NPC 都生效**：`pushStores()` 对 `world.actors` 里
@@ -350,5 +357,7 @@ NPC 读 `npcFits`。见 [loadout.md](loadout.md#npc-的挂载)。
 **+ 16 艘舰船** `orca bluewhale humpback spermwhale dolphin trilobite ammonite
 seascorpion cameroceras dunkleosteus daplu skori diklo cross icecore atoll`
 ——新增模型后记得往 `game.js` 的 `needModels` 数组里加，否则自检不会覆盖它。
-舰船虽然**还没有出现在任何关卡里**，也已经进了这份清单：
+舰船是先进清单、后进关卡的（v1.4.0 起已由 `spawnShip` 用在各关里）：
 模型名写错要在自检里暴露，而不是等某个任务第一次引用它的时候才炸。
+机型借用的模型（`c9` `c21` `c33` `gal31` `vac14` `spray` `rok40` 等）不在这份清单里，
+由 `preflight` 对每条 `AIRCRAFT[].model` 的单独检查覆盖。

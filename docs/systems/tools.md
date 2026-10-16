@@ -5,6 +5,7 @@
 · `tools/render-planform.js`（离线机库俯视图预览）· `tools/render-ships.js`（离线舰船外形预览）
 · `tools/render-units.js`（离线单位 3D 预览）· `tools/shot-unitview.js`（无头 Chrome 截详情页布局）
 · `tools/lib/raster.js`（几个预览器共用的光栅器 / Canvas 桩 / PNG 编码）
+· `tools/probe-missions.js`（逐关验证胜利条件可达）· `tools/render-mounts.js`（离线 NPC 挂载预览）
 · `tools/rename-aircraft.js`（一次性批量改名）
 
 ---
@@ -46,6 +47,8 @@
 探针的做法很直接：加载真沙箱 → `startMission(mi)` → 每 0.5 秒无条件清空
 所有 `team === 1` 的飞机与设施（连带把玩家设成无敌，避免被"打下来"干扰）
 → 看 `mission.win()` 会不会在合理时间内变成 `true`。
+（文件头注释写的是"每帧"，实际代码是 `f % 30 === 0`，即 60 FPS 下每 30 帧 = 0.5 秒清一次，
+足够把新刷出来的增援 / 波次一并清掉；以代码为准。）
 
 ```
 node tools/probe-missions.js
@@ -99,7 +102,7 @@ node tools/smoke.js
 
 分组之间用 `== 组名 ==` 分隔，每条断言行两格缩进。**`OK`**（绿）只打印，
 **`FAIL`**（红）既打印又进 `problems` 数组。**退出码只有两个**：
-`0` = 全部通过，`1` = 至少一条 FAIL。
+`0` = 全部通过，`1` = 至少一条 FAIL。当前版本全绿时共打印 107 行 `OK`（数字随断言增减而变，只作参考）。
 
 ```js
 const problems = [];
@@ -119,7 +122,7 @@ function ok(msg) { console.log('  \x1b[32mOK\x1b[0m    ' + msg); }
 
 没有测试框架。整个"框架"就是四个手写桩 + 一个 `vm` sandbox。
 
-#### 最小 DOM（`smoke.js:36-193`）
+#### 最小 DOM（`smoke.js` 的 `makeEl()` 及其周边）
 
 `makeEl()` 返回普通对象，有 `children` / `classList` / `addEventListener` /
 `fire(type)` / `setAttribute` / `getBoundingClientRect`。关键几点：
@@ -130,12 +133,12 @@ function ok(msg) { console.log('  \x1b[32mOK\x1b[0m    ' + msg); }
 - **`querySelectorAll` 只认识三个选择器**：`.screen` / `[data-go]` / `[data-ptab]`；
   查别的选择器一律得到 `[]`——这是桩的边界，不是 bug
 - **重复 id 会立刻 FAIL**（`makeEl` 里查 `byId`）：`index.html 出现重复 id：xxx`
-- **`innerHTML` 的 setter 必须清空 `children`**（`smoke.js:126-133`）。只改字符串属性
+- **`innerHTML` 的 setter 必须清空 `children`**（`makeEl()` 里的 `innerHTML` setter）。只改字符串属性
   的话，反复构建（每次进机库）会让子元素越积越多，测出来是"8 行应该是 4 行"
   这种**假故障**——踩过一次，注释就留在那儿了
 - `fire('click')` 同时调 `addEventListener` 注册的回调和 `el.onclick`
 
-#### Canvas 与 WebAudio（`smoke.js:42-94`）
+#### Canvas 与 WebAudio（`smoke.js` 的 `ctx2d()` / `audioParam()` / `audioNode()`）
 
 `ctx2d()` 返回 `Proxy`：未知属性一律返回 `() => {}`，所有绘制调用都是静默空操作
 （例外：`canvas` 属性、`measureText`、两个 `create*Gradient`）。
@@ -148,7 +151,7 @@ function ok(msg) { console.log('  \x1b[32mOK\x1b[0m    ' + msg); }
 记账后再转发给原函数的包装即可。音频桩只保证合成路径不抛异常，
 **不验证声音好不好听**。
 
-#### 脚本加载顺序只有一个权威来源（`smoke.js:25-28`）
+#### 脚本加载顺序只有一个权威来源（`smoke.js` 的 `ORDER`）
 
 ```js
 const ORDER = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/script>/g)]
@@ -167,7 +170,7 @@ const ORDER = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/s
 - `render-planform.js:293-294` 用**同一个正则**解析同一份 `index.html`——
   两份工具、一个来源
 
-#### sandbox 里暴露了哪些全局（`smoke.js:195-224`）
+#### sandbox 里暴露了哪些全局（`smoke.js` 的 `windowStub` / `const sandbox`）
 
 `const sandbox = windowStub;` 然后 `vm.createContext(sandbox)`。
 因为 sandbox **就是**那个 window 桩对象：
@@ -204,7 +207,7 @@ const preflightBox = bodyEl.children.find(c => /开机自检发现/.test(c.inner
 测试直接用。`Game.__fireSpecial` **不存在**——所以发射一律走真实链路：
 取 `docListeners['keydown']` 里的回调，发 `{ code: 'Enter' }`。
 
-#### 假时钟与 pump()（`smoke.js:334-343`）
+#### 假时钟与 pump()（`smoke.js` 的 `function pump`）
 
 ```js
 let fakeClock = Date.now();
@@ -391,6 +394,8 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 `release.js` 读最上面那条的锚点，用 `git log <锚点>..HEAD` 取新提交，
 再按提交信息判涨哪一位（`feat!` / `[major]` / `BREAKING` → 主版本，
 `feat` / 含"新增" → 次版本，其余 → 修订）。加 `--dry` 只预览不落盘。
+如果这批改动**只碰了文档**（`docs/` 或任意 `.md`），它只刷新生成物、不涨版本号
+（理由见 VERSIONING.md 第 6 节）；确实要为纯文档改动发版时加 `--force`。
 规则全文在 [VERSIONING.md](../VERSIONING.md)。
 
 ### 为什么不做成全自动
@@ -677,7 +682,7 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 2. **`fail()` 不中断**：第一条 FAIL 才是根因，从中间开始读会浪费很多时间
 3. **写死的 `Date.now()`**：连续 `pump` 之间时间几乎不变，`dt≈0`、飞机不动，
    于是卡死检测误报。**一律用 `pump()` 推进**
-4. **`innerHTML` 的 setter 不真的清 DOM**：桩里显式处理了（`smoke.js:126-133`），
+4. **`innerHTML` 的 setter 不真的清 DOM**：桩里显式处理了（`makeEl()` 里的 `innerHTML` setter），
    否则反复进机库会看到"行数翻倍"的假故障
 5. **借了不还**：包装 `Ent.stepAircraft` / `Renderer.pushModel` / `Renderer.setCamera`、
    临时改 `WEAPONS.*.seeker`、改玩家的 `special`/`spAmmo`/`slotCd`——

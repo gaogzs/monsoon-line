@@ -43,6 +43,7 @@ monsoon-line/
     ├── render-units.js     单位详情页 3D 预览 PNG（走 unitview 自己的渲染器）
     ├── shot-unitview.js    无头 Chrome 截详情页布局（验证 CSS）
     ├── lib/raster.js       几个预览器共用的光栅器 / Canvas 桩 / PNG 编码
+    ├── probe-missions.js   可完成性探针：清空敌人后逐关验证 win() 能成立
     ├── rename-aircraft.js  机型批量改名
     └── preview/            预览器输出的 PNG
 ```
@@ -137,6 +138,8 @@ requestAnimationFrame(loop)
   objective, objectiveSub,
   roeBlocked, detected,
   killed, hitsLanded, shotsFired,
+  groundKilled,                       // 被摧毁的地面/海面目标，单独计分
+  timeLimit, timeLeft,                // 关卡时限（秒），0 = 不限时
   fireMissile(actor, target), radio   // radio 指向 Radio 模块
 }
 ```
@@ -331,17 +334,18 @@ requestAnimationFrame(loop)
 1. **没有可访问性支持**：纯鼠标键盘操作，无手柄、无 `prefers-reduced-motion`
 2. **菜单不能用键盘导航**：`Tab` 键在游戏内被占用（切目标），
    菜单里应该单独支持
-3. **任务目标缺少屏幕内指示**：指南针上有方位标记，但屏幕内没有
-   "目标在那边"的箭头。M2 找浮空平台仍然偏难
-4. **结算后 `world` 未释放**：`finish()` 后 `player`/`world` 仍持有引用，
+3. **结算后 `world` 未释放**：`finish()` 后 `player`/`world` 仍持有引用，
    连续玩多关会累积内存
-5. **只有一个存档点**：`cleared` 记录在内存里，刷新页面就丢
+4. **只有一个存档点**：`cleared` 记录在内存里，刷新页面就丢
+
+> 原第 3 条"任务目标缺少屏幕内指示"已解决：`hud.js` 的 `drawOffscreen()`
+> 把屏外目标钉在安全矩形边上，已锁定目标另有专属提示（v1.4.0）。
 
 ### 可以但没必要
 
-6. 相机与 HUD 的缩放（`hudScale` 曾计划做，最后换成了 `hudOpacity`）
-7. 更多机型与武器（数据结构已支持，缺的是数值设计和模型）
-8. 手绘贴图/精灵替代纯色面
+5. 相机与 HUD 的缩放（`hudScale` 曾计划做，最后换成了 `hudOpacity`）
+6. 更多机型与武器（数据结构已支持，缺的是数值设计和模型）
+7. 手绘贴图/精灵替代纯色面
 
 ---
 
@@ -382,7 +386,6 @@ requestAnimationFrame(loop)
 | — | 补 ROK-27 机型条目 | 此前 `type:'m27'` 在 AIRCRAFT 表里查不到，makeAircraft 静默回退到 DB-11，敌机一直被标成"军舰鸟" |
 | — | 图鉴收录四方势力战机，`enemyOnly`→`npcOnly` | 字段名和设定叙述都不该预设玩家立场，为别的视角留余地 |
 | — | 可驾驶机型 3 → 6 | 只有三架时，机库里的"选择"其实不存在；补上高空截击、隐身、前掠翼三种完全不同的气动 |
-| — | 呼号体系（下游用消失的村庄名） | 之前 HUD 上冒出的"测绘机 3"是内部下标漏出来了 |
 | — | 挂载图鉴补「定位」与「射程」列 | 射程是选弹第一眼要看的东西；定位一句话说清战场角色 |
 | — | 补三个导弹定位缺口 | 反无人机（设定有 MUM-T 却没对应弹）、极高空拦截（所有弹在同一高度退化）、远程对地（原有对地弹只到 9.6 km） |
 | — | 资料库把势力与战役拆开 | 势力介绍要能脱离"谁在打谁"独立成立 |
@@ -410,6 +413,12 @@ requestAnimationFrame(loop)
 | — | **实体挂载对敌我 NPC 生效**（`npcFits` 第二张适配表 + `Ent.mountPlan()` / `buildNpcMounts()` + `launch()` 统一回写弹药池） | 上一版"挂架上的实物"只画玩家：下游弹的 `fits` 是空数组（语义是"上游拿不到实物"），被渲染当成"挂不上"过滤掉，敌机机翼永远是干净的；僚机倒是画得出来，却没有弹药池与发射槽，弹永远挂着不消失。现在两张适配表分开（玩家 `fits` / NPC `npcFits`）、NPC 按"吊舱先占、制式弹铺满剩下的组"分配，并统一回写弹药池 —— AI 射速不受影响（`s.shootT` 下限比槽冷却长）。**适配表没有删掉**：`pelican` / `quartz` / `a2` / `gal44` 只有机腹挂点，删了就等着看格斗弹长在预警机机腹上。吊舱与制式弹**共存**（吊舱从外侧/机腹往里占，把重挂点留给导弹；正序占位会让 `spray` 那种通用+机腹的机型一枚弹都画不出来）。见 [loadout.md](systems/loadout.md#npc-的挂载)；肉眼验证走新增的 `tools/render-mounts.js`（走真正的 `makeAircraft` + `pushStores` + `render.js`） |
 | — | **吊舱有了自己的模型 `MODELS.pod`**（短粗钝头 + 尾端散热格栅），9 件吊舱不再借用导弹外壳；挂点组新增可选字段 `hy`（吊挂高度） | 吊舱原来全是 `model: 'missile'`（`e4` / `l2` 连 model 都没写），于是"这架带了干扰吊舱"在画面上读不出来 —— 一张"导弹 + 吊舱"的预览图和一张"纯导弹"的预览图**字节相同**。换成独立剪影之后一眼可分。顺带查出一条一直存在的几何 bug：默认吊挂高度是按战斗机（机身深一米上下）定的，GAL-44 干扰机与石英预警机的机腹在 −2.60 m，吊舱按 −1.95 挂**整件埋进机身**，而吊舱正是那两型飞机唯一的外挂特征。修法是让挂点组自己带一个 `hy`，并给 `smoke.js` 加一条几何断言（挂载物顶部必须比挂点正下方的机体表面低至少 0.30 m）——把 hy 改回默认它真的会 FAIL |
 | — | **AI 开火时选弹**（`Ent.chooseWeapon` / `setWeapon`）+ **关卡可写逐组 NPC 挂载**（`spawnEnemy` 的 `o.loadout`） | 敌机到这一版为止只能挂一件制式弹（`special`），AI 开火段还写着 `kind === 'aam' && dist < 7200` 一刀切 —— 混挂既没法指定也没意义。现在：AI 每次开火前按**目标类别（对空 / 对面）+ 射程**挑一件（够得着的里面取射程最短的；无制导弹不参与，AI 没有投弹瞄准）；"谁能打谁"合并成唯一的 `Ent.weaponMatchesTarget`（玩家的 `targetMismatch` 也改读它），"设成当前武器"合并成唯一的 `Ent.setWeapon`（玩家换弹也走它）。关卡侧新增 `o.loadout: { 组id: 武器id }`，**上游 NPC 的每一条都必须符合该挂点的选项限制**（`fits` ∩ `canCarry`）——配错不崩，但会记进 `Ent.mountIssues`，`smoke.js` 断言它是空的；下游 NPC 不需要（单一制式弹 + `npcFits` 已经保证适配）。顺带接上一条缺了很久的行为：AI 以前完全看不见 `world.targets`，带对面弹的飞机现在会去挑面目标（现有 NPC 里没有一件对地弹，所以现有三关的行为零变化）。见 [missions.md](systems/missions.md#给-npc-设计挂载) |
+| — | **舰船进关卡并有航路**（`spawnShip` + `route`）、`timeLimit` 正式接入、地面/海面目标单独计分（`groundKilled`，每个 400） | 舰船先做出来、后上场的那一半补完；`timeLimit` 此前声明了却没人读；打设施在结算上原本等于没发生。见 [missions.md](systems/missions.md) |
+| — | 新增 `tools/probe-missions.js` | smoke 只证明关卡"跑得起来"，不证明"打得赢"：清空敌人后 `win()` 仍不成立的关卡要单独抓 |
+| — | **修大气等温层常数** `62188.6` → `6341.6` | 原常数大了十倍，11–20 km 的密度几乎不变（18 km 仍是 0.325），然后在 20 km 处断崖式跌到 0.088。新常数取自 `9000 / ln(0.3639 / 0.08803)`，让这一段恰好在 20 km 接上第三段 —— 18 km 现在是 0.12 kg/m³（海平面的 9.9%），与设定集 7.1 表的相对密度 0.099 一致。整个"平流层作战"的手感建立在这条曲线上，见 [flight-model.md](systems/flight-model.md) |
+| — | **修导弹转弯耗能**：转弯前量偏差 | 原来在转完之后量 `want`，量到的是"还剩多少没转"，接近对准时趋近零 —— 急转末段几乎不掉速 |
+| — | **修挂载重量惩罚**：搬到 `stepAircraft` 开头 | 原来在姿态旋转之后才替换 `p`，俯仰 / 滚转惩罚从未生效，失速判定也用的是未打折的 `vStall`；机库面板显示的数字与手感对不上 |
+| — | **修无炮 NPC 不发射导弹**：`ai.js` 开火段的机炮部分不再 `return` | v1.4.1 为 `gun: null` 加的保护写成了 `return`，把导弹段一起截掉 —— M5 的巡航弹载机、M8 的轰炸机挂着弹却从未开火。这会让这两关的敌方对面打击**第一次真正发生**，见 [ai.md](systems/ai.md) |
 
 ---
 
@@ -417,11 +426,13 @@ requestAnimationFrame(loop)
 
 1. 在 `missions.js` 末尾 `MISSIONS.push({...})`，字段照抄现有任何一关
 2. 必须提供：`id` `no` `name` `en` `loc` `date` `altStart` `speedStart`
-   `prose` `objectives` `threats` `intel` `map` `spawn()` `tick()` `win()` `lose()`
+   `prose` `objectives` `threats` `intel` `map` `spawn()` `tick()` `win()` `lose()`；
+   可选 `timeLimit`（秒，倒计时由 `game.js` 统一处理，归零判负）
 3. 在 `data.js` 的 `VOICES` 里加同名 `id` 的台词表，至少要有 `start`
 4. **把它的全局下标写进某个战役的 `missions` 数组**（见下一节）——
    漏了这一步，关卡会存在但永远选不到，`preflight()` 会报出来
-5. 跑 `node tools/smoke.js`——它会自动检查新任务的字段完整性
+5. 跑 `node tools/smoke.js`——它会自动检查新任务的字段完整性；
+   再跑 `node tools/probe-missions.js`——确认清空敌人之后这一关真的能赢
 
 `map` 里的坐标是**世界米**，相对进入点。绘图由 `drawMap()` 统一处理。
 

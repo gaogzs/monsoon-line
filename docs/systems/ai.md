@@ -1,6 +1,6 @@
 # AI 行为
 
-代码：`js/ai.js`（752 行）· 调用方：`js/missions.js` 的 `spawnEnemy()` / `spawnWingman()`、`js/game.js` 的 `updateMouseAim()`
+代码：`js/ai.js`（965 行）· 调用方：`js/missions.js` 的 `spawnEnemy()` / `spawnWingman()`、`js/game.js` 的 `updateMouseAim()`
 
 ---
 
@@ -216,7 +216,7 @@ out.yaw   = yawCmd * gain;
 
 | 字段 | 初值 | 含义 |
 |---|---|---|
-| `role` | `'enemy'` | `enemy` / `drone` / `wingman` |
+| `role` | `'enemy'` | `enemy` / `drone` / `wingman`；预警机由 `spawnAewc()` 改成 `support`（它带 `route`，不走状态机） |
 | `skill` | 0.6 | 0..1，见「技能等级」 |
 | `mode` | `'pursue'` | `pursue` / `evade` / `extend` |
 | `modeT` | 0 | `extend` 剩余时间 |
@@ -225,9 +225,10 @@ out.yaw   = yawCmd * gain;
 | `flareT` | 0 | 干扰弹投放间隔 |
 | `shootT` | 0 | 导弹发射冷却 |
 | `burstT` | 0 | 机炮点射计时（当前未使用） |
+| `ewResist` | 0 | 对敌方电子战的适应度（设定 7.3"对手也在学"），压低目标干扰对锁定距离的折扣 |
 | `target` | null | 当前目标 |
 | `retargetT` | `rnd(0, 1.2)` | 下一次重选目标的倒计时 |
-| `formation` | null | 实际由 `missions.js` 传 `{dx, dy, dz}` |
+| `formation` | null | 实际由 `missions.js` 传 `{dx, dy, dz}`（`attach` 的 `opt` 也接受它，只是文档化签名里没列） |
 | `wander` | `rnd(0, 6.28)` | 巡逻用的相位 |
 | `cmd` | `'focus'` | 僚机指令 `focus` / `cover` / `spread`。缺省为最保守的 `focus` |
 
@@ -313,9 +314,12 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 
 | 任务 | 左僚机 | 右僚机 |
 |---|---|---|
-| M1 | (-170, 25, -260) | (170, 25, -260) |
-| M2 | (-150, 12, -240) | (150, 12, -240) |
+| M1 | (-220, 30, -320) | (220, 30, -320) |
+| M2 | (-180, 14, -300) | (180, 14, -300) |
 | M3 | (-190, 30, -300) | (190, 30, -300) |
+
+（其余各关在同一量级，逐关见 `missions.js` 的 `spawnWingman` 调用；
+M8 的 `dz` 是 **+320**，僚机排在长机前方。）
 
 `ai.js` 里的兜底默认值是 drone `{140, 25, -190}`、wingman `{120, 30, -180}`。
 
@@ -370,13 +374,24 @@ gunCone  = 0.028 + (1 - skill) * 0.02;
 a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
 ```
 
+**没有机炮的机型**（数据里 `gun: null`：ROK-40 / 鹈鹕 / 石英）只跳过
+机炮这一段，`firingGun` 保持 `false`，然后**照常进入导弹段**。
+
+这里走过两次弯路：最早直接读 `WEAPONS[a.gun].range`，无炮飞机一到开火段
+就抛异常；后来改成 `if (!gunW) return`，异常没了，却把下面的导弹段一起截掉
+—— M5 的巡航弹载机（`lcm`）、M8 的轰炸机（`dl4` / `vbn`）挂着弹，
+一发都没打出去过。**不要再在机炮段里 `return`。**
+
+注意：沿 `route` 飞的飞机（M2 的轰炸机、各关的干扰机）在 `updateRoute()`
+就返回了，根本不进开火段，不受这条影响。
+
 开火时调 `Ent.fireGun(a, world)`，并按距离播敌方机炮声
 （`SFX.gunShotAt`，内部采样节流）。别人开火的声音是刻意加的：
 以前只有玩家自己的机炮有音效，AI 打出去的子弹**无声**，
 而它们通常在视线的侧后方，于是玩家会以为"敌人从来不开炮"。
 
-导弹的外层门槛是 `s.shootT <= 0`、`a.spAmmo > 0`、`a.spCd <= 0`，
-四个条件都满足才发射：
+先挑弹，再看外层门槛 `s.shootT <= 0`、`a.spAmmo > 0`、`a.spCd <= 0`，
+然后以下条件都满足才发射：
 
 1. **挑一件武器**：`Ent.chooseWeapon(a, t, dist)` —— 先看**目标类别**
    （目标物 `kind === 'target'` 算"对面"，其余算"空中"，判据与玩家的
@@ -388,7 +403,9 @@ a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
 2. **锁定锥**：`off < cone * 0.85`，`y > 18000` 时 `cone *= 0.8`（收窄 20%）
 3. **锁定距离**：`dist < lockDist * lockK * resist`，其中
    `lockK = 1 - min(0.25, max(0, (y - 15000) / 40000))`（越高越难锁），
-   `resist = t.lockResist ? 1 - t.lockResist : 1`（目标的干扰舱打折）
+   `resist = t.lockResist ? 1 - t.lockResist : 1`（目标的被动吊舱打折）；
+   目标正在主动干扰（`t.ewPower > 0`）**且本弹是雷达制导**时再乘
+   `1 - ewPower × ewLockReduce × (1 - s.ewResist)` —— 红外弹不吃雷达干扰
 4. **最小距离**：`dist > (spW.nezer ? 1400 : (对面目标 ? 1200 : 700))`
 5. **意愿**：`Math.random() < 0.35 + skill * 0.45`
 
@@ -443,6 +460,10 @@ a.route = {
   onArrive: bombTheBase        // 到点要做的事
 };
 ```
+
+**盘旋型**（`route.loiter: true`，预警机，`missions.js` 的 `spawnAewc()`）：
+到点后 `wp` 与 `exit` 互换，在两点之间来回飞、永不退场 —— 击落是唯一让它
+消失的方式。轰炸机是**事件**，预警机得一直在那儿看着。
 
 **三段**：`ingress`（进场）→ 到点触发 `onArrive`，把 `wp` 换成 `exit`、
 `alt` 换成 `exitAlt` → `egress`（脱离）。飞完最后一段就 `alive = false`
@@ -538,8 +559,9 @@ desired = norm(V(tan.x, climb, tan.z));      // 取切向 → 持续转圈
 | 导弹发射意愿 | 35% | 80% |
 | 发射冷却系数 | ×1.6（4.16–8.32 s） | ×1.0（2.6–5.2 s） |
 
-现有数值：M1 测绘机 0.32、M1 VAC-14 护航 0.40、M2 伏击（头机 / 僚机）
-0.72 / 0.50、M3 播撒机 0.25、M3 护航 0.6、
+现有数值（举例，全部见 `missions.js`）：M1 测绘机 0.32、护航 0.40、
+第二波 0.62、播撒机 0.30；M2 伏击（头机 / 僚机）0.72 / 0.50、ROK-40 0.30；
+M3 播撒机 0.25、护航 0.58–0.72、
 **冬港（WINTERPORT）0.96**（血量过半后提到 **1.0**）、无人僚机 0.62。
 
 ---

@@ -29,6 +29,7 @@
 
 ```bash
 node tools/smoke.js                 # 唯一的自动化测试，改完代码必跑
+node tools/probe-missions.js        # 可完成性探针：清空敌人后逐关验证能否取胜（改关卡后跑）
 node tools/release.js               # 发版：自动分配版本号 + 追加更新日志
 node tools/stamp-version.js         # 只刷新标题页的版本戳时间（提交前跑）
 node tools/render-planform.js       # 导出机库俯视图 PNG（本机没浏览器时看画风）

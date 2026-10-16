@@ -36,20 +36,23 @@
 | `spawnEnemy` | `spawnEnemy(w, o) → a` | 造一架敌机并推入 `w.actors`。`o` 字段见下表 |
 | `spawnWingman` | `spawnWingman(w, idx, slotX, slotY, slotZ) → a` | 造僚机（机型写死 `ucav`，队形相对长机），登记 `w.wings[idx]` |
 | `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets` |
-| `spawnShip` | `spawnShip(w, o) → t` | **水面舰船**：按 `o.model` 查 `SHIPS` 表取 `hp/radius/value/label`，再调 `spawnTarget`；`o` 可覆盖 `hp/radius/value/label/team/drift/route/weapon/fireCd` |
+| `spawnShip` | `spawnShip(w, o) → t` | **水面舰船**：按 `o.model` 查 `SHIPS` 表取 `hp/radius/value/label`（查不到回退 `SHIPS[0]`），直接调 `Ent.makeTarget` 并推入 `w.targets`；`team` 缺省 1、`fireCd` 缺省 `rnd(3,8)`；`o` 可覆盖 `hp/radius/value/label/team/drift/route/weapon/fireCd` |
 | `spawnAewc` | `spawnAewc(w, o) → a` | **空中预警机**：`spawnEnemy` + `a.aewc = true` + `route: {loiter:true, wp, exit}`。行为在 `game.js` 的 `updateAewc()` 里 |
 | `bombTheBase` | `bombTheBase(bomber, w)` | 轰炸机抵达投弹点的动作：48 个爆炸粒子 + 对 `w.baseTarget` 造成 340 伤害 |
 
-> **水面舰船的接入方式。** `data.js` 里的 `SHIPS` 表（16 艘，见
-> [SETTING.md 8.0.1](../world/SETTING.md)）已经备好了 `model` / `hp` / `radius` /
-> `value` / `label`，接进来照着下面 `spawnTarget` 的写法加几行即可。
+> **水面舰船一律走 `spawnShip`。** `data.js` 里的 `SHIPS` 表（16 艘，见
+> [SETTING.md 8.0.1](../world/SETTING.md)）提供 `model` / `hp` / `radius` /
+> `value` / `label`，任务里只写"哪条船、在哪、由谁指挥"（全文件约 25 处调用）。
+> 简报与台词里的舰船编号必须取自 `SHIPS[].hull`（`BLO-` / `BEI-`）——
+> v1.4.1 把 m4 / m9 里编造的 `CON-*` 编号全部改了回来。
 > 舰船用 `ttype: 'ground'`、`ground: true`（**不要**新造 `ttype:'ship'`：
 > 渲染按 `MODELS[t.model]` 查表，`ttype` 只影响 HUD 文案与受损下沉分支）。
 >
 > **船会动，浮台不会。** `drift` 是随气流往复（浮空平台用），让一条船真的航行
 > 要给它 `route`：`{ wp: [{x,z}…], speed, loop, arrive, onArrive, despawn }`，
 > 有 `route` 时优先于 `drift`。`speed` 是**米/秒**，而 `SHIPS[].speed` 是节
-> （接入时 ×0.514）。实现见 [entities.md](entities.md#35-目标物-tkind-target)。
+> （`spawnShip` 不替你换算，需要按表取值时自己 ×0.514）。现有关卡多用
+> `loop: true` 的两点往返巡航（8–20 m/s），m9 的登陆舰用 `loop: false` 一路往北开。实现见 [entities.md](entities.md#35-目标物-tkind-target)。
 
 `spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（缺省 `'dl6'`）/ **`loadout`**（逐组挂载，见下一节）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
 
@@ -140,6 +143,24 @@ spawnEnemy(w, {
   报了整场战役方位的那个人从此有了实体
 - **m3** 放了一架下游 `ROK-2 石英`（team 1），以及一架 `GAL-44 磁石` 干扰机：
   后者用 `route.onArrive` 调 `Ent.openEcm(a, 'vsc')` 开机，然后掉头走
+- **m10** 再放一架鹈鹕（team 0，`SEXTANT`），敌方预警机的 `aewDown` 是该关的阶段事件
+
+### 背景单位（`team: 2`）
+
+v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，一律 `team: 2`：
+`cycleTarget` 只收 team 1，所以玩家锁不到；`ai.js` 的 `nearestSurfaceTarget`
+把 `team > 1` 排除，所以 AI 也不认。它们不计入胜负。
+
+| 关卡 | 单位 |
+|---|---|
+| m1 | 群岛国 `k8` XAMSI「潮线」（`behavior: 'recon'`）+ 巡逻艇 `daplu`「屿」 |
+| m4 | 三条中立国民用船：`cross` 南十字、`icecore` 冰芯、`atoll` 环礁（沿航路巡航） |
+| m5 | 管理局勤务机 `a2` MERLI「水准」+ 测量船 `diklo`「标杆」 |
+
+这是"不做中立识别机制"下唯一干净的安排：要么能打、要么不在交战语法里，
+没有"能锁但不该打"的中间态。MERLI 只有一个机腹挂载组、而机腹挂不了任何
+空空弹，所以任务里**不给它写 `special` / `loadout`**（与设定"名义上没有武器"一致）；
+注意 `spawnEnemy` 的 `special` 缺省值仍是 `'dl6'`，只是挂不上、画不出来。
 
 `spawnWingman` 写死的部分：机型 `ucav`、阵营 0、`isDrone: true`、`special: 'v9'`、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
 
@@ -220,8 +241,8 @@ spawnEnemy(w, {
 | `ace` / `aceSpawned` | m3、m10 | 王牌冬港（m3 与 m10 各一次） |
 | `guarded[]` | m8 | 必须保护的上游编队（沉任一即判负） |
 | `skQueue` / `skBatch` | sk1 | 随机遭遇的六个批次（`spawn()` 一次性生成） |
-| `timeLimit` / `timeLeft` | `newWorld()` | 关卡时限；`startMission` 从 `mission.timeLimit` 落进来 |
-| `groundKilled` | `newWorld()`，`Ent.killGround` 累加 | 被摧毁的地面/海面目标数（结算单列一行，权重 400） |
+| `timeLimit` / `timeLeft` | `newWorld()` | 关卡时限；`startMission` 从 `mission.timeLimit` 落进来；归零时 `game.js` 播一句"时间到"并 `finish(false)` |
+| `groundKilled` | `newWorld()`，`Ent.killGround` 累加 | 被摧毁的地面/海面目标数（结算单列一行，`finish()` 里 `gk * 400`；低于一架飞机的 1000，免得"打不还手的设施"成为刷分捷径） |
 | `friendlyLoss` | `game.js` `hitTarget` 写、`finish()` 读 | 误伤扣分 |
 
 ---

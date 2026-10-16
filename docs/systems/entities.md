@@ -34,7 +34,7 @@
 | `ctrlFactor` | `ctrlFactor(y, speed, ac) → 0..1` | 气动权限系数，端点可被机型覆盖 |
 | `turnFactor` | `turnFactor(y) → 0.34..1` | 导弹转弯率的气动缩放 |
 | `makeAircraft` | `makeAircraft(o) → a` | 造飞机。`o = {type, team, x/y/z, fwd, speed, throttle, special, loadout, pods, isPlayer, isDrone, flares, radio, group}`。非玩家会顺手建 `ammoPool` / `slotCd`（§ 3.1） |
-| `stepAircraft` | `stepAircraft(a, dt, world)` | 飞机每帧：动压→姿态→速度→位置→冷却→拖烟 |
+| `stepAircraft` | `stepAircraft(a, dt, world)` | 飞机每帧：挂载惩罚→动压→失速→姿态→速度→位置→冷却→拖烟 |
 | `fitsKind` | `fitsKind(w, kind, playerStyle) → bool` | 这件武器挂得住这种挂点吗。玩家读 `fits`，NPC 读 `npcFits`（缺省退回 `fits`） |
 | `mountPlan` | `mountPlan(a) → [弹种或 null]` | 逐组挂载分配（逐组配置 → 吊舱 → 制式弹），下标对齐 `ac.hardpointGroups` |
 | `storePos` | `storePos(a, g, pt) → 世界坐标` | 一个挂点的挂载物该画在哪。`pt` 只有 (横向, 前后)，高度取 `g.hy` 或按类型给的默认值（`STORE_HY`） |
@@ -48,12 +48,15 @@
 | `stepMissile` | `stepMissile(m, dt, world)` | 导弹每帧：动力段→导引→位置→近炸→尾迹 |
 | `effectiveLife` | `effectiveLife(w, y) → s` | 动力段时长，冲压弹在 18 km 以上缩短 |
 | `breakLock` | `breakLock(a, world) → bool` | 投放一组干扰弹（热焰弹 + 箔丝）并尝试欺骗来袭弹 |
+| `openEcm` | `openEcm(actor, wid, threatSkill)` | 电子战吊舱开机（认知电子战闭环的入口） |
+| `passiveEffects` | `passiveEffects([{wid, n}]) → {lockResist, armor, lockRange, flareBonus, silentLock}` | 汇总被动吊舱效果（`armor` 封顶 0.55）。玩家（`game.js` 同名包装按挂点组展开）与敌机 `pods`（`missions.js`）共用 |
 | `fireGun` | `fireGun(a, world)` | 按射速节流开火，生成子弹 + 炮口火光 |
 | `stepBullet` | `stepBullet(b, dt)` | 子弹每帧：重力 + 位移 + 寿命 |
 | `SLOT_EMPTY` | 常量 `1e9` | 空挂架标记：永远不会装填完成 |
 | `spawnParticle` | `spawnParticle(list, pos, vel, life, size, color, opt)` | 生成一个粒子。`opt = {grow, alpha, drag, grav}` |
 | `stepParticles` | `stepParticles(list, dt)` | 粒子每帧：寿命 → 位移 → 阻力 → 重力 |
 | `explode` | `explode(list, pos, scale, count)` | 爆炸：多色火球 + 黑烟 |
+| `detonate` | `detonate(m, t, world)` | 近炸命中判定（反辐射弹对辐射源伤害 ×2） |
 | `damage` | `damage(ent, amt, world, source) → bool` | 对**飞机**结算伤害（含装甲减伤），返回是否击杀 |
 | `kill` | `kill(ent, world, groundImpact, source)` | 击落飞机：爆炸 + 音效 + `source.kills++` |
 | `killGround` | `killGround(ent, world)` | 摧毁目标物：按半径缩放爆炸 + `SFX.bigHit()` + `world.groundKilled++` |
@@ -62,7 +65,7 @@
 | `stepTarget` | `stepTarget(t, dt, world)` | 目标物每帧：航路或漂移 + 受损下沉 |
 | `randUnit` | `randUnit() → 单位向量` | 球面均匀随机方向（爆炸、干扰弹用） |
 
-**不导出的内部函数**：`detonate(m, t, world)`（近炸命中判定）、`killMissile(m, world, hit)`。它们只在 `stepMissile` 内部调用，外部模块要击落导弹请直接置 `m.alive = false`（`updateDEW` 就是这么做的）。
+**不导出的内部函数**：`killMissile(m, world, hit)`（`detonate` 虽然也导出了，但正常只在 `stepMissile` 内部调用）。外部模块要击落导弹请直接置 `m.alive = false`（`updateDEW` 就是这么做的）。
 
 ---
 
@@ -109,7 +112,8 @@
 | `radius` | `missions.js` | 敌机命中半径（8），轰炸机 22 |
 | `loadoutList` / `ammoPool` / `loadout` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy` 的 `o.loadout`（NPC） | 挂载列表 / 各武器储备 / **逐组**配置（组 id → 弹种）。NPC 的 `ammoPool` / `slotCd` 在 `makeAircraft()` 里就建好了（见 [loadout.md](loadout.md#npc-的挂载)） |
 | `wpIdx` / `spSalvo` | `game.js` | 当前挂载下标；`spSalvo` **写入后无人读取** |
-| `loadFactor` / `armor` / `lockResist` / `lockRangeK` / `silentLock` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy`（敌机 `pods`） | 重量惩罚与被动吊舱加成。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
+| `loadFactor` | `game.js` `startMission`（**只有玩家**） | 挂载重量惩罚，`stepAircraft()` 开头读。NPC 虽有实体挂载（`npcFits`）但**不设**它，飞行性能不受挂载影响 |
+| `armor` / `lockResist` / `lockRangeK` / `silentLock` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy`（敌机 `pods`，不设 `lockRangeK`） | 被动吊舱加成。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
 | `gLoad` / `brake` / `hiG` | `game.js` `controlPlayer` | 高 G 倍率 / 减速板 / HUD 指示 |
 | `sweep` | `stepAircraft` | 可变后掠翼位置（仅 `ac.variableSweep`） |
 | `ai` | `AI.attach` | 见 [ai.md](ai.md) |
@@ -241,7 +245,7 @@ keydown Enter / 鼠标右键
   → 之后每帧 stepMissile()
 ```
 
-**AI 走的是另一条路**：`world.fireMissile(actor, target)` → `launch()`。AI 没有填充 `slotCd`，所以 `launch()` 退回到 `spCd` 单冷却分支（`else if (actor.spCd > 0) return false`）。写新武器时别假设 AI 也有槽数组。
+**AI 走的是另一条路**：`ai.js` 先 `Ent.chooseWeapon()` + `Ent.setWeapon()` 选定 `a.special`，再 `world.fireMissile(actor, target)` → `launch()`。有实体挂载的 NPC 由 `buildNpcMounts()` 建了 `slotCd`，走同样的找槽逻辑；只有 `slotCd[special]` 不存在时，`launch()` 才退回 `spCd` 单冷却分支（`else if (actor.spCd > 0) return false`）。写新武器时别假设每架 AI 都有槽数组。
 
 ### 4.3 装填与冷却：`slotCd` 的真实语义
 
@@ -264,7 +268,7 @@ keydown Enter / 鼠标右键
 ```
 
 - `Ent.kill()` 按结构完整度决定爆炸规模（`hp>150` 用 3.2 / 26 个粒子，否则 2.2 / 20），并给 `source.kills++`。
-- `Ent.damage()` **会**扣装甲减伤（`ent.armor`，上限 60%）；`hitTarget()` **不会**——目标物不吃装甲，这是刻意的（装甲是飞机的挂载件）。
+- `Ent.damage()` **会**扣装甲减伤（`ent.armor`；`damage()` 钳在 60%，但 `passiveEffects()` 汇总时已封顶 55%）；`hitTarget()` **不会**——目标物不吃装甲，这是刻意的（装甲是飞机的挂载件）。
 - 无制导弹也走 `scanShot`：它们没有导引头，唯一能命中的方式就是撞上去。
 
 ### 4.5 干扰弹链路
@@ -323,7 +327,7 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 | 受损拖烟阈值 | `stepAircraft()` 里 `a.hp < a.maxHp * 0.45` |
 | 加力尾焰间隔 | `stepAircraft()` 里 `trailTimer = 0.028` |
 | 粒子数量上限 | `game.js` `compact()` 里的 `> 900` |
-| 干扰弹投放间隔 / 组数 | `entities.js` `breakLock()` 的 `flareCd = 0.12`、`flares` 初值 80 |
+| 干扰弹投放间隔 / 组数 | `entities.js` `breakLock()` 的 `flareCd = 0.45`、`makeAircraft()` 里 `flares` 初值 80 |
 | 被干扰概率 | `data.js` `WEAPONS[].flare` |
 | 锁定速率 / 锥角 / 距离 | `game.js` `updateLock()` + `data.js` 的 `lockCone` / `lockDist` / `nezer` / `seeker` |
 | 地面火力开火节奏 | `game.js` `updateTargets()`：`t.fireCd = w.cd + rnd(0,2)` |
@@ -362,9 +366,9 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 
 6. **槽数组是**按武器**建的，渲染是**按挂点组**遍历的。** `game.js` `pushStores()` 必须自己维护 `used[wid]` 起始下标，否则两组挂同一种弹时会共用前两个槽，出现"打掉一个、两组同时消失"。**推进 `used[wid]` 必须发生在适配检查之后**——否则一个挂不上的组也会占掉下标，把它后面的挂架整体顶偏。
 
-7. **挂载重量是整体替换 `p`，不是就地缩放。** `stepAircraft()` 里 `p = { vMax, vMil, vStall, accel, decel, pitch, roll }`——少列一个字段（历史上漏过 `accel`/`decel`）就会让那个字段变成 `undefined`，加速变成瞬时。加字段时记得同步这里。
+7. **挂载重量是整体替换 `p`，不是就地缩放。** `stepAircraft()` 里 `p = { vMax, vMil, vStall, accel, decel, pitch, roll, yaw }`——少列一个字段（历史上漏过 `accel`/`decel`）就会让那个字段变成 `undefined`，加速变成瞬时。加字段时记得同步这里。**这一段还必须在函数开头**：以前它在姿态旋转之后，pitch / roll 惩罚从未生效、失速判定用的是未打折的 `vStall`。
 
-8. **AI 只发射 `a.special` 这一件武器，但它现在也有 `slotCd` 了。** 以前 NPC 的 `slotCd` 是空对象，`launch()` 对它退回单冷却 `spCd`；现在 `buildNpcMounts()` 会按挂点数建槽（实体挂载要靠它判断"这一发还在不在"）。这不改变 AI 的射速 —— `ai.js` 自己的 `s.shootT` 下限（1.0–2.6 s）比任何槽冷却都长。想做"敌机换弹打"要动的是 AI 的选弹逻辑，不是这里。
+8. **AI 每次开火前都会重新选弹，而且它现在也有 `slotCd` 了。** `ai.js` 调 `Ent.chooseWeapon()` 挑一件（对空 / 对面 + 够得着的里面射程最短），`Ent.setWeapon()` 把它设成 `a.special`——这就是"AI 换武器"的全部，没有独立的选弹状态。以前 NPC 的 `slotCd` 是空对象，`launch()` 对它退回单冷却 `spCd`；现在 `buildNpcMounts()` 会按挂点数建槽（实体挂载要靠它判断"这一发还在不在"）。这不改变 AI 的射速 —— `ai.js` 的 `s.shootT = rnd(2.6, 5.2) × (1.6 − 0.6·skill)` 通常比槽冷却长。
 
 9. **`hitTarget()` 里 `var penal = ...` 算了没用。** 真正的误伤扣分是紧接着那段 `source.isPlayer` 判断累加 `world.friendlyLoss`。别把这个变量当成扣分依据。
 

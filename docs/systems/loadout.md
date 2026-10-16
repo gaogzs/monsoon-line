@@ -395,7 +395,7 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 吊舱吃掉挂点后，导弹的**可视挂架会变少，但弹药池不变**
 （`ammoPool[wid] = w.ammo`）—— AI 该打几发还是几发，只是能看见的发射架少了。
 
-`Ent.buildNpcMounts(a)`（`makeAircraft()` 末尾对非玩家调用）据此建两样东西：
+`entities.js` 内部的 `buildNpcMounts(a)`（不导出；`makeAircraft()` 末尾对非玩家调用）据此建两样东西：
 
 - `a.ammoPool[wid] = w.ammo` —— **取 `w.ammo`，不是玩家的
   `挂点数 × perPoint`**；下游弹的 `perPoint` 是 0，按玩家口径会建出 0 发弹
@@ -415,7 +415,7 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 
 发射侧的弹药池回写也在 `launch()` 里对两边统一做了
 （`actor.ammoPool[actor.special] = actor.spAmmo`）。**AI 的发射节奏不变**：
-它自己的 `s.shootT` 下限是 1.0–2.6 秒，比任何槽冷却都长，
+它自己的 `s.shootT = rnd(2.6, 5.2) × (1.6 − 0.6·skill)`（2.6–8.3 秒）通常比槽冷却长，
 所以槽数变多不会把敌机变成连发火箭炮。
 
 **吊舱与定向能不占发射槽，也一直挂在挂架上**（`kind === 'ecm' || 'dew'`）。
@@ -527,11 +527,18 @@ pitch  × (1 − 0.18·lf)
 roll   × (1 − 0.12·lf)
 ```
 
-在 `stepAircraft()` 里对机型物理数据做临时缩放（**整体替换 `p`**，
+在 `stepAircraft()` **开头**对机型物理数据做临时缩放（**整体替换 `p`**，
 所以每个字段都得列上，漏一个就会取到 `undefined`；`accel` / `decel`
-就曾经这样漏过）。
+就曾经这样漏过。`yaw` 不受挂载影响，但也得原样带上）。
 
-**AI 不带挂载，`loadFactor` 是 `undefined`**，所以这些惩罚只作用于玩家。
+**位置也踩过坑**：这一段以前在姿态旋转之后，于是 `pitch` / `roll`
+两项惩罚**从未生效**，失速判定也用的是未打折的 `vStall` ——
+面板上写着"俯仰 −18%"，手感上却只有速度那几项。现在放在函数最前面，
+失速判定、姿态旋转、目标速度读的都是打过折的 `p`。
+
+**`loadFactor` 只有玩家设**（`game.js` `startMission`）。NPC 虽然有
+实体挂载（见 [§ NPC 的挂载](#npc-的挂载)），但不设这个字段，
+所以重量惩罚只作用于玩家 —— NPC 的挂载只影响外观、弹药与选弹，不影响手感。
 
 这是"空置挂架换机动性"的实现方式，也是半拟真感的来源之一 ——
 满载出击真的会飞得笨。

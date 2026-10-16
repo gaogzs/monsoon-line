@@ -18,7 +18,7 @@
 | 文件 | `js/unitview.js`，全中文注释 |
 | 加载位置 | `index.html` 里紧随 `hud.js` 之后（**必须在 `codex.js` / `data.js` / `models.js` / `planform.js` 之后**） |
 | 依赖 | `M3`（相机与向量）、`MODELS`、`PLANFORM`、`AIRCRAFT`、`SHIPS`、`WEAPONS`（只为了显示机炮名） |
-| 输出 | 全局 `var UnitView`，四个方法 |
+| 输出 | 全局 `var UnitView`，五个方法 |
 | DOM | 只**生成字符串**；插入由 `game.js` 负责。挂载时只找 `#uvCanvas` / `#uvPlan` 两个 id |
 | 校验 | `tools/smoke.js` 里"单位详情页"一组断言（4 条） |
 
@@ -39,6 +39,7 @@ UnitView.findUnit(kind, id) // → { kind, rec, model, modelKey } 或 null
 ```
 
 `kind` 只有两个取值：`'aircraft'`（查 `AIRCRAFT`）与 `'ship'`（查 `SHIPS`）。
+所以详情页的总数就是两张表的长度之和：当前 **33 页 = 17 机型 + 16 舰船**，加一条记录就多一页，不需要登记。
 
 **`html()` 与 `mount()` 是分开的两步**，因为 `game.js` 是先 `innerHTML =` 再挂载的：
 字符串里只有占位 `<canvas id="uvCanvas">`，真正的初始化必须等它进了 DOM。
@@ -148,7 +149,7 @@ for (i = 0; i < nv; i++) {
 | 3D 预览 | 全部 | 全部 |
 | 矢量俯视图 | **只有 7 型有数据**（6 架可驾驶 + `k8` 复用 `c14`） | 无 |
 | 设定 | `desc` | `desc` |
-| 参数表 | `phys` / `maxLoad` / `gun` / `hardpointGroups` / `caps` / `ctrlFloor` … | `disp` / `dim` / `speed` / `crew` / `arms` / `vials` / `hp` / `radius` / `value` |
+| 参数表 | `phys` / `maxLoad` / `gun`（`gun: null` 的预警机、轰炸机显示「（无）」）/ `hardpointGroups` / `caps` / `ctrlFloor` … | `disp` / `dim` / `speed` / `crew` / `arms` / `vials` / `hp` / `radius` / `value` |
 
 ### 俯视图的分配规则
 
