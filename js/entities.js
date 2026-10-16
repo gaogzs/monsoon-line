@@ -9,6 +9,9 @@
 var Ent = (function () {
 
   var G = 9.80665, RHO0 = 1.225;
+  var RHO_TROPO = 0.3639;     // 11 km 对流层顶密度，推力衰减的归一化基准
+  var THRUST_TAPER = 1.0;     // 剩余推力在接近目标速度的最后一段渐弱，见 stepAircraft
+  var TURN_BLEED = 0.20;      // 转弯诱导阻力系数
 
   /* 激光照射锥：载机的机头必须保持在这个角度内才算"还在照着"。
 
@@ -269,16 +272,22 @@ var Ent = (function () {
   function buildNpcMounts(a) {
     var groups = (a.ac && a.ac.hardpointGroups) || [];
     var plan = mountPlan(a);
-    var pts = {}, gi, k;
+    var pts = {}, gi, k, mass = 0;
 
     for (gi = 0; gi < groups.length; gi++) {
       var wid = plan[gi];
       if (!wid) continue;
       var w = WEAPONS[wid];
+      // 挂载重量：与 game.js 的 loadoutMass 同一条公式（吊舱也算重量）
+      if (w) mass += groups[gi].pts.length * (w.perPoint || 1) * (w.mass || 100);
       /* 吊舱与定向能不是打出去的东西，不占发射槽（渲染那边也一直挂着） */
       if (!w || w.kind === 'gun' || w.kind === 'ecm' || w.kind === 'dew') continue;
       pts[wid] = (pts[wid] || 0) + groups[gi].pts.length;
     }
+
+    /* NPC 也吃挂载重量惩罚。以前只有玩家设 loadFactor，
+       满挂的敌机飞起来和空挂一样。 */
+    a.loadFactor = Math.min(1, mass / ((a.ac && a.ac.maxLoad) || 5000));
 
     for (k in pts) {
       if (!Object.prototype.hasOwnProperty.call(pts, k)) continue;
@@ -484,7 +493,7 @@ var Ent = (function () {
     var p = a.phys;
 
     // 挂载越重越笨拙：加速、转向、滚转都吃一点亏。
-    // loadFactor 由玩家按机库配置设定；NPC 的实体挂载不设它，所以是 undefined。
+    // loadFactor：玩家按机库配置设定（game.js），NPC 由 buildNpcMounts 按实体挂载算。
     /* 必须放在函数开头：下面的失速判定、姿态旋转、目标速度全都读 p。
        以前这一段在姿态旋转之后，于是 pitch / roll 惩罚从未生效，
        失速判定也用的是未打折的 vStall。 */
@@ -574,12 +583,12 @@ var Ent = (function () {
     // 是否加力由 a.ab 单独决定，见 game.js controlPlayer()
     var th = M3.clamp(a.throttle, 0, 1);
     var vTarget = M3.lerp(p.vStall * 0.74, a.ab ? p.vMax : p.vMil, th);
-    vTarget -= a.fwd.y * 52;                                  // 爬升掉速 / 俯冲增速
-    vTarget = Math.max(vTarget, p.vStall * 0.52);
 
-    // 高空推力衰减：20 km 只有海平面的约 20%
+    /* 高空推力衰减：跟着密度走，而不是另起一条直线。
+       以 11 km 为基准归一化，保证在对流层顶连续；0.75 次幂是
+       涡扇推力随密度衰减的常见近似。20 km ≈ 0.35，最低保底 0.20。 */
     if (a.pos.y > 11000) {
-      var k = M3.clamp(1 - (a.pos.y - 11000) / 15000, 0.20, 1);
+      var k = M3.clamp(Math.pow(airDensity(a.pos.y) / RHO_TROPO, 0.75), 0.20, 1);
       vTarget = M3.lerp(p.vStall * 0.55, vTarget, k);
     }
 
@@ -589,13 +598,42 @@ var Ent = (function () {
     }
 
     if (a.brake) vTarget = Math.min(vTarget, p.vStall * 0.92);
-    var acc = (vTarget > a.speed) ? p.accel : p.decel;
-    if (a.brake) acc = p.decel * 1.8;
-    var dv = M3.clamp(vTarget - a.speed, -acc * dt, acc * dt);
-    a.speed = M3.clamp(a.speed + dv, p.vStall * 0.42, p.vMax * 1.12);
+
+    /* 推力 / 阻力平衡。
+
+       以前是"以恒定加速度逼近 vTarget"—— 那样任何额外的减速项
+       （重力、转弯）都会被满额加速度吃掉，平衡点永远停在 vTarget。
+       现在剩余推力在接近 vTarget 时才渐弱（最后约三成速度区间），
+       于是爬升和急转会把平衡速度真的压下去，而低速段的加速手感不变。 */
+    var r2 = (a.speed * a.speed) / Math.max(1, vTarget * vTarget);
+    var acc;
+    if (r2 < 1) acc = p.accel * Math.min(1, THRUST_TAPER * (1 - r2));
+    else acc = -p.decel * Math.min(1, (r2 - 1) * 4);
+    if (a.brake && a.speed > vTarget) acc = -p.decel * 1.8;
+
+    // 重力沿航迹的分量：爬升掉速、俯冲增速
+    acc -= G * a.fwd.y;
+
+    /* 转弯掉速（诱导阻力）：实际角速度 × 速度 × 舵效。
+       舵效乘进来，是因为高动压下拉出来的过载最大、阻力也最大；
+       动压掉光以后转不动，也就不怎么掉速了 —— 角点速度由此而来。 */
+    var wTurn = (Math.abs(dPitch * pIn) + Math.abs(dYaw * yIn)) / Math.max(1e-5, dt);
+    acc -= TURN_BLEED * wTurn * a.speed * ctrl;
+
+    a.speed = M3.clamp(a.speed + acc * dt, p.vStall * 0.42, p.vMax * 1.12);
 
     // ---- 位置 ----
+    var vPrev = a.vel || M3.mul(a.fwd, a.speed);
     a.vel = M3.mul(a.fwd, a.speed);
+
+    /* 载荷因数（G 表）：加速度加上 1G 抵消重力，投到机体 up 轴。
+       平飞 1G，推杆为负。做一点平滑，免得逐帧抖动。 */
+    if (dt > 1e-4) {
+      var acv = M3.mul(M3.sub(a.vel, vPrev), 1 / dt);
+      var nRaw = (M3.dot(acv, a.up) + G * a.up.y) / G;
+      if (a.gNow === undefined) a.gNow = 1;
+      a.gNow += (nRaw - a.gNow) * Math.min(1, dt / 0.15);
+    }
     a.pos = M3.add(a.pos, M3.mul(a.vel, dt));
 
     // ---- 天花板 / 地形 ----

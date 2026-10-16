@@ -274,29 +274,54 @@ var HUD = (function () {
     text(ctx, p.pos.y.toFixed(0), x2 + 46, cy + 5, '#eaf4fb', FB, 'left');
     text(ctx, (p.pos.y * 3.28084).toFixed(0) + ' FT', x2 + 46, cy + 21, DIM, FS, 'left');
 
-    /* ---------- 右下：动压 Q（本作核心仪表） ---------- */
-    var qx = W - m, qy = top + hgt + U(58);
+    /* ---------- 右下：动压 Q（本作核心仪表）与过载 G ----------
+       两个框并排坐在挂载俯视图正上方（Q 左、G 右）。以前 Q 框
+       按高度带往下排，会压住 STORES 面板的上沿；再往下叠一个 G 框
+       就整个盖在俯视图上了。所以改为从 hmiLayout 的 storeY 往上排。 */
+    var L = hmiLayout(W, H);
+    var qy = L.storeY - U(64);
+    var gx = W - L.margin - 58;
+    var qx = gx - 122;
     var q = p.q;
     var qCol = q < 12 ? RED : (q < 20 ? AMBER : GREEN);
     ctx.strokeStyle = DIM; ctx.lineWidth = 1;
-    ctx.strokeRect(qx - 62, qy - 26, 124, 48);
-    text(ctx, 'Q 动压', qx - 54, qy - 9, DIM, FS, 'left');
-    text(ctx, q.toFixed(1) + ' kPa', qx + 54, qy + 11, qCol, FB, 'right');
+    ctx.strokeRect(qx - 58, qy - 26, 116, 48);
+    // 动压不足时标题闪成"舵面失效"—— 不另占一行
+    var bl = (q < 12) && (Math.sin(performance.now() * 0.012) > 0);
+    text(ctx, bl ? '▲ 舵面失效' : 'Q 动压', qx - 50, qy - 9, bl ? RED : DIM, FS, 'left');
+    text(ctx, q.toFixed(1) + ' kPa', qx + 50, qy + 11, qCol, FB, 'right');
 
     // Q 条
     var k = M3.clamp(q / 60, 0, 1);
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.fillRect(qx - 54, qy + 16, 108, 5);
+    ctx.fillRect(qx - 50, qy + 16, 100, 5);
     ctx.fillStyle = qCol;
-    ctx.fillRect(qx - 54, qy + 16, 108 * k, 5);
+    ctx.fillRect(qx - 50, qy + 16, 100 * k, 5);
     // 12 kPa 警戒线
     ctx.fillStyle = RED;
-    ctx.fillRect(qx - 54 + 108 * 0.2, qy + 14, 1.5, 9);
+    ctx.fillRect(qx - 50 + 100 * 0.2, qy + 14, 1.5, 9);
 
-    if (q < 12) {
-      var bl = (Math.sin(performance.now() * 0.012) > 0);
-      if (bl) text(ctx, '▲ 舵面失效', qx, qy + 38, RED, FS, 'center');
-    }
+    /* 实时过载 G：由 stepAircraft 按实际加速度算（a.gNow），不是由杆量推出来的 ——
+       所以低动压下拉满杆、表上也只有一两个 G，这正是"舵面失效"的手感。
+       不设上限，只在超过 9G（人能扛的量级）时变色。 */
+    var gy = qy;
+    var gN = (p.gNow === undefined) ? 1 : p.gNow;
+    var gCol = (gN > 9 || gN < -2) ? AMBER : GREEN;
+    ctx.strokeStyle = DIM; ctx.lineWidth = 1;
+    ctx.strokeRect(gx - 58, gy - 26, 116, 48);
+    text(ctx, 'G 过载', gx - 50, gy - 9, DIM, FS, 'left');
+    text(ctx, gN.toFixed(1) + ' G', gx + 50, gy + 11, gCol, FB, 'right');
+
+    // G 条：-3 … +12，从 0G 往两边长；1G 处一道基准线
+    var G_LO = -3, G_HI = 12;
+    var g0 = 100 * (0 - G_LO) / (G_HI - G_LO);
+    var gk = 100 * (M3.clamp(gN, G_LO, G_HI) - G_LO) / (G_HI - G_LO);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(gx - 50, gy + 16, 100, 5);
+    ctx.fillStyle = gCol;
+    ctx.fillRect(gx - 50 + Math.min(g0, gk), gy + 16, Math.abs(gk - g0), 5);
+    ctx.fillStyle = DIM;
+    ctx.fillRect(gx - 50 + 100 * (1 - G_LO) / (G_HI - G_LO), gy + 14, 1.5, 9);
 
     /* ---------- 油门条不在这里 ----------
        它原来贴在屏幕左下角，而那正好是雷达圆心 —— 雷达在 drawTapes
@@ -691,7 +716,9 @@ var HUD = (function () {
      只是这里不自动瞄准，而是把它标出来，玩家自己把机头摆上去 ——
      保留了手动瞄准的手感，去掉了心算提前量的负担。
 
-     超出机炮有效射程就不画：那时该换导弹，画着反而误导。
+     一选中目标就画，不等导弹锁定 —— 锁定时间取决于手上那枚弹，
+     和机炮无关。超出机炮有效射程时画成淡虚线（"往这儿带，但还够不着"），
+     进入射程才变实线。
      ============================================================ */
   function drawLeadReticle(ctx, W, H, cam, p) {
     var t = p.target;
@@ -703,7 +730,7 @@ var HUD = (function () {
 
     var dist = M3.dist(t.pos, p.pos);
     var gunRange = (p.pos.y > 18000 ? gunW.highRange : gunW.range) * 0.95;
-    if (dist > gunRange) return;
+    var inRange = dist <= gunRange;
 
     var tv = t.vel || M3.V(0, 0, 0);
     var tGo = dist / gunW.speed;
@@ -715,14 +742,16 @@ var HUD = (function () {
     // 距离越近圈越小，暗示"该更精确了"
     var r = 8 + M3.clamp(dist / 1800, 0, 1) * 5;
 
-    ctx.strokeStyle = 'rgba(255,228,150,0.70)';
+    ctx.strokeStyle = inRange ? 'rgba(255,228,150,0.70)' : 'rgba(255,228,150,0.50)';
     ctx.lineWidth = 1.4;
+    if (!inRange) ctx.setLineDash([3, 4]);
     ctx.beginPath();
     ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.setLineDash([]);
 
     // 圆心小点：真正的瞄准点
-    ctx.fillStyle = 'rgba(255,244,200,0.92)';
+    ctx.fillStyle = inRange ? 'rgba(255,244,200,0.92)' : 'rgba(255,244,200,0.55)';
     ctx.beginPath();
     ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2);
     ctx.fill();

@@ -181,27 +181,54 @@ if (yIn) { ang =  dYaw   * yIn; a.fwd = rotAxis(a.fwd, a.up, ang); a.right = rot
 ```js
 th = clamp(a.throttle, 0, 1);                       // 加力区在 1 以上，插值前夹回
 vTarget = lerp(vStall * 0.74, a.ab ? vMax : vMil, th);
-vTarget -= a.fwd.y * 52;                            // 爬升掉速 / 俯冲增速
-vTarget = max(vTarget, vStall * 0.52);
 
-if (y > 11000) {                                    // 高空推力衰减
-  k = clamp(1 - (y - 11000) / 15000, 0.20, 1);
+if (y > 11000) {                                    // 高空推力衰减，跟着密度走
+  k = clamp(pow(airDensity(y) / RHO_TROPO, 0.75), 0.20, 1);   // RHO_TROPO = 0.3639
   vTarget = lerp(vStall * 0.55, vTarget, k);
 }
 
 if (a.brake) vTarget = min(vTarget, vStall * 0.92);
-acc = (vTarget > a.speed) ? p.accel : p.decel;
-if (a.brake) acc = p.decel * 1.8;
 
-dv = clamp(vTarget - a.speed, -acc*dt, acc*dt);
-a.speed = clamp(a.speed + dv, vStall * 0.42, vMax * 1.12);
+r2 = speed² / vTarget²;                             // 推力 / 阻力平衡
+acc = r2 < 1 ? p.accel * min(1, THRUST_TAPER * (1 - r2))     // THRUST_TAPER = 1.0
+             : -p.decel * min(1, (r2 - 1) * 4);
+if (a.brake && speed > vTarget) acc = -p.decel * 1.8;
+
+acc -= G * a.fwd.y;                                 // 重力沿航迹分量
+acc -= TURN_BLEED * wTurn * speed * ctrl;           // 转弯掉速，TURN_BLEED = 0.20
+
+a.speed = clamp(a.speed + acc*dt, vStall * 0.42, vMax * 1.12);
 a.vel = a.fwd * a.speed;
 a.pos += a.vel * dt;
 ```
 
-- 高空衰减到海平面的 **20%**——这是自适应循环发动机的物理依据
-  （见 [world/SETTING.md](../world/SETTING.md) 的发动机一节）。
+- **为什么不再是"恒定加速度逼近 vTarget"**：那样任何额外的减速项
+  （重力、转弯）都会被满额加速度吃掉，平衡点永远停在 vTarget。
+  现在剩余推力随 `(v/vTarget)²` 渐弱，平飞极速不变，
+  但爬升和急转能把平衡速度真的压下去。
+- **重力**：以前是 `vTarget -= fwd.y * 52`，垂直爬升只少 52 m/s 目标速度、
+  可以无限爬。现在是真实的 `G·sinγ`，垂直爬升的平衡速度约为平飞的 82%
+  （D-14 加力 566 → 约 463 m/s），推重比低的 G-6 更明显。
+- **转弯掉速**：`wTurn` 是本帧实际的俯仰 + 偏航角速度（rad/s）。
+  乘上 `ctrl`，动压越高、拉出的过载越大、掉得越多；动压掉光后转不动，
+  也就不怎么掉了 —— 持续满杆转弯会自然收敛到角点速度附近。
+  实测：D-14 加力、3 km、满杆 10 s，566 → 约 210 m/s。
+- 高空推力以 11 km 密度归一化，在对流层顶连续；20 km ≈ 0.35，
+  最低保底 0.20 —— 自适应循环发动机的物理依据见
+  [world/SETTING.md](../world/SETTING.md) 的发动机一节。
 - 减速板（`brake`）把目标速度压到 `vStall * 0.92`，减速率乘 1.8。
+
+### 载荷因数（HUD 的 G 表）
+
+`stepAircraft` 末尾按实际加速度算：
+
+```js
+n = (dot((vel - velPrev)/dt, up) + G * up.y) / G;   // 平飞 1G，推杆为负
+a.gNow += (n - a.gNow) * min(1, dt / 0.15);         // 0.15 s 平滑
+```
+
+不设 G 上限 —— 高动压满杆可以读到二三十 G。HUD 上与动压框并排、坐在挂载俯视图正上方（Q 左 G 右），
+条的范围 −3…+12，超过 9G 或低于 −2G 变琥珀色。
 - 最终速度被钳在 `[0.42·vStall, 1.12·vMax]`，所以俯冲不会无限加速、
   失速也不会掉成零。
 - 加力（`a.ab`）与减速板（`a.brake`）由 `game.js` 按油门轴
@@ -284,9 +311,10 @@ if (a.loadFactor) {
 以前它在姿态旋转之后，于是 pitch / roll 惩罚从未生效，
 失速判定也用的是未打折的 `vStall`；机库面板上的数字和手感对不上。
 
-**只有玩家有 `loadFactor`**（`game.js` 按机库配置设定）。
-NPC 虽然从 v1.3 起有实体挂载（`npcFits`），但不设这个字段，
-所以 NPC 的飞行性能不受挂载重量影响。
+**玩家和 NPC 都有 `loadFactor`**：玩家由 `game.js` 按机库配置设定；
+NPC 由 `entities.js` 的 `buildNpcMounts()` 按 `mountPlan()` 推出的实体挂载算，
+质量公式和 `loadoutMass()` 一致（`挂点数 × (perPoint||1) × (mass||100)`，
+吊舱也算重量），除以 `ac.maxLoad || 5000`。
 
 ---
 
@@ -554,9 +582,11 @@ if (!(Math.random() < chance)) continue;
 | 推杆权限（0.5） | `stepAircraft()` 的 `PITCH_DOWN_K` |
 | 高 G 倍率上限（2.3） | `stepAircraft()` 的 `gl` 钳制 |
 | 导弹过载衰减下限（0.34 / 0.78） | `turnFactor()`、`highAltImmune` 分支 |
-| 转弯掉速（62 / 170 下限） | `stepMissile()` 的能量消耗段 |
-| 高空推力衰减曲线 | `stepAircraft()` 里 `y > 11000` 那段 |
-| 爬升掉速系数（52） | 同上，`vTarget -= fwd.y * 52` |
+| 导弹转弯掉速（62 / 170 下限） | `stepMissile()` 的能量消耗段 |
+| 飞机转弯掉速（0.20） | `entities.js` 顶部 `TURN_BLEED` |
+| 推力渐弱区间（1.0） | `entities.js` 顶部 `THRUST_TAPER` |
+| 高空推力衰减曲线（ρ 比的 0.75 次幂） | `stepAircraft()` 里 `y > 11000` 那段 |
+| 实时过载（G 表） | `stepAircraft()` 末尾的 `a.gNow`；HUD 在 `hud.js` 动压框右侧 |
 | 速度钳位（0.42·vStall – 1.12·vMax） | `stepAircraft()` 的最后一行 |
 | 硬天花板（23 000 m） | `stepAircraft()` 的 `pos.y > 23000` |
 | 机型性能 | `data.js` 的 `phys` 字段 |
