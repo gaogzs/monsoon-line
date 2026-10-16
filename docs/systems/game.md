@@ -274,7 +274,7 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
   ```
 
   加力（`> 1.0`）与减速板（`< 0.04`）都是**按住才有效的瞬时态**：松手后自动回落到军推区间的边界，回落速率 `dt * 1.6` 比推进的 `0.62` 快、又不是瞬间弹回。这正是 [hud.md](hud.md#引擎出力带thrtape) 警告“别拿它们当稳定读数去测”的原因。`player.ab = throttle > 1.0`、`player.brake = throttle < 0.04`。
-- 高 G 机动（`G`）：只有 `demand = |pitch| + |roll| > 0.55` 且 `speed > vStall * 1.30` 才生效 —— 否则它就成了一个无脑常开的加速器。生效时 `gLoad` 用 `M3.smooth(..., HIG_MAX, 9, dt)` 拉起、速度按 `HIG_BLEED * dt` 掉；松手用 `M3.smooth(..., 1, 6, dt)` 落回。
+- 高 G 机动（`G`）：只有 `demand = |pitch| + |roll| > 0.55` 且 `speed > vStall * 1.30` 才生效 —— 否则它就成了一个无脑常开的加速器。生效时 `gLoad` 用 `M3.smooth(..., HIG_MAX, 9, dt)` 拉起；速度代价由 `stepAircraft` 的转弯掉速自然产生（角速度放大约 1.9 倍，掉速随之放大）；松手用 `M3.smooth(..., 1, 6, dt)` 落回。
 - 机炮：`wantGun = mouse.left || keys.Space` → `Ent.fireGun`，`SFX.gun(wantGun && player.gunAmmo > 0)`（有按键没弹时不出声）。
 
 ---
@@ -465,7 +465,7 @@ var queue = [], timer = 0, box = null, live = [];
 | `dt` 上限 / 异常兜底 | `loop()` 里的 `0.05` / `0.016` |
 | 油门量程上限 | `THR_MAX = 1.25` |
 | 油门推进 / 回落 / 加力与减速板阈值 | `controlPlayer()` 里的 `0.62` / `dt * 1.6` / `1.0` / `0.04` |
-| 高 G 倍率与掉速 | `HIG_MAX = 1.90` / `HIG_BLEED = 82` |
+| 高 G 倍率 | `HIG_MAX = 1.90`（掉速见 `entities.js` 的 `TURN_BLEED`） |
 | 高 G 触发门槛 | `controlPlayer()` 里的 `demand > 0.55`、`vStall * 1.30` |
 | 相机俯仰限位 | `updateCamera()` 里的 `CAM_PITCH_LIM = 89°` |
 | 追尾镜头的偏航/俯仰平滑与位置跟随 | `1.2` / `9` / `7.5`（`exp` 时间常数） |

@@ -93,9 +93,11 @@ var Game = (function () {
      不再需要单独的加力/减速板按键。 */
   var THR_MAX = 1.25;
 
-  /* 高 G 机动：转向率放大倍率，以及每秒付出的速度代价（m/s²） */
+  /* 高 G 机动：转向率放大倍率。
+     速度代价不再单独扣 —— stepAircraft 的转弯掉速按实际角速度算，
+     高 G 放大了角速度，掉速自然约是普通拉杆的两倍。以前这里另扣
+     82 m/s²，和物理掉速叠在一起，三秒就能把 G-6 拉到失速以下。 */
   var HIG_MAX = 1.90;
-  var HIG_BLEED = 82;
   var camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0), camPos = M3.V(0, 0, 0);
   var camYaw = 0, camPitch = 0;
   /* 追尾镜头的基准朝向。它不直接等于机头方向 —— 见 updateCamera 里的说明：
@@ -1915,15 +1917,14 @@ var Game = (function () {
     /* ---- 高 G 机动 ----
        只有在"确实在使劲转"的时候才允许触发 —— 鼠标只偏一点点时
        按住 G 不会有任何效果，否则它会变成一个无脑常开的加速器。
-       代价是动能：拉高 G 掉速极快，用完之后就没法再机动了。 */
+       代价是动能：角速度放大后转弯掉速也跟着放大（见 stepAircraft），
+       速度掉到 1.3 倍失速以下就自动退出。 */
     var demand = Math.abs(c.pitch) + Math.abs(c.roll);
     var canG = player.speed > player.phys.vStall * 1.30;
     var wantG = !!keys.KeyG && demand > 0.55 && canG;
 
     if (wantG) {
       player.gLoad = M3.smooth(player.gLoad || 1, HIG_MAX, 9, dt);
-      player.speed = Math.max(player.phys.vStall * 0.92,
-        player.speed - HIG_BLEED * dt);
     } else {
       player.gLoad = M3.smooth(player.gLoad || 1, 1, 6, dt);
     }
