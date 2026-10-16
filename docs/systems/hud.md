@@ -493,28 +493,28 @@ ctx.strokeText(t, x, y);
 
 | 输入 | 作用 | 代码位置 |
 |---|---|---|
-| 鼠标移动 | 引导机头指向（默认） | `updateMouseAim()` |
+| 鼠标移动 | 转动世界瞄准方向（默认，指针锁定） | `mousemove` → `aimYaw / aimPitch` |
+| 点击画布 | 锁定指针 | `requestAimLock()` |
 | `M` | 切换鼠标引导 / 键盘直控 | `toggleAimMode()` |
-| `W`/`S` | 抬头 / 低头 | `controlPlayer()` |
-| `A`/`D` | 左滚 / 右滚 | 同上 |
-| `Q`/`E` | 方向舵 | 同上 |
+| `W`/`S` | 抬头 / 低头（鼠标引导时按住临时覆盖飞控） | `controlPlayer()` |
+| `A`/`D` | 左滚 / 右滚（同上） | 同上 |
+| `Q`/`E` | 方向舵（同上） | 同上 |
 | `Shift`/`Ctrl` | 油门杆（推满自动进加力，收到底自动张减速板） | 同上 |
-| `X`/`Z` | 直接推到底 / 收到底 | 同上 |
+| 滚轮 | 微调油门 | `wheel` 监听 |
 | `↑↓←→` | 自由视角（回中） | `updateCamera()` |
 | 左键 / `Space` | 机炮 | `controlPlayer()` |
 | 右键 / `Enter` | 特殊武器 | `fireSpecial()` |
 | `F`/`Tab` | 切目标 | `cycleTarget()` |
 | `R` | 切挂载 | `cycleSpecial()` |
-| `V` | 干扰弹 | `Ent.breakLock()` |
-| `C` | 切视角 | `camMode` |
+| `V` | 干扰弹（按住连投） | `Ent.breakLock()` |
+| `G` | 高 G 机动（按住） | `controlPlayer()` |
 | `1`/`2`/`3` | 僚机指令 | `setWingCmd()` |
 | `N` | EMCON-Δ 电磁静默 | `toggleEmcon()` |
-| `H` / `Esc` | 暂停 | `togglePause()` |
+| `H` / `Esc` | 暂停（菜单里 Esc 返回标题） | `togglePause()` |
 
-**鼠标引导**：`updateMouseAim()` 把屏幕点转成世界方向，
-再交给 `AI.steerTo()`（和 AI 同一个控制律，见 [ai.md](ai.md)）。
-
-鼠标位置是**绝对屏幕坐标**，不锁指针 —— 推到边缘就是最大持续转弯率。
+**鼠标引导**：战雷式 —— 鼠标位移转动世界坐标里的瞄准方向，追尾镜头跟它走，
+`updateMouseAim(dt)` 把它交给 `AI.steerTo()`（和 AI 同一个控制律，见 [ai.md](ai.md)）。
+详见 [game.md](game.md)。
 
 ---
 
