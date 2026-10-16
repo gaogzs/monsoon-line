@@ -74,7 +74,7 @@ var AIRCRAFT = [
     caps: ['strike', 'ew'],
     maker: '上游公约 · 北岸航空',
     stats: { spd: 0.68, mob: 0.72, stl: 0.55, fire: 0.70, dur: 0.62, rng: 0.76 },
-    phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.76, roll: 3.0, yaw: 0.30, hp: 130 },
+    phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.76, roll: 2.34, yaw: 0.30, hp: 130 },
     gun: 'k3',
     variableSweep: true,
     maxLoad: 6500,          // 最大挂载重量 kg，超过只会拖慢自己
@@ -119,7 +119,7 @@ var AIRCRAFT = [
     caps: ['intercept'],
     maker: '上游公约 · 高空试验局',
     stats: { spd: 0.96, mob: 0.84, stl: 0.86, fire: 0.54, dur: 0.32, rng: 0.48 },
-    phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.80, roll: 3.4, yaw: 0.28, hp: 92 },
+    phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.80, roll: 2.65, yaw: 0.28, hp: 92 },
     gun: 'k3',
     maxLoad: 4800,
 
@@ -162,7 +162,7 @@ var AIRCRAFT = [
     caps: ['strike'],
     maker: '上游公约 · 北岸航空',
     stats: { spd: 0.34, mob: 0.44, stl: 0.30, fire: 0.98, dur: 0.98, rng: 0.60 },
-    phys: { vMax: 380, vMil: 320, vStall: 88, accel: 18, decel: 44, pitch: 0.62, roll: 2.2, yaw: 0.34, hp: 250 },
+    phys: { vMax: 380, vMil: 320, vStall: 88, accel: 18, decel: 44, pitch: 0.62, roll: 1.72, yaw: 0.34, hp: 250 },
     gun: 'k7',
     maxLoad: 7200,
 
@@ -217,7 +217,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
 逼它转弯、逼它爬升、逼它放弃速度 ——
 一旦空速掉下去，它就从"全场最快的截击机"变成"一架普通的飞机"。</p>`,
     stats: { spd: 0.95, mob: 0.40, stl: 0.30, fire: 0.74, dur: 0.58, rng: 0.62 },
-    phys: { vMax: 620, vMil: 500, vStall: 138, accel: 34, decel: 32, pitch: 0.48, roll: 2.2, yaw: 0.24, hp: 110 },
+    phys: { vMax: 620, vMil: 500, vStall: 138, accel: 34, decel: 32, pitch: 0.48, roll: 1.72, yaw: 0.24, hp: 110 },
     gun: 'k3',
     maxLoad: 5200,
     hardpointGroups: [
@@ -248,7 +248,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       一旦外挂，它的隐身性能会掉到和普通战机差不多的水平 ——
       <b>隐身不是一种属性，是一种状态。</b></p>`,
     stats: { spd: 0.72, mob: 0.66, stl: 0.96, fire: 0.56, dur: 0.50, rng: 0.70 },
-    phys: { vMax: 540, vMil: 430, vStall: 118, accel: 26, decel: 36, pitch: 0.66, roll: 3.1, yaw: 0.26, hp: 96 },
+    phys: { vMax: 540, vMil: 430, vStall: 118, accel: 26, decel: 36, pitch: 0.66, roll: 2.42, yaw: 0.26, hp: 96 },
     gun: 'k3',
     maxLoad: 4200,
     hardpointGroups: [
@@ -281,7 +281,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       它飞不快，加速也一般，但<b>转得比这里任何一架都快</b> ——
       在低速缠斗里，这个优势几乎没法用别的东西补回来。</p>`,
     stats: { spd: 0.52, mob: 0.90, stl: 0.24, fire: 0.60, dur: 0.62, rng: 0.80 },
-    phys: { vMax: 470, vMil: 380, vStall: 96, accel: 24, decel: 42, pitch: 0.74, roll: 3.6, yaw: 0.36, hp: 118 },
+    phys: { vMax: 470, vMil: 380, vStall: 96, accel: 24, decel: 42, pitch: 0.74, roll: 2.81, yaw: 0.36, hp: 118 },
     gun: 'k3',
     maxLoad: 5000,
     hardpointGroups: [
@@ -322,7 +322,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       等于用一个人的编制换三个发射架。</b>
       代价是它没有判断力 —— 长机被打掉，它就会原地盘旋到燃料耗尽。</p>`,
     stats: { spd: 0.50, mob: 0.76, stl: 0.32, fire: 0.42, dur: 0.28, rng: 0.38 },
-    phys: { vMax: 460, vMil: 380, vStall: 96, accel: 26, decel: 44, pitch: 0.78, roll: 3.4, yaw: 0.40, hp: 58 },
+    phys: { vMax: 460, vMil: 380, vStall: 96, accel: 26, decel: 44, pitch: 0.78, roll: 2.65, yaw: 0.40, hp: 58 },
     gun: 'k3',
     maxLoad: 1200,
     hardpointGroups: [
@@ -357,7 +357,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       火控和电子设备还要更旧一代，但产量是上游的三倍 ——
       他们用数量补质量，而且从来不缺愿意坐进去的人。`,
     stats: { spd: 0.62, mob: 0.58, stl: 0.18, fire: 0.68, dur: 0.55, rng: 0.52 },
-    phys: { vMax: 505, vMil: 398, vStall: 118, accel: 25, decel: 38, pitch: 0.58, roll: 2.7, yaw: 0.30, hp: 120 },
+    phys: { vMax: 505, vMil: 398, vStall: 118, accel: 25, decel: 38, pitch: 0.58, roll: 2.11, yaw: 0.30, hp: 120 },
     gun: 'k11',
     maxLoad: 4000,
     // 挂点只用于资料库展示；下游弹的 fits 为空，所以 defaultLoadout 留空
@@ -393,7 +393,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>开它的多半是那批老兵。在这个高度上，
       他们的手感比上游任何一个人都好。</p>`,
     stats: { spd: 0.80, mob: 0.32, stl: 0.16, fire: 0.78, dur: 0.68, rng: 0.58 },
-    phys: { vMax: 585, vMil: 470, vStall: 142, accel: 30, decel: 30, pitch: 0.44, roll: 2.0, yaw: 0.22, hp: 150 },
+    phys: { vMax: 585, vMil: 470, vStall: 142, accel: 30, decel: 30, pitch: 0.44, roll: 1.56, yaw: 0.22, hp: 150 },
     gun: 'k11',
     maxLoad: 6200,
     hardpointGroups: [
@@ -426,7 +426,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>下游同盟前后造了四千多架。它在战场上的作用不是"打赢"，
       而是让对手的弹药先消耗完。</p>`,
     stats: { spd: 0.36, mob: 0.50, stl: 0.12, fire: 0.62, dur: 0.60, rng: 0.44 },
-    phys: { vMax: 395, vMil: 330, vStall: 92, accel: 20, decel: 42, pitch: 0.60, roll: 2.5, yaw: 0.32, hp: 130 },
+    phys: { vMax: 395, vMil: 330, vStall: 92, accel: 20, decel: 42, pitch: 0.60, roll: 1.95, yaw: 0.32, hp: 130 },
     gun: 'k11',
     maxLoad: 3400,
     hardpointGroups: [
@@ -469,7 +469,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     stats: { spd: 0.16, mob: 0.05, stl: 0.06, fire: 0.18, dur: 0.95, rng: 0.74 },
     phys: {
       vMax: 320, vMil: 272, vStall: 132,
-      accel: 8, decel: 16, pitch: 0.15, roll: 0.85, yaw: 0.10, hp: 420
+      accel: 8, decel: 16, pitch: 0.15, roll: 0.66, yaw: 0.10, hp: 420
     },
     /* 无武装。理由与做法见上面那段注释 —— 这不是漏写。 */
     gun: null,
@@ -503,7 +503,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>它飞不快，也打不远。但在这片空域里，它是唯一一面
       不属于任何一方的旗。</p>`,
     stats: { spd: 0.44, mob: 0.62, stl: 0.14, fire: 0.40, dur: 0.44, rng: 0.48 },
-    phys: { vMax: 430, vMil: 350, vStall: 102, accel: 21, decel: 40, pitch: 0.62, roll: 2.9, yaw: 0.32, hp: 100 },
+    phys: { vMax: 430, vMil: 350, vStall: 102, accel: 21, decel: 40, pitch: 0.62, roll: 2.26, yaw: 0.32, hp: 100 },
     gun: 'k1',
     maxLoad: 2600,
     hardpointGroups: [
@@ -537,7 +537,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       政变之后，它和「屿」级巡逻艇是这片海域里少数几样
       还会回应求救信号的东西。</p>`,
     stats: { spd: 0.28, mob: 0.30, stl: 0.10, fire: 0.26, dur: 0.52, rng: 0.92 },
-    phys: { vMax: 340, vMil: 290, vStall: 82, accel: 14, decel: 36, pitch: 0.38, roll: 2.1, yaw: 0.30, hp: 110 },
+    phys: { vMax: 340, vMil: 290, vStall: 82, accel: 14, decel: 36, pitch: 0.38, roll: 1.64, yaw: 0.30, hp: 110 },
     gun: 'k1',
     maxLoad: 1400,
     hardpointGroups: [
@@ -569,7 +569,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       名义上没有武器。不过在那个高度还没有人护航的，
       通常也用不上武器。`,
     stats: { spd: 0.30, mob: 0.22, stl: 0.20, fire: 0.10, dur: 0.72, rng: 0.86 },
-    phys: { vMax: 310, vMil: 260, vStall: 78, accel: 11, decel: 34, pitch: 0.34, roll: 2.0, yaw: 0.26, hp: 180 },
+    phys: { vMax: 310, vMil: 260, vStall: 78, accel: 11, decel: 34, pitch: 0.34, roll: 1.56, yaw: 0.26, hp: 180 },
     gun: 'k2',
     maxLoad: 900,
     hardpointGroups: [
@@ -608,7 +608,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       "点灯的人" —— 因为它一开机，就等于把整片空域照亮，
       也包括它自己。</p>`,
     stats: { spd: 0.26, mob: 0.18, stl: 0.10, fire: 0.05, dur: 0.84, rng: 0.94 },
-    phys: { vMax: 320, vMil: 268, vStall: 80, accel: 11, decel: 33, pitch: 0.32, roll: 1.9, yaw: 0.25, hp: 200 },
+    phys: { vMax: 320, vMil: 268, vStall: 80, accel: 11, decel: 33, pitch: 0.32, roll: 1.48, yaw: 0.25, hp: 200 },
     /* 无武装。上面那段描述写了好几个版本，数值这里一直挂着 k3 ——
        所谓"没有任何武器"在数据里其实是有武器。现在对齐。 */
     gun: null,
@@ -638,7 +638,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>机身锈得厉害，设备却是新的：这东西他们买得到，
       飞行员不好补。</p>`,
     stats: { spd: 0.22, mob: 0.14, stl: 0.08, fire: 0.04, dur: 0.80, rng: 0.90 },
-    phys: { vMax: 302, vMil: 250, vStall: 78, accel: 10, decel: 32, pitch: 0.30, roll: 1.8, yaw: 0.24, hp: 190 },
+    phys: { vMax: 302, vMil: 250, vStall: 78, accel: 10, decel: 32, pitch: 0.30, roll: 1.4, yaw: 0.24, hp: 190 },
     /* 无武装，同 J-2 —— 预警机是眼睛，不是枪手。 */
     gun: null,
     maxLoad: 0,
@@ -668,7 +668,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       第一句的人。<b>代价是它开机的时候藏不住</b>：
       那片噪声就是它的位置。</p>`,
     stats: { spd: 0.34, mob: 0.12, stl: 0.06, fire: 0.05, dur: 0.88, rng: 0.72 },
-    phys: { vMax: 390, vMil: 330, vStall: 122, accel: 14, decel: 30, pitch: 0.40, roll: 1.5, yaw: 0.22, hp: 260 },
+    phys: { vMax: 390, vMil: 330, vStall: 122, accel: 14, decel: 30, pitch: 0.40, roll: 1.17, yaw: 0.22, hp: 260 },
     // 下游只有一条机炮生产线（设定 8.4）—— 原来误写成上游的 CEL-3
     gun: 'k11',
     maxLoad: 0,

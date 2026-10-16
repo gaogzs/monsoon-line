@@ -664,8 +664,13 @@ var Ent = (function () {
       a.fwd = M3.rotAxis(a.fwd, a.right, ang);
       a.up = M3.rotAxis(a.up, a.right, ang);
     }
-    if (rIn) {                                   // 右滚为正 → 绕 fwd 转负角
-      var ang2 = -dRoll * rIn;
+    /* 滚转带一点惯性：滚转角速度向目标值指数逼近（时间常数 0.14 s），
+       推杆后要一瞬才滚到满速，松杆后也要一瞬才停住。
+       以前输入多少当帧就转多少，手感发飘。 */
+    var rTarget = rIn * dRoll / Math.max(dt, 1e-6);
+    a.rollRate = (a.rollRate || 0) + (rTarget - (a.rollRate || 0)) * Math.min(1, dt / 0.14);
+    if (Math.abs(a.rollRate) > 1e-4) {          // 右滚为正 → 绕 fwd 转负角
+      var ang2 = -a.rollRate * dt;
       a.right = M3.rotAxis(a.right, a.fwd, ang2);
       a.up = M3.rotAxis(a.up, a.fwd, ang2);
     }
