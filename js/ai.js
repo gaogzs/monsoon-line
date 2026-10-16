@@ -818,14 +818,17 @@ var AI = (function () {
 
     // --- 机炮 ---
     /* 没有机炮的机型是合法的（预警机、勤务机、重型轰炸机在数据里是
-       `gun: null`）。这一段的其余部分都假设有炮，所以在这里直接收口 ——
+       `gun: null`）。没有炮只跳过机炮这一段，**不能 return** ——
        以前这里直接读 `WEAPONS[a.gun].range`，一架没有炮的飞机只要
-       走到开火段就会抛异常。 */
+       走到开火段就会抛异常；后来改成 return，又把下面的导弹段一起截掉了：
+       M5 的巡航弹载机、M8 的轰炸机挂着弹却一发都没打出去过。 */
     var gunW = WEAPONS[a.gun];
-    if (!gunW) { a.firingGun = false; return; }
-    var gunRange = (a.pos.y > 18000 ? gunW.highRange : gunW.range);
-    var gunCone = 0.028 + (1 - s.skill) * 0.02;
-    a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
+    a.firingGun = false;
+    if (gunW) {
+      var gunRange = (a.pos.y > 18000 ? gunW.highRange : gunW.range);
+      var gunCone = 0.028 + (1 - s.skill) * 0.02;
+      a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
+    }
     if (a.firingGun) {
       Ent.fireGun(a, world);
       /* 别人开火的声音。

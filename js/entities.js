@@ -28,7 +28,7 @@ var Ent = (function () {
       return 1.225 * Math.pow(T / 288.15, 4.2561);
     }
     if (y < 20000) {
-      return 0.3639 * Math.exp(-(y - 11000) / 62188.6);
+      return 0.3639 * Math.exp(-(y - 11000) / 6341.6);
     }
     if (y < 32000) {
       var T3 = 216.65 + 0.001 * (y - 20000);
@@ -477,6 +477,31 @@ var Ent = (function () {
     if (!a.alive) return;
     var p = a.phys;
 
+    // 挂载越重越笨拙：加速、转向、滚转都吃一点亏。
+    // loadFactor 由玩家按机库配置设定；NPC 的实体挂载不设它，所以是 undefined。
+    /* 必须放在函数开头：下面的失速判定、姿态旋转、目标速度全都读 p。
+       以前这一段在姿态旋转之后，于是 pitch / roll 惩罚从未生效，
+       失速判定也用的是未打折的 vStall。 */
+    if (a.loadFactor) {
+      // 系数来自 loadoutPenalty() —— 和机库面板显示的是同一份，
+      // 免得界面上的数字与实际手感对不上
+      /* 注意：这里是**整体替换** p，所以每个用到的字段都得列上。
+         之前漏了 accel / decel，还写了个根本不存在的 acc ——
+         于是下面 `p.accel` 取到 undefined，加减速彻底失去节流，
+         推油门的速度变化变成瞬时的。yaw 不受挂载影响，原样带过。 */
+      var lp = loadoutPenalty(a.loadFactor);
+      p = {
+        vMax: p.vMax * lp.vMax,
+        vMil: p.vMil * lp.vMil,
+        vStall: p.vStall * lp.vStall,
+        accel: p.accel * lp.accel,
+        decel: p.decel * lp.decel,
+        pitch: p.pitch * lp.pitch,
+        roll: p.roll * lp.roll,
+        yaw: p.yaw
+      };
+    }
+
     // ---- 动压 ----
     var q = qOf(a.pos.y, a.speed);
     a.q = q / 1000;                        // kPa，供 HUD 显示
@@ -555,27 +580,6 @@ var Ent = (function () {
     // 可变后掠翼：低速展开（改善低速盘旋），高速后掠（减小波阻）
     if (a.ac && a.ac.variableSweep) {
       a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
-    }
-
-    // 挂载越重越笨拙：加速、转向、滚转都吃一点亏。
-    // loadFactor 只由玩家按机库配置设定，AI 不带挂载所以是 undefined。
-    if (a.loadFactor) {
-      // 系数来自 loadoutPenalty() —— 和机库面板显示的是同一份，
-      // 免得界面上的数字与实际手感对不上
-      /* 注意：这里是**整体替换** p，所以每个用到的字段都得列上。
-         之前漏了 accel / decel，还写了个根本不存在的 acc ——
-         于是下面 `p.accel` 取到 undefined，加减速彻底失去节流，
-         推油门的速度变化变成瞬时的。 */
-      var lp = loadoutPenalty(a.loadFactor);
-      p = {
-        vMax: p.vMax * lp.vMax,
-        vMil: p.vMil * lp.vMil,
-        vStall: p.vStall * lp.vStall,
-        accel: p.accel * lp.accel,
-        decel: p.decel * lp.decel,
-        pitch: p.pitch * lp.pitch,
-        roll: p.roll * lp.roll
-      };
     }
 
     if (a.brake) vTarget = Math.min(vTarget, p.vStall * 0.92);
@@ -941,6 +945,9 @@ var Ent = (function () {
         var tf = turnFactor(m.pos.y);
         if (w.highAltImmune) tf = Math.max(tf, 0.78);
         var maxTurn = m.turn * tf * dt;
+        /* 偏差要在转之前量：转完之后再量，得到的是"还剩多少没转"，
+           快对准时趋近零，转弯就几乎不花速度了。 */
+        var want = M3.angleBetween(m.fwd, desired);
         var B = M3.turnToward(m.fwd, m.up, desired, maxTurn);
         m.fwd = B.fwd; m.up = B.up;
         m.right = M3.cross(m.up, m.fwd);
@@ -951,7 +958,6 @@ var Ent = (function () {
            没有这一条，导弹的动力段之外照样能满过载无限机动，
            玩家的桶滚和 3/9 线规避全都没有意义 —— 因为对手不累。
            现在它必须为每一次急转付出速度。 */
-        var want = M3.angleBetween(m.fwd, desired);
         var used = Math.min(want, maxTurn) / Math.max(1e-5, dt);   // 实际转弯率 rad/s
         var load = M3.clamp(used / 3.0, 0, 1);
         m.speed = Math.max(170, m.speed - load * 62 * dt);
