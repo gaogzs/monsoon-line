@@ -146,7 +146,7 @@ var Game = (function () {
     /* 资料库的详情页有一个常驻的 requestAnimationFrame 在转模型，
        离开这一屏必须停掉 —— 否则它在后台一直烧 CPU（而且画在
        一个已经隐藏的 canvas 上）。 */
-    if (id !== 'codex' && typeof UnitView !== 'undefined') UnitView.stop();
+    if (id !== 'codex' && id !== 'hangar' && typeof UnitView !== 'undefined') UnitView.stop();
 
     var all = document.querySelectorAll('.screen');
     for (var i = 0; i < all.length; i++) all[i].classList.remove('active');
@@ -524,6 +524,11 @@ var Game = (function () {
     sum += '<div class="ld-note">编号前缀取自逻辑语词根 —— ' +
       '环带工程自 2062 年起以逻辑语为签字语言，详见资料库。</div>';
     document.getElementById('acLoadout').innerHTML = sum;
+
+    /* ---- 3D 预览：机体 + 当前挂载，改了挂载立刻换模型（转角保留） ---- */
+    if (typeof UnitView !== 'undefined') {
+      UnitView.mountModel(document.getElementById('hangar3d'), UnitView.composeLoadout(ac, lo), true);
+    }
 
     /* ---- 俯视识别图 ---- */
     PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup);
@@ -2817,10 +2822,10 @@ var Game = (function () {
      离线预览器 tools/render-mounts.js 用的是同一份。
      ============================================================ */
   function pushOneStore(a, g, pt, w) {
-    // 外观由 WEAPONS[id].look 决定（尺寸是真实米数，不再统一缩放）；吊舱沿用原模型
-    var lk = !!w.look;
+    var sc = MODELS.storeScale(w);
     var mdl = MODELS.store(w);
-    Renderer.pushModel(mdl, Ent.storePos(a, g, pt), a.fwd, a.up, { scale: lk ? 1 : 0.85, store: true });
+    var p = M3.add(Ent.storePos(a, g, pt), M3.mul(a.up, -MODELS.storeDrop(mdl, sc)));
+    Renderer.pushModel(mdl, p, a.fwd, a.up, { scale: sc, store: true });
   }
 
   function pushStores(a) {

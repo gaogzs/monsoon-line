@@ -335,9 +335,73 @@ var Ent = (function () {
      优先于默认值。 */
   var STORE_HY = { tip: -0.35, heavy: -1.35, light: -1.15, belly: -1.95 };
 
-  function storePos(a, g, pt) {
-    var hy = (typeof g.hy === 'number') ? g.hy : STORE_HY[g.kind];
+  /* 竖直射线穿模型：(x, z) 处最低的那层表面的 y；打不到给 null。
+     与 tools/smoke.js 的 surfaceUnderModel 同一个算法（三角扇 + 重心坐标）。 */
+  function surfaceBelow(m, px, pz) {
+    var best = null;
+    for (var fi = 0; fi < m.f.length; fi++) {
+      var idx = m.f[fi].i;
+      if (idx.length < 3) continue;
+      for (var t = 1; t < idx.length - 1; t++) {
+        var A = m.v[idx[0]], B = m.v[idx[t]], C = m.v[idx[t + 1]];
+        var d = (B[2] - C[2]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[2] - C[2]);
+        if (Math.abs(d) < 1e-9) continue;
+        var w1 = ((B[2] - C[2]) * (px - C[0]) + (C[0] - B[0]) * (pz - C[2])) / d;
+        var w2 = ((C[2] - A[2]) * (px - C[0]) + (A[0] - C[0]) * (pz - C[2])) / d;
+        var w3 = 1 - w1 - w2;
+        if (w1 < -0.02 || w2 < -0.02 || w3 < -0.02) continue;
+        var y = w1 * A[1] + w2 * B[1] + w3 * C[1];
+        if (best === null || y < best) best = y;
+      }
+    }
+    return best;
+  }
+
+  /* 挂点高度 = 那一层机体下表面。挂载怎么往下挂、留多少间隙
+     由 MODELS.storeDrop() 按挂载模型的实际最高点决定。
+
+     以前按挂点类型取固定高度（STORE_HY），机身扁、机翼高的机型上
+     挂载就悬在半空。现在直接从模型里量：在挂点和前后各 0.8 m 处
+     各打一条竖直射线，取最低的那层表面 —— 长弹的前后段也不会
+     穿进进气道或发动机舱。打不到机体（翼尖外侧）才退回 g.hy / STORE_HY。
+     挂载模型自己负责往下挂（MODELS.store 已经按弹径下移）。 */
+  var HY_CACHE = {};
+  function storeHy(a, g, pt) {
+    var mk = a.model || (a.ac && a.ac.model);
+    var key = mk + ':' + g.id + ':' + pt.x + ':' + pt.y;
+    if (Object.prototype.hasOwnProperty.call(HY_CACHE, key)) return HY_CACHE[key];
+    var m = (typeof MODELS !== 'undefined') ? MODELS[mk] : null;
+    var hy = null;
+    if (m) {
+      /* 分级找：① 挂点前后 0.8 m；② 打不到就沿弹体扩大到前 1.5 / 后 2.5 m
+         （识别图上的挂点常落在机翼前缘之前，弹体其实往后伸进翼下）；
+         ③ 还打不到就往机身方向内移，最多 2 m（翼尖挂点）。 */
+      var lowest = function (x, zs) {
+        var r = null;
+        for (var i = 0; i < zs.length; i++) {
+          var sy = surfaceBelow(m, x, zs[i]);
+          if (sy !== null && (r === null || sy < r)) r = sy;
+        }
+        return r;
+      };
+      var near = [pt.y, pt.y + 0.8, pt.y - 0.8];
+      var wide = [pt.y + 1.5, pt.y - 1.2, pt.y - 1.8, pt.y - 2.5];
+      hy = lowest(pt.x, near);
+      if (hy === null) hy = lowest(pt.x, wide);
+      var sgn = pt.x >= 0 ? 1 : -1;
+      for (var dx = 0.4; hy === null && dx <= 2.0 + 1e-9; dx += 0.4) {
+        var x2 = pt.x - sgn * dx;
+        if (x2 * sgn < 0) break;
+        hy = lowest(x2, near.concat(wide));
+      }
+    }
+    if (hy === null) hy = (typeof g.hy === 'number') ? g.hy : STORE_HY[g.kind];
     if (hy === undefined) hy = -1.2;
+    return (HY_CACHE[key] = hy);
+  }
+
+  function storePos(a, g, pt) {
+    var hy = storeHy(a, g, pt);
     // 机体坐标 → 世界：x 取右、y 取上、z 取机头方向
     var local = M3.V(pt.x, hy, pt.y);
     return M3.add(a.pos, M3.add(M3.mul(a.right, local.x),
@@ -1865,7 +1929,7 @@ var Ent = (function () {
     /* 挂点适配与 NPC 的挂载分配 —— game.js 的 pushStores 渲染实体挂载时
        要用同一份规则，不能再抄一遍。 */
     hostile: hostile,
-    fitsKind: fitsKind, mountPlan: mountPlan, storePos: storePos, STORE_HY: STORE_HY,
+    fitsKind: fitsKind, mountPlan: mountPlan, storePos: storePos, storeHy: storeHy, surfaceBelow: surfaceBelow, STORE_HY: STORE_HY,
     forEachStoreSlot: forEachStoreSlot, storeForSlot: storeForSlot,
     /* 选弹与"当前触发武器" —— game.js 的 syncWeapon（玩家换弹）与 ai.js
        的开火选弹都走 setWeapon，判据同源。 */

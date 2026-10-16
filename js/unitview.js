@@ -93,9 +93,8 @@ var UnitView = (function () {
      渲染一帧
 
      yaw / pitch 决定相机在球面上的位置，相机始终看向模型中心。
-     分两趟：第一趟把顶点投到相机空间并量出屏幕范围（自动适配缩放），
-     第二趟才算面、排序、填充。两趟共用同一批相机空间坐标，
-     所以只算一次变换。
+     分两趟：第一趟把顶点投到相机空间，第二趟算面、排序、填充。
+     缩放由包围球决定（见下），不随转角变化。
      ============================================================ */
   function renderModel(cvs, model, yaw, pitch) {
     if (!cvs || !model) return;
@@ -121,9 +120,9 @@ var UnitView = (function () {
     var verts = model.v, nv = verts.length;
     if (nv > BUFCAP) return;
 
-    /* ---- 第一趟：顶点 → 相机空间，并量出屏幕范围 ---- */
+    /* ---- 第一趟：顶点 → 相机空间 ---- */
     var i, k, v, px, py, pz;
-    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, any = false;
+    var any = false;
     for (i = 0; i < nv; i++) {
       v = verts[i];
       px = v[0] - cam.pos.x; py = v[1] - cam.pos.y; pz = v[2] - cam.pos.z;
@@ -133,25 +132,19 @@ var UnitView = (function () {
       cX[i] = ax; cY[i] = ay; cZ[i] = az;
       if (az < cam.near) { front[i] = 0; continue; }
       front[i] = 1;
-      var sx = cam.cx + ax * cam.focal / az;
-      var sy = cam.cy - ay * cam.focal / az;
-      if (sx < minX) minX = sx;
-      if (sx > maxX) maxX = sx;
-      if (sy < minY) minY = sy;
-      if (sy > maxY) maxY = sy;
       any = true;
     }
     if (!any) return;
 
-    /* 自动适配：整机始终占画面约 84%，不论它是一架 8 米的无人机
-       还是一条 210 米的补给舰，也不论当前转到哪个角度 */
-    var k = Math.min(
-      W * 0.84 / Math.max(1, maxX - minX),
-      H * 0.84 / Math.max(1, maxY - minY)
-    );
-    var bcx = (minX + maxX) / 2, bcy = (minY + maxY) / 2;
-    var ox = W / 2 - (bcx - cam.cx) * k;
-    var oy = H / 2 - (bcy - cam.cy) * k;
+    /* 缩放只由包围球决定，**不随转角变化**。
+
+       以前按每一帧投影出来的外框自动适配：长条形的模型转到侧面时外框长、
+       转到正面时外框短，于是镜头看起来一会儿拉远一会儿推近。
+       相机距离本来就是 bd.r × 3.4，包围球在屏幕上的投影半径就是
+       r·focal/dist —— 让它占画面短边的 52%，任何角度都装得下，也不再晃。
+       相机对准球心，所以原点就是画布中心。 */
+    var k = (Math.min(W, H) * 0.52) / Math.max(1e-6, bd.r * cam.focal / dist);
+    var ox = W / 2, oy = H / 2;
 
     /* 相机空间 → 屏幕偏移：**每个顶点只做一次**。
        顶点是共享的（一个顶点常被 4 个面引用），放进面循环里做就会
@@ -326,6 +319,42 @@ var UnitView = (function () {
     return paraTable(rows);
   }
 
+  /* ============================================================
+     机体 + 挂载合成一个模型（机库预览用）
+
+     用一个停在原点、机头朝 +z 的假飞机，走实机同一条路径：
+     Ent.forEachStoreSlot 决定哪个挂点挂什么，Ent.storePos 给挂点位置，
+     MODELS.store / storeDrop / storeScale 给模型与下挂量 ——
+     所以机库里看到的，就是起飞以后翼下的样子。
+     ============================================================ */
+  function composeLoadout(ac, loadout) {
+    var base = MODELS[ac.model];
+    if (!base) return null;
+    var out = { v: base.v.slice(), f: base.f.slice() };
+    if (typeof Ent === 'undefined' || !Ent.forEachStoreSlot) return out;
+    var a = {
+      ac: ac, model: ac.model, isPlayer: true, loadout: loadout || {},
+      pos: M3.V(0, 0, 0), fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0)
+    };
+    Ent.forEachStoreSlot(a, function (g, pt, wid) {
+      var w = WEAPONS[wid];
+      if (!w) return;
+      var m = MODELS.store(w), sc = MODELS.storeScale(w);
+      var p = Ent.storePos(a, g, pt);
+      var dy = p.y - MODELS.storeDrop(m, sc);
+      var off = out.v.length, i;
+      for (i = 0; i < m.v.length; i++) {
+        out.v.push([p.x + m.v[i][0] * sc, dy + m.v[i][1] * sc, p.z + m.v[i][2] * sc]);
+      }
+      for (i = 0; i < m.f.length; i++) {
+        var idx = m.f[i].i, ni = [];
+        for (var j = 0; j < idx.length; j++) ni.push(idx[j] + off);
+        out.f.push({ i: ni, c: m.f[i].c });
+      }
+    });
+    return out;
+  }
+
   var KIND_LABEL = {
     aam: '空空导弹', asm: '反大型 / 反舰', agm: '空地导弹', bomb: '炸弹与火箭',
     ecm: '吊舱', dew: '定向能吊舱'
@@ -463,7 +492,8 @@ var UnitView = (function () {
   var FRAME_MIN = 1 / 30;
 
   function stop() {
-    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    if (raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
+    raf = 0;
     canvas = null;
     cur = null;
     drag = null;
@@ -510,24 +540,40 @@ var UnitView = (function () {
   window.addEventListener('mousemove', onDragMove);
   window.addEventListener('mouseup', onDragEnd);
 
+  /* 把任意模型挂到任意 canvas 上转起来。同一时刻只有一个预览在转。
+     keepAngle：同一块画布换模型时保留当前转角（机库里改挂载不该把飞机转回原位）。 */
+  function mountModel(cvs, model, keepAngle) {
+    var same = keepAngle && cvs === canvas;
+    stop();
+    if (!cvs || !model) return;
+    cur = model;
+    canvas = cvs;
+    fit(canvas);
+    if (!same) { yaw = 0.7; pitch = 0.30; }
+
+    /* 拖动改视角；松手后从当前角度继续自动旋转。
+       用 onmousedown 赋值而不是 addEventListener —— 机库那块画布是常驻的，
+       每次刷新都 add 一次会越积越多。 */
+    canvas.style.cursor = 'grab';
+    canvas.onmousedown = function (ev) {
+      drag = { x: ev.clientX, y: ev.clientY, yaw: yaw, pitch: pitch, moved: false };
+      canvas.style.cursor = 'grabbing';
+      if (ev.preventDefault) ev.preventDefault();
+    };
+
+    lastT = 0;
+    acc = 0;
+    renderModel(canvas, cur, yaw, pitch);
+    if (typeof requestAnimationFrame === 'function') raf = requestAnimationFrame(frame);
+  }
+
   function mount(kind, id) {
     stop();
     var u = findUnit(kind, id);
     if (!u || !u.model) return;
-    cur = u.model;
-
-    canvas = document.getElementById('uvCanvas');
-    if (!canvas) { cur = null; return; }
-    fit(canvas);
-
-    /* 拖动改视角；松手后从当前角度继续自动旋转。
-       只绑 canvas 自己的 mousedown，移动与抬起走上面那两个全局监听。 */
-    canvas.style.cursor = 'grab';
-    canvas.addEventListener('mousedown', function (ev) {
-      drag = { x: ev.clientX, y: ev.clientY, yaw: yaw, pitch: pitch, moved: false };
-      canvas.style.cursor = 'grabbing';
-      if (ev.preventDefault) ev.preventDefault();
-    });
+    var cvs = document.getElementById('uvCanvas');
+    if (!cvs) return;
+    mountModel(cvs, u.model, false);
 
     /* 矢量俯视图：数据有则画，没有则那一栏已经不在了。
        画布固定 640×440 —— 与机库 index.html 里 #planCv 的属性完全一致，
@@ -551,12 +597,10 @@ var UnitView = (function () {
       plan.height = 440;
       PLANFORM.draw(plan, u.rec, {}, null);
     }
-
-    lastT = 0;
-    acc = 0;
-    if (raf) cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(frame);
   }
 
-  return { html: html, mount: mount, stop: stop, renderModel: renderModel, findUnit: findUnit };
+  return {
+    html: html, mount: mount, mountModel: mountModel, composeLoadout: composeLoadout,
+    stop: stop, renderModel: renderModel, findUnit: findUnit
+  };
 })();

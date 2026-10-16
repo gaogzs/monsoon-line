@@ -2078,7 +2078,6 @@ if (Ent && M3 && me && world) {
        抓过一次：GAL-44 干扰机与石英的机腹在 -2.60 m，而按机型类型给的
        默认吊舱高度是 -1.95（对战斗机合适），于是机腹吊舱整件埋进机身 ——
        而吊舱是那两架飞机唯一的外挂特征。 */
-    const STORE_HYX = Ent3.STORE_HY;
     function surfaceUnderModel(m2, px, pz) {
       let best = null;
       for (let fi = 0; fi < m2.f.length; fi++) {
@@ -2104,15 +2103,20 @@ if (Ent && M3 && me && world) {
       if (!m2) continue;
       for (let gi2 = 0; gi2 < ac2.hardpointGroups.length; gi2++) {
         const g2 = ac2.hardpointGroups[gi2];
-        const hy2 = (typeof g2.hy === 'number') ? g2.hy : STORE_HYX[g2.kind];
         for (let pi2 = 0; pi2 < g2.pts.length; pi2++) {
           const pt2 = g2.pts[pi2];
           if (pt2.x < 0) continue;                       // 左右对称，只看右翼
           const s2 = surfaceUnderModel(m2, pt2.x, pt2.y);
           if (s2 === null) continue;                     // 挂点在机体之外，判不了
-          if (s2 - hy2 < 0.30) {
-            bad.push(ac2.id + ' 的挂点组 ' + g2.id + '（' + g2.kind + '）挂载物埋进机体：' +
-              '挂载中心 ' + hy2 + '、局部下表面 ' + s2.toFixed(2) + ' m');
+          /* 挂点高度 = 挂载**顶部**（挂载模型自己往下挂）。
+             顶部高于下表面 → 埋进机体；低于下表面太多 → 悬在半空。 */
+          const hy2 = Ent3.storeHy({ model: ac2.model, ac: ac2 }, g2, pt2);
+          if (hy2 > s2 + 0.01) {
+            bad.push(ac2.id + ' 的挂点组 ' + g2.id + '（' + g2.kind + '）挂载顶部埋进机体：' +
+              '挂点 ' + hy2.toFixed(2) + '、局部下表面 ' + s2.toFixed(2) + ' m');
+          } else if (s2 - hy2 > 0.25) {
+            bad.push(ac2.id + ' 的挂点组 ' + g2.id + '（' + g2.kind + '）挂载悬空：' +
+              '挂点 ' + hy2.toFixed(2) + '、局部下表面 ' + s2.toFixed(2) + ' m');
           }
         }
       }

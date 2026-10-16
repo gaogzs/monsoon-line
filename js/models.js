@@ -1502,6 +1502,23 @@ var MODELS = (function () {
   Object.defineProperty(M, 'round', { value: round, enumerable: false });
   Object.defineProperty(M, 'store', { value: store, enumerable: false });
 
+  /* 挂载离挂点往下放多少：模型最高点（含竖直尾翼）× 缩放 + 一点间隙。
+     贴死了尾翼会戳进机翼，所以统一"略微浮空"。实机（game.js pushOneStore）
+     与机库预览（unitview.js composeLoadout）共用这一份。 */
+  var STORE_GAP = 0.08;
+  function storeDrop(mdl, scale) {
+    if (mdl.top === undefined) {
+      var t = -1e9;
+      for (var i = 0; i < mdl.v.length; i++) if (mdl.v[i][1] > t) t = mdl.v[i][1];
+      mdl.top = t;
+    }
+    return mdl.top * scale + STORE_GAP;
+  }
+  // 按 look 生成的模型是真实米数；吊舱等老模型沿用 0.85 的缩放
+  function storeScale(w) { return (w && w.look) ? 1 : 0.85; }
+  Object.defineProperty(M, 'storeDrop', { value: storeDrop, enumerable: false });
+  Object.defineProperty(M, 'storeScale', { value: storeScale, enumerable: false });
+
   /* ---------- 导弹 / 炸弹小模型 ---------- */
   M.missile = (function () {
     var b = new MB();
@@ -1888,6 +1905,89 @@ var MODELS = (function () {
 
     return done(b, { span: 48, len: 44 });
   })();
+
+  /* ============================================================
+     座舱盖落座
+
+     战斗机的座舱盖都是一块菱形薄片（前尖 / 两侧 / 后顶），
+     手填的坐标普遍高出机身上表面一截 —— 侧面看是一张悬着的纸。
+     这里统一后处理：竖直射线量出机身上表面，
+       · 三个底点（前尖与两侧）压到表面上；
+       · 最高点保留原来的"鼓包高度"，但从表面量起；
+       · 补两片三角把后面封住，让它成为一个坐在机身上的鼓包。
+     只动顶点不与别的面共享的座舱盖（方盒窗带不碰），舰船 / 地面模型跳过。
+     ============================================================ */
+  function topAbove(m, px, pz, skip) {
+    var best = null;
+    for (var fi = 0; fi < m.f.length; fi++) {
+      if (skip[fi]) continue;
+      var idx = m.f[fi].i;
+      for (var t = 1; t < idx.length - 1; t++) {
+        var A = m.v[idx[0]], B = m.v[idx[t]], Cc = m.v[idx[t + 1]];
+        var d = (B[2] - Cc[2]) * (A[0] - Cc[0]) + (Cc[0] - B[0]) * (A[2] - Cc[2]);
+        if (Math.abs(d) < 1e-9) continue;
+        var w1 = ((B[2] - Cc[2]) * (px - Cc[0]) + (Cc[0] - B[0]) * (pz - Cc[2])) / d;
+        var w2 = ((Cc[2] - A[2]) * (px - Cc[0]) + (A[0] - Cc[0]) * (pz - Cc[2])) / d;
+        var w3 = 1 - w1 - w2;
+        if (w1 < -0.02 || w2 < -0.02 || w3 < -0.02) continue;
+        var y = w1 * A[1] + w2 * B[1] + w3 * Cc[1];
+        if (best === null || y > best) best = y;
+      }
+    }
+    return best;
+  }
+
+  function seatCanopies(m) {
+    var use = {}, fi, k, canopy = [];
+    for (fi = 0; fi < m.f.length; fi++) {
+      for (k = 0; k < m.f[fi].i.length; k++) use[m.f[fi].i[k]] = (use[m.f[fi].i[k]] || 0) + 1;
+    }
+    for (fi = 0; fi < m.f.length; fi++) {
+      var f = m.f[fi];
+      if ((f.c !== C.canopy && f.c !== C.canopy2) || f.i.length !== 4) continue;
+      var shared = false;
+      for (k = 0; k < 4; k++) if (use[f.i[k]] > 1) shared = true;
+      if (!shared) canopy.push(fi);
+    }
+    if (!canopy.length) return;
+    var skip = {};
+    for (k = 0; k < canopy.length; k++) skip[canopy[k]] = true;
+    var extra = [];
+    for (var ci = 0; ci < canopy.length; ci++) {
+      var ids = m.f[canopy[ci]].i, pk = 0;
+      for (k = 1; k < 4; k++) if (m.v[ids[k]][1] > m.v[ids[pk]][1]) pk = k;
+      var tops = [], ok = true, baseY = 0;
+      for (k = 0; k < 4; k++) {
+        var v = m.v[ids[k]];
+        var ty = topAbove(m, v[0], v[2], skip);
+        if (ty === null) { ok = false; break; }
+        tops.push(ty);
+        if (k !== pk) baseY += v[1] / 3;
+      }
+      if (!ok) continue;
+      var bulge = M3.clamp(m.v[ids[pk]][1] - baseY, 0.14, 0.32);   // 过高的鼓包会像一片竖起的鳍
+      for (k = 0; k < 4; k++) {
+        if (k === pk) continue;
+        m.v[ids[k]][1] = tops[k] - 0.01;          // 略沉一点，压住接缝
+      }
+      var apex = m.v[ids[pk]];
+      apex[1] = tops[pk] + bulge;
+      // 封底：最高点正下方补一个落在机身上的点，与前后两个邻点各围一片三角
+      m.v.push([apex[0], tops[pk] - 0.01, apex[2]]);
+      var foot = m.v.length - 1;
+      var prev = ids[(pk + 3) % 4], next = ids[(pk + 1) % 4];
+      var col = m.f[canopy[ci]].c;
+      extra.push({ i: [prev, ids[pk], foot], c: col }, { i: [next, foot, ids[pk]], c: col });
+    }
+    for (k = 0; k < extra.length; k++) m.f.push(extra[k]);
+  }
+
+  for (var mk in M) {
+    if (!Object.prototype.hasOwnProperty.call(M, mk)) continue;
+    var mm = M[mk];
+    if (!mm || !mm.v || mm.ground || mm.sea) continue;
+    seatCanopies(mm);
+  }
 
   return M;
 })();
