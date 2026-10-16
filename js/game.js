@@ -174,7 +174,7 @@ var Game = (function () {
     volSfx: 85,
     muted: false,
     fov: 56,
-    camDist: 52,
+    camDist: 20,
     camHeight: 13,
     hudOpacity: 100,
     hudScale: 100,
@@ -202,16 +202,10 @@ var Game = (function () {
       title: '视角',
       hint: '暂停时调整可以实时看到画面变化 —— 不用退出去再进来。',
       items: [
-        {
-          k: 'camMode', label: '机位', type: 'select',
-          options: [
-            { v: 0, t: '追尾（地平线保持水平）' },
-            { v: 1, t: '座舱（跟随滚转）' },
-            { v: 2, t: '目标（从侧上方看双方）' }
-          ]
-        },
+        /* 机位选项暂时隐藏：座舱 / 目标视角问题太多，只开放追尾。
+           相机代码保留，修好后把这一项加回来、去掉 loadSettings 里的强制归零即可。 */
         { k: 'fov', label: '视场角 FOV', type: 'range', min: 38, max: 100, unit: '°' },
-        { k: 'camDist', label: '镜头距离', type: 'range', min: 16, max: 200, unit: ' m' },
+        { k: 'camDist', label: '镜头距离', type: 'range', min: 2, max: 30, unit: ' m' },
         { k: 'camHeight', label: '镜头高度', type: 'range', min: -15, max: 60, unit: ' m' }
       ]
     },
@@ -239,6 +233,8 @@ var Game = (function () {
         }
       }
     } catch (e) { /* 无痕模式或禁用存储时静默降级 */ }
+    o.camMode = 0;     // 只开放追尾机位 —— 旧存档里选过座舱 / 目标的也拉回来
+    o.camDist = Math.min(30, Math.max(2, +o.camDist || DEFAULTS.camDist));   // 旧存档可能超出新范围
     return o;
   }
 
@@ -374,7 +370,6 @@ var Game = (function () {
     ['F / Tab', '切换目标'],
     ['R', '切换挂载'],
     ['V', '投放干扰弹 —— 热焰弹与箔丝同时撒出，按住连续投放'],
-    ['—', '机位（追尾 / 座舱 / 目标）在「设置 → 视角」里改，无热键'],
     ['1 / 2 / 3', '僚机指令：散开 / 集火 / 掩护'],
     ['N', 'EMCON-Δ 电磁静默 —— 雷达关机、数据链断开、干扰机停辐射'],
     ['G', '高 G 机动 —— 大幅转向时按住，拉出额外过载，代价是掉速'],
@@ -3326,7 +3321,14 @@ var Game = (function () {
       el.innerHTML = 'BUILD <i>开发版</i>';
       return;
     }
-    var v = BUILD_STAMP.version ? BUILD_STAMP.version + ' · ' : '';
+    // 版本名取自更新日志里同一版本的标题（如「看清是谁」）
+    var title = '';
+    if (typeof CHANGELOG !== 'undefined' && CHANGELOG.releases) {
+      for (var ri = 0; ri < CHANGELOG.releases.length; ri++) {
+        if (CHANGELOG.releases[ri].version === BUILD_STAMP.version) { title = CHANGELOG.releases[ri].title || ''; break; }
+      }
+    }
+    var v = BUILD_STAMP.version ? BUILD_STAMP.version + (title ? '「' + title + '」' : '') + ' · ' : '';
     // 只显示版本与时间；提交号与提交信息放进悬停提示，不占菜单版面
     el.innerHTML = 'BUILD <b>' + v + BUILD_STAMP.time + '</b>';
     el.title = BUILD_STAMP.hash + '　' + BUILD_STAMP.subject;

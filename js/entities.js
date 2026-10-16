@@ -1567,9 +1567,9 @@ var Ent = (function () {
     for (var si = 0; si < sides.length; si++) {
       var mz = gunMuzzle(a, sides[si]);
       spawnParticle(world.particles, mz, M3.clone(a.vel),
-        0.055, 0.55, '#fff2c0', { grow: true });
+        0.055, 0.275, '#fff2c0', { grow: true });
       spawnParticle(world.particles, mz, M3.mul(a.vel, 0.9),
-        0.10, 0.95, '#ffd070', { grow: true });
+        0.10, 0.475, '#ffd070', { grow: true });
     }
   }
 
