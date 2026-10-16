@@ -1687,21 +1687,28 @@ var Game = (function () {
 
     /* lockProgress 不再拦发射。它仍然驱动 HUD 上的锁定环 ——
        那是给玩家看的"火控解算进度"，不是开火许可。 */
-    if (launch(player, t, world)) {
-      Radio.raw({
-        who: CALLSIGN.player, cls: 'ally',
-        /* Fox 呼叫只适用于空空导弹。
+    if (launch(player, t, world)) launchCall(w);
+  }
 
-           炸弹（包括有制导的）应该报"投放" —— 原来的判断只看了
-           unguided，于是 PEJ-30 这类制导炸弹会喊出 Fox 2，
-           那是战斗机发射格斗弹时的呼叫。 */
-        tx: (w.unguided || w.kind === 'bomb' || w.kind === 'agm' || w.kind === 'asm')
-          ? '<b>投放</b>'
-          : (w.seeker === 'radar' ? '<b>Fox 3</b>'
-            : (w.seeker === 'laser' ? '<b>照射</b>' : '<b>Fox 2</b>')),
-        gap: 0.4
-      });
-    }
+  /* 发射呼叫。
+
+     按导引头报标准简令：红外 Fox 2、雷达 Fox 3；
+     对地 / 反舰 / 炸弹 / 火箭一律报"投弹"。
+
+     连续开火时**冷却期内的发射一律不喊**：以前每一发都排进无线电队列，
+     连打十几发之后队列里堆着一长串 Fox 2，换了武器也要等它们播完 ——
+     听起来就像"不管打什么都在喊 Fox 2"。冷却按真实时间算，暂停不影响。 */
+  var CALL_CD = 3.0;
+  var lastCallT = -1e9;
+  function launchCall(w) {
+    var now = performance.now() / 1000;
+    if (now - lastCallT < CALL_CD) return;
+    lastCallT = now;
+    var tx;
+    if (w.kind !== 'aam' || w.unguided) tx = '<b>投弹</b>';
+    else if (w.seeker === 'radar') tx = '<b>Fox 3</b>';
+    else tx = '<b>Fox 2</b>';
+    Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: tx, gap: 0.4 });
   }
 
   function togglePause() {
