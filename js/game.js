@@ -363,7 +363,6 @@ var Game = (function () {
     ['A / D', '左滚 / 右滚'],
     ['Q / E', '方向舵'],
     ['Shift / Ctrl', '油门杆 —— 推满自动进加力，收到底自动张减速板'],
-    ['X / Z', '直接推到底（加力）/ 收到底（减速板）'],
     ['↑ ↓ ← →', '自由视角（松开自动回中）'],
     ['鼠标左键 / Space', '机炮'],
     ['鼠标右键 / Enter', '发射特殊武器'],
@@ -1903,7 +1902,6 @@ var Game = (function () {
     }
 
     // 单一油门轴：推满自动进加力，收到底自动张减速板。
-    // X / Z 保留为"一把推到底 / 一把收到底"的快捷键。
     var thrIn = 0;
     if (keys.ShiftLeft || keys.ShiftRight) thrIn += 1;
     if (keys.ControlLeft || keys.ControlRight) thrIn -= 1;
@@ -1924,9 +1922,6 @@ var Game = (function () {
       player.throttle = Math.min(0.04, player.throttle + dt * 1.6);
     }
 
-    // X / Z 仍然是"一把推到底 / 一把收到底"，同样松手即回落
-    if (keys.KeyX) player.throttle = THR_MAX;
-    if (keys.KeyZ) player.throttle = 0;
 
     /* ---- 高 G 机动 ----
        只有在"确实在使劲转"的时候才允许触发 —— 鼠标只偏一点点时
