@@ -226,7 +226,68 @@ var MODELS = (function () {
   function done(mb, extra) {
     var m = { v: mb.v, f: mb.f };
     if (extra) for (var k in extra) m[k] = extra[k];
+    if (!m.ground && !m.sea) orientClosed(m);
     return m;
+  }
+
+  /* 闭合部件定向（给 render.js 的背面剔除用）。
+
+     构造器里 tube / box / fuselage 的绕序并不统一：有的部件整体朝外、
+     有的整体朝内。这里按"共用顶点"把面分成部件，面数 ≥ 5 且每条边都被
+     两个面共用的视为闭合体（机身、盒子、带端盖的管子），逐面检查法线是否背离部件中心，
+     朝内就翻转顶点顺序，并标 cl = 1 —— 只有标了的面才会被剔除。
+     单片的翼面、座舱盖不标，保持双面。
+     舰船 / 地面设施的船体有凹面，中心判据不可靠，不处理。 */
+  function orientClosed(m) {
+    var nv = m.v.length, par = new Array(nv), i, j, fi;
+    for (i = 0; i < nv; i++) par[i] = i;
+    var root = function (x) { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    for (fi = 0; fi < m.f.length; fi++) {
+      var id = m.f[fi].i;
+      for (j = 1; j < id.length; j++) par[root(id[j])] = root(id[0]);
+    }
+    var comps = {};
+    for (fi = 0; fi < m.f.length; fi++) {
+      var r = root(m.f[fi].i[0]);
+      (comps[r] = comps[r] || []).push(fi);
+    }
+    for (var key in comps) {
+      var fs = comps[key];
+      if (fs.length < 5) continue;
+      // 必须真封闭：每条边恰好被两个面共用。开口的管子（发动机吊舱、喷口）
+      // 剔掉背面就能从端口看穿，保持双面
+      var edges = {}, closed = true;
+      for (i = 0; i < fs.length; i++) {
+        var ee = m.f[fs[i]].i;
+        for (j = 0; j < ee.length; j++) {
+          var u = ee[j], w = ee[(j + 1) % ee.length];
+          var ek = u < w ? u + ',' + w : w + ',' + u;
+          edges[ek] = (edges[ek] || 0) + 1;
+        }
+      }
+      for (var ek2 in edges) if (edges[ek2] !== 2) { closed = false; break; }
+      if (!closed) continue;
+      var cx = 0, cy = 0, cz = 0, cn = 0;
+      for (i = 0; i < fs.length; i++) {
+        var ii = m.f[fs[i]].i;
+        for (j = 0; j < ii.length; j++) { var v = m.v[ii[j]]; cx += v[0]; cy += v[1]; cz += v[2]; cn++; }
+      }
+      cx /= cn; cy /= cn; cz /= cn;
+      for (i = 0; i < fs.length; i++) {
+        var f = m.f[fs[i]], q = f.i;
+        var A = m.v[q[0]], B = m.v[q[1]], Cc = m.v[q[2]];
+        var e1x = B[0] - A[0], e1y = B[1] - A[1], e1z = B[2] - A[2];
+        var e2x = Cc[0] - A[0], e2y = Cc[1] - A[1], e2z = Cc[2] - A[2];
+        var nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+        var fx = 0, fy = 0, fz = 0;
+        for (j = 0; j < q.length; j++) { fx += m.v[q[j]][0]; fy += m.v[q[j]][1]; fz += m.v[q[j]][2]; }
+        fx = fx / q.length - cx; fy = fy / q.length - cy; fz = fz / q.length - cz;
+        var d = nx * fx + ny * fy + nz * fz;
+        if (Math.abs(d) < 1e-9) continue;       // 判不了的不剔
+        if (d < 0) f.i = q.slice().reverse();
+        f.cl = 1;
+      }
+    }
   }
 
   var M = {};

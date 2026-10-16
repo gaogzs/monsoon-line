@@ -722,7 +722,9 @@ var HUD = (function () {
     if (!inb && !lit) return;
 
     var bl = Math.sin(performance.now() * 0.018) > -0.35;
-    var y = H * 0.14;
+    /* 让开顶部的任务目标块（目标行 U(92)、副行 U(110)、时限 U(128)）：
+       以前写死 H*0.14，正好压在那几行上。 */
+    var y = Math.max(H * 0.22, U(128) + U(48));
     var big = 'bold ' + (30 * HUDK).toFixed(0) + 'px Consolas,monospace';
 
     if (inb) {

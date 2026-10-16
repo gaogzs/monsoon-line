@@ -362,6 +362,13 @@ var Renderer = (function () {
       var ny = e1z * e2x - e1x * e2z;
       var nz = e1x * e2y - e1y * e2x;
       var nl = Math.sqrt(nx * nx + ny * ny + nz * nz);
+
+      /* 背面剔除：只对闭合部件（models.js 的 orientClosed 标了 cl）。
+         画家算法本身处理不了穿插，但朝后的那一面参与排序时最容易把正面盖住 ——
+         先把它们扔掉，能去掉一大半错误遮挡。翼面等单片仍然双面。 */
+      if (face.cl && nl > 1e-9 &&
+          nx * (wX[a0] - cam.pos.x) + ny * (wY[a0] - cam.pos.y) + nz * (wZ[a0] - cam.pos.z) > 0) continue;
+
       var bright = 0.62;
       if (nl > 1e-9) {
         nx /= nl; ny /= nl; nz /= nl;

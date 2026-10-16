@@ -194,6 +194,13 @@ var UnitView = (function () {
     }
     if (!m) return;
 
+    /* ---- 深度缓冲光栅化 ----
+       画家算法（整面按平均深度排序）处理不了穿插的面：尾翼插进机身、
+       座舱盖压在机身上、进气道贴在机身侧面 —— 交线两侧谁在前各不相同，
+       整面排序总有一半是错的。预览画布小、面数少，逐像素比深度负担得起。
+       拿不到像素缓冲（离屏测试桩）时退回下面的画家算法。 */
+    if (g.getImageData && g.putImageData && zRaster(g, W, H, faceList, m, ox, oy)) return;
+
     /* ---- 排序：远的先画（画家算法，与 render.js 同一套） ---- */
     order.length = 0;
     for (i = 0; i < m; i++) order.push(faceList[i]);
@@ -223,6 +230,52 @@ var UnitView = (function () {
       g.strokeStyle = col;
       g.lineWidth = 0.8;
       g.stroke();
+    }
+  }
+
+  var zbuf = null, zbufN = 0;
+  function zRaster(g, W, H, list, n, ox, oy) {
+    var img;
+    try { img = g.getImageData(0, 0, W, H); } catch (e) { return false; }
+    if (!img || !img.data) return false;
+    var px = img.data, N = W * H;
+    if (!zbuf || zbufN < N) { zbuf = new Float32Array(N); zbufN = N; }
+    for (var q = 0; q < N; q++) zbuf[q] = 0;          // 存 1/z：0 = 无穷远
+    for (var fi = 0; fi < n; fi++) {
+      var r = list[fi], rgb = rgbOf(r.hex), b = r.c;
+      var cr = rgb[0] * b, cg = rgb[1] * b, cb = rgb[2] * b;
+      var ids = r.i;
+      for (var t = 1; t < ids.length - 1; t++) {
+        tri(px, W, H, ids[0], ids[t], ids[t + 1], ox, oy, cr, cg, cb);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return true;
+  }
+
+  function tri(px, W, H, a, b2, c, ox, oy, cr, cg, cb) {
+    var x0 = ox + cX[a], y0 = oy + cY[a], x1 = ox + cX[b2], y1 = oy + cY[b2], x2 = ox + cX[c], y2 = oy + cY[c];
+    var w0 = 1 / cZ[a], w1 = 1 / cZ[b2], w2 = 1 / cZ[c];
+    var area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+    if (Math.abs(area) < 1e-6) return;
+    var minx = Math.max(0, Math.floor(Math.min(x0, x1, x2))), maxx = Math.min(W - 1, Math.ceil(Math.max(x0, x1, x2)));
+    var miny = Math.max(0, Math.floor(Math.min(y0, y1, y2))), maxy = Math.min(H - 1, Math.ceil(Math.max(y0, y1, y2)));
+    var inv = 1 / area;
+    for (var y = miny; y <= maxy; y++) {
+      var sy = y + 0.5;
+      for (var x = minx; x <= maxx; x++) {
+        var sx = x + 0.5;
+        var e0 = ((x2 - x1) * (sy - y1) - (y2 - y1) * (sx - x1)) * inv;
+        var e1 = ((x0 - x2) * (sy - y2) - (y0 - y2) * (sx - x2)) * inv;
+        var e2 = 1 - e0 - e1;
+        if (e0 < 0 || e1 < 0 || e2 < 0) continue;
+        var iz = e0 * w0 + e1 * w1 + e2 * w2;
+        var k = y * W + x;
+        if (iz <= zbuf[k]) continue;
+        zbuf[k] = iz;
+        var p4 = k * 4;
+        px[p4] = cr; px[p4 + 1] = cg; px[p4 + 2] = cb; px[p4 + 3] = 255;
+      }
     }
   }
 

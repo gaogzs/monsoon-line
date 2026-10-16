@@ -140,6 +140,20 @@ function makeCtx(ras) {
 
   const ctx = {
     get canvas() { return { width: ras.w, height: ras.h }; },
+    // 整幅读写（unitview 的深度缓冲渲染器用）：只支持从 (0,0) 起的整幅
+    getImageData(x, y, w, h) {
+      const d = new Uint8ClampedArray(w * h * 4);
+      for (let i = 0; i < w * h; i++) {
+        d[i * 4] = ras.rgb[i * 3]; d[i * 4 + 1] = ras.rgb[i * 3 + 1]; d[i * 4 + 2] = ras.rgb[i * 3 + 2]; d[i * 4 + 3] = 255;
+      }
+      return { width: w, height: h, data: d };
+    },
+    putImageData(img) {
+      const d = img.data;
+      for (let i = 0; i < img.width * img.height; i++) {
+        ras.rgb[i * 3] = d[i * 4]; ras.rgb[i * 3 + 1] = d[i * 4 + 1]; ras.rgb[i * 3 + 2] = d[i * 4 + 2];
+      }
+    },
     set strokeStyle(v) { st.strokeStyle = v; }, get strokeStyle() { return st.strokeStyle; },
     set fillStyle(v) { st.fillStyle = v; }, get fillStyle() { return st.fillStyle; },
     set lineWidth(v) { st.lineWidth = v; }, get lineWidth() { return st.lineWidth; },
