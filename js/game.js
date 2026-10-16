@@ -358,7 +358,7 @@ var Game = (function () {
   ];
 
   var TIPS = [
-    'NEZ 不可逃逸区：锁定框收成<b>红色实环</b>时发射，敌机极难摆脱。',
+    '发射包线：锁定框淡橙 = 射程外，橙色 = 射程内，<b>红色 = NEZ 不可逃逸区</b>，此时发射敌机极难摆脱。',
     '能量机动：爬升掉速、俯冲增速。低速时舵效下降，谨防失速。',
     '导弹规避：把来袭导弹放在 3/9 线（正横），持续桶滚消耗其能量。',
     '动压 Q：18 km 以上的空气密度只有海平面的 12%。低于 <b>12 kPa</b> 时舵面开始失效、导弹过载崩塌 —— 但机炮的弹道反而更平直。',
@@ -1257,7 +1257,10 @@ var Game = (function () {
     var si2 = Math.max(0, slotIdx);
     var side = (si2 % 2) ? 1 : -1;
     var rank = Math.floor(si2 / 2);
-    var hp = M3.add(actor.pos, M3.add(
+    /* 出膛点 = 这个槽对应的那个挂架（与 pushStores 画的是同一个位置）。
+       没有挂点表的单位（任务脚本里的航线单位等）退回旧的估算。 */
+    var st = Ent.storeForSlot(actor, actor.special, si2);
+    var hp = st ? Ent.storePos(actor, st.g, st.pt) : M3.add(actor.pos, M3.add(
       M3.mul(actor.fwd, 4),
       M3.mul(actor.right, side * (2.4 + rank * 1.9))));
 
@@ -1272,6 +1275,11 @@ var Game = (function () {
        同一点、同一指向出去的弹会完全重叠成一发。 */
     var nShot = Math.max(1, Math.min(wp.salvo || 1, actor.spAmmo));
     var shots = salvoShots(actor, wp, nShot);
+    /* 红外齐射：只有第一枚接手锁定的目标，其余几枚出膛后各自在
+       导引头视场（lockCone）里找 —— 并避开兄弟弹已经咬住的那几架，
+       一次齐射才能分打一个编队。雷达弹要靠载机交接，不走这条。 */
+    var irSalvo = (nShot > 1 && wp.seeker === 'ir') ? { claimed: [] } : null;
+    if (irSalvo && target) irSalvo.claimed.push(target);
     for (var q = 0; q < nShot; q++) {
       var m = Ent.makeMissile({
         weapon: actor.special,
@@ -1279,9 +1287,10 @@ var Game = (function () {
         pos: M3.add(hp, shots[q].off),
         fwd: shots[q].fwd,
         speed: actor.speed + 70,
-        target: target || null,
+        target: (irSalvo && q > 0) ? null : (target || null),
         owner: actor
       });
+      m.salvo = irSalvo;
       w.missiles.push(m);
     }
 
@@ -2789,69 +2798,22 @@ var Game = (function () {
   }
 
   function pushStores(a) {
-    if (!a.ac || !a.ac.hardpointGroups) return;
-    var isPlayer = !!a.isPlayer;
-    if (isPlayer && !a.loadout) return;
-
-    /* 弹种从哪儿来：
-         玩家  机库配置 lo（组 id → 弹种）
-         NPC   任务只写了一件制式弹（special）与可选的吊舱（pods），
-               铺在哪几组由 Ent.mountPlan() 推（它读 npcFits）
-       判据是 a.isPlayer —— 玩家以外一律走 mountPlan，哪怕以后任务脚本
-       也给 NPC 写一张逐组的 loadout。 */
-    var lo = a.loadout || {};
-    var plan = isPlayer ? null : Ent.mountPlan(a);
+    /* 槽号 ↔ 挂点的对应在 Ent.forEachStoreSlot 里，launch 的出膛点用同一份。 */
     var slots = a.slotCd || {};
-    var gi, pi;
-
-    /* 槽数组是**按武器**建的，长度 = 这种武器占用的挂点总数；
-       而下面是**按组**遍历的。所以必须自己维护每组在数组里的起始下标 ——
-
-       否则两组挂同一种弹时会都从 arr[0] 开始读，变成"四个挂架共用
-       前两个槽"：打掉一个，两个组的同一位置同时消失，而后两个挂架
-       永远不会消失。发射那边是对的（launch 遍历整个 slotCd[wid]），
-       只有这里的实体渲染会错位。 */
-    var used = {};
-
-    for (gi = 0; gi < a.ac.hardpointGroups.length; gi++) {
-      var g = a.ac.hardpointGroups[gi];
-      var wid = isPlayer ? lo[g.id] : plan[gi];
-      if (!wid) continue;
-
+    Ent.forEachStoreSlot(a, function (g, pt, wid, si) {
       var w = WEAPONS[wid];
-      if (!w || w.kind === 'gun') continue;
-      /* 这种弹能不能挂在这种挂点上。
-
-         玩家那边由选装界面保证；NPC 走 npcFits（下游弹的 fits 为空，
-         那是"玩家拿不到实物"，不是"挂不上"）。见 Ent.fitsKind。
-         注意这一步必须在推进 used[wid] **之前** —— 否则一个挂不上的组
-         也会在槽数组里占掉几个下标，把后面的挂架整体顶偏。 */
-      if (!Ent.fitsKind(w, g.kind, isPlayer)) continue;
-
       // 已经打光：冷却早已归零，但挂架上不该再有任何东西
       var pool = a.ammoPool ? a.ammoPool[wid] : undefined;
-      if (pool !== undefined && pool <= 0) continue;
-
-      /* 吊舱与定向能不是"打出去"的东西 —— 主动被动都一直挂在挂架上。
-
-         以前只有 passive 吊舱这样处理，于是 ZUN-4 开一次机就会在翼下
-         消失一个冷却周期，看起来像被扔掉了。 */
-      if (w.kind === 'ecm' || w.kind === 'dew') {
-        for (pi = 0; pi < g.pts.length; pi++) pushOneStore(a, g, g.pts[pi], w);
-        continue;                    // 吊舱不占发射槽下标
+      if (pool !== undefined && pool <= 0) return;
+      /* 吊舱与定向能不是"打出去"的东西 —— 一直挂在挂架上（si 为 null）。 */
+      if (si !== null) {
+        var arr = slots[wid] || [];
+        if ((arr[si] || 0) > 0) return;          // 这个发射槽还在装填 → 挂架空着
       }
-
-      var base = used[wid] || 0;
-      used[wid] = base + g.pts.length;      // 下一组从这里接着排
-
-      var arr = slots[wid] || [];
-      for (pi = 0; pi < g.pts.length; pi++) {
-        // 这个发射槽还在装填 → 挂架空着
-        if ((arr[base + pi] || 0) > 0) continue;
-        pushOneStore(a, g, g.pts[pi], w);
-      }
-    }
+      pushOneStore(a, g, pt, w);
+    });
   }
+
 
   /* ============================================================
      渲染

@@ -344,6 +344,47 @@ var Ent = (function () {
       M3.add(M3.mul(a.up, local.y), M3.mul(a.fwd, local.z))));
   }
 
+  /* 逐个挂点遍历：cb(g, pt, wid, slotIdx)。
+
+     发射槽数组是**按武器**建的，长度 = 这种武器占用的挂点总数；
+     挂点却是**按组**排的。槽号 ↔ 挂点的对应只有这一份：
+     game.js 的 pushStores（画翼下的弹）与 launch（出膛点）都走这里，
+     不然打出去的那一发和消失的那个挂架会对不上。
+
+     吊舱 / 定向能不占槽下标，slotIdx 给 null。
+     挂不上的组（fitsKind 不过）必须在推进下标**之前**跳过。 */
+  function forEachStoreSlot(a, cb) {
+    if (!a.ac || !a.ac.hardpointGroups) return;
+    var isPlayer = !!a.isPlayer;
+    if (isPlayer && !a.loadout) return;
+    var lo = a.loadout || {};
+    var plan = isPlayer ? null : mountPlan(a);
+    var used = {};
+    for (var gi = 0; gi < a.ac.hardpointGroups.length; gi++) {
+      var g = a.ac.hardpointGroups[gi];
+      var wid = isPlayer ? lo[g.id] : plan[gi];
+      if (!wid) continue;
+      var w = WEAPONS[wid];
+      if (!w || w.kind === 'gun') continue;
+      if (!fitsKind(w, g.kind, isPlayer)) continue;
+      var pod = (w.kind === 'ecm' || w.kind === 'dew');
+      var base = used[wid] || 0;
+      if (!pod) used[wid] = base + g.pts.length;
+      for (var pi = 0; pi < g.pts.length; pi++) {
+        cb(g, g.pts[pi], wid, pod ? null : base + pi);
+      }
+    }
+  }
+
+  /* 某武器第 idx 个发射槽对应的挂点 → { g, pt }，找不到给 null。 */
+  function storeForSlot(a, wid, idx) {
+    var hit = null;
+    forEachStoreSlot(a, function (g, pt, w2, si) {
+      if (!hit && w2 === wid && si === idx) hit = { g: g, pt: pt };
+    });
+    return hit;
+  }
+
   /* ============================================================
      飞机
      ============================================================ */
@@ -860,6 +901,8 @@ var Ent = (function () {
       }
       return best;
     }
+    var taken = m.salvo ? m.salvo.claimed : null;
+    var best2 = null, bs2 = 0;
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
       if (!e.alive || e.team === m.team || e.team > 1) continue;   // 中立（team 2）谁都不认
@@ -875,8 +918,15 @@ var Ent = (function () {
       var off = M3.angleBetween(m.fwd, M3.mul(to, 1 / Math.max(1, d)));
       if (off > cone) continue;                 // 不在导引头视场里
       var score = irSignature(e) * (1 - off / cone) / (1 + d / 1500);
+      /* 齐射：兄弟弹已经咬住的目标排在后面 —— 视场里只剩它们时照样可以重复。 */
+      if (taken && taken.indexOf(e) >= 0) {
+        if (score > bs2) { bs2 = score; best2 = e; }
+        continue;
+      }
       if (score > bs) { bs = score; best = e; }
     }
+    if (!best) best = best2;
+    if (best && taken && taken.indexOf(best) < 0) taken.push(best);
     return best;
   }
 
@@ -1789,6 +1839,7 @@ var Ent = (function () {
     /* 挂点适配与 NPC 的挂载分配 —— game.js 的 pushStores 渲染实体挂载时
        要用同一份规则，不能再抄一遍。 */
     fitsKind: fitsKind, mountPlan: mountPlan, storePos: storePos, STORE_HY: STORE_HY,
+    forEachStoreSlot: forEachStoreSlot, storeForSlot: storeForSlot,
     /* 选弹与"当前触发武器" —— game.js 的 syncWeapon（玩家换弹）与 ai.js
        的开火选弹都走 setWeapon，判据同源。 */
     chooseWeapon: chooseWeapon, setWeapon: setWeapon,
