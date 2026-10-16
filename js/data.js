@@ -248,8 +248,10 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: 'k3',
     maxLoad: 4200,
     hardpointGroups: [
-      { id: 'A', label: '内埋弹舱', kind: 'belly', pts: [{ x: 1.1, y: -2.2 }, { x: -1.1, y: -2.2 }] },
-      { id: 'B', label: '翼下挂点', kind: 'light', pts: [{ x: 3.6, y: -3.4 }, { x: -3.6, y: -3.4 }] }
+      /* 升力体机身很扁（下表面约 -0.75 m），默认的 belly -1.95 / light -1.15
+         会让挂载悬在机身下面一米多 —— 贴着机腹 / 翼面挂。 */
+      { id: 'A', label: '内埋弹舱', kind: 'belly', hy: -0.82, pts: [{ x: 1.1, y: -2.2 }, { x: -1.1, y: -2.2 }] },
+      { id: 'B', label: '翼下挂点', kind: 'light', hy: -0.55, pts: [{ x: 3.6, y: -3.4 }, { x: -3.6, y: -3.4 }] }
     ],
     defaultLoadout: { A: 'lcm', B: 'oep' }
   },
@@ -2012,6 +2014,61 @@ var STORE_ATTR = {
   for (var k in STORE_ATTR) {
     if (!Object.prototype.hasOwnProperty.call(WEAPONS, k)) continue;
     for (var f in STORE_ATTR[k]) WEAPONS[k][f] = STORE_ATTR[k][f];
+  }
+})();
+
+/* ============================================================
+   挂载外观（纯美术，不影响任何数值）
+   len / dia：弹体长度与直径（米）。格斗弹短细、远程弹粗长，
+              一眼能从翼下看出这架飞机是去狗斗还是去守门。
+   fin：  'strake' 长边条翼（格斗） / 'small' 小弹翼（中远）
+          / 'cruise' 平直弹翼（巡航弹）/ 'bomb' 炸弹尾翼
+   boost：尾部助推段（超远程 / 反舰）
+   rack： 一个挂架上**看得见**的弹数 —— 不是 perPoint（那是弹库）
+   nest： 'tube' 圆筒火箭巢 / 'box' 方形发射巢；cells 是管口数
+   3D（MODELS.store / MODELS.round）与识别图（PLANFORM.drawStore）读同一份。
+   ============================================================ */
+var STORE_LOOK = {
+  /* 格斗 */
+  srm:  { len: 2.7, dia: 0.13, fin: 'strake', rack: 2 },
+  trm:  { len: 2.9, dia: 0.13, fin: 'strake', rack: 2 },
+  hos:  { len: 2.6, dia: 0.14, fin: 'strake' },
+  otr:  { len: 2.8, dia: 0.14, fin: 'small' },
+  dl6:  { len: 2.9, dia: 0.14, fin: 'strake' },
+  qsr:  { len: 2.2, dia: 0.11, fin: 'strake', nest: 'box', cells: 3 },
+  swm:  { len: 1.9, dia: 0.10, fin: 'strake', nest: 'box', cells: 4 },
+  /* 中距 */
+  wasp: { len: 3.2, dia: 0.16, fin: 'small', rack: 3 },
+  v9:   { len: 3.0, dia: 0.15, fin: 'strake', rack: 2 },
+  v11:  { len: 3.4, dia: 0.17, fin: 'small', rack: 2 },
+  mrm:  { len: 3.7, dia: 0.18, fin: 'small', rack: 2 },
+  dl4:  { len: 3.6, dia: 0.18, fin: 'small' },
+  vbn:  { len: 3.6, dia: 0.18, fin: 'small', rack: 2 },
+  /* 远程 */
+  arm:  { len: 4.2, dia: 0.24, fin: 'small' },
+  v17:  { len: 4.4, dia: 0.24, fin: 'small' },
+  dl9:  { len: 4.3, dia: 0.25, fin: 'small' },
+  ss6:  { len: 4.3, dia: 0.25, fin: 'small' },
+  hva:  { len: 4.7, dia: 0.28, fin: 'small', boost: true },
+  vlar: { len: 5.2, dia: 0.32, fin: 'small', boost: true },
+  /* 对地 / 反舰 */
+  asl:  { len: 3.9, dia: 0.30, fin: 'cruise' },
+  asl2: { len: 4.6, dia: 0.36, fin: 'cruise' },
+  v25:  { len: 4.0, dia: 0.30, fin: 'small' },
+  vgt:  { len: 4.0, dia: 0.32, fin: 'small' },
+  sat:  { len: 4.8, dia: 0.34, fin: 'small', boost: true },
+  vsr:  { len: 5.0, dia: 0.34, fin: 'small', boost: true },
+  v22:  { len: 5.6, dia: 0.40, fin: 'small', boost: true },
+  lcm:  { len: 6.0, dia: 0.42, fin: 'cruise', boost: true },
+  /* 炸弹 / 火箭 */
+  clb:  { len: 3.0, dia: 0.42, fin: 'bomb' },
+  v30:  { len: 2.8, dia: 0.40, fin: 'bomb' },
+  rkt:  { len: 2.6, dia: 0.48, fin: 'small', nest: 'tube', cells: 7 }
+};
+
+(function () {
+  for (var k in STORE_LOOK) {
+    if (Object.prototype.hasOwnProperty.call(WEAPONS, k)) WEAPONS[k].look = STORE_LOOK[k];
   }
 })();
 

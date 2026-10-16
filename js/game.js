@@ -119,6 +119,17 @@ var Game = (function () {
   /* ============================================================
      屏幕管理
      ============================================================ */
+  /* 鼠标引导要锁定指针：瞄准方向由鼠标位移驱动，没锁的话指针碰到屏幕边缘
+     就再也拖不动了。浏览器只允许在用户手势里请求 —— 开始任务的那次点击、
+     取消暂停的那次按键、以及画布上的任何一次点击都算。 */
+  function requestAimLock() {
+    if (!cv || !aimMode || document.pointerLockElement === cv || !cv.requestPointerLock) return;
+    try {
+      var r = cv.requestPointerLock();
+      if (r && r.catch) r.catch(function () { /* 被拒绝就等下一次点击 */ });
+    } catch (err) { /* 不支持就退回普通指针 */ }
+  }
+
   /* 离开飞行（菜单、暂停、战报）时交还鼠标指针 */
   function releasePointer() {
     if (document.pointerLockElement === cv && document.exitPointerLock) document.exitPointerLock();
@@ -1335,6 +1346,7 @@ var Game = (function () {
      开始任务
      ============================================================ */
   function startMission(idx) {
+    requestAimLock();
     missionIdx = idx;
     mission = MISSIONS[idx];
     world = newWorld();
@@ -1468,10 +1480,7 @@ var Game = (function () {
     cv.addEventListener('mousedown', function (e) {
       SFX.unlock();
       // 鼠标引导要锁定指针：瞄准方向由位移驱动，指针跑出窗口就断了
-      if (state === 'playing' && aimMode && !paused && document.pointerLockElement !== cv &&
-          cv.requestPointerLock) {
-        try { cv.requestPointerLock(); } catch (err) { /* 不支持就退回普通指针，照样能用 */ }
-      }
+      if (state === 'playing' && !paused) requestAimLock();
       if (e.button === 0) mouse.left = true;
       if (e.button === 2) { mouse.right = true; fireSpecial(); }
     });
@@ -1704,6 +1713,7 @@ var Game = (function () {
   function togglePause() {
     paused = !paused;
     document.getElementById('pause').classList.toggle('on', paused);
+    if (!paused) requestAimLock();
     if (paused) {
       releasePointer();
       SFX.silence();
@@ -1841,6 +1851,7 @@ var Game = (function () {
   function toggleAimMode() {
     aimMode = !aimMode;
     aimInit = false;
+    if (aimMode) requestAimLock();
     player.aimDir = null;
     if (!aimMode && document.pointerLockElement === cv && document.exitPointerLock) document.exitPointerLock();
     cv.style.cursor = aimMode ? 'none' : 'default';
@@ -2502,6 +2513,14 @@ var Game = (function () {
 
       // ② 俯仰：先钳位，再平滑
       var camPitchAng = Math.atan2(lookDir.y, Math.max(hlen, 1e-4));
+      /* 跟瞄准方向时俯仰做软限幅（tanh，渐近 72°）：瞄准点推到正上方时
+         镜头不会直挺挺对着天顶 —— 那里只有一片空天，云层、地平线和俯仰
+         刻度全都出画，画面会突然"变空"。准星这时落在画面中心偏上，
+         照样投影在瞄准方向上，看得见。 */
+      if (lookAim) {
+        var CAM_SOFT = 72 * Math.PI / 180;
+        camPitchAng = CAM_SOFT * Math.tanh(camPitchAng / CAM_SOFT);
+      }
       camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
       if (camPitchSmooth === null) camPitchSmooth = camPitchAng;
       camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-pitchRate * dt));
@@ -2799,8 +2818,10 @@ var Game = (function () {
      离线预览器 tools/render-mounts.js 用的是同一份。
      ============================================================ */
   function pushOneStore(a, g, pt, w) {
-    var mdl = MODELS[w.model] || MODELS.missile;
-    Renderer.pushModel(mdl, Ent.storePos(a, g, pt), a.fwd, a.up, { scale: 0.85 });
+    // 外观由 WEAPONS[id].look 决定（尺寸是真实米数，不再统一缩放）；吊舱沿用原模型
+    var lk = !!w.look;
+    var mdl = MODELS.store(w);
+    Renderer.pushModel(mdl, Ent.storePos(a, g, pt), a.fwd, a.up, { scale: lk ? 1 : 0.85, store: true });
   }
 
   function pushStores(a) {
@@ -2856,7 +2877,7 @@ var Game = (function () {
     for (i = 0; i < world.missiles.length; i++) {
       var ms = world.missiles[i];
       if (!ms.alive) continue;
-      var mm = MODELS[ms.model] || MODELS.missile;
+      var mm = (ms.w && ms.w.look) ? MODELS.round(ms.w) : (MODELS[ms.model] || MODELS.missile);
       Renderer.pushModel(mm, ms.pos, ms.fwd, ms.up, {});
     }
     Renderer.flush();
@@ -2933,6 +2954,10 @@ var Game = (function () {
       ctx.textAlign = 'center';
       ctx.fillStyle = acol;
       ctx.fillText('CMD', ax, ay + rad + 13);
+      if (document.pointerLockElement !== cv) {
+        ctx.fillStyle = 'rgba(255,176,58,0.9)';
+        ctx.fillText('点击画面锁定鼠标', ax, ay + rad + 28);
+      }
       ctx.restore();
     }
   }

@@ -303,7 +303,130 @@ var PLANFORM = (function () {
     return kind === 'ecm' || kind === 'dew';
   }
 
-  function drawStore(g, x, y, kind, k, style) {
+  /* 挂载物在图上的半宽（像素）—— 装填进度的裁剪框要包住整组多联 / 发射巢 */
+  function storeHalfW(w, k) {
+    var lk = w && w.look;
+    if (!lk) return k * 1.8;
+    if (lk.nest) return Math.max(4, lk.dia * (lk.nest === 'tube' ? 1.2 : 2.0) * k) + 2;
+    var n = lk.rack || 1;
+    return Math.max(2, lk.dia * 1.7 * k) * (n === 1 ? 1.6 : n === 2 ? 2.4 : 3.0) + 2;
+  }
+
+  function storeLen(w, k) {
+    var lk = w && w.look;
+    return (lk ? lk.len + (lk.nest ? 0.3 : 0) : (STORE_LEN[w.kind] || 3.0)) * k;
+  }
+
+  /* 按 WEAPONS[id].look 画：单发 / 多联挂梁 / 发射巢。
+     没有 look 的（吊舱）走老的按 kind 画法。 */
+  function drawStore(g, x, y, w, k, style) {
+    var lk = w.look;
+    if (!lk) return drawStoreKind(g, x, y, w.kind, k, style);
+    g.lineWidth = style.line;
+    var L = lk.len * k, D = Math.max(2, lk.dia * 1.7 * k), i;
+
+    if (lk.nest === 'tube') {
+      // 圆筒火箭巢：平头圆筒 + 前端一排管口
+      var R = Math.max(4, lk.dia * 1.2 * k);
+      g.beginPath();
+      g.moveTo(x - R * 0.6, y - L / 2);
+      g.lineTo(x + R * 0.6, y - L / 2);
+      g.lineTo(x + R, y - L * 0.36);
+      g.lineTo(x + R, y + L * 0.38);
+      g.lineTo(x + R * 0.6, y + L / 2);
+      g.lineTo(x - R * 0.6, y + L / 2);
+      g.lineTo(x - R, y + L * 0.38);
+      g.lineTo(x - R, y - L * 0.36);
+      g.closePath();
+      g.stroke();
+      var tubes = Math.min(4, Math.max(2, Math.round((lk.cells || 7) / 2)));
+      var dr = Math.max(0.9, R * 0.16);
+      for (i = 0; i < tubes; i++) {
+        var tx = x - R * 0.6 + (R * 1.2) * (i + 0.5) / tubes;
+        g.beginPath();
+        g.arc(tx, y - L * 0.40, dr, 0, Math.PI * 2);
+        g.stroke();
+      }
+      return;
+    }
+    if (lk.nest === 'box') {
+      // 方形发射巢：方框 + 每格一个伸出的弹头
+      var cols = lk.cells === 4 ? 2 : (lk.cells || 3);
+      var HW = Math.max(4, lk.dia * 2.0 * k) * (cols / 2.4 + 0.4);
+      g.strokeRect(x - HW, y - L / 2 + L * 0.12, HW * 2, L * 0.88);
+      for (i = 0; i < cols; i++) {
+        var cx = x - HW + HW * 2 * (i + 0.5) / cols;
+        g.beginPath();
+        g.moveTo(cx - HW / cols * 0.55, y - L / 2 + L * 0.12);
+        g.lineTo(cx, y - L / 2);
+        g.lineTo(cx + HW / cols * 0.55, y - L / 2 + L * 0.12);
+        g.stroke();
+        if (i > 0) {
+          g.beginPath();
+          g.moveTo(cx - HW / cols, y - L / 2 + L * 0.12);
+          g.lineTo(cx - HW / cols, y + L / 2);
+          g.stroke();
+        }
+      }
+      return;
+    }
+
+    var n = lk.rack || 1;
+    if (n === 1) { drawRound(g, x, y, lk, L, D); return; }
+    // 多联挂梁：中间一道横梁 + 并排的弹（三联：中间那枚靠后半个身位，读作"下挂"）
+    var gap = D * (n === 3 ? 1.5 : 2.0);
+    var offs = n === 2 ? [-gap / 2, gap / 2] : [-gap, 0, gap];
+    g.beginPath();
+    g.moveTo(x + offs[0], y + L * 0.05);
+    g.lineTo(x + offs[offs.length - 1], y + L * 0.05);
+    g.stroke();
+    for (i = 0; i < offs.length; i++) {
+      drawRound(g, x + offs[i], y + (n === 3 && i === 1 ? L * 0.12 : 0), lk, L, D);
+    }
+  }
+
+  function drawRound(g, x, y, lk, L, D) {
+    if (lk.fin === 'bomb') {
+      g.beginPath();
+      g.moveTo(x, y - L / 2);
+      g.quadraticCurveTo(x + D / 2, y - L * 0.18, x + D / 2, y + L * 0.22);
+      g.lineTo(x + D * 0.25, y + L / 2);
+      g.lineTo(x - D * 0.25, y + L / 2);
+      g.lineTo(x - D / 2, y + L * 0.22);
+      g.quadraticCurveTo(x - D / 2, y - L * 0.18, x, y - L / 2);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(x - D * 0.9, y + L / 2);
+      g.lineTo(x + D * 0.9, y + L / 2);
+      g.stroke();
+      return;
+    }
+    var tail = lk.fin === 'strake' ? 1.6 : 1.3;
+    g.beginPath();
+    g.moveTo(x, y - L / 2);
+    g.lineTo(x + D / 2, y - L * 0.32);
+    g.lineTo(x + D / 2, y + L * 0.36);
+    g.lineTo(x + D * tail, y + L / 2);
+    g.lineTo(x - D * tail, y + L / 2);
+    g.lineTo(x - D / 2, y + L * 0.36);
+    g.lineTo(x - D / 2, y - L * 0.32);
+    g.closePath();
+    g.stroke();
+    // 每条线单独 beginPath：多段 moveTo 在离线预览器的光栅里会被连起来
+    function seg(x0, y0, x1, y1) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+    if (lk.fin === 'strake') {
+      // 长边条：从弹体中前部斜向后
+      seg(x - D / 2, y - L * 0.12, x - D * 1.05, y + L * 0.14);
+      seg(x + D / 2, y - L * 0.12, x + D * 1.05, y + L * 0.14);
+    } else if (lk.fin === 'cruise') {
+      seg(x - D * 3.2, y + L * 0.02, x + D * 3.2, y + L * 0.02);   // 平直大弹翼
+    } else {
+      seg(x - D * 1.1, y - L * 0.02, x + D * 1.1, y - L * 0.02);
+    }
+    if (lk.boost) seg(x - D * 0.8, y + L * 0.28, x + D * 0.8, y + L * 0.28);
+  }
+
+  function drawStoreKind(g, x, y, kind, k, style) {
     var L = (STORE_LEN[kind] || 3.0) * k;
     var W;
 
@@ -526,23 +649,23 @@ var PLANFORM = (function () {
              而且一眼就能看出是哪一组的哪一发在装填。 */
           g.strokeStyle = 'rgba(79,224,138,0.20)';
           g.lineWidth = 1.3;
-          drawStore(g, px, py, st.w.kind, k, { line: 1.3 });
+          drawStore(g, px, py, st.w, k, { line: 1.3 });
 
           if (ready > 0.002) {
-            var Lc = (STORE_LEN[st.w.kind] || 3.0) * k;
+            var Lc = storeLen(st.w, k), Hc = storeHalfW(st.w, k);
             g.save();
             g.beginPath();
-            g.rect(px - k * 1.8, py + Lc / 2 - Lc * ready, k * 3.6, Lc * ready);
+            g.rect(px - Hc, py + Lc / 2 - Lc * ready, Hc * 2, Lc * ready);
             g.clip();
             g.strokeStyle = STORE;
             g.lineWidth = 1.4;
-            drawStore(g, px, py, st.w.kind, k, { line: 1.4 });
+            drawStore(g, px, py, st.w, k, { line: 1.4 });
             g.restore();
           }
         } else {
           g.strokeStyle = isActive ? AMBER : STORE;
           g.lineWidth = isActive ? 2 : 1.3;
-          drawStore(g, px, py, st.w.kind, k, { line: isActive ? 2 : 1.3 });
+          drawStore(g, px, py, st.w, k, { line: isActive ? 2 : 1.3 });
         }
       }
     }

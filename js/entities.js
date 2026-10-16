@@ -1542,7 +1542,11 @@ var Ent = (function () {
       var dir = M3.norm(M3.add(a.fwd, M3.add(
         M3.mul(a.right, gauss() * w.spread),
         M3.mul(a.up, gauss() * w.spread))));
-      var muzzle = M3.add(a.pos, M3.add(M3.mul(a.fwd, 6), M3.mul(a.right, (i % 2) ? 0.7 : -0.7)));
+      /* 左右炮口交替。以前用 i % 2，而每轮通常只出 1 发 → 永远是左炮口，
+         火光却画在右边，看上去子弹和火光不是一个地方出来的。
+         现在按"发"轮换（a.gunSide 跨轮保留），火光跟着同一个点走。 */
+      a.gunSide = a.gunSide ? 0 : 1;
+      var muzzle = gunMuzzle(a, a.gunSide);
       world.bullets.push({
         kind: 'bullet', team: a.team, alive: true,
         pos: muzzle,
@@ -1556,11 +1560,18 @@ var Ent = (function () {
        注意 spawnParticle 的签名是 (list, pos, vel, life, size, ...) ——
        这里原来把 size 写成了 3.2（米），直径六米多，比飞机还大，
        所以整团火直接把机体盖住了。 */
-    var mz = M3.add(a.pos, M3.add(M3.mul(a.fwd, 7.5), M3.mul(a.right, 0.9)));
-    spawnParticle(world.particles, mz, M3.mul(a.vel, 0.15),
+    /* 火光放在这一轮最后一发的炮口上，并且**跟着飞机走**（速度 = 机体速度）：
+       以前给的是 0.15 倍机速，飞机 300 m/s 往前冲，火光一生成就往后拖十几米。 */
+    var mz = gunMuzzle(a, a.gunSide);
+    spawnParticle(world.particles, mz, M3.clone(a.vel),
       0.055, 0.55, '#fff2c0', { grow: true });
-    spawnParticle(world.particles, mz, M3.V(0, 0, 0),
+    spawnParticle(world.particles, mz, M3.mul(a.vel, 0.9),
       0.10, 0.95, '#ffd070', { grow: true });
+  }
+
+  /* 炮口位置（side 0 = 左，1 = 右）。子弹出膛与火光共用这一份。 */
+  function gunMuzzle(a, side) {
+    return M3.add(a.pos, M3.add(M3.mul(a.fwd, 6), M3.mul(a.right, side ? 0.7 : -0.7)));
   }
 
   function stepBullet(b, dt) {

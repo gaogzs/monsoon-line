@@ -1708,6 +1708,45 @@ if (Ent && M3 && me && world) {
       '；最大机头误差 ' + Math.max.apply(null, res.map(r => r.steadyErr)).toFixed(2) + '°');
   }
 
+  /* ---- 俯冲 / 竖直附近不能原地连滚 ----
+     机头接近竖直时"机翼水平"没有定义，坡度只是数值噪声；倒飞时往左
+     改平和往右改平一样远。两处都曾让飞机追着噪声或翻号的目标连滚好几圈
+     才开始转向。这里把瞄准点拖到正下方、以及先下再侧，累计滚转量要有界。 */
+  {
+    const M3 = sandbox.M3, AI = sandbox.AI;
+    const D = Math.PI / 180, dt = 1 / 60;
+    const dir = (y, p) => M3.V(Math.sin(y) * Math.cos(p), Math.sin(p), Math.cos(y) * Math.cos(p));
+    function totalRoll(aimFn, T) {
+      const a = {
+        fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
+        phys: { pitch: 0.76, roll: 3.0, yaw: 0.30 }, ctrlAuth: 1, ctrl: {}
+      };
+      let tot = 0;
+      for (let t = 0; t < T; t += dt) {
+        AI.steerTo(a, aimFn(t), a.ctrl, a, dt);
+        const c = a.ctrl;
+        tot += a.phys.roll * dt * Math.abs(c.roll);
+        const pk = c.pitch >= 0 ? 1 : 0.5;
+        let g = -a.phys.pitch * pk * dt * c.pitch;
+        a.fwd = M3.rotAxis(a.fwd, a.right, g); a.up = M3.rotAxis(a.up, a.right, g);
+        g = -a.phys.roll * dt * c.roll;
+        a.right = M3.rotAxis(a.right, a.fwd, g); a.up = M3.rotAxis(a.up, a.fwd, g);
+        g = a.phys.yaw * dt * c.yaw;
+        a.fwd = M3.rotAxis(a.fwd, a.up, g); a.right = M3.rotAxis(a.right, a.up, g);
+        const B = M3.orthonormalize(a.fwd, a.up);
+        a.fwd = B.fwd; a.up = B.up; a.right = B.right;
+      }
+      return tot / D;
+    }
+    const r1 = totalRoll(t => dir(0, -Math.min(60 * t, 89) * D), 6);
+    const r2 = totalRoll(t => dir(-Math.max(0, t - 1.5) * 40 * D, -Math.min(50 * t, 70) * D), 6);
+    const bad = [];
+    if (r1 > 250) bad.push('瞄准点拖到正下方后累计滚转 ' + r1.toFixed(0) + '°（在竖直附近原地连滚）');
+    if (r2 > 420) bad.push('先俯冲再侧转累计滚转 ' + r2.toFixed(0) + '°（倒飞时改平方向翻号）');
+    if (bad.length) bad.forEach(fail);
+    else ok('俯冲不连滚：拖到正下方累计滚转 ' + r1.toFixed(0) + '°，先下再侧 ' + r2.toFixed(0) + '°');
+  }
+
   /* ---- 两组挂架挂同一种武器：槽下标不能撞 ----
      slotCd 是按**武器**建的（长度 = 该武器占用的挂点总数），
      而渲染按**组**遍历。如果每组都从 arr[0] 开始读，
@@ -2009,7 +2048,7 @@ if (Ent && M3 && me && world) {
 
     // 7. 主循环的接线：render() 必须对**每一架**飞机调 pushStores。
     //    上面几条都是直接调函数的，这条走真实的一帧 —— 挂载的指纹是
-    //    pushModel 的 scale 0.85（飞机 / 目标 / 导弹都不带这个值）。
+    //    pushModel 的 store 标记（飞机 / 目标 / 导弹都不带这个值）。
     let expect = 0;
     for (let i = 0; i < w0.actors.length; i++) {
       if (w0.actors[i].alive) expect += countStoresOf(w0.actors[i]);
@@ -2018,7 +2057,7 @@ if (Ent && M3 && me && world) {
     {
       const o = Rn.pushModel;
       Rn.pushModel = function (m, p, f, u, op) {
-        if (op && op.scale === 0.85) drawn++;
+        if (op && op.store) drawn++;
         return o(m, p, f, u, op);
       };
       pump(1);
@@ -2947,8 +2986,8 @@ if (Ent && M3 && me && world) {
      这也正是它单独占一条带子、而不是塞进速度带里的原因。
      断言盯三件事：标签在、读数跟着油门轴走、0 / 军推 / 加力三档分得开。
 
-     读数固定在带子的垂直中心（y = H/2 + 5），所以按 y 过滤就能把它
-     和别处的百分比文字（HULL 之类）分开，不会误判。 */
+     出力带现在在雷达右侧（左下象限），按"左半屏、下半屏"过滤就能把它
+     和别处的百分比文字（HULL 在屏幕正中之下）分开，不会误判。 */
   {
     const G8 = sandbox.Game, R4 = sandbox.Renderer;
     const bad = [];
@@ -2964,17 +3003,16 @@ if (Ent && M3 && me && world) {
       return origText.apply(this, arguments);
     };
 
-    const midY = R4.H / 2 + 5;
     let sawLabel = false;
     /* 只用**稳态档位**：加力（>1.0）与减速板（<0.04）在 game.js 里是瞬时态，
        不给输入时每帧会自己往军推/零位掉，拿它们当稳定读数会测出假失败。 */
-    const cases = [[0.5, '40%'], [1.0, '80%']];
+    const cases = [[0.5, '50%'], [1.0, '100%']];
     for (const c of cases) {
       pl.throttle = c[0];
       seen.length = 0;
       pump(1);
       if (seen.some(s => s.t === 'THR')) sawLabel = true;
-      const readout = seen.filter(s => /%$/.test(s.t) && Math.abs(s.y - midY) < 2.5);
+      const readout = seen.filter(s => /%$/.test(s.t) && s.x < R4.W / 2 && s.y > R4.H / 2);
       if (!readout.some(s => s.t === c[1])) {
         bad.push('油门 ' + c[0] + ' 时出力条没有显示 ' + c[1] +
           '（该高度的读数：' + (readout.map(s => s.t).join('/') || '无') + '）');
@@ -2986,9 +3024,9 @@ if (Ent && M3 && me && world) {
       pl.throttle = 1.25;
       seen.length = 0;
       pump(1);
-      const pct = seen.filter(s => /%$/.test(s.t) && Math.abs(s.y - midY) < 2.5)
+      const pct = seen.filter(s => /%$/.test(s.t) && s.x < R4.W / 2 && s.y > R4.H / 2)
         .map(s => parseInt(s.t, 10));
-      if (!pct.some(v => v > 80)) {
+      if (!pct.some(v => v > 100)) {
         bad.push('加力位没有显示出力超过军推（该高度的读数：' +
           (pct.join('/') || '无') + '）');
       }
@@ -2998,7 +3036,7 @@ if (Ent && M3 && me && world) {
     if (!sawLabel) bad.push('HUD 里找不到引擎出力条的 "THR" 标签');
 
     if (bad.length) bad.forEach(fail);
-    else ok('引擎出力条：读数随油门走（杆位 0.5 → 40% / 军推 80% / 加力 >80%）');
+    else ok('引擎出力条：读数随油门走（杆位 0.5 → 50% / 军推 100% / 加力 >100%）');
   }
 
   /* ---- 激光制导机制（休眠中，但代码要能跑）----

@@ -119,7 +119,16 @@ const CASES = [
   { tag: 'spray-vbn-vzu-belly', type: 'spray', special: 'vbn', pods: ['vzu'], el: -0.42, note: '浪花，从下看机腹的吊舱' },
   { tag: 'm27-dl6-belly', type: 'm27', special: 'dl6', el: -0.42, note: '片岩，从下看：翼下挂载的高度对不对' },
   { tag: 'pelican-dl6', type: 'pelican', special: 'dl6', note: 'J-2 鹈鹕预警机 + 空空弹：适配表拦住它（应当一件都没有）' },
-  { tag: 'ucav-v9', type: 'ucav', special: 'v9', note: 'KA-7 僚机 + GIR-9' }
+  { tag: 'ucav-v9', type: 'ucav', special: 'v9', note: 'KA-7 僚机 + GIR-9' },
+  { tag: 'c21-default', type: 'c21', note: 'D-21 贼鸥：机腹与翼下挂载要贴着扁平机身' },
+  { tag: 'c21-default-belly', type: 'c21', el: -0.42, note: '同上，从下看' },
+  { tag: 'c11-srm', type: 'c11', special: 'srm', note: '外观：TOR-2 双联格斗弹（应当短小）' },
+  { tag: 'c11-wasp', type: 'c11', special: 'wasp', note: '外观：SUT-7 三联挂梁' },
+  { tag: 'c11-qsr', type: 'c11', special: 'qsr', note: '外观：GIR-5 三管方巢' },
+  { tag: 'c11-swm', type: 'c11', special: 'swm', note: '外观：GIR-12 四格方巢' },
+  { tag: 'c11-rkt', type: 'c11', special: 'rkt', note: '外观：PEJ-6 七管火箭巢' },
+  { tag: 'c11-vlar', type: 'c11', special: 'vlar', note: '外观：CLA-12 超远程（应当最大）' },
+  { tag: 'c11-lcm', type: 'c11', special: 'lcm', note: '外观：GUT-30 巡航弹' }
 ];
 
 const BG = [0x0d, 0x16, 0x1c];
@@ -160,7 +169,7 @@ for (const c of CASES) {
   ras.clear(BG[0], BG[1], BG[2]);      // begin() 画的天空/海面网格不要
   Renderer.pushModel(mdl, M3.V(0, 0, 0), M3.V(0, 0, 1), M3.V(0, 1, 0), { sweep: a.sweep || 0 });
   const orig = Renderer.pushModel;
-  Renderer.pushModel = function (m, p, f, u, o) { if (o && o.scale === 0.85) stores++; return orig(m, p, f, u, o); };
+  Renderer.pushModel = function (m, p, f, u, o) { if (o && o.store) stores++; return orig(m, p, f, u, o); };
   Game.__pushStores(a);                // ← 实机那条渲染路径
   Renderer.pushModel = orig;
   Renderer.flush();
