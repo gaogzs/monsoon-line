@@ -505,6 +505,27 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
 
 ---
 
+## 水面 / 地面目标的对空射击（`game.js`）
+
+带 `t.weapon` 的设施与舰船不走 `ai.js`，由 `game.js` 的 `updateTargets(dt)` 每帧处理：
+`fireCd` 走完后调 `pickTargetFor(t, w)` 选目标，再 `Ent.makeMissile`（朝目标方向偏上 260 m 出筒，
+初速 140，弹的 `team` = 发射者阵营），`fireCd = w.cd + rnd(0, 2)`。
+
+| 发射者 | 选谁 |
+|---|---|
+| team 1（敌方） | **玩家优先**：在 `lockDist × (1 − player.lockResist)` 内，且 `world.detected` 或"低空突防被目视发现"（地面目标、玩家低于 `dangerAltitude`、5.2 km 内）。玩家不合格时，**已被发现**才转打 `lockDist` 内最近的我方飞机（僚机 / 无人机）；未被发现前不打僚机 —— 一开火就等于自己暴露 |
+| team 0（我方，如带 `ss6` FAN-6 的驱逐舰） | `lockDist` 内最近的非本方、非中立飞机；**永远不选玩家** |
+| team 2（中立，如 SKORI） | 从不开火（`updateTargets` 直接跳过） |
+
+- 命中与近炸按 `m.team` 过滤，所以我方舰艇的弹伤不到玩家与僚机。
+- **"发射！"无线电与 `SFX.missileFar()` 只在 `tgt === player` 时触发**；
+  告警音 / RWR 由主循环按 `m.target` 判，打僚机的弹不会让玩家听到告警。
+- 舰艇打下的敌机照样计入 `world.killed`（主循环数的是所有阵亡的 team 1 飞机，不看是谁打的），
+  也会弹出 `KILL` 提示。
+- 断言入口：`Game.__updateTargets`（`smoke.js` 用它单推一帧，确认我方舰艇不朝玩家打）。
+
+---
+
 ## 无人僚机（`role: 'drone'`）
 
 与 `role: 'wingman'` 的差别不是参数，而是**有没有判断力**。

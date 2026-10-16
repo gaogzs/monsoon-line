@@ -98,10 +98,10 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 | `swm` GIR-12 | tip, light, heavy | 16 | 62 |
 | `v9` GIR-9 | tip, light, heavy | 2 | 110 |
 | `v11` SUT-11 | light, heavy | 2 | 135 |
-| `mrm` BIN-4 | light, heavy, belly | 4 | 195 |
+| `mrm` CLA-4 | light, heavy, belly | 4 | 195 |
 | `v17` CLA-17 | heavy | 1 | 285 |
-| `arm` BIN-8 | heavy | 2 | 310 |
-| `vlar` DAR-12 | heavy | 1 | 720 |
+| `arm` SPO-8 | heavy | 2 | 310 |
+| `vlar` CLA-12 | heavy | 1 | 720 |
 | `hva` SPO-9 | heavy | 1 | 560 |
 | `v25` GUT-25 | heavy, belly | 2 | 330 |
 | `asl` GUT-9 | light, heavy | 4 | 240 |
@@ -118,7 +118,7 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 | `dec` ZUN-12 | light, belly | 1 | 210 |
 | `oep` GUS-6 | light, belly | 1 | 175 |
 | `irp` GUS-9 | tip, light, belly | 1 | 160 |
-| `hdp` BAD-3 | light, belly | 1 | 320 |
+| `hdp` JDA-3 | light, belly | 1 | 320 |
 
 下游专用弹（`dl4` / `dl6` / `dl9` / `vgt` / `vsr` / `vbn` / `otr` / `vzu`）
 的 `fits` 是**空数组**，表示玩家挂不上它们。
@@ -133,10 +133,10 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 | `dl6` BIN-6 | tip, light, heavy |
 | `vbn` BIN-9 | tip, light, heavy |
 | `otr` TOR-1 | tip, light, heavy |
-| `vsc` ZUN-14 | light, belly |
-| `vgt` GUT-7 | heavy, belly |
-| `vsr` SPO-14 | heavy |
-| `vzu` ZUN-6 | light, belly |
+| `vsc` SAV-14 | light, belly |
+| `vgt` TUM-7 | heavy, belly |
+| `vsr` BOX-14 | heavy |
+| `vzu` SAV-6 | light, belly |
 | `dl9` BAD-9 | 不写 —— 地面发射，不上机 |
 
 适配表**不能不要**：`a2` / `pelican` / `quartz` / `gal44` 这些
@@ -197,12 +197,12 @@ function canCarry(ac, w) {
 | D-33 信天翁 | （无）—— 纯格斗机 |
 | KA-7 折翼 | （无，且 `npcOnly`） |
 
-> `BIN-8` 追云**不在** `STORE_NEEDS` 里。它原来被标成"反辐射弹"、要求
+> `SPO-8` 追云**不在** `STORE_NEEDS` 里。它原来被标成"反辐射弹"、要求
 > `strike`（对地火控），于是只有攻击机和多用途机能挂 —— 而它其实是一枚
 > **对空的重型拦截弹**，最该带它的恰恰是制空 / 截击机（D-14、F-9），
 > 那些机型没有 `strike`，反而挂不上。那个门槛造成的是荒谬的分配，
 > 所以整个删掉，现在只受 `fits: ['heavy']` 约束。
-> `smoke.js` 专门断言"制空/截击机必须挂得上 BIN-8"。
+> `smoke.js` 专门断言"制空/截击机必须挂得上 SPO-8"。
 >
 > **但"反辐射"这个标签本身没有删。** 它当时的另一个问题是"没有机制支撑"
 > —— 世界里既没有雷达开机状态、也没有预警机。这两样现在都有了
@@ -392,13 +392,14 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 （`smoke.js` 有断言盯着）。
 
 所以"一种导弹 + 一些吊舱"、以及"两种导弹各占一组"都是支持的。
-吊舱吃掉挂点后，导弹的**可视挂架会变少，但弹药池不变**
-（`ammoPool[wid] = w.ammo`）—— AI 该打几发还是几发，只是能看见的发射架少了。
+吊舱吃掉挂点后，导弹的**可视挂架会变少，弹药池也跟着变少**：
+上游弹的储备按 `min(w.ammo, 挂点数 × perPoint)` 封顶 —— 机翼上挂不下的弹打不出来。
 
 `entities.js` 内部的 `buildNpcMounts(a)`（不导出；`makeAircraft()` 末尾对非玩家调用）据此建两样东西：
 
-- `a.ammoPool[wid] = w.ammo` —— **取 `w.ammo`，不是玩家的
-  `挂点数 × perPoint`**；下游弹的 `perPoint` 是 0，按玩家口径会建出 0 发弹
+- `a.ammoPool[wid] = min(w.ammo, 挂点数 × perPoint)` —— `w.ammo` 是"打一仗的预算"，
+  但不能超过机翼上实际挂得下的量（以前直接取 `w.ammo`，KA-7 两个轻挂点能打出 44 发 GIR-9）。
+  下游弹的 `perPoint` 是 0（没有挂载表），**仍只按 `w.ammo`** —— 按玩家口径会建出 0 发弹
 - `a.slotCd[wid] = [...]` —— 长度 = 该武器占用的挂点数，超出储备的槽标
   `SLOT_EMPTY`（与玩家同一条规矩）
 
@@ -437,8 +438,8 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 | 键 | 名 | 字段 | 值 | 效果 |
 |---|---|---|---|---|
 | `ecm2` | ZUN-8 静默 | `lockResist` | 0.40 | 敌方对你的锁定距离 ×(1−0.40) |
-| `vzu` | ZUN-6 迷雾 | `lockResist` | 0.30 | 同上（下游，玩家挂不上） |
-| `hdp` | BAD-3 护盾 | `armorBonus` | 0.22 | 全向减伤，可叠加 |
+| `vzu` | SAV-6 迷雾 | `lockResist` | 0.30 | 同上（下游，玩家挂不上） |
+| `hdp` | JDA-3 护盾 | `armorBonus` | 0.22 | 全向减伤，可叠加 |
 | `oep` | GUS-6 明瞳 | `lockRangeBonus` / `silentLock` | 0.45 | 锁定距离 ×(1+0.45)；**被动测距，不触发对方 RWR** |
 | `irp` | GUS-9 夜枭 | `lockRangeBonus` / `lockResist` / `silentLock` | 0.25 / 0.15 | 同时给三项 |
 | `dec` | ZUN-12 雾障 | `flareBonus` | 40 | 额外干扰弹组数（×挂载点数） |

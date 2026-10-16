@@ -34,18 +34,20 @@
 | `CALLSIGN` | 对象 | 6 键 | `game.js`、`missions.js` |
 | `AIRCRAFT` | 数组 | **17** 条（可驾驶 6） | `entities.js` `makeAircraft`、`game.js`、`codex.js`、`ai.js`、`planform.js`、`hud.js`、`unitview.js` |
 | `SHIPS` | 数组 | **16** 条 | `missions.js` `spawnShip`、`codex.js` `inv3`、`unitview.js`、`game.js` `preflight` |
-| `WEAPONS` | 对象 | **43** 键 | `entities.js`、`game.js`、`ai.js`、`hud.js`、`codex.js` |
+| `WEAPONS` | 对象 | **44** 键 | `entities.js`、`game.js`、`ai.js`、`hud.js`、`codex.js` |
 | `STORE_ATTR` | 对象 | 29 键 → 注入 `fits` `perPoint` `mass` | 间接；挂载系统 |
-| `STORE_ROLE` | 对象 | 37 键 → 注入 `role` | 机库卡片、图鉴 |
+| `STORE_ROLE` | 对象 | 38 键 → 注入 `role` | 机库卡片、图鉴 |
 | `STORE_NEEDS` | 对象 | 9 键 → 注入 `needs` | `canCarry`、`preflight` |
-| `STORE_COOLDOWN` | 对象 | 27 键 → 覆盖 `cd` | `launch()` 的槽计时 |
-| `MISSILE_LEAD` | 对象 | 27 键 → 注入 `lead` | 导弹提前量 |
+| `STORE_COOLDOWN` | 对象 | 28 键 → 覆盖 `cd` | `launch()` 的槽计时 |
+| `MISSILE_LEAD` | 对象 | 28 键 → 注入 `lead` | 导弹提前量 |
 | `CS_DOWNSTREAM` | 数组 | 20 条 `{cn,en}` | `missions.js` |
 | `downstreamCallsign(i)` | 函数 | — | `missions.js` |
 | `missileRange(w)` | 函数 | — | 机库卡片、图鉴 |
 | `canCarry(ac,w)` | 函数 | — | `game.js`、`preflight` |
 | `loadoutPenalty(lf)` | 函数 | — | `game.js` 面板 + `entities.js` 物理 |
-| `FLARE_RD` | 对象 | 15 键 → 注入 `flareRD`（只给雷达弹） | `breakLock()` |
+| `FLARE_RD` | 对象 | 14 键 → 注入 `flareRD`（只给雷达弹） | `breakLock()` |
+| `HARD_MODELS` | 对象 | 1 键（`radar`） | `entities.js` `isHard` / `warheadK`（加固目标的战斗部系数） |
+| `roeRestricted(w)` | 函数 | — | `game.js` `launch()` 的 ROE 拦截、desc 末尾的 ROE 提示（同一判据） |
 | `VOICES` | 对象 | 11 个任务（`m1`–`m10` + `sk1`） | `game.js` 的 `Radio` |
 
 规模数字会随内容增长，以上是核对 `data.js` 时的值——数错不会报错，只当参考。
@@ -208,6 +210,8 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 于是 `arms` 用文字："32 单元舰空弹垂发"、"反舰导弹 ×8"。
 `arms` 不参与战斗：舰船在关卡里开不开火、打什么，由任务调用 `spawnShip` 时传的
 `o.weapon`（`WEAPONS` 的键）决定，与 `arms` 的文字无关。
+`weapon` 对**我方舰艇（team 0）**同样有效：上游驱逐舰带的是专门的舰载弹 `ss6`（FAN-6 海墙，`fits: []`），
+只打敌机、从不朝玩家开火（选目标规则见 [ai.md](ai.md)）。team 2（中立）带了也不开火。
 
 ### 与 `AIRCRAFT` 的结构性差异
 
@@ -226,7 +230,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 
 ## WEAPONS 表
 
-对象，43 键。**对象键是内部代号**（`v11` `k3` `dl4`…），玩家看到的永远是 `name`。改键名要动多个文件，别改。
+对象，44 键。**对象键是内部代号**（`v11` `k3` `dl4`…），玩家看到的永远是 `name`。改键名要动多个文件，别改。
 
 `kind` 取值（当前分布）：
 
@@ -269,17 +273,24 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `reAcquire` | 丢目标后重捕一次 | ✅ `entities.js` |
 | `nezer` | 冲压弹，锁定时长 1.5 s | ✅ `game.js` |
 | `scramjet` | 18 km 以上动力段 ×0.24 | ✅ `entities.js`、`hud.js` |
-| `bigTarget` | 大型目标标记 | ✅ `missions.js`（打大目标） |
-| `highAltImmune` | 过载不随空气变稀崩塌 | ✅ `entities.js` |
+| `highAltImmune` | 过载不随空气变稀崩塌；低空推力 / 滑翔掉速有代价 | ✅ `entities.js` |
+| `hobs` | 大离轴：出膛后导引头视场 = max(77°, `lockCone`) | ✅ `entities.js` `stepMissile` |
+| `cluster` | 子母弹覆盖半径（米） | ✅ `entities.js` `clusterBurst`、`game.js` |
+| `penetrator` | 侵彻：对 `HARD_MODELS` 全额伤害 | ✅ `entities.js` `warheadK` |
+| `loft` | `{alt, dive}` 攻顶弹道 | ✅ `entities.js` `stepMissile` |
+| `decoyMemory` | 不被同一团诱饵云骗第二次（CLA-4） | ✅ `entities.js` `decoyRecheck` |
+| `twinSeeker` | 双导引头，连中两次诱饵才脱锁（BIN-9） | ✅ `entities.js` `breakLock` |
+| `antiRadar` | 对辐射中的目标伤害 ×2 | ✅ `entities.js` `detonate` |
 | `passive` | 被动吊舱，不扣扳机 | ✅ `game.js` `passiveEffects()` |
 | `duration` / `lockReduce` | ECM 生效时长与压缩比 | ✅ `game.js` |
 | `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | 定向能拦截 | ✅ `entities.js` `game.js` |
-| `highAltScale` | 标注"会受高空缩放" | ❌ **无人读取**（缩放由 `turnFactor()` 对所有弹统一做） |
-| `hobs` | 标注"大离轴" | ❌ 无人读取（离轴能力实际由 `lockCone` 决定） |
-| `cluster` | 标注"集束" | ❌ 无人读取 |
-| `selfBlind` | 标注"干扰是双向的" | ⚠️ 字段本身无人读 —— 双向压制由 `lockReduce` + `ewPower` 实现在 `updateLock()` 里，见 [weapons.md](weapons.md) |
 
-**这四个未被读取的标记保留是有意义的**——它们是给读表人（和未来机制）的说明，但别指望写上去就生效。
+`highAltScale` / `selfBlind` / `emitter` / 武器上的 `bigTarget` 曾是"写了没人读"的说明性标记，**已全部删除**
+（`bigTarget` 现在只是 `missions.js` 写在**实体**上的标签）。
+
+**desc 模板**：`desc` 里可以写 `{{字段}}` 与派生量（`coneDeg` `lockKm` `hardPct` `loftAlt` …），
+`data.js` 末尾的 IIFE 在所有补丁表合并之后替换成当前数值；玩家挂得上且 `roeRestricted(w)` 为真的武器
+再自动追加一句交战规则提示。完整列表见 [weapons.md](weapons.md#特殊标记)。
 
 **被动吊舱专属字段**（`passive: true` 才有）：`lockResist` `lockRangeBonus` `flareBonus` `armorBonus` `silentLock`。汇总在 `entities.js` 的 `Ent.passiveEffects(list)`（`game.js` 只负责把挂载点分组翻译成 `{wid,n}` 列表；**敌机的 `o.pods` 走同一个函数**）：`lockResist` 取最大值，其余按挂载点数累加，`armor` 上限 0.55、`lockRange` 上限 1.9；`silentLock` 是布尔，任一被动测距吊舱即可点亮。
 
@@ -318,7 +329,7 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 
 单独放的理由是"一眼横着比较谁挂得下、谁带得多、谁更重"。`fits` 的取值只有四种：`tip` / `light` / `heavy` / `belly`。
 
-**下游专用弹（`vzu` `vgt` `vsr` `vbn` `otr` `dl4` `dl6` `dl9` `vsc`）直接把 `fits: []` 写在 `WEAPONS` 里，不放进 `STORE_ATTR`**——空数组 = 玩家挂不上。`vsc`（ZUN-14 焦炬）是下游的**烧穿吊舱**：主动 ECM，靠 `jamRadius` / `jamK` 在 `world` 里建范围压制场（见 [game.md](game.md) 的 `updateJamming()`）。
+**下游专用弹（`vzu` `vgt` `vsr` `vbn` `otr` `dl4` `dl6` `dl9` `vsc`，以及上游舰载的 `ss6` FAN-6）直接把 `fits: []` 写在 `WEAPONS` 里，不放进 `STORE_ATTR`**——空数组 = 玩家挂不上。`vsc`（SAV-14 焦炬）是下游的**烧穿吊舱**：主动 ECM，靠 `jamRadius` / `jamK` 在 `world` 里建范围压制场（见 [game.md](game.md) 的 `updateJamming()`）。
 
 这些弹另有一个手写字段 `npcFits`（**只有它们有**）：
 
@@ -335,7 +346,7 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 而渲染实体挂载时把它当"挂不上"就会把敌机机翼清空。
 `Ent.fitsKind()` 按 `a.isPlayer` 在两张表之间选。
 
-### `STORE_ROLE`（37 键）
+### `STORE_ROLE`（38 键）
 
 一句话定位。机炮（`k1` `k2` `k3` `k7` `k11`）与下游烧穿吊舱 `vsc` 没有条目，所以它们没有 `role`；图鉴/卡片用 `(w.role || '—')` 兜底。
 
@@ -348,13 +359,13 @@ hva: ['intercept'], vlar: ['intercept'], e4: ['ew'], l2: ['ew']
 
 判定在 `canCarry(ac, w)`：**没有 `needs`（或空数组）一律放行**。这是刻意的——门槛只加在少数重型弹上。
 
-### `STORE_COOLDOWN`（27 键）
+### `STORE_COOLDOWN`（28 键）
 
 "**每个发射槽**的装填时间"，不是每件武器。注意它与 `WEAPONS[].cd` 的关系：**补丁表覆盖原始 `cd`**。
 
-⚠️ **下游专用弹不在表里**（`vzu:6.8` `vgt:11` `vsr:15.6` `vbn:8` `otr:6` 保留的就是 `WEAPONS` 里写的原始值）。这是**有意的**：它们只给 NPC 用，不参与玩家的槽计时。但对**玩家可发射武器**，`smoke.js` 会强制要求写进 `STORE_COOLDOWN`——漏写会用旧语义的 `cd`，可能快得离谱（历史上 CLA-17 就这样漏过一次）。
+⚠️ **下游专用弹不在表里**（`vzu:6.8` `vgt:11` `vsr:15.6` `vbn:8` `otr:6` 保留的就是 `WEAPONS` 里写的原始值）；例外是上游舰载 `ss6`，在表里（`ss6: 15`）。这是**有意的**：它们只给 NPC 用，不参与玩家的槽计时。但对**玩家可发射武器**，`smoke.js` 会强制要求写进 `STORE_COOLDOWN`——漏写会用旧语义的 `cd`，可能快得离谱（历史上 CLA-17 就这样漏过一次）。
 
-### `MISSILE_LEAD`（27 键）
+### `MISSILE_LEAD`（28 键）
 
 导引品质 0..1。合并时**跳过 `unguided`**：
 
@@ -367,7 +378,7 @@ WEAPONS[k].lead = MISSILE_LEAD[k];
 
 **静默回退**：`entities.js` 里 `var lead = (w.lead === undefined) ? 0.6 : w.lead;`。也就是说漏写 `lead` 不会报错，而是悄悄拿到 **0.6**——一个"中等聪明"的弹。`smoke.js` 会拦（除 `unguided` / `seeker === 'none'` / `passive` / `gun` 之外都必须有 `lead`）。
 
-### `FLARE_RD`（15 键，只发给雷达弹）
+### `FLARE_RD`（14 键，只发给雷达弹）
 
 干扰弹是**热焰弹 + 箔丝**一起投的，所以同一枚弹对两种导引头其实有**两个**概率：
 
@@ -386,7 +397,7 @@ WEAPONS[k].flareRD = FLARE_RD[k];
 它修的是设定 8.3 里明确记着的那个"待修的数值问题"：`flare` 当初逐个手调、
 没按导引头排序，于是雷达弹平均（0.66）反而**比红外弹（0.44）更好骗**，
 与"多普勒滤波该让雷达弹更难骗"相反。现在空空的雷达弹整体压到红外弹均值
-以下（BIN-4 的 0.30 是全场最难骗的一枚），对地/反大型弹保持高值。
+以下（CLA-4 的 0.30 是全场最难骗的一枚），对地/反大型弹保持高值。
 
 **静默回退**：`breakLock()` 里 `w.flareRD !== undefined ? w.flareRD : w.flare`。
 `smoke.js` 会拦：所有雷达弹都必须显式给出 `flareRD`，且"空空雷达弹均值
@@ -516,7 +527,7 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 1. **`WEAPONS` 键拼错进补丁表 = 静默丢弃**。五张补丁表都有 `hasOwnProperty` 检查，拼错的键既不会报错也不会生效。
 2. **`flare` 必须显式写 `0`，不能省**（PEJ-30 的教训）。`breakLock` 的判定是 `if (Math.random() >= w.flare) continue;`——不写 `flare` 就是 `undefined`，比较恒为 `false`，弹**每次都被骗走**，和"不受干扰"正好相反。
 3. **`lead` 缺省是 0.6，不是 0**。想要"笨弹"必须写负数方向的值（例如 TOR-2 是 0.38），不写只会得到中等水平的弹。
-4. **`highAltScale` / `hobs` / `cluster` / `selfBlind`（说明性标记）与 `WEAPONS[].stat`（条形图预留）当前都没有代码读取**；`AIRCRAFT[].stats` 才是机库六维条。别以为写上去机制就生效了。
+4. **`WEAPONS[].stat`（条形图预留）当前没有代码读取**；`AIRCRAFT[].stats` 才是机库六维条。别以为写上去机制就生效了。
 5. **`CALLSIGN` 的 `awacs` / `enemy` / `ace` 是死字段**；改它们不会有任何效果。改预警机名要动 `VOICES` 的 `who`。
 6. **`VOICES` 事件名写错 = 台词静默消失**，没有任何报错。
 7. **`makeAircraft` 查不到机型就回退 `AIRCRAFT[0]`**，HUD 上的名字会张冠李戴而不报错。

@@ -23,14 +23,22 @@
 | `PEJ-` | pej | *preja* | 扩散 / 播撒 —— 集束炸弹、火箭巢 |
 | `GUS-` | gus | *gusni* | 光 —— 定向能 / 光电吊舱 |
 | `ZUN-` | zun | *zunti* | 干扰 —— 认知电子战吊舱 |
+| `JDA-` | jda | *jdari* | 坚硬 —— 装甲吊舱（JDA-3） |
+| `FAN-` | fan | *fanta* | 阻止 —— 上游舰载防空导弹（FAN-6） |
 | `DAR-` | dar | *darno* | 远 —— 下游中距弹 |
-| `BIN-` | bin | *jbini* | 之间 / 近 —— 中距 / 格斗弹 |
-| `BAD-` | bad | *bandu* | 防卫 —— 装甲吊舱、防空导弹 |
+| `BIN-` | bin | *jbini* | 之间 / 近 —— 下游格斗弹 |
+| `BAD-` | bad | *bandu* | 防卫 —— 下游防空导弹 |
+| `SAV-` | sav | *savru* | 噪声 —— 下游干扰吊舱（SAV-6 / SAV-14） |
+| `TUM-` | tum | *tumla* | 大地 —— 下游对地弹（TUM-7） |
+| `BOX-` | box | *boxna* | 浪 —— 下游反舰弹（BOX-14） |
 | `CAV-` | cav | *carvi* | 雨 —— 调节场体系（`CAV-7` = 第 7 号控制平台） |
 | `DIL-` | dil | *dilnu* | 云 —— 调节单元型号（`DIL-4`） |
 
-同一个词根在不同阵营各排各的号：上游的 `SPO-6` 与下游的 `SPO-14`
-都出自 *daspo*，只是两家分别排号。
+**前缀分属阵营**：TOR / SUT / GIR / CLA / SPO / GUT / PEJ / GUS / ZUN / JDA / FAN
+只出现在上游，DAR / BIN / BAD / SAV / TUM / BOX 只出现在下游 —— 看前缀就知道是谁的弹
+（权威表在 [SETTING.md](../world/SETTING.md)）。
+
+同一个词根在不同势力各排各的号（机炮 `CEL-` 就是这样：上游 3/7、下游 11、分水 1、管理局 2）。
 
 **重要**：`WEAPONS` 的**对象键**（`v11` `k3` `dl4` …）是早期技术代号，
 与显示名不一致，这是有意的——改键名要动多个文件，风险不值得。
@@ -41,7 +49,7 @@
 
 ```js
 var ROOTS = {
-  k3: '发射器 / 炮', k7: '发射器 / 炮', v9: '组 / 群', v11: '快',
+  k1/k2/k3/k7/k11: '发射器 / 炮', v9: '组 / 群', v11: '快',
   v17: '长', v22: '摧毁', v25: '攻击', v30: '扩散 / 播撒',
   e4: '干扰', l2: '光', dl4: '远', dl6: '之间 / 近', dl9: '防卫'
 };
@@ -104,25 +112,34 @@ rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
 
 | 标记 | 被谁读 | 含义 |
 |---|---|---|
-| `reAcquire` | `entities.js` `stepMissile` | **雷达弹**丢失后在 2.6 km 内重新捕获最近的敌机（盲飞期 `reLockT` 之后）。红外弹不靠它，走 `irAcquire()` 自主寻的 |
+| `reAcquire` | `entities.js` `stepMissile` | **雷达弹**丢失后在 2.6 km 且锁定锥内重新捕获最近的敌机（盲飞期 `reLockT` 之后）。红外弹不靠它，走 `irAcquire()` 自主寻的 —— `target !== 'air'` 的红外弹（GUT-9、TUM-7）只在 `world.targets` 里找地面热源，不会转去追飞机 |
 | `antiRadar` | `entities.js` `detonate` | 对**正在辐射**的目标（预警机、开机的干扰机）伤害 ×2 |
 | `npcFits` | `entities.js` `fitsKind` / `mountPlan` | NPC 的挂点适配表（写在字面量里，不经 `STORE_ATTR`）；缺省退回 `fits` |
 | `nezer` | `ai.js`（最小发射距离 1400）、`game.js`（锁定 1.5 s） | 冲压弹：NEZ 大但近距无力 |
 | `scramjet` | `entities.js` `effectiveLife`、`hud.js` | 18 km 以上动力段骤减 |
-| `highAltImmune` | `entities.js` | 转弯下限抬到 0.78（仅 SPO-9） |
-| `ballistic` | `entities.js` | 无动力，走自由落体弹道 |
+| `highAltImmune` | `entities.js` | 转弯下限抬到 0.78（仅 SPO-9）；代价是低空推力最多 −45%、滑翔掉速最多 ×1.6（按相对密度插值） |
+| `ballistic` | `entities.js` | 无动力，走自由落体弹道；有导引头的（GUT-9、PEJ-30）由导引转动**速度矢量**（保持速率） |
+| `hobs` | `entities.js` `stepMissile` | 出膛后的导引头视场取 max(77°, `lockCone`)，大离轴锁定的目标不会出膛即丢 |
+| `cluster` | `entities.js` `clusterBurst`、`game.js` `scanShot` | 数值 = 覆盖半径（米）；起爆 / 落地 / 撞设施时半径内所有地面目标吃满额伤害 |
+| `penetrator` | `entities.js` `warheadK` | 对加固目标（`HARD_MODELS`）全额伤害；普通战斗部 ×0.6、集束 ×0.2 |
+| `loft` | `entities.js` `stepMissile` | `{alt, dive}`：水平距离 > dive 时瞄准点抬高 alt，末段俯冲（GUT-25、BOX-14） |
+| `decoyMemory` | `entities.js` `decoyRecheck` | 盲飞结束时不会被骗走它的那团诱饵云再骗一次（CLA-4） |
+| `twinSeeker` | `entities.js` `breakLock` | 双导引头：要连中两次诱饵才脱锁（BIN-9） |
 | `unguided` | `entities.js`、`game.js` | 无制导，不找目标、走线段命中检测 |
 | `passive` | `game.js`、`ui` | 被动吊舱：不占扳机、不进入武器纵列 |
 | `duration` / `lockReduce` | `entities.js` `openEcm`（→ `spActive` / `ewLockReduce`，再由 `ai.js` 的锁定距离读） | ECM 生效时间与锁定压缩 |
 | `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | `game.js` `updateDEW`、`entities.js` `stepAircraft` | 定向能吊舱 |
-| **`hobs`** | **无** | 数据侧标注"大离轴"，实际离轴能力就是 `lockCone` |
-| **`highAltScale`** | **无** | 数据侧标注；`turnFactor` 是无条件应用的 |
-| **`cluster`** | **无** | 数据侧标注"集束"，没有二次抛撒机制 |
-| **`bigTarget`** | **无**（武器字段） | 数据侧标注；`missions.js` 另有同名的**实体**字段 |
-| **`selfBlind`** | **无** | 数据侧标注"雷达同时被压制"，没有实现 |
 
-> 这几条"无读者"的标记当初是为了表达设定，但代码从没跟上。
-> 写新武器时别假设它们有效。
+desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派生量），
+`data.js` 末尾在所有挂载表合并之后替换成当前数值；交战规则那一句由
+`roeRestricted(w)` 统一追加（只加给玩家挂得上的，`fits` 非空）—— 与 `game.js` 的拦截判据同源。
+派生量全表（`DERIVED`）：`coneDeg` `lockKm` `flarePct` `flareRDPct` `lockResistPct` `lockReducePct`
+`interceptConeDeg` `interceptPct` `highAltPct` `volleys` `hardPct` `loftAlt` `loftDiveKm`；
+其余 `{{x}}` 取 `w[x]` 的数值，取不到就原样保留。`hardPct` 的 0.2 / 0.6 是在
+`data.js` 里**另写一份**的（`HARD_K_TEXT`），改 `entities.js` 的 `HARD_K` 时要同步。
+`highAltScale` / `bigTarget`（武器上）/ `selfBlind` / `emitter` / `reDone`
+没有任何代码读，已删除。
+
 
 ---
 
@@ -159,18 +176,21 @@ rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
 | `swm` | GIR-12 鸦群 | ir | 720 | 300 | 3.5 / 9 | 2.55 | 3400 | 16 | 0.44 | 0.44 | 4.4 | 16 |
 | `v9` | GIR-9 蜂群 | ir | 830 | 200 | 4.0 / 9 | 1.90 | 3800 | 44 | 0.50 | 0.52 | 6 | 2 |
 | `v11` | SUT-11 锥刺 | ir | 790 | 280 | 5.0 / 11 | 2.45 | 4600 | 56 | 0.35 | 0.62 | 9.2 | 2 |
-| `mrm` | BIN-4 中继 | radar | 900 | 200 | 8.0 / 20 | 1.45 | 8600 | 40 | 0.30 | 0.78 | 15 | 4 |
-| `arm` | BIN-8 追云 | radar | 880 | 190 | 7.5 / 18 | 1.35 | 9500 | 52 | 0.35 | 0.72 | 18 | 2 |
+| `mrm` | CLA-4 中继 | radar | 900 | 200 | 8.0 / 20 | 1.45 | 8600 | 40 | 0.30 | 0.78 | 15 | 4 |
+| `arm` | SPO-8 追云 | radar | 880 | 190 | 7.5 / 18 | 1.35 | 9500 | 52 | 0.35 | 0.72 | 18 | 2 |
 | `v17` | CLA-17 长杆 | radar | 1150 | 160 | 10.0 / 30 | 1.00 | 12500 | 62 | 0.72 | 0.86 | 22 | 1 |
-| `vlar` | DAR-12 极远 | radar | 980 | 150 | 12.0 / 30 | 0.78 | 16000 | 66 | 0.66 | 0.90 | 32 | 1 |
+| `vlar` | CLA-12 极远 | radar | 980 | 150 | 12.0 / 30 | 0.78 | 16000 | 66 | 0.66 | 0.90 | 32 | 1 |
 | `hva` | SPO-9 落雷 | radar | 980 | 240 | 8.0 / 18 | 1.30 | 11000 | 62 | 0.70 | 0.80 | 26 | 1 |
 | `dl4` | DAR-4 砾石 | radar | 880 | 210 | 6.5 / 16 | 1.25 | 7200 | 30 | 0.45 | 0.74 | 6.8 | 0① |
 | `dl6` | BIN-6 燧火 | ir | 780 | 190 | 4.5 / 10 | 2.05 | 3600 | 26 | 0.35 | 0.48 | 4.4 | 0① |
 | `dl9` | BAD-9 高墙 | radar | 940 | 320 | 9.0 / 22 | 1.50 | 9000 | 48 | 0.60 | 0.80 | 14 | 0① |
 | `vbn` | BIN-9 双生 | ir | 780 | 300 | 4.0 / 10 | 2.10 | 4200 | 42 | 0.58 | 0.66 | 8 | 0① |
 | `otr` | TOR-1 旧锭 | ir | 620 | 200 | 3.0 / 7 | 1.35 | 3000 | 30 | 0.86 | 0.32 | 6 | 0① |
+| `ss6` | FAN-6 海墙 | radar | 960 | 330 | 9.5 / 22 | 1.45 | 9500 | 46 | 0.42② | 0.80 | 15 | 0① |
 
-① `fits: []` —— 下游专用弹，玩家挂不上（见 [loadout.md](loadout.md)）。
+① `fits: []` —— 下游专用弹（以及上游舰载的 FAN-6），玩家挂不上（见 [loadout.md](loadout.md)）。
+② 雷达弹的 `flare` 由 `FLARE_RD` 覆盖。FAN-6 只装在**我方舰艇**上（`target.weapon = 'ss6'`），
+对空射击的选目标规则见 [ai.md](ai.md)「水面目标的对空射击」。
 
 ### 对地 / 反大型 / 炸弹
 
@@ -185,6 +205,8 @@ rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
 | `rkt` | PEJ-6 撒星 | bomb | 无制导 | 620 | 520 | 3 / 3 | — | — | 22 | 14 | 4 | 28 |
 | `clb` | PEJ-9 碎玉 | bomb | 无制导 | 300 | — | 12 / 24 | — | — | 118 | 34 | 14 | 2 |
 | `v30` | PEJ-30 铁蒺藜 | bomb | eo | 280 | — | 12 / 24 | 0.20 | 2400 | 210 | 42 | 16 | 1 |
+| `vgt` | TUM-7 碎石 | agm | ir | 430 | 120 | 9 / 20 | 0.62 | 7000 | 190 | 30 | 11 | 0① |
+| `vsr` | BOX-14 坍方 | asm | radar | 560 | 150 | 11 / 24 | 0.55 | 9000 | 260 | 34 | 15.6 | 0① |
 
 `asl` 与 `v30` 是**无动力但有制导**（`ballistic: true`）：扔出去之后
 只剩动能与弹翼 / 末端修正；`rkt` 与 `clb` 是无制导（`unguided`），
@@ -201,8 +223,9 @@ rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
 | `dec` | ZUN-12 雾障 | ecm 被动 | `flareBonus 40` | 0 | 1 |
 | `oep` | GUS-6 明瞳 | ecm 被动 | `lockRangeBonus 0.45` | 0 | 1 |
 | `irp` | GUS-9 夜枭 | ecm 被动 | `lockRangeBonus 0.25`、`lockResist 0.15` | 0 | 1 |
-| `hdp` | BAD-3 护盾 | ecm 被动 | `armorBonus 0.22` | 0 | 1 |
-| `vzu` | ZUN-6 迷雾 | ecm 被动 | `lockResist 0.30`（下游，`fits: []`） | 6.8 | 0 |
+| `hdp` | JDA-3 护盾 | ecm 被动 | `armorBonus 0.22` | 0 | 1 |
+| `vzu` | SAV-6 迷雾 | ecm 被动 | `lockResist 0.30`（下游，`fits: []`；玩家锁它时也生效） | 6.8 | 0 |
+| `vsc` | SAV-14 焦炬 | ecm | 下游烧穿吊舱：`jamRadius 9000`、`jamK 0.85` 范围压制（见 [game.md](game.md) `updateJamming()`） | 40 | 0 |
 
 ---
 
@@ -269,7 +292,7 @@ CEL 系机炮每门都是 3900 发/分，每次扣扳机出 2 发（`n = round(r
 | `seeker` | 抗干扰 | 说明 |
 |---|---|---|
 | `ir`（红外） | 看 `flare` | 点源导引头，热焰弹能骗 |
-| `radar`（雷达） | 看 `flare` | 也能被箔丝骗，但数据上 `flare` 普遍偏高 |
+| `radar`（雷达） | 看 `flareRD`（缺省回退 `flare`） | 被箔丝骗；空空雷达弹的 `flareRD` 整体低于红外弹的 `flare` |
 | `eo`（光电，仅 PEJ-30） | `flare: 0`，永远不被骗 | 成像导引头，热焰弹与箔丝都无意义 |
 | `laser`（激光照射） | — | **当前无武器使用**；机制代码在 `entities.js` 里休眠 |
 | `none` | — | 无制导 |
@@ -400,11 +423,22 @@ hp = actor.pos + actor.fwd*4 + actor.right * side * (2.4 + rank*1.9)
 ```js
 if (dist < m.prox + 6) detonate(m, t, world);
 // detonate:
-if (t && t.alive && M3.dist(t.pos, m.pos) < m.prox + 14) damage(t, m.dmg, world, m.owner);
+if (w.cluster) return clusterBurst(m, world);                    // 子母弹：面杀伤
+reach = m.prox + 14 + (t.kind === 'target' ? t.radius : 0);       // 设施 / 舰船加上自身半径
+if (dist < reach) hitAny(t, m.dmg * warheadK(w, t) * (antiRadar && isRadiating(t) ? 2 : 1));
 ```
 
-近炸不会直接秒杀，而是造成 `dmg` 伤害；只有目标仍在 `prox + 14` 内
+近炸不会直接秒杀，而是造成 `dmg` 伤害；只有目标仍在 `prox + 14`（地面目标再加 `radius`）内
 才真正扣血。这避免了"擦过就算命中"。
+
+- **设施 / 舰船走 `hitTarget`**：`game.js` 启动时 `Ent.setTargetHitHandler()` 注册自己的
+  `hitTarget`，制导弹与子母弹打地面目标都经它结算（击毁进 `groundKilled`、误击调节单元记处罚）。
+  没注册时（工具脚本）退回 `hp -= dmg` + `killGround`。
+- **加固目标（`Ent.isHard`）**：`t.hard` 或 `HARD_MODELS[t.model]`（目前只有 `radar`）。
+  `warheadK`：`penetrator`（GUT-12）×1、`cluster` ×0.2、其余战斗部 ×0.6；机炮子弹无 `b.w`，不打折。
+- **子母弹（`cluster` = 半径 m，PEJ-9 60、PEJ-30 80）**：起爆、落地（`pos.y <= 0`）、
+  或作为无制导弹撞上设施时调 `Ent.clusterBurst`：半径（+目标自身 `radius`）内**每个**敌方
+  地面目标吃满额 `dmg × warheadK`，边缘不衰减；只打地面，不打飞机。
 
 子弹与**无制导弹**都用 `M3.raySphere()` 做**线段**求交
 （`prev → pos`），见 [flight-model.md](flight-model.md#子弹)。
@@ -432,15 +466,24 @@ if (!m.alive || m.target !== a) continue;
 m.decoyTries = (m.decoyTries || 0) + 1;
 chance = Math.max(0.03, chance * Math.pow(0.62, m.decoyTries - 1));
 if (Math.random() >= chance) continue;     // 没被骗到
+if (m.seekers > 1) { m.seekers--; continue; }   // BIN-9 双导引头：先骗掉一个
 m.target = null; m.seekerOn = false; m.lostTime = 1;
 m.reLockT = 1.4;      // 盲飞 1.4 s：这之前谁都不能重新捕获
-m.spoofed = a;        // 记住是谁骗的：盲飞期内优先避开它
+m.spoofed = a;        // 投诱饵的那一架：只在盲飞期内被 irAcquire 跳过
+m.decoy = { p, v, t0, p2: chance * 0.5 };   // 骗走它的那团诱饵云
 ```
 
 **关键点**：
 
-- **不对导引头类型做过滤** —— 热焰弹与箔丝是一起投放的，
-  红外弹与雷达弹**都会**被这同一次掷骰判定。
+- **按导引头分流概率**：热焰弹与箔丝一起投放，同一次掷骰里
+  `ir` 用 `flare`、`radar` 用 `flareRD`（缺省回退 `flare`）、`eo` / `laser` 恒为 0。
+- **诱饵云的二次欺骗（`decoyRecheck`）**：盲飞期结束那一帧，若骗走它的诱饵云
+  还亮着（2.6 s 内）且在锁定锥里，没有 `decoyMemory` 的弹以 `chance × 0.5`
+  再咬回那团云，盲飞延长到云熄灭。**CLA-4（`decoyMemory`）认得那团云**，
+  直接跳过这一步 —— 它不会被同一组诱饵骗两次，但仍可重新咬住投诱饵的那架飞机。
+- **雷达弹的重捕获（`reAcquire`）限制在 2.6 km 且锁定锥内**。
+- **双导引头（`twinSeeker`，BIN-9）**：第一次骗中只扣掉一个导引头，
+  第二次骗中才真正脱锁。
 - **`flare` 字段本身就是"被干扰的概率"，越小越难骗**。
   公式里写成 `1 - flare·k` 是错的（曾经这么错过，等于把抗干扰改型
   TOR-4 变成了最容易被骗的一枚）。
@@ -460,7 +503,8 @@ m.spoofed = a;        // 记住是谁骗的：盲飞期内优先避开它
   - 旧实现是用 `m.reDone = true` 兼职的，而那一位置同时是 `reAcquire`
     的重捕获闸门 —— 于是**一次诱饵就让带 reAcquire 的弹永久失去重捕获能力**；
     IR 弹那边靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
-  - 现在 `spoofed` 只是"优先避开谁"的提示，只在 `reLockT > 0` 期间生效。
+  - 现在 `spoofed` 只在 `reLockT > 0` 期间生效：`irAcquire` 跳过它，
+    告警 / 来袭标记据它继续报警。盲飞期一过就没有任何作用。
   - 断言见 `tools/smoke.js`「诱饵只买到一段时间」。
 - **告警与来袭标记不只看 `m.target`。** 判据是
   "当前锁定本机"**或**"刚被本机诱饵骗掉、`reLockT > 0`、且仍在本机 3600 m 内"
@@ -470,14 +514,12 @@ m.spoofed = a;        // 记住是谁骗的：盲飞期内优先避开它
 - 成功与否由 `breakLock` 返回值表示：**只要本帧真的投了一组诱饵就返回 `true`**
   （哪怕一枚都没骗到）—— 返回值表示"投放动作"是否发生，不是命中数。
   命中数与"无效投放数"写在 `a.decoysBroke` / `a.decoysIneffective` 上。
-- 举例：`v11` 锥刺 `flare = 0.35` → 第一次 65% 被骗走；
-  `v17` 长杆 `flare = 0.72` → 第一次 28% 被骗走。
+- 举例：`v11` 锥刺（红外）`flare = 0.35` → 第一次投放 35% 被骗走；
+  `v17` 长杆（雷达）`flareRD = 0.44` → 第一次 44% 被骗走。
 
-> **数值现状与直觉相反，记在这里免得下一个人被误导**：
-> 雷达弹 14 枚的 `flare` 平均约 0.66，红外弹 13 枚平均约 0.44 ——
-> 也就是雷达弹现在**更容易**被骗。"多普勒滤波能滤掉静止箔丝回波"
-> 的直觉在这里不成立，因为 `flare` 当初是逐个按"这枚弹好不好骗"
-> 手调的，没有按导引头类型排序。属于待修的数值问题。
+> 雷达弹曾经平均**更容易**被骗（`flare` 是逐个手调的）。现在雷达弹走
+> `data.js` 的 `FLARE_RD` 表，空空雷达弹整体低于红外弹均值，
+> 由 `tools/smoke.js`「箔丝有效」断言守着。
 
 ### 定向能拦截（GUS-2）
 
@@ -490,8 +532,15 @@ m.spoofed = a;        // 记住是谁骗的：盲飞期内优先避开它
 
 ```js
 chance = (actor.pos.y > 18000 && w.highAltChance) ? w.highAltChance : w.interceptChance;
-if (Math.random() > chance * dt / 1.2) continue;     // 折算成每帧概率
+if (m.dewRolled === actor.id) continue;   // 每枚来袭弹只掷一次骰
+m.dewRolled = actor.id;
+if (!(Math.random() < chance)) continue;
 ```
+
+**每枚来袭弹只判一次**：第一次进入包线时按 `chance` 掷骰，结果记在 `m.dewRolled`
+（`makeMissile` 初始化为 `null`）。以前是把总概率按"约 1.2 s 飞行时间"折成每帧概率连续掷，
+实际累积取决于接近速度 —— 迎头快弹的 55% 实际只有 37% 左右。现在 desc 写的 55%
+就是每枚弹被烧掉的概率（18 km 以上用 `highAltChance`）。
 
 成功后消耗一次充能、烧毁导弹、播 `laser()` 音效与一句电台。
 
@@ -507,8 +556,8 @@ if (Math.random() > chance * dt / 1.2) continue;     // 折算成每帧概率
 第三阶段「线」的核心约束：**阵列空域内禁止 20 kg 以上战斗部**。
 
 ```js
-if (actor.isPlayer && w.roeBlocked &&
-    (wp.kind === 'asm' || wp.kind === 'agm' || wp.kind === 'bomb')) {
+// data.js：function roeRestricted(w) { return w.kind === 'asm' || 'agm' || 'bomb'; }
+if (actor.isPlayer && w.roeBlocked && roeRestricted(wp)) {
   Radio.raw({ who: 'SEXTANT', ..., tx: '交战规则限制 —— 该武器在阵列空域内被锁定。' });
   return false;
 }
@@ -518,6 +567,9 @@ if (actor.isPlayer && w.roeBlocked &&
 玩家距离任一**存活**的调节单元 5 km 以内就置真。机炮与所有
 空空弹（`kind: 'aam'`）不受影响，所以玩家在 M3 里被迫用机炮去啃
 调节单元阵列周围的目标。
+
+判据只有 `data.js` 的 `roeRestricted()` 一处：武器 desc 末尾的交战规则提示也由它生成，
+两边不会再对不上。
 
 ---
 

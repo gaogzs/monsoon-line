@@ -54,7 +54,7 @@
 > （`spawnShip` 不替你换算，需要按表取值时自己 ×0.514）。现有关卡多用
 > `loop: true` 的两点往返巡航（8–20 m/s），m9 的登陆舰用 `loop: false` 一路往北开。实现见 [entities.md](entities.md#35-目标物-tkind-target)。
 
-`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（缺省 `'dl6'`）/ **`loadout`**（逐组挂载，见下一节）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
+`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（**只在没写时**缺省 `'dl6'`；显式 `null` = 不带弹，预警机 / 轰炸机 / 运输用的 GAL-31 都这么传）/ **`loadout`**（逐组挂载，见下一节）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
 
 `special` 与 `pods` 都**同时管机制和外观**：
 
@@ -65,12 +65,14 @@
 
 两者是**共存**的：吊舱先占掉它挂得住的组，制式弹再铺满剩下的 ——
 "一枚空空弹 + 一个干扰吊舱"就是这么来的（m3 的护航那样）。吊舱占位后
-导弹的可视挂架会变少，但它的弹药池不变，AI 该打几发还是几发。
+导弹的可视挂架会变少，弹药池也跟着少：上游弹按 `min(w.ammo, 挂点数 × perPoint)` 封顶，
+下游弹（`perPoint` 为 0）仍按 `w.ammo`。
 
 弹种能挂到哪类挂点由 `data.js` 的 `npcFits` 决定（**不是** `fits` —— 那是玩家机库的表）。
 所以给敌机指定弹种时，要确认目标机型有对应的挂点类型：
 `pelican` / `quartz` / `a2` / `gal44` 只有机腹挂点，写 `special: 'dl6'`（格斗弹）
-不会画出来（也不会报错 —— 它照旧能发射）。
+不会画出来（也不会报错 —— 它照旧能发射）。不想让它带弹就**显式写 `special: null`**
+（`spawnAewc` 就是这么传的）；省略不写会拿到缺省的 `'dl6'`。
 
 ### 给 NPC 设计挂载
 
@@ -145,6 +147,31 @@ spawnEnemy(w, {
   后者用 `route.onArrive` 调 `Ent.openEcm(a, 'vsc')` 开机，然后掉头走
 - **m10** 再放一架鹈鹕（team 0，`SEXTANT`），敌方预警机的 `aewDown` 是该关的阶段事件
 
+### 各关兵力：敌方一律是下游
+
+**所有 team 1 飞机都是下游机型、挂下游弹**（早先混着上游的 F-9 / D-21 / D-33 / G-6，
+挂 GUT-9 / GUT-12 —— 对面不该开着我们的飞机）。上游机型只出现在玩家机库与我方（team 0）。
+
+| 关卡 | 敌方飞机（team 1） | 其他 |
+|---|---|---|
+| m1 | ROK-27 测绘机 ×5（`dl6`）· VAC-14 护航 ×2（`vbn`）· ROK-27 ×2（`dl6` + `pods: ['vzu']`） | 我方鹈鹕预警机；群岛国 k8（team 2） |
+| m2 | ROK-40 轰炸机 ×2（`special: null`，`onArrive` 结算）· 伏击 GAL-31 / ROK-27 · 石英预警机 | 防空浮台 `dl9`；巡逻舰；我方驱逐舰虎鲸带 `ss6` |
+| m3 | GAL-31 王牌**冬港**（`spawnWinterport`）· 护航 GAL-31 ×2（`dl4` + `vbn`）、ROK-27 ×2 · 运输 GAL-31（`null`）· GAL-44（`vsc`）· 石英 | 群岛国 DJACU 浪花（team 2，`otr`） |
+| m4 | ROK-27（`vsr` + `dl6`）×2 · VAC-14（`vgt` + `vbn`） | 我方护卫舰海豚带 `ss6`；三条民用船（team 2） |
+| m5 | 截击编队 GAL-31 / ROK-27 · ROK-40（`vsr`）· GAL-44（`vsc`） | **准绳 SKORI**（`team: 2` + `friendlyAsset`，误伤扣分）；MERLI / 标杆（team 2） |
+| m6 | GAL-31（`dl4`）×4 · ROK-27（`dl6`，隔一架带 `vzu`）×4 · 石英 | — |
+| m7 | ROK-27（`dl6`）· GAL-44（`vsc`） | 舰船 `dl9` |
+| m8 | VAC-14（`vgt` + `vbn`）×5 · ROK-27（`vsr` + `dl6`）· ROK-40（`vsr`）×2 · GAL-31 / VAC-14 掩护 · 石英 | 上游编队（team 0）：座头鲸 / 抹香鲸带 `ss6`，蓝鲸 `weapon: null` |
+| m9 | ROK-27（`dl6` + `vzu`）· ROK-27（`vsr` + `dl6`）· VAC-14（`vgt` + `vbn`） | 登陆舰 / 护航舰 `dl9` |
+| m10 | 冬港（`spawnWinterport`，同 m3）· 两层护航 GAL-31 / ROK-27（轻型带 `vzu`）· 石英 | 指挥舰 `dl9` |
+| sk1 | 机型池 `['m27','m27','gal31','vac14']`，按 `SK_FITS` 配弹 | 鹈鹕（team 0）；k8（team 2） |
+
+`spawnWinterport(w, {x, y, z, skill})` 是 m3 与 m10 共用的冬港生成器：GAL-31、`loadout: {A:'dl4', B:'vbn'}`、
+`phys` 覆盖（"人比飞机快"）、`isAce` / `bigTarget`、写入 `w.ace`。
+
+**舰艇的 `weapon` 对 team 0 同样生效**：上游舰带 `ss6`（FAN-6）只打敌机、从不朝玩家开火；
+team 2 带了也不开火。选目标规则见 [ai.md](ai.md)「水面 / 地面目标的对空射击」。
+
 ### 背景单位（`team: 2`）
 
 v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，一律 `team: 2`：
@@ -160,7 +187,7 @@ v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，
 这是"不做中立识别机制"下唯一干净的安排：要么能打、要么不在交战语法里，
 没有"能锁但不该打"的中间态。MERLI 只有一个机腹挂载组、而机腹挂不了任何
 空空弹，所以任务里**不给它写 `special` / `loadout`**（与设定"名义上没有武器"一致）；
-注意 `spawnEnemy` 的 `special` 缺省值仍是 `'dl6'`，只是挂不上、画不出来。
+注意 MERLI 是**省略** `special`（没写 `null`），所以仍会拿到缺省的 `'dl6'`，只是挂不上、画不出来。
 
 `spawnWingman` 写死的部分：机型 `ucav`、阵营 0、`isDrone: true`、`special: 'v9'`、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
 
@@ -170,7 +197,7 @@ v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，
 |---|---|
 | `Radio.play(missionId, evt)` | 按任务 id + 事件名取 `VOICES[missionId][evt]` 入队 |
 | `Radio.raw(line)` | 直接插一条 `{ who, cls, tx, gap }` |
-| `downstreamCallsign(i)` | 取第 i 个下游呼号，格式 `"枯河 DRYRIVER"`，越界取模 |
+| `downstreamCallsign(i)` | 取第 i 个下游呼号，格式 `"旱沟 DRYGULLY"`，越界取模 |
 
 任务脚本用的是 `w.radio`（`newWorld` 里指向 `Radio`）。全局事件 `'start'` 由 `startMission` 播，`'allyDown'` 由 `game.js` 主循环播。
 
@@ -283,17 +310,17 @@ MY(wz) = cy - wz / R * (H * 0.62);   // 纵向（北向上）
 |---|---|---|---|
 | 起点 | 5200 m，距编队 34 km | 9000 m，距雷达网 30 km | 18 000 m，加力 |
 | 核心机制 | **反舰**：舰船首次成为主角 | **压制**：打雷达 / 防空 / 干扰机 | 高空拦截第二梯队 |
-| 首次登场 | 5 型舰船 + `sat`/`v22` | 管理局「准绳」+ `vsr`/`vgt` | `c9` 海燕 ×4 + `hva`/`swm` |
+| 首次登场 | 5 型舰船 + `sat`/`v22`；敌机带 `vsr`/`vgt` 来打船 | 管理局「准绳」（中立）+ ROK-40 挂 `vsr` | 高空的 GAL-31 ×4 + ROK-27 ×4 |
 | 唯一失败条件 | 玩家阵亡 | 玩家阵亡 | 玩家阵亡 |
 
 | | m7 雾里 | m8 燧石 | m9 登陆窗口 | m10 指挥所 |
 |---|---|---|---|---|
 | 起点 | 2200 m（云下） | 6000 m，背对编队 | 4800 m，**时限 300 s** | 17 000 m，加力 |
 | 核心机制 | 低云 / 低空暴露 | 保卫舰群（敌机真的来炸船） | 时间窗 + 阻止靠岸 | 斩指挥链 |
-| 首次登场 | `seascorpion`/`cameroceras` 舰船 | `humpback`/`spermwhale`/`bluewhale`/`orca` + 敌 `s6` | `c9` 之外的 `v30` 类对地弹 | **冬港**（`c33` 座机） |
+| 首次登场 | `seascorpion`/`cameroceras` 舰船 | `humpback`/`spermwhale`/`bluewhale`/`orca`（带 `ss6` 自卫）+ 敌 VAC-14 / ROK-27 / ROK-40 攻击队 | 登陆舰航路 + 双层空中掩护 | **冬港**再登场（同一架 GAL-31，`spawnWinterport`） |
 | 失败条件 | 玩家阵亡 | 玩家阵亡，或编队任意一舰被击沉 | 玩家阵亡，或登陆舰抵达 `z > 38000`，或**超时** | 玩家阵亡 |
 
-**m1** 是教学关：5 架低速测绘机（skill 0.32）+ 2 架 VAC-14 护航 + 2 架带抗锁定吊舱的 D-21 贼鸥。
+**m1** 是教学关：5 架低速测绘机（skill 0.32）+ 2 架 VAC-14 护航 + 2 架带 SAV-6 抗锁定吊舱的 ROK-27。
 护航被明确排除在目标计数与胜利条件之外——简报说的是"5 个目标"，把它们算进去玩家会发现"剩余 N"对不上。测绘机血量掉到 75% 以下转为 `extend` 逃跑且停止射击；这既是叙事（"他们在测量，不是在打仗"），也让"打跑"和"打掉"在体感上有区别。
 
 **m2** 是有"必须保护的东西"的关卡之一。设计是一条**因果链**：三个浮空中继平台把地面测控平台的信号中继回南边 → 打掉地面测控平台触发下游截击机伏击 → 两架 ROK-40 轰炸机沿固定航线炸掉玩家的前进基地。`lose()` 在基地被毁时直接判负，**哪怕中继网已经拆干净**。天气是核心约束：云底 900 m，而平台在 4000 m；爬到 1500 m 以上就会被雷达看见（`w.detected`），这时四个防空浮台才会开火。本关还放了两艘下游巡逻舰与一架石英预警机当"环境"——它们不计入胜利条件。
@@ -412,7 +439,7 @@ spawn()
 
 17. **随机波次不要在 `tick()` 里掷骰。** `sk1` 的六个批次在 `spawn()` 里一次性生成（`M3.pick` + `M3.rnd`），`tick()` 只读 `w.skQueue`。逐帧掷骰会让目标数抖动，也会让冒烟测试失去可复现性。
 
-18. **`escort` 标签在 m3 已经失配。** m3 的护航（含新增的 D-33 / ROK-27）都没有 `escort` 标签，属于"必须全部击落"；只有 m1 的两架 VAC-14 用了它。改这两关的目标计数时留意。
+18. **`escort` 标签在 m3 已经失配。** m3 的护航（GAL-31 / ROK-27）都没有 `escort` 标签，属于"必须全部击落"；只有 m1 的两架 VAC-14 用了它。改这两关的目标计数时留意。
 
 ---
 

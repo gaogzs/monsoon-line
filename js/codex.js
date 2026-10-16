@@ -106,23 +106,23 @@ var CODEX = [
     title: '平流层作战：二十公里的空气',
     sub: 'STRATOSPHERIC COMBAT · 本作与其他空战游戏最大的不同',
     html: `
-<p>本作十一个任务中，有<b>两个</b>发生在 18 至 22 公里高度
-（第三阶段「线」与第六阶段「第二梯队」）。
+<p>本作 {{ms.total}} 个任务中，有<b>{{ms.highN}} 个</b>从 17 公里以上开局
+（{{ms.highList}}）。
 这不是为了好看 —— 那个高度的物理学是这个世界里最锋利的一把刀。</p>
 
 <h4>空气</h4>
 <table class="cx-table">
   <tr><th>高度</th><th>密度（相对海平面）</th><th>静压</th><th>气温</th></tr>
-  <tr><td>0 m</td><td>1.00</td><td>101.3 kPa</td><td>+15 ℃</td></tr>
-  <tr><td>11 000 m</td><td>0.30</td><td>22.6 kPa</td><td>−56 ℃</td></tr>
-  <tr><td>18 000 m</td><td>0.12</td><td>7.6 kPa</td><td>−57 ℃</td></tr>
-  <tr><td><b>20 000 m</b></td><td><b>0.072</b></td><td><b>5.5 kPa</b></td><td>−57 ℃</td></tr>
-  <tr><td>22 000 m</td><td>0.045</td><td>4.0 kPa</td><td>−54 ℃</td></tr>
+  <tr><td>0 m</td><td>{{rho.0}}</td><td>101.3 kPa</td><td>+15 ℃</td></tr>
+  <tr><td>11 000 m</td><td>{{rho.11000}}</td><td>22.6 kPa</td><td>−56 ℃</td></tr>
+  <tr><td>18 000 m</td><td>{{rho.18000}}</td><td>7.6 kPa</td><td>−57 ℃</td></tr>
+  <tr><td><b>20 000 m</b></td><td><b>{{rho.20000}}</b></td><td><b>5.5 kPa</b></td><td>−57 ℃</td></tr>
+  <tr><td>22 000 m</td><td>{{rho.22000}}</td><td>4.0 kPa</td><td>−54 ℃</td></tr>
 </table>
 
 <h4>后果一：动压</h4>
 <p>动压 <span class="cy">q = ½ρv²</span>。在 20 公里高度要获得与海平面相同的动压，
-需要 <b>3.7 倍</b>的速度。这就是为什么在那种高度上，
+需要 <b>{{rho.qSpeed20}} 倍</b>的速度。这就是为什么在那种高度上，
 战斗机必须保持在 <b>M1.8 以上</b>才能做出有效机动 ——
 一旦掉到 M1.2 以下，你的飞行员会发现操纵杆像接在了一块黄油上。</p>
 <p><b>游戏机制：</b>在 18 公里以上，飞机的可用过载随真空速线性下降。
@@ -132,15 +132,15 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <p>导弹靠舵面偏转产生的力矩来转弯，而力矩正比于动压。
 一枚在设计高度有 40G 可用过载的格斗弹，在 20 公里高度的可用过载
 可能只剩 <b>6 到 9G</b>。</p>
-<p><b>游戏机制：</b>所有导弹的转弯率按 <span class="cy">√(ρ/ρ₀)</span> 缩放。
+<p><b>游戏机制：</b>所有导弹的转弯率按 <span class="cy">√(ρ/ρ₀)</span> 缩放（下限 {{rho.turnFloor}}；20 公里处为 {{rho.turn20}}）。
 在 20 公里高度，连最好的格斗弹也只能做出"平缓的弧线"。
 <span class="am">在高空，导弹几乎变成了一门有制导的炮。</span></p>
 
 <h4>后果三：机炮反而更好用</h4>
 <p>炮弹不需要空气来转向，它只需要空气来<b>保持弹道</b> ——
 而稀薄空气意味着<b>更小的阻力、更平直的弹道、更远的有效射程</b>。</p>
-<p>20mm 炮弹在海平面的有效直射距离约 1200 米；
-在 20 公里高度，这个数字是 <b>2600 米</b>。</p>
+<p>{{gun.k3.cal}}（{{gun.k3.name}}）在 18 公里以下的有效射程是 {{gun.k3.range}} 米；
+在 18 公里以上，这个数字是 <b>{{gun.k3.highRange}} 米</b>。</p>
 <p><b>这就是本作让你在高空用机炮的真正原因 —— 不是情怀，是弹道学。</b></p>
 
 <h4>后果四：你也在同一条船上</h4>
@@ -228,8 +228,8 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 
 <h4>游戏机制对应</h4>
 <ul>
-<li>干扰吊舱开机后，敌方对你的锁定距离最多缩短 <b>40%</b>，冷却 <b>50 秒</b>。</li>
-<li><b>它不是一段恒定的 6 秒满效果。</b>识别与建模要 <b>0.2 秒</b>爬到位，
+<li>干扰吊舱（{{w.e4.name}}）开机后，敌方对你的锁定距离最多缩短 <b>{{w.e4.lockReducePct}}</b>，冷却 <b>{{w.e4.cd}} 秒</b>。</li>
+<li><b>它不是一段恒定的 {{w.e4.duration}} 秒满效果。</b>识别与建模要 <b>0.2 秒</b>爬到位，
 然后对手开始对抗 —— 一支信号处理能力强的部队能在 <b>3 秒</b>内完成，
 差一些的要 <b>8 秒</b>。对抗完成之后压制迅速掉回零。
 <b>那段时间就是你的攻击窗口。</b></li>
@@ -277,9 +277,9 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 
 <h4>游戏机制对应</h4>
 <p>本作中定向能吊舱（<span class="am">GUS-2「日光」</span>）实现为一门<b>自动拦截的软杀伤系统</b>：
-当敌方导弹逼近到 <b>1200 米</b>内且你与导弹的夹角小于 <b>35°</b> 时，
-有 <b>55%</b> 概率烧毁其导引头。充能上限 3 次，每 <b>18 秒</b>恢复一次。</p>
-<p>注意：在 18 公里以上高度，这个概率下降到 <b>35%</b>（铁律二）。</p>`
+当敌方导弹逼近到 <b>{{w.l2.interceptRange}} 米</b>内且你与导弹的夹角小于 <b>{{w.l2.coneDeg}}°</b> 时，
+有 <b>{{w.l2.chancePct}}</b> 概率烧毁其导引头。充能上限 {{w.l2.charges}} 次，每 <b>{{w.l2.recharge}} 秒</b>恢复一次。</p>
+<p>注意：在 18 公里以上高度，这个概率下降到 <b>{{w.l2.highPct}}</b>（铁律二）。</p>`
   },
 
   /* ================= 兵器 ================= */
@@ -308,17 +308,18 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <h4>冲压发动机改变了包线的形状</h4>
 <p>固体火箭发动机的总冲在点火瞬间就基本耗尽。
 <b>固体燃料冲压发动机</b>可以吸入大气中的氧，
-把燃烧时间从 <b>6 秒</b>延长到 <b>60 秒以上</b>。</p>
+把动力段拉得比同级火箭弹更长 —— 本作里 {{w.v17.name}} 的动力段是 <b>{{w.v17.life}} 秒</b>，
+同为雷达中距弹的 {{w.mrm.name}} 是 {{w.mrm.life}} 秒。</p>
 <p>这带来的不是射程翻倍，而是包线形状的改变：冲压弹在末段仍有推力，
-因此可以反复与目标做机动博弈。本作中的 <span class="am">CLA-17「长杆」</span>
-就属于这一类 —— 转弯率只有 <b>0.9 rad/s</b>，比格斗弹差得多，
-但它能在你逃了 40 秒之后依然咬着你。</p>
+因此可以反复与目标做机动博弈。本作中的 <span class="am">{{w.v17.name}}「{{w.v17.cnShort}}」</span>
+就属于这一类 —— 转弯率只有 <b>{{w.v17.turn}} rad/s</b>，比格斗弹（{{w.srm.name}} {{w.srm.turn}} rad/s）差得多，
+但它能在你逃了 {{w.v17.vsLife}} 秒之后依然咬着你。</p>
 
 <h4>但在两万米，这一切都要重算</h4>
 <p>冲压发动机在 20 公里高度会遇到一个尴尬的问题：
-那里的空气密度只有海平面的 7%，<b>没有足够的氧气供给燃烧</b>。
-所以本作的 CLA-17 在 18 公里以上会自动降级为火箭模式，
-动力段从 60 秒掉到 <b>14 秒</b>。</p>
+那里的空气密度只有海平面的 {{rho.pct20}}，<b>没有足够的氧气供给燃烧</b>。
+所以本作的 {{w.v17.name}} 在 18 公里以上会自动降级为火箭模式，
+动力段从 {{w.v17.life}} 秒掉到 <b>{{w.v17.lifeHigh}} 秒</b>。</p>
 <p><span class="am">高空没有杀手锏，只有更简单的算术。</span></p>
 
 <h4>NEZ 是怎么算出来的</h4>
@@ -348,9 +349,9 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <h4>二、防空系统拦不住炮弹</h4>
 <p>定向能武器可以烧毁一枚以 900 m/s 飞来的导弹的导引头 ——
 因为它有 0.5 秒的滞留时间。
-但机炮炮弹以 <b>1100 m/s</b> 飞来，从进入 1000 米射程到命中你，
-只有 <b>0.9 秒</b>，而且它不是一枚，是每秒 <b>65 发</b>。
-给 65 个目标逐一分配照射时间是做不到的。</p>
+但机炮炮弹以 <b>{{gun.k3.speed}} m/s</b> 飞来，从进入 {{gun.k3.range}} 米射程到命中你，
+只有 <b>{{gun.k3.tof}} 秒</b>，而且它不是一枚，是每秒 <b>{{gun.k3.rps}} 发</b>。
+给 {{gun.k3.rps}} 个目标逐一分配照射时间是做不到的。</p>
 <p><b>动能武器在能量武器面前的优势从来不是威力，是廉价和饱和。</b></p>
 
 <h4>三、交战规则</h4>
@@ -358,11 +359,11 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 一个携带反凝结核战斗部的导弹在阵列中爆炸，会造成持续数年的区域性降水异常 ——
 这比输掉一场战役严重得多。</p>
 <p>因此，在阵列空域内，所有战斗部超过 <b>20 公斤</b>的武器被禁止使用。
-这条规则在游戏里表现为：<b>靠近调节单元时，对地导弹与炸弹被锁定禁用，
-只有机炮和格斗弹可用。</b></p>
+这条规则在游戏里表现为：<b>距调节单元 5 公里以内，空地导弹、反大型弹与炸弹被锁定禁用；
+空空武器 —— 机炮与全部空空导弹 —— 照常可用。</b></p>
 
 <h4>四、在两万米，它是唯一能打的东西</h4>
-<p>回到最硬的物理：在 20 公里高度，动压只有海平面的 7%，
+<p>回到最硬的物理：在 20 公里高度，空气密度只有海平面的 {{rho.pct20}}，
 所有气动控制面的效率暴跌。导弹的可用过载掉到个位数 G，
 而炮弹的弹道比海平面更平直、有效射程更远。</p>
 <p><span class="am">平流层是机炮的世纪。这不是设计选择，是空气密度决定的。</span></p>
@@ -371,14 +372,7 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <p class="cx-note">机炮不是通用件。四方各有一条自己的供应线，同一个逻辑语词根下
 各家排自己的号 —— 与 <b>SUT-</b> / <b>GUT-</b> 那些家族同一套规矩。
 口径与射速决定了它们打起来是什么感觉，编号决定了它们是谁的。</p>
-<table class="cx-table">
-  <tr><th>型号</th><th>口径</th><th>射速</th><th>备弹</th><th>初速</th><th>装备方</th></tr>
-  <tr><td>CEL-1</td><td>20mm 六管</td><td>3900 发/分</td><td>6000</td><td>1100 m/s</td><td>分水群岛国（上游外销型）</td></tr>
-  <tr><td>CEL-2</td><td>20mm 六管</td><td>3900 发/分</td><td>6000</td><td>1100 m/s</td><td>调节场管理局（上游退役库存）</td></tr>
-  <tr><td>CEL-3</td><td>20mm 六管</td><td>3900 发/分</td><td>6000</td><td>1100 m/s</td><td>上游公约 · 全部制式机</td></tr>
-  <tr><td>CEL-7</td><td>30mm 四管</td><td>3900 发/分</td><td>14000</td><td>1020 m/s</td><td>上游公约 · G-6（专用重炮）</td></tr>
-  <tr><td>CEL-11</td><td>30mm 四管</td><td>3900 发/分</td><td>14000</td><td>1020 m/s</td><td>下游同盟 · 全部制式机</td></tr>
-</table>`
+{{gunTable}}`
   },
 
   {
@@ -539,7 +533,7 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 
 <h4>呼号</h4>
 <p>军用呼号取自<b>星名</b> —— 长庚、参宿、天狼、织女，
-全是天上还亮着的东西。一个群岛国家用星名当呼号，
+全是天上还亮着的东西。九个群岛与海洋国家共用星名当呼号，
 是因为他们的天空从来没变过：雨还会下，海还在那里，
 明年的航道照样开。</p>
 
@@ -837,14 +831,14 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <p>两栖船团出港了。三条登陆舰、两条护卫、几条快艇，
 目标是把一个营送上分水主岛的东岸。
 只要它们靠岸，岛上就会多出一个不需要谈判的据点。</p>
-<p>气象台给出的登陆窗口是五个小时，而你已经过去了两个小时 ——
+<p>潮位与气象只留给登陆部队最后 {{ms.m9.limit}} 冲上滩头 ——
 <b>这是整场战役里唯一一次"打不完就直接输"的时限。</b></p>
 
 <h4>第十阶段 · 指挥所<br><span style="color:#6b7d8c">COMMAND POST</span></h4>
 <p>上游的决定是把下游的指挥链从中间摘掉：
 预警机、舰上指挥所、以及把它们连起来的那个人。</p>
 <p>下游把指挥所摆在了正面 —— 它被两层护航包着，
-而最上面那架信天翁的飞行员就是冬港。
+而最上面那一架的飞行员就是冬港。
 <b>他不是来复仇的：冬港是一座还在用水的镇子，
 他来谈的是一桩十六年没人愿意开口的交易。</b></p>
 
@@ -869,14 +863,14 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <p>2078 年五月，双方在分水海盆中央形成了一种默契：
 不再往那片空域派侦察机，也不宣布它中立。
 它没有名字，海图上的编号是空的 ——
-飞行员管它叫<b>空白海域</b>。</p>
+飞行员管它叫<b>无号区</b>。</p>
 <p>通告里的说法是"该空域不存在成建制的敌对活动"。
 于是每一支还剩油的中队都往那里派单机巡逻：
 <b>谁都不承认自己在找谁。</b></p>
 
 <h4>为什么每次都不一样</h4>
 <p>因为进那片空域的不是编队，是<b>单机</b>。
-上游、下游、以及政变之后旗子换过三次的群岛国 ——
+上游、下游、以及政变之后挂过四面不同旗子的群岛国 ——
 每个中队都派一架，各自走各自的航路，
 相遇的位置、机型和数量每一次都不同。</p>
 <p>两边的飞机在同一段航路上碰见，谁先转到对方尾后谁就先开火。
@@ -961,6 +955,131 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 ];
 
 /* ============================================================
+   静态条目里的数值占位符
+   —— 叙事页（t1 / t3 / t4 / s1 / s2 / 战役页）里凡是复述了
+   WEAPONS / MISSIONS / 大气模型的数字，一律写成 {{键}}，
+   渲染时由 _cxFill() 现场替换。这样改了 data.js，正文跟着变。
+
+   同样受加载顺序约束：codex.js 在 data.js / entities.js /
+   missions.js 之前加载，所以 _CX_VALS 里的每一项都是函数，
+   只在 build() 被调用（玩家点进页面）时才去读那些全局。
+
+   找不到的键原样保留 {{键}} —— smoke.js 会拦下来。
+   ============================================================ */
+function _cxW(id) { return WEAPONS[id]; }
+function _cxNum(x, d) { return (+x).toFixed(d === undefined ? 0 : d); }
+function _cxPct(r) { return Math.round(r * 100) + '%'; }
+/** 相对海平面的密度，直接取 Ent.airDensity —— 与飞行 / 导弹物理同一条曲线 */
+function _cxRel(y) { return Ent.airDensity(y) / Ent.airDensity(0); }
+
+/** 机炮附带的"装备方"是叙事，不是数据；参数列全部现读 WEAPONS */
+var _CX_GUN_OWNER = {
+  k1: '分水群岛国（上游外销型）',
+  k2: '调节场管理局（上游退役库存）',
+  k3: '上游公约 · 全部制式机',
+  k7: '上游公约 · G-6（专用重炮）',
+  k11: '下游同盟 · 全部制式机'
+};
+
+function _cxGunTable() {
+  var h = '<table class="cx-table"><tr><th>型号</th><th>口径</th><th>射速</th>' +
+    '<th>备弹</th><th>初速</th><th>射程（18 km 以上）</th><th>装备方</th></tr>';
+  for (var id in WEAPONS) {
+    if (!Object.prototype.hasOwnProperty.call(WEAPONS, id)) continue;
+    var w = WEAPONS[id];
+    if (w.kind !== 'gun') continue;
+    h += '<tr><td>' + w.name + '</td><td>' + w.cn.split(' ·')[0].replace('转膛炮', '') + '</td>' +
+      '<td>' + w.rpm + ' 发/分</td><td>' + w.ammo + '</td><td>' + w.speed + ' m/s</td>' +
+      '<td>' + w.range + ' m（' + w.highRange + ' m）</td>' +
+      '<td>' + (_CX_GUN_OWNER[id] || '—') + '</td></tr>';
+  }
+  return h + '</table>';
+}
+
+/** 任务统计：从 MISSIONS 现数，不再手写"十一个任务里有两个" */
+function _cxMissions() {
+  var hi = [];
+  for (var i = 0; i < MISSIONS.length; i++) {
+    if (MISSIONS[i].altStart >= 17000) hi.push('「' + MISSIONS[i].name + '」');
+  }
+  return { total: MISSIONS.length, hi: hi };
+}
+function _cxMission(id) {
+  for (var i = 0; i < MISSIONS.length; i++) if (MISSIONS[i].id === id) return MISSIONS[i];
+  return null;
+}
+/** 秒 → "N 分钟" / "N 秒" */
+function _cxDur(t) { return (t % 60 === 0) ? (t / 60) + ' 分钟' : t + ' 秒'; }
+
+var _CX_VALS = {
+  'rho.0': function () { return _cxNum(_cxRel(0), 2); },
+  'rho.11000': function () { return _cxNum(_cxRel(11000), 2); },
+  'rho.18000': function () { return _cxNum(_cxRel(18000), 3); },
+  'rho.20000': function () { return _cxNum(_cxRel(20000), 3); },
+  'rho.22000': function () { return _cxNum(_cxRel(22000), 3); },
+  'rho.pct20': function () { return _cxPct(_cxRel(20000)); },
+  'rho.qSpeed20': function () { return _cxNum(Math.sqrt(1 / _cxRel(20000)), 1); },
+  'rho.turn20': function () { return _cxNum(Ent.turnFactor(20000), 2); },
+  'rho.turnFloor': function () { return _cxNum(Ent.turnFactor(1e9), 2); },
+
+  'gunTable': _cxGunTable,
+  'gun.k3.name': function () { return _cxW('k3').name; },
+  'gun.k3.cal': function () { return _cxW('k3').cn.split(' ')[0] + ' 炮弹'; },
+  'gun.k3.speed': function () { return _cxW('k3').speed; },
+  'gun.k3.range': function () { return _cxW('k3').range; },
+  'gun.k3.highRange': function () { return _cxW('k3').highRange; },
+  'gun.k3.tof': function () { return _cxNum(_cxW('k3').range / _cxW('k3').speed, 1); },
+  'gun.k3.rps': function () { return Math.round(_cxW('k3').rpm / 60); },
+
+  'w.e4.name': function () { return _cxW('e4').name; },
+  'w.e4.lockReducePct': function () { return _cxPct(_cxW('e4').lockReduce); },
+  'w.e4.cd': function () { return _cxW('e4').cd; },
+  'w.e4.duration': function () { return _cxW('e4').duration; },
+
+  'w.l2.interceptRange': function () { return _cxW('l2').interceptRange; },
+  'w.l2.coneDeg': function () { return Math.round(_cxW('l2').interceptCone * 180 / Math.PI); },
+  'w.l2.chancePct': function () { return _cxPct(_cxW('l2').interceptChance); },
+  'w.l2.highPct': function () { return _cxPct(_cxW('l2').highAltChance); },
+  'w.l2.charges': function () { return _cxW('l2').charges; },
+  'w.l2.recharge': function () { return _cxW('l2').recharge; },
+
+  'w.v17.name': function () { return _cxW('v17').name; },
+  'w.v17.cnShort': function () { return _cxW('v17').cn.split(' ·')[0]; },
+  'w.v17.life': function () { return _cxNum(_cxW('v17').life, 0); },
+  'w.v17.vsLife': function () { return _cxNum(_cxW('v17').vsLife, 0); },
+  'w.v17.turn': function () { return _cxNum(_cxW('v17').turn, 2); },
+  /* 冲压弹高空降级：直接问 entities.js，取 18 km 以上的动力段 */
+  'w.v17.lifeHigh': function () {
+    return _cxNum(Ent.effectiveLife(_cxW('v17'), 20000), 1);
+  },
+  'w.mrm.name': function () { return _cxW('mrm').name; },
+  'w.mrm.life': function () { return _cxNum(_cxW('mrm').life, 0); },
+  'w.srm.name': function () { return _cxW('srm').name; },
+  'w.srm.turn': function () { return _cxNum(_cxW('srm').turn, 2); },
+
+  'ms.total': function () { return _cxMissions().total; },
+  'ms.highN': function () { return _cxMissions().hi.length; },
+  'ms.highList': function () { return _cxMissions().hi.join('、'); },
+  'ms.m9.limit': function () { var m = _cxMission('m9'); return m ? _cxDur(m.timeLimit) : '—'; }
+};
+
+/** 把 {{键}} 换成现读的数值。未知键原样保留，交给 smoke.js 报错 */
+function _cxFill(html) {
+  return html.replace(/\{\{([\w.]+)\}\}/g, function (all, k) {
+    var f = _CX_VALS[k];
+    return f ? String(f()) : all;
+  });
+}
+
+/* 带占位符的静态条目统一改走 build()：buildCodex 已经认 build，
+   不需要动 game.js；smoke.js 也会顺带把它们当动态条目跑一遍。 */
+for (var _cxi = 0; _cxi < CODEX.length; _cxi++) {
+  if (CODEX[_cxi].html && CODEX[_cxi].html.indexOf('{{') >= 0 && !CODEX[_cxi].build) {
+    CODEX[_cxi].build = function () { return _cxFill(this.html); };
+  }
+}
+
+/* ============================================================
    装备图鉴
    —— 内容由 build() 现场从 AIRCRAFT / WEAPONS / STORE_ATTR 生成，
    所以改了武器数据这里会自动跟上，不会出现"文档说 A、实际是 B"。
@@ -979,7 +1098,7 @@ function _capLabel(c) {
 
      它表示"需要完整的重型火控与重挂架"，用在加固侵彻、防区外对地、
      远程巡航、反舰这些真正的重型弹药上。以前这里写作"对地火控"，
-     而当时 BIN-8 追云（一枚对空的重型拦截弹）也被挂在这个门槛下，
+     而当时 SPO-8 追云（一枚对空的重型拦截弹）也被挂在这个门槛下，
      于是图鉴把它标成"限 对地火控" —— 看着像分类错了。
      那个挂载门槛已经删掉，这里保留"重型火控"是为了准确地描述
      剩下那几件弹药的共同要求。 */
@@ -997,17 +1116,34 @@ function _rngTxt(w) {
   return r.toFixed(1) + ' km';
 }
 
-/** 导引方式描述。导引品质（lead）是这版新加的，直接摆出来对比 */
+/** 导引方式 —— 图鉴（_seekerLabel）与机库挂载卡片（game.js storeStatLine）
+    共用这一个判定，避免两处各写一份映射再各自漂移。
+
+    返回 { name, note, lead }：
+      name  中文导引方式；被动吊舱 = '被动'，没有导引头 = '无制导'
+      note  附注（光电"不受干扰弹影响"、激光"需保持照射"），没有则为 ''
+      lead  预测品质 0–1；光电 / 激光 / 无制导不报（null）
+
+    无制导的判据是 `w.unguided` 或 seeker 缺省 / 'none'。
+    以前缺省 seeker 的火箭弹（rkt）和子母弹（clb）落进了最后的
+    else 分支，被图鉴标成了"雷达"。 */
+function weaponGuidance(w) {
+  if (w.passive) return { name: '被动', note: '', lead: null };
+  if (w.unguided || !w.seeker || w.seeker === 'none') {
+    return { name: '无制导', note: '', lead: null };
+  }
+  if (w.seeker === 'eo') return { name: '光电', note: '不受干扰弹影响', lead: null };
+  if (w.seeker === 'laser') return { name: '激光照射', note: '需保持照射', lead: null };
+  var name = ({ ir: '红外', radar: '雷达' })[w.seeker] || w.seeker;
+  return { name: name, note: '', lead: (w.lead !== undefined ? w.lead : null) };
+}
+
+/** 导引方式描述（图鉴表格用） */
 function _seekerLabel(w) {
-  if (w.passive) return '被动';
-  if (w.seeker === 'none') return '无制导';
-  var s = (w.seeker === 'ir') ? '红外'
-    : (w.seeker === 'eo' ? '光电'
-      : (w.seeker === 'laser' ? '激光照射' : '雷达'));
-  // 光电/激光靠图像或照射，谈不上"预测品质"那种提前量解算
-  if (w.seeker === 'eo') return s + ' · 不受干扰弹影响';
-  if (w.seeker === 'laser') return s + ' · 需保持照射';
-  if (w.lead !== undefined) s += ' · 预测 ' + Math.round(w.lead * 100) + '%';
+  var g = weaponGuidance(w);
+  var s = g.name;
+  if (g.note) return s + ' · ' + g.note;
+  if (g.lead !== null) s += ' · 预测 ' + Math.round(g.lead * 100) + '%';
   return s;
 }
 

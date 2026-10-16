@@ -1,3 +1,4 @@
+
 /* ============================================================
    game.js —— 状态机 / 主循环 / 无线电 / UI 绑定
    ============================================================ */
@@ -744,14 +745,11 @@ var Game = (function () {
       if (w.kind === 'dew' && w.interceptRange) {
         bits.push('拦截 ' + (w.interceptRange / 1000).toFixed(1) + ' km');
       }
-      var sk = ({ ir: '红外', eo: '光电', radar: '雷达',
-        laser: '激光照射', none: '无制导' })[w.seeker];
-      if (sk && w.seeker !== 'none') {
-        // 光电与激光都不做提前量解算，报"预测品质"没有意义
-        if (w.seeker === 'eo') bits.push('导引 光电（不受干扰弹影响）');
-        else if (w.seeker === 'laser') bits.push('导引 激光照射（需保持照射）');
-        else bits.push('导引 ' + sk + ' ' + Math.round((w.lead || 0) * 100) + '%');
-      }
+      // 与图鉴共用 weaponGuidance()（codex.js）—— 两处不再各写一份映射
+      var gd = weaponGuidance(w);
+      if (gd.note) bits.push('导引 ' + gd.name + '（' + gd.note + '）');
+      else if (gd.lead !== null) bits.push('导引 ' + gd.name + ' ' + Math.round(gd.lead * 100) + '%');
+      else bits.push('导引 ' + gd.name);
     }
     bits.push(w.mass + ' kg');
     if (w.cd) bits.push('冷却 ' + w.cd.toFixed(1) + 's');
@@ -1236,8 +1234,9 @@ var Game = (function () {
     }
 
     /* 交战规则：阵列空域内禁止 20 kg 以上战斗部 */
-    if (actor.isPlayer && w.roeBlocked &&
-      (wp.kind === 'asm' || wp.kind === 'agm' || wp.kind === 'bomb')) {
+    /* 判据只有一处：data.js 的 roeRestricted() —— 武器 desc 末尾那句
+       交战规则提示也是由它生成的，两边不会再对不上。 */
+    if (actor.isPlayer && w.roeBlocked && roeRestricted(wp)) {
       Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>交战规则限制 —— 该武器在阵列空域内被锁定。</b>', gap: 0.9 });
       return false;
     }
@@ -2140,6 +2139,11 @@ var Game = (function () {
        这是"更难被发现"那一头的代价，与被动吊舱的 +45% 正好互为反面。 */
     if (player.emcon) lockDist *= 0.5;
 
+    /* 目标自己的被动抗锁（SAV-6 / ZUN-8 这类吊舱汇总出来的 lockResist）。
+       AI 锁玩家时一直在读它（ai.js），玩家锁 AI 时以前却不读 ——
+       敌机挂的干扰吊舱对玩家完全没用。 */
+    if (t.lockResist) lockDist *= (1 - t.lockResist);
+
     /* ---------- 对空与对面是两套完全不同的判据 ----------
 
        对空弹靠**导引头**：受视场锥角限制，目标偏出锥外就丢，
@@ -2236,9 +2240,17 @@ var Game = (function () {
         var r = tg.radius || 8;
         var t2 = M3.raySphere(prev, dir, tg.pos, r);
         if (t2 >= 0 && t2 <= segLen) {
-          b.alive = false;
           if (b.owner && b.owner.isPlayer) world.hitsLanded++;
-          hitTarget(tg, b.dmg, b.owner);
+          /* 子母弹撞上设施 = 就地抛撒，按覆盖半径结算一片（Ent.clusterBurst）。 */
+          if (b.w && b.w.cluster) {
+            b.pos = M3.add(prev, M3.mul(dir, t2));
+            Ent.clusterBurst(b, world);
+            SFX.hit();
+            break;
+          }
+          b.alive = false;
+          // 加固目标对普通战斗部打折（Ent.warheadK；子弹的 b.w 是 undefined → 1）
+          hitTarget(tg, b.dmg * Ent.warheadK(b.w, tg), b.owner);
           SFX.hit();
           break;
         }
@@ -2246,11 +2258,20 @@ var Game = (function () {
       if (b.pos.y <= 0) b.alive = false;
   }
 
+  /* 制导弹（detonate）与子母弹（clusterBurst）打设施也走这里 ——
+     以前它们走的是 Ent.damage → kill()，击毁不进 groundKilled、
+     误击调节单元也不记处罚。 */
+  Ent.setTargetHitHandler(function (tg, dmg, source) { hitTarget(tg, dmg, source); });
+
   function hitTarget(tg, dmg, source) {
+    if (!tg.alive) return;
     tg.hp -= dmg;
     Ent.spawnParticle(world.particles, tg.pos, M3.V(0, 2, 0), 0.3, 2.6, '#ffcc66', { grow: true });
     if (tg.hp <= 0) {
+      /* 打掉 friendlyAsset（调节单元、准绳）一律记处罚 —— 以前 penal 算了没人用，
+         只有 cell 分支自己累加，准绳被打掉反而 +400。 */
       var penal = tg.friendlyAsset && source && source.isPlayer;
+      if (penal) world.friendlyLoss = (world.friendlyLoss || 0) + 1;
       Ent.killGround(tg, world);
       if (tg.model === 'cell') {
         Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>你打爆了一个调节单元！</b>340 公斤碘化银在那一层高度散开了。', gap: 1.2 });
@@ -2266,36 +2287,71 @@ var Game = (function () {
   /* ============================================================
      地面 / 平台火力
      ============================================================ */
+  /* 水面/地面目标的对空射击。
+
+     以前这里只会朝玩家开火 —— 于是我方舰艇（team 0）根本没法带武器：
+     一带上就会对玩家自己发射。现在按阵营挑目标：
+       team 1（敌方）  玩家优先；玩家不在射程/没被发现时，打最近的我方飞机（僚机/无人机）
+       team 0（我方）  最近的敌机（team 1）
+       team 2（中立）  从不开火
+     发射本身沿用原来那条路径（makeMissile + fireCd）。弹的阵营 = 发射者阵营，
+     命中判定与近炸都按 m.team 过滤（见 entities.js），所以我方舰艇的弹
+     不会伤到玩家与僚机。 */
+  function pickTargetFor(t, w) {
+    if (t.team === 1) {
+      if (player.alive) {
+        var d = M3.dist(t.pos, player.pos);
+        // 玩家的被动吊舱会压缩敌方对他的锁定距离
+        if (d <= w.lockDist * (1 - (player.lockResist || 0))) {
+          // 低空突防可以躲开对空雷达；但贴得太近仍会被目视发现
+          var lowExposed = t.ground && player.pos.y < (world.dangerAltitude || 1500) && d < 5200;
+          if (world.detected || lowExposed) return player;
+        }
+      }
+      // 没被发现之前不会去打僚机 —— 否则一开火就等于自己暴露了
+      if (!world.detected) return null;
+    } else if (t.team !== 0) {
+      return null;
+    }
+    var best = null, bd = w.lockDist;
+    for (var j = 0; j < world.actors.length; j++) {
+      var e = world.actors[j];
+      if (!e.alive || e === player || e.team === t.team || e.team === 2) continue;
+      var de = M3.dist(t.pos, e.pos);
+      if (de < bd) { bd = de; best = e; }
+    }
+    return best;
+  }
+
   function updateTargets(dt) {
     for (var i = 0; i < world.targets.length; i++) {
       var t = world.targets[i];
       if (!t.alive) continue;
       Ent.stepTarget(t, dt);
 
-      if (!t.weapon) continue;
+      if (!t.weapon || t.team === 2) continue;
       if (t.fireCd > 0) { t.fireCd -= dt; continue; }
-      if (!player.alive) continue;
 
-      var d = M3.dist(t.pos, player.pos);
       var w = WEAPONS[t.weapon];
-      // 玩家的被动吊舱会压缩敌方对他的锁定距离
-      if (d > w.lockDist * (1 - (player.lockResist || 0))) continue;
-
-      // 低空突防可以躲开对空雷达；但贴得太近仍会被目视发现
-      var lowExposed = t.ground && player.pos.y < (world.dangerAltitude || 1500) && d < 5200;
-      if (!world.detected && !lowExposed) continue;
+      if (!w) continue;
+      var tgt = pickTargetFor(t, w);
+      if (!tgt) continue;
+      var d = M3.dist(t.pos, tgt.pos);
 
       t.fireCd = w.cd + M3.rnd(0, 2);
-      var dir = M3.norm(M3.add(M3.sub(player.pos, t.pos), M3.V(0, 260, 0)));
+      var dir = M3.norm(M3.add(M3.sub(tgt.pos, t.pos), M3.V(0, 260, 0)));
       var m = Ent.makeMissile({
         weapon: t.weapon, team: t.team,
         pos: M3.V(t.pos.x, t.pos.y + 5, t.pos.z),
         fwd: dir, speed: 140,
-        target: player, owner: t
+        target: tgt, owner: t
       });
       world.missiles.push(m);
-      Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>发射！方位 ' + bearing(t.pos, player.pos) + '，距离 ' + (d / 1000).toFixed(1) + ' km。</b>', gap: 0.9 });
-      SFX.missileFar();
+      // 只有冲着玩家来的那一发才喊"发射"；告警音由主循环按 m.target 判
+      if (tgt === player) {
+        Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>发射！方位 ' + bearing(t.pos, player.pos) + '，距离 ' + (d / 1000).toFixed(1) + ' km。</b>', gap: 0.9 });
+        SFX.missileFar();
+      }
     }
   }
 
@@ -2328,8 +2384,16 @@ var Game = (function () {
       if (M3.angleBetween(actor.fwd, toM) > w.interceptCone) continue;
       // 平流层的风切变会把光斑抹开，拦截概率下降（见 codex t4 铁律二）
       var chance = (actor.pos.y > 18000 && w.highAltChance) ? w.highAltChance : w.interceptChance;
-      // 导弹在这段距离内的飞行时间约 1.2 秒，把总概率折算成每帧概率
-      if (Math.random() > chance * dt / 1.2) continue;
+      /* 每枚来袭弹**只判一次**：第一次进入包线时按 chance 掷骰。
+
+         以前是把总概率按"约 1.2 秒飞行时间"折成每帧概率连续掷，
+         实际累积是 1 − e^(−chance·T/1.2)，T 取决于接近速度：
+         迎头 1200 m/s 的弹只在包线里待 1 秒，55% 实际只有 37% 左右。
+         现在 desc 写的 55% 就是每枚弹被烧掉的概率。 */
+      var rollKey = actor.id !== undefined ? actor.id : actor;
+      if (m.dewRolled === rollKey) continue;
+      m.dewRolled = rollKey;
+      if (!(Math.random() < chance)) continue;
       // 拦截成功
       actor.spCharges--;
       // 开始充能倒计时（打空了就一直走到补满为止）
@@ -2991,7 +3055,7 @@ var Game = (function () {
          叫"机炮精度"说的才是它真正测的东西。 */
       ['机炮精度', (acc * 100).toFixed(0) + '%'],
       ['机体完整度', player.alive ? (hull * 100).toFixed(0) + '%' : '—'],
-      ['调节单元损失', penalty],
+      ['误击友方设施', penalty],
       ['作战时间', world.timeLimit > 0
         ? fmtTime(world.time) + ' / ' + fmtTime(world.timeLimit)
         : fmtTime(world.time)],
@@ -3351,7 +3415,9 @@ var Game = (function () {
     __player: function () { return player; },
     __world: function () { return world; },
     // 实体挂载的渲染：断言要能单独喂一架飞机进来数它画了几个挂载
-    __pushStores: pushStores
+    __pushStores: pushStores,
+    // 水面目标的对空射击：断言要能单独推一帧，确认我方舰艇不朝玩家打
+    __updateTargets: updateTargets
   };
 })();
 

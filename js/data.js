@@ -368,7 +368,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
      GAL-31「玄武岩」—— 高峰军工制造局的重型截击机
 
      下游的机型前缀取自**设计局**（参照苏联按 MiG / Su / Tu 分的做法），
-     而 galtu（高）正是这家厂唯一的招牌。它存在的理由也只有一个：
+     而 galtu（高）正是这家厂的招牌（它另一型产品是 GAL-44 干扰机）。它存在的理由也只有一个：
      让那批在 15 公里以上飞了半辈子的老兵有东西可开。
      ============================================================ */
   {
@@ -383,7 +383,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     maker: '高峰军工制造局（galtu cmana jenmi zbasu girzu）',
     npcOnly: true,
     model: 'gal31',
-    desc: `高峰军工制造局的唯一产品，也是下游同盟飞得最高的一架。
+    desc: `高峰军工制造局的招牌产品，也是下游同盟飞得最高的一架。
       两台大推力发动机、巨大的雷达、四枚远距弹 ——
       低空笨得没法看，可它的战场从来不在低空。
       <p>开它的多半是那批老兵。在这个高度上，
@@ -512,8 +512,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
      「浪花」SPRAY Mk.1 —— 海上巡逻机
 
      群岛国不叫它战斗机，因为它的确不是：一架飞得慢、转得笨、
-     但能在海上待很久的机器，机腹挂一副搜救吊舱和两挺机枪。
-     政变之后，它是这片海域里唯一还会回应求救信号的东西。
+     但能在海上待很久的机器，机腹挂一副搜救吊舱，机头一门 20 mm 炮。
+     政变之后，它和「屿」级巡逻艇是这片海域里少数还会回应求救信号的东西。
      ============================================================ */
   {
     id: 'spray',
@@ -529,8 +529,9 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     model: 'spray',
     desc: `严格说它不算军用飞机：飞得慢、转得笨，
       唯一的本事是能在海上待六个小时。
-      <p>机腹挂一副搜救吊舱、两挺机枪 —— 就这些。
-      政变之后，它是这片海域里唯一还会回应求救信号的东西。</p>`,
+      <p>机腹挂一副搜救吊舱、机头一门 20 毫米炮 —— 就这些。
+      政变之后，它和「屿」级巡逻艇是这片海域里少数几样
+      还会回应求救信号的东西。</p>`,
     stats: { spd: 0.28, mob: 0.30, stl: 0.10, fire: 0.26, dur: 0.52, rng: 0.92 },
     phys: { vMax: 340, vMil: 290, vStall: 82, accel: 14, decel: 36, pitch: 0.38, roll: 2.1, yaw: 0.30, hp: 110 },
     gun: 'k1',
@@ -664,7 +665,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       那片噪声就是它的位置。</p>`,
     stats: { spd: 0.34, mob: 0.12, stl: 0.06, fire: 0.05, dur: 0.88, rng: 0.72 },
     phys: { vMax: 390, vMil: 330, vStall: 122, accel: 14, decel: 30, pitch: 0.40, roll: 1.5, yaw: 0.22, hp: 260 },
-    gun: 'k3',
+    // 下游只有一条机炮生产线（设定 8.4）—— 原来误写成上游的 CEL-3
+    gun: 'k11',
     maxLoad: 0,
     hardpointGroups: [
       /* 机腹干扰吊舱。hy 是这架飞机的机腹下表面（-2.60 m）再减一点余量 ——
@@ -713,7 +715,7 @@ var SHIPS = [
     vials: ['四面相控阵', '前甲板垂发阵位', '动力舱'],
     arms: ['32 单元舰空弹垂发', '近防炮 ×2', '76 mm 舰炮 ×1', '反潜鱼雷 ×6'],
     desc: `
-<p>上游公约海军留在分水方向的<b>两艘</b>水面战舰之一。它的任务书里没有一条是"歼灭敌方舰队" ——
+<p>上游公约海军留在分水方向的<b>两艘</b>护航驱逐舰之一。它的任务书里没有一条是"歼灭敌方舰队" ——
 这片海域上没有值得歼灭的舰队，只有漂在海上的平台、电缆和驳船。</p>
 <p>所以它全部的战斗力都朝<b>上</b>：四面相控阵、32 单元垂发、两座近防炮。
 它的射界里绝大多数时间出现的是飞机和导弹，不是船。</p>
@@ -858,7 +860,7 @@ var SHIPS = [
     vials: ['两座四联装发射箱', '驾驶室', '主机的进排气'],
     arms: ['反舰导弹 ×8', '30 mm 遥控炮 ×1'],
     desc: `
-<p>42 米，八枚反舰弹，贴海跑 40 节。它是这片海域上唯一的饱和攻击平台，
+<p>42 米，八枚反舰弹，贴海跑 40 节。它是这片海域上最小的饱和攻击平台，
 也是造价最低的一条船 —— <b>这两件事本来就是同一件事。</b></p>
 <p>三叶虫是化石里最常见的一种：数量极大、种类极多，在地层里到处都是。
 而快艇在下游的编制表上就是消耗品：它们的存在意义是一次齐射。
@@ -892,8 +894,9 @@ var SHIPS = [
 把补给护送到被下游扶植的岛上行政机构，顺便用自己的雷达给岸基
 反舰弹提供中继。</p>
 <p>下游的船普遍维护得差，焊缝上常年有锈。
-但它们的舰员比飞行员老练得多 —— 飞行员平均飞行时数只有对方的一半，
-而海军这一行，下游从几十年前就没停过。</p>`
+但它们的舰员比飞行员老练 —— 下游没有深厚的海军传统，
+这些人多半是从内河航运和近海缉私队里一船一船攒出来的，
+在水上待的年头比飞行员在天上待的长得多。</p>`
   },
   {
     id: 'seascorpion',
@@ -1251,9 +1254,8 @@ var WEAPONS = {
     speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
     turn: 1.75, seeker: 'ir', lockCone: 45 * Math.PI / 180, lockDist: 4200,
     dmg: 30, ammo: 8, cd: 0.11, salvo: 1, flare: 0.38, prox: 20,
-    target: 'air', highAltScale: true,
-    desc: `基础短程红外弹。转弯率 2.4 rad/s，抗干扰一般，锁定锥 45°。
-      单点挂载量是全部弹种里最高的 —— 它就是用来"多带几发"的。`,
+    target: 'air',    desc: `基础短程红外弹。转弯率 {{turn}} rad/s，抗干扰一般，锁定锥 {{coneDeg}}°。
+      一个挂点带 {{perPoint}} 发、装填只要 {{cd}} 秒 —— 它就是用来"多带几发"的。`,
     stat: { dmg: 0.34, spd: 0.50, trn: 0.68, rng: 0.36, ecm: 0.30 }
   },
 
@@ -1268,9 +1270,8 @@ var WEAPONS = {
     speed: 820, boost: 210, life: 5.0, vsLife: 13.0,
     turn: 1.95, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4800,
     dmg: 32, ammo: 6, cd: 0.14, salvo: 1, flare: 0.24, prox: 20,
-    target: 'air', highAltScale: true,
-    desc: '短哨是基础弹的抗干扰改型：换了双色导引头，flare 从 0.38 降到 0.24，' +
-      '代价是单价上去了、单挂点只能带 6 发。',
+    target: 'air',    desc: '短哨是基础弹的抗干扰改型：换了双色导引头，flare 从 0.38 降到 {{flare}}，' +
+      '代价是单价上去了、单挂点只能带 {{perPoint}} 发。',
     stat: { dmg: 0.36, spd: 0.56, trn: 0.72, rng: 0.42, ecm: 0.58 }
   },
 
@@ -1280,34 +1281,37 @@ var WEAPONS = {
     speed: 700, boost: 240, life: 4.0, vsLife: 11.0,
     turn: 2.60, seeker: 'ir', lockCone: 88 * Math.PI / 180, lockDist: 3200,
     dmg: 28, ammo: 4, cd: 0.12, salvo: 1, flare: 0.42, prox: 18,
-    target: 'air', highAltScale: true, hobs: true,
-    desc: '环刃的导引头能在 88° 离轴角上锁定 —— 机头都不用转过去就能打。' +
+    target: 'air', hobs: true,
+    desc: '环刃的导引头能在 {{coneDeg}}° 离轴角上锁定、出膛后也一直看得见那么宽 —— 机头都不用转过去就能打。' +
       '转弯率是全家族最高的，但射程和抗干扰都垫底。',
     stat: { dmg: 0.32, spd: 0.42, trn: 0.95, rng: 0.24, ecm: 0.24 }
   },
 
   mrm: {
-    id: 'mrm', name: 'BIN-4', cn: '中继 · RELAY', kind: 'aam',
+    id: 'mrm', name: 'CLA-4', cn: '中继 · RELAY', kind: 'aam',
     model: 'missile',
     speed: 900, boost: 200, life: 8.0, vsLife: 20.0,
     turn: 1.45, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 8600,
     dmg: 40, ammo: 4, cd: 0.64, salvo: 1, flare: 0.30, prox: 26,
-    target: 'air', highAltScale: true, reAcquire: true,
+    target: 'air', reAcquire: true, decoyMemory: true,
     /* 原句是"不吃干扰弹"。那是假的 —— 干扰弹是热焰弹与箔丝一起投放的，
-       箔丝专门骗雷达导引头，BIN-4 一样会被骗。
+       箔丝专门骗雷达导引头，CLA-4 一样会被骗。
 
        它真正的强项是**抗干扰**而不是免疫：flare 0.30 是全表第二低。
-       再加上 reAcquire，它被欺骗之后重新捕获时会避开骗过它的那一架。
+       再加上 reAcquire + decoyMemory：被骗之后盲飞一段，重新搜索时
+       **不会再咬回骗过它的那团箔丝云**（entities.js 的 decoyRecheck），
+       而是在锁定锥内重新捕获真目标 —— 包括刚才丢诱饵的那一架。
        （别处也写着"雷达弹不吃箔丝"，同批一起改掉了。） */
-    desc: '主动雷达中距弹。抗干扰是它的强项：干扰弹里的箔丝能骗到它，' +
-      '但机会不大；而且它记得是谁骗的，重新捕获时会避开那一架。' +
+    desc: '主动雷达中距弹。抗干扰是它的强项：干扰弹里的箔丝骗到它的概率只有 {{flareRDPct}}；' +
+      '就算骗中了，它也记得那团箔丝 —— 盲飞过后重新搜索时不会再被同一团诱饵骗走，' +
+      '而是在 {{coneDeg}}° 锁定锥内重新咬住真目标。' +
       '比干扰弹更可靠的办法是机动 —— 把它的能量耗光。' +
       '锁定需要时间，打完就得脱离，否则对方会用同样的东西回敬你。',
     stat: { dmg: 0.48, spd: 0.70, trn: 0.52, rng: 0.72, ecm: 0.20 }
   },
 
   arm: {
-    id: 'arm', name: 'BIN-8', cn: '追云 · CLOUDHUNT', kind: 'aam',
+    id: 'arm', name: 'SPO-8', cn: '追云 · CLOUDHUNT', kind: 'aam',
     model: 'missile',
     speed: 880, boost: 190, life: 7.5, vsLife: 18.0,
     turn: 1.35, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 9500,
@@ -1361,12 +1365,12 @@ var WEAPONS = {
      ============================================================ */
 
   vlar: {
-    id: 'vlar', name: 'DAR-12', cn: '极远 · OUTREACH', kind: 'aam',
+    id: 'vlar', name: 'CLA-12', cn: '极远 · OUTREACH', kind: 'aam',
     model: 'missile',
     speed: 980, boost: 150, life: 12.0, vsLife: 30.0,
     turn: 0.78, seeker: 'radar', lockCone: 18 * Math.PI / 180, lockDist: 16000,
     dmg: 66, ammo: 1, cd: 1.5, salvo: 1, flare: 0.66, prox: 34,
-    target: 'air', highAltScale: true, bigTarget: true,
+    target: 'air',
     desc: '一发就占满一个重挂点。它存在的意义是把预警机和浮空平台' +
       '从护航圈里拽下来 —— 打战斗机是浪费。',
     stat: { dmg: 0.82, spd: 0.78, trn: 0.24, rng: 1.00, ecm: 0.16 }
@@ -1378,8 +1382,8 @@ var WEAPONS = {
     speed: 740, boost: 190, life: 4.2, vsLife: 11.0,
     turn: 1.70, seeker: 'ir', lockCone: 52 * Math.PI / 180, lockDist: 4000,
     dmg: 24, ammo: 12, cd: 0.28, salvo: 3, flare: 0.40, prox: 16,
-    target: 'air', highAltScale: true,
-    desc: '三联装发射巢，一个挂点就是三枚。单发威力最小，' +
+    target: 'air',
+    desc: '三联装发射巢：按一下出 {{salvo}} 枚，一个挂点装 {{perPoint}} 枚（{{volleys}} 次齐射）。单发威力最小，' +
       '但一次齐射能铺开一片 —— 用来逼对方放弃进攻航线比用来击落更有效。',
     stat: { dmg: 0.26, spd: 0.46, trn: 0.64, rng: 0.34, ecm: 0.22 }
   },
@@ -1390,9 +1394,12 @@ var WEAPONS = {
     speed: 860, boost: 260, life: 4.8, vsLife: 12.0,
     turn: 2.15, seeker: 'ir', lockCone: 58 * Math.PI / 180, lockDist: 5200,
     dmg: 38, ammo: 3, cd: 0.38, salvo: 1, flare: 0.36, prox: 22,
-    target: 'air', highAltScale: true, reAcquire: true,
-    desc: '锥刺的轻量版：推力更猛、加速更快，进不可逃逸区比谁都快。' +
-      '代价是动力段短，追不上掉头就跑的目标。',
+    target: 'air', reAcquire: true,
+    /* 原文"推力更猛、加速更快"与数据相反（boost 260 < 锥刺的 280）。
+       它真正快的是**最高速**（860 > 790）与锁定距离。 */
+    desc: '锥刺的轻量版：极速 {{speed}} m/s、锁定距离 {{lockKm}} km，都比锥刺高，' +
+      '进不可逃逸区比谁都快。代价是战斗部小、转弯率只有 {{turn}} rad/s，' +
+      '动力段短，追不上掉头就跑的目标。',
     stat: { dmg: 0.44, spd: 0.62, trn: 0.78, rng: 0.50, ecm: 0.26 }
   },
 
@@ -1414,8 +1421,8 @@ var WEAPONS = {
        （我上一轮按 unguided 删除制导类字段时把它一起删了，那是错的。） */
     flare: 0.55,
     target: 'ground', ballistic: true,
-    desc: '无动力滑翔制导炸弹。轻、便宜、能多带 —— 一个重挂点塞得下四枚。' +
-      '缺点是扔出去之后就只能等，目标挪了就打空。',
+    desc: '无动力滑翔制导炸弹，红外导引头只找地面热源。轻、便宜、能多带 —— 一个挂点塞得下 {{perPoint}} 枚。' +
+      '没有发动机，射程全靠投放高度与速度换；转弯率只有 {{turn}} rad/s，目标挪远了就打空。',
     stat: { dmg: 0.52, spd: 0.20, trn: 0.30, rng: 0.48, ecm: 0.60 }
   },
 
@@ -1426,8 +1433,10 @@ var WEAPONS = {
     turn: 0.90, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 9000,
     dmg: 340, ammo: 2, cd: 0.72, salvo: 1, flare: 0.75, prox: 34,
     target: 'ground',
-    desc: '重型侵彻战斗部，专门对付加固机堡和指挥所。' +
-      '一发就能解决一座控制站，但一个挂点只带得下两枚。',
+    /* 侵彻：对加固目标（HARD_MODELS）不打折，见 entities.js 的 warheadK */
+    penetrator: true,
+    desc: '重型侵彻战斗部，专门对付加固目标：对它们<b>全额伤害</b>，' +
+      '而普通战斗部只剩 {{hardPct}}。一发就能解决一座测控站，但一个挂点只带得下 {{perPoint}} 枚。',
     stat: { dmg: 0.90, spd: 0.36, trn: 0.34, rng: 0.62, ecm: 0.30 }
   },
 
@@ -1437,7 +1446,7 @@ var WEAPONS = {
     speed: 540, boost: 130, life: 9.0, vsLife: 20.0,
     turn: 1.05, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 8200,
     dmg: 260, ammo: 2, cd: 0.64, salvo: 1, flare: 0.68, prox: 30,
-    target: 'ship', bigTarget: true,
+    target: 'ship',
     desc: '为浮空平台设计的串联战斗部：先撕气囊、再打吊舱。' +
       '打战斗机和海上目标都是浪费。',
     stat: { dmg: 0.76, spd: 0.42, trn: 0.42, rng: 0.58, ecm: 0.34 }
@@ -1484,9 +1493,11 @@ var WEAPONS = {
     model: 'bomb',
     speed: 300, life: 12.0, vsLife: 24.0,
     dmg: 118, ammo: 2, cd: 0.6, salvo: 1, prox: 34,
-    target: 'ground', cluster: true, unguided: true, ballistic: true,
-    desc: '子母弹。抛撒覆盖一整片阵地，对分散的软目标效率极高，' +
-      '但打不动加固目标 —— 破片啃不开机堡。' +
+    /* cluster = 覆盖半径（米）：落地或撞上设施时，半径内所有水面/地面目标
+       都吃满额伤害（entities.js 的 clusterBurst）。 */
+    target: 'ground', cluster: 60, unguided: true, ballistic: true,
+    desc: '子母弹。抛撒覆盖半径 {{cluster}} 米，范围内每个地面目标都吃满额伤害，对分散的软目标效率极高，' +
+      '但打不动加固目标 —— 破片啃不开机堡，只剩 {{hardPct}} 伤害。' +
       '<b>自由落体，抛撒之后没有任何制导。</b>',
     stat: { dmg: 0.44, spd: 0.18, trn: 0.26, rng: 0.42, ecm: 0.66 }
   },
@@ -1503,7 +1514,10 @@ var WEAPONS = {
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0, prox: 0,
     target: 'none', passive: true,
     lockResist: 0.40,
-    desc: '拖曳式诱饵。敌方对你的锁定距离缩短 40%，且不需要手动开启 ——' +
+    /* 原文"拖曳式诱饵"—— 代码里它只有 lockResist，并不会把来袭弹引开。
+       改成如实描述。 */
+    desc: '常开的被动干扰吊舱。敌方对你的锁定距离缩短 {{lockResistPct}}，且不需要手动开启 ——' +
+      '它不会把已经飞来的导弹引开，那仍然要靠干扰弹和机动；' +
       '代价是这个挂点永远空着。',
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.92 }
   },
@@ -1551,7 +1565,7 @@ var WEAPONS = {
   },
 
   hdp: {
-    id: 'hdp', name: 'BAD-3', cn: '护盾 · AEGIS', kind: 'ecm',
+    id: 'hdp', name: 'JDA-3', cn: '护盾 · AEGIS', kind: 'ecm',
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
@@ -1571,8 +1585,7 @@ var WEAPONS = {
     speed: 720, boost: 300, life: 3.5, vsLife: 9.0,
     turn: 2.55, seeker: 'ir', lockCone: 55 * Math.PI / 180, lockDist: 3400,
     dmg: 16, ammo: 8, cd: 0.17, salvo: 4, flare: 0.44, prox: 14,
-    target: 'air', highAltScale: true,
-    desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下十六发，
+    target: 'air',    desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下十六发，
       一次齐射四枚 —— 它的用法不是"击落"，而是把蜂群从天上扫下来。
       <b>拿去打有人机是浪费。</b>`,
     stat: { dmg: 0.16, spd: 0.44, trn: 0.72, rng: 0.28, ecm: 0.22 }
@@ -1584,8 +1597,7 @@ var WEAPONS = {
     speed: 980, boost: 240, life: 8.0, vsLife: 18.0,
     turn: 1.30, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 11000,
     dmg: 62, ammo: 1, cd: 1.2, salvo: 1, flare: 0.70, prox: 32,
-    target: 'air', highAltImmune: true, bigTarget: true,
-    desc: `为两万米以上专门设计的拦截弹。舵面比同级大将近一倍，
+    target: 'air', highAltImmune: true,    desc: `为两万米以上专门设计的拦截弹。舵面比同级大将近一倍，
       代价是低空阻力大、加速慢。
       <b>它的过载不随空气变稀而崩塌</b> —— 这是它唯一的长处，
       也是在那个高度唯一还重要的东西。`,
@@ -1600,8 +1612,7 @@ var WEAPONS = {
     speed: 480, boost: 110, life: 30.0, vsLife: 42.0,
     turn: 0.48, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 14000,
     dmg: 300, ammo: 1, cd: 1.6, salvo: 1, flare: 0.85, prox: 36,
-    target: 'ground', bigTarget: true,
-    desc: `涡扇动力的对地巡航弹，射程是全家族里最远的。
+    target: 'ground',    desc: `涡扇动力的对地巡航弹，射程是全家族里最远的。
       但它飞得慢、转弯迟钝 —— 一旦被拦，连躲的能力都没有。
       <b>它的生存性完全建立在"发射前没人发现你"上。</b>`,
     stat: { dmg: 0.86, spd: 0.30, trn: 0.14, rng: 1.00, ecm: 0.36 }
@@ -1614,9 +1625,9 @@ var WEAPONS = {
     speed: 790, boost: 280, life: 5.0, vsLife: 11.0,
     turn: 2.45, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4600,
     dmg: 56, ammo: 16, cd: 0.23, salvo: 1, flare: 0.35, prox: 26,
-    target: 'air', reAcquire: true, highAltScale: true,
-    desc: `高机动缠斗弹。转弯率 <b>3.4 rad/s</b>（约 60G），
-      失去目标后还有<b>一次</b>重新捕获的机会 —— 它会绕回来。抗干扰差。
+    target: 'air', reAcquire: true,
+    desc: `高机动缠斗弹。转弯率 <b>{{turn}} rad/s</b>，全场最高之一；
+      丢失目标后导引头会在 {{coneDeg}}° 视场里重新搜索热源。抗干扰差。
       <br><span class="am">注意：在高空，它的过载会随动压一起崩塌。</span>`,
     stat: { dmg: 0.62, spd: 0.55, trn: 1.0, rng: 0.40, ecm: 0.25 }
   },
@@ -1626,9 +1637,9 @@ var WEAPONS = {
     speed: 830, boost: 200, life: 4.0, vsLife: 9.0,
     turn: 1.90, seeker: 'ir', lockCone: 75 * Math.PI / 180, lockDist: 3800,
     dmg: 44, ammo: 44, cd: 0.16, salvo: 2, flare: 0.50, prox: 22,
-    target: 'air', hobs: true, highAltScale: true,
-    desc: `大离轴角格斗弹，锁定锥 <b>±75°</b> —— 目标甚至不需要在你前方。
-      双发齐射、冷却只有 0.8 秒，是狗斗中的弹药倾泻器。`,
+    target: 'air', hobs: true,
+    desc: `大离轴角格斗弹，锁定锥 <b>±{{coneDeg}}°</b> —— 目标甚至不需要在你前方。
+      一按 {{salvo}} 发齐射、每槽 {{cd}} 秒装填，一个挂点带 {{perPoint}} 发，是狗斗中的弹药倾泻器。`,
     stat: { dmg: 0.50, spd: 0.60, trn: 0.76, rng: 0.32, ecm: 0.40 }
   },
   v17: {
@@ -1653,9 +1664,9 @@ var WEAPONS = {
     speed: 920, boost: 130, life: 12.0, vsLife: 45.0,
     turn: 0.55, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 8600,
     dmg: 260, ammo: 6, cd: 0.48, salvo: 1, flare: 0.85, prox: 34,
-    target: 'ship', bigTarget: true,
+    target: 'ship',
     desc: `对大型目标的重型弹。命中大型结构时造成毁灭性伤害，
-      对战斗机几乎无法命中。<b>靠近调节单元时被交战规则禁用。</b>`,
+      对战斗机几乎无法命中。`,
     stat: { dmg: 1.0, spd: 0.66, trn: 0.16, rng: 0.92, ecm: 0.86 }
   },
   v25: {
@@ -1665,8 +1676,10 @@ var WEAPONS = {
     turn: 0.62, seeker: 'radar', lockCone: 45 * Math.PI / 180, lockDist: 8000,
     dmg: 175, ammo: 10, cd: 0.34, salvo: 1, flare: 0.80, prox: 30,
     target: 'ground',
-    desc: `防区外空地导弹，攻顶弹道。对固定海上目标一击必毁。
-      <b>靠近调节单元时被交战规则禁用。</b>`,
+    /* 攻顶：水平距离 > dive 时瞄准点抬高 alt 米，末段俯冲（entities.js） */
+    loft: { alt: 1500, dive: 2800 },
+    desc: `防区外空地导弹，攻顶弹道：先爬到目标上空约 {{loftAlt}} 米，
+      最后 {{loftDiveKm}} km 压头俯冲。`,
     stat: { dmg: 0.82, spd: 0.52, trn: 0.18, rng: 0.85, ecm: 0.82 }
   },
   v30: {
@@ -1702,11 +1715,11 @@ var WEAPONS = {
        将来要启用，把某件弹的 seeker 填成 'laser' 即可。 */
     turn: 0.20, seeker: 'eo', lockCone: 60 * Math.PI / 180, lockDist: 2400,
     dmg: 210, ammo: 6, cd: 0.24, salvo: 1, prox: 42,
-    target: 'ground', cluster: true, ballistic: true,
-    desc: `光电制导集束炸弹，抛撒 <b>72 枚</b>子弹药，覆盖半径 80 米。
+    target: 'ground', cluster: 80, ballistic: true,
+    desc: `光电制导集束炸弹，抛撒子弹药覆盖半径 <b>{{cluster}} 米</b>，范围内每个地面目标都吃满额伤害
+      （加固目标只剩 {{hardPct}}）。
       导引头看的是可见光 / 近红外图像，<b>热焰弹和箔丝都骗不到它</b>。
-      代价是需要俯冲投放，让导引头在命中前一直看得见目标。
-      <b>交战规则禁用区同样锁定。</b>`,
+      代价是没有发动机、转弯率只有 {{turn}} rad/s：得从目标上空 {{lockKm}} km 内投放。`,
     stat: { dmg: 0.90, spd: 0.10, trn: 0.08, rng: 0.20, ecm: 1.0 }
   },
   e4: {
@@ -1715,9 +1728,10 @@ var WEAPONS = {
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 99, cd: 5, salvo: 0, flare: 1.0, prox: 0,
-    target: 'none', duration: 6.0, lockReduce: 0.40, selfBlind: true,
-    desc: `认知电子战吊舱。开启后 <b>6 秒</b>内敌方对你的锁定距离缩短 <b>40%</b>，
-      但你自己的雷达同时被压制。冷却 <b>50 秒</b>。
+    target: 'none', duration: 6.0, lockReduce: 0.40,
+    desc: `认知电子战吊舱。开启后 <b>{{duration}} 秒</b>内敌方<b>雷达</b>对你的锁定距离最多缩短 <b>{{lockReducePct}}</b>
+      （只管锁定距离：已经飞来的导弹不受影响），
+      但你自己的雷达同时被压制。冷却 <b>{{cd}} 秒</b>。
       <br><span class="am">干扰给的不是免疫，是时间。</span>`,
     stat: { dmg: 0.0, spd: 0.0, trn: 0.0, rng: 0.0, ecm: 1.0 }
   },
@@ -1734,18 +1748,19 @@ var WEAPONS = {
     recharge: 18,
     interceptRange: 1200, interceptCone: 35 * Math.PI / 180,
     interceptChance: 0.55, highAltChance: 0.35,
-    desc: `200 kW 级固态激光吊舱。来袭导弹进入 <b>1200 米</b>且与你的夹角小于
-      <b>35°</b> 时，有 <b>55%</b> 概率烧毁其导引头。充能 3 次，每 18 秒恢复一次。
-      <br><span class="rd">18 公里以上，平流层风切变会把光斑抹开，概率降到 35%。</span>`,
+    desc: `200 kW 级固态激光吊舱。来袭导弹进入 <b>{{interceptRange}} 米</b>且与你的机头夹角小于
+      <b>{{interceptConeDeg}}°</b> 时，每枚弹有 <b>{{interceptPct}}</b> 概率被烧穿导引头、当场失效。
+      充能 {{charges}} 次，每 {{recharge}} 秒恢复一次。
+      <br><span class="rd">18 公里以上，平流层风切变会把光斑抹开，概率降到 {{highAltPct}}。</span>`,
     stat: { dmg: 0.0, spd: 0.0, trn: 0.0, rng: 0.0, ecm: 1.0 }
   },
 
   /* ============================================================
      下游同盟与分水群岛国的装备
 
-     它们和上游共用逻辑语编号（那是通用技术语言），但**型号号各自排** ——
-     所以会出现同词根不同号的情况：上游的 SPO-6 与下游的 SPO-14
-     都出自 daspo（摧毁），只是两家分别排自己的号。
+     它们和上游共用逻辑语这套编号语言，但**词根分属两方**：
+     DAR / BIN / BAD / SAV / TUM / BOX 只用在下游的挂架上
+     （例如反舰弹，上游叫 SPO-（daspo 摧毁），下游叫 BOX-（boxna 浪））。
 
      fits 留空 = 玩家挂不上，只作为 NPC 的制式装备存在。
 
@@ -1756,7 +1771,7 @@ var WEAPONS = {
 
   /* --- 下游：认知电子战是他们的看家本事 --- */
   vzu: {
-    id: 'vzu', name: 'ZUN-6', cn: '迷雾 · MISTVEIL', kind: 'ecm',
+    id: 'vzu', name: 'SAV-6', cn: '迷雾 · MISTVEIL', kind: 'ecm',
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
@@ -1787,7 +1802,7 @@ var WEAPONS = {
      "爬升→压制→被对手对抗掉"的曲线，而是直接给辐射范围内的人
      打上 suppressed —— 也就是你能做的只有离开那片空域。 */
   vsc: {
-    id: 'vsc', name: 'ZUN-14', cn: '焦炬 · TORCH', kind: 'ecm',
+    id: 'vsc', name: 'SAV-14', cn: '焦炬 · TORCH', kind: 'ecm',
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
@@ -1795,8 +1810,9 @@ var WEAPONS = {
     target: 'none', duration: 8,
     /* 范围压制：半径内的人被压住，越靠中心越狠（见 game.js updateJamming） */
     jamRadius: 9000, jamK: 0.85,
-    /* 辐射特征大得藏不住 —— RWR 上是全屏最亮的那一个 */
-    emitter: true,
+    /* 辐射特征：开机期间 ewPower > 0，entities.js 的 isRadiating 据此
+       把它当反辐射目标（SPO-8 伤害翻倍）。原来这里另有一个 emitter 字段，
+       没有任何代码读它，删掉。 */
     fits: [], perPoint: 0, mass: 0,
     npcFits: ['light', 'belly'],
     desc: `下游的干扰吊舱，和上游的 ZUN-4 是两种哲学。
@@ -1809,7 +1825,7 @@ var WEAPONS = {
 
   /* --- 下游：对地 --- */
   vgt: {
-    id: 'vgt', name: 'GUT-7', cn: '碎石 · RUBBLE', kind: 'agm',
+    id: 'vgt', name: 'TUM-7', cn: '碎石 · RUBBLE', kind: 'agm',
     model: 'missile',
     speed: 430, boost: 120, life: 9.0, vsLife: 20.0,
     turn: 0.62, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 7000,
@@ -1829,16 +1845,18 @@ var WEAPONS = {
 
   /* --- 下游：反大型 --- */
   vsr: {
-    id: 'vsr', name: 'SPO-14', cn: '坍方 · SLIPFALL', kind: 'asm',
+    id: 'vsr', name: 'BOX-14', cn: '坍方 · SLIPFALL', kind: 'asm',
     model: 'missile',
     speed: 560, boost: 150, life: 11.0, vsLife: 24.0,
     turn: 0.55, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 9000,
     dmg: 260, ammo: 1, cd: 15.6, salvo: 1, flare: 0.72, prox: 34,
     target: 'ship',
+    /* 高抛剖面 + 末段俯冲（entities.js 的 loft 分支） */
+    loft: { alt: 2500, dive: 3500 },
     fits: [], perPoint: 0, mass: 0,
     /* 反大型弹只有重挂点撑得住（与上游的 SPO-22 同一档） */
     npcFits: ['heavy'],
-    desc: `打大型目标的半穿甲弹，飞行剖面很高、末段俯冲 ——
+    desc: `打大型目标的半穿甲弹，飞行剖面很高（目标上空约 {{loftAlt}} 米）、最后 {{loftDiveKm}} km 俯冲 ——
        这个设计是为了绕开调节场上空那些不好惹的东西。`,
     stat: { dmg: 0.76, spd: 0.46, trn: 0.20, rng: 0.70, ecm: 0.34 }
   },
@@ -1851,9 +1869,12 @@ var WEAPONS = {
     turn: 2.10, seeker: 'ir', lockCone: 62 * Math.PI / 180, lockDist: 4200,
     dmg: 42, ammo: 2, cd: 8, salvo: 1, flare: 0.58, prox: 20,
     target: 'air',
+    /* 双导引头：第一次骗中只打掉一个（entities.js 的 breakLock / m.seekers） */
+    twinSeeker: true,
     fits: [], perPoint: 0, mass: 0,
     npcFits: ['tip', 'light', 'heavy'],
-    desc: `两个导引头共用一个弹体 —— 打丢一个还有第二个。
+    desc: `两个导引头共用一个弹体 —— 一组热焰弹骗中了，也只骗掉其中一个，
+       另一个照样咬着；要甩掉它，得连着骗中两次。
        下游飞行员喜欢它，因为<b>被它盯上时，一发干扰弹不够用</b>。`,
     stat: { dmg: 0.48, spd: 0.52, trn: 0.62, rng: 0.34, ecm: 0.26 }
   },
@@ -1879,8 +1900,7 @@ var WEAPONS = {
     speed: 880, boost: 210, life: 6.5, vsLife: 16.0,
     turn: 1.25, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 7200,
     dmg: 30, ammo: 8, cd: 0.68, salvo: 1, flare: 0.45, prox: 28,
-    target: 'air', highAltScale: true,
-    // 下游专用弹：fits 为空表示玩家挂不上它
+    target: 'air',    // 下游专用弹：fits 为空表示玩家挂不上它
     fits: [], perPoint: 0, mass: 0,
     npcFits: ['light', 'heavy'],
     desc: '下游中距弹。'
@@ -1890,7 +1910,7 @@ var WEAPONS = {
     speed: 780, boost: 190, life: 4.5, vsLife: 10.0,
     turn: 2.05, seeker: 'ir', lockCone: 60 * Math.PI / 180, lockDist: 3600,
     dmg: 26, ammo: 6, cd: 0.44, salvo: 1, flare: 0.35, prox: 24,
-    target: 'air', highAltScale: true,
+    target: 'air',
     fits: [], perPoint: 0, mass: 0,
     npcFits: ['tip', 'light', 'heavy'],
     desc: '下游格斗弹。'
@@ -1900,9 +1920,23 @@ var WEAPONS = {
     speed: 940, boost: 320, life: 9.0, vsLife: 22.0,
     turn: 1.50, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 9000,
     dmg: 48, ammo: 4, cd: 1.4, salvo: 1, flare: 0.60, prox: 34,
-    target: 'air', highAltScale: true,
+    target: 'air',
     fits: [], perPoint: 0, mass: 0,
     desc: '地面发射的远程防空导弹。'
+  },
+
+  /* ---------- 上游：舰载防空 ----------
+     FAN- 取自 fanta（阻止），与 F- 截击机同一词根。
+     数值照 BAD-9 的档位：上游的舰炮护不住整片海，护得住的是这一圈。 */
+  ss6: {
+    id: 'ss6', name: 'FAN-6', cn: '海墙 · SEAWALL', kind: 'aam', model: 'missile',
+    speed: 960, boost: 330, life: 9.5, vsLife: 22.0,
+    turn: 1.45, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 9500,
+    dmg: 46, ammo: 8, cd: 1.6, salvo: 1, flare: 0.58, prox: 34,
+    target: 'air',
+    fits: [], perPoint: 0, mass: 0,
+    desc: '上游公约舰载垂发防空导弹。驱逐舰护得住的是自己周围 {{lockKm}} km 这一圈 ——' +
+      '飞进来的敌机会先收到它的告警。'
   }
 };
 
@@ -2000,7 +2034,9 @@ var STORE_ATTR = {
    详见设定集 8.7 节。
    ============================================================ */
 var CS_DOWNSTREAM = [
-  { cn: '枯河', en: 'DRYRIVER' },
+  /* 原来第一个是「枯河」—— 它同时是一个**国家**的名字（冬港所在的
+     枯河国，见设定集第二、六节），拿国名当村名呼号会混。 */
+  { cn: '旱沟', en: 'DRYGULLY' },
   { cn: '石桥', en: 'STONEBRIDGE' },
   { cn: '空井', en: 'EMPTYWELL' },
   { cn: '灰塘', en: 'ASHPOND' },
@@ -2022,7 +2058,7 @@ var CS_DOWNSTREAM = [
   { cn: '远雷', en: 'FARTHUNDER' }
 ];
 
-/** 取第 i 个下游呼号，格式为 "枯河 DRYRIVER" */
+/** 取第 i 个下游呼号，格式为 "旱沟 DRYGULLY" */
 function downstreamCallsign(i) {
   var c = CS_DOWNSTREAM[i % CS_DOWNSTREAM.length];
   return c.cn + ' ' + c.en;
@@ -2072,6 +2108,7 @@ var STORE_ROLE = {
   dl4:  '中距拦截',
   dl6:  '格斗',
   dl9:  '要地防空',
+  ss6:  '舰载防空（上游）',
   vzu:  '被动 · 抗锁定（下游）',
   vgt:  '对地攻击（下游）',
   vsr:  '反大型（下游）',
@@ -2143,7 +2180,7 @@ function missileRange(w) {
    ============================================================ */
 var STORE_NEEDS = {
   /* 对地 / 对海 */
-  /* BIN-8 追云**不在这里**。它原来被标成"反辐射弹"、要求 strike
+  /* SPO-8 追云**不在这里**。它原来被标成"反辐射弹"、要求 strike
      （对地火控），于是只有攻击机和多用途机能挂 —— 而它其实是一枚
      对空的重型拦截弹，最该带它的恰恰是制空/截击机（D-14、F-9），
      那些机型没有 strike，反而挂不上。那个门槛造成的是荒谬的分配，
@@ -2211,7 +2248,9 @@ var STORE_COOLDOWN = {
   e4: 50, l2: 36,
 
   /* 下游 */
-  dl4: 6.8, dl6: 4.4, dl9: 14
+  dl4: 6.8, dl6: 4.4, dl9: 14,
+  /* 上游舰载 */
+  ss6: 15
 };
 
 (function () {
@@ -2249,7 +2288,7 @@ var MISSILE_LEAD = {
   vlar: 0.90,
   asl: 0.65, asl2: 0.70, sat: 0.68,
   v25: 0.66, v22: 0.74, v30: 0.48,
-  dl4: 0.74, dl6: 0.48, dl9: 0.80,
+  dl4: 0.74, dl6: 0.48, dl9: 0.80, ss6: 0.80,
   swm: 0.44, hva: 0.80, lcm: 0.62,
   /* 下游与分水 */
   vgt: 0.58, vsr: 0.70, vbn: 0.66, otr: 0.32
@@ -2284,23 +2323,24 @@ var MISSILE_LEAD = {
    "这枚弹对热焰弹有多脆弱"，语义与既有的断言（TOR-4 最难骗）保持一致。
 
    取值原则：
-     · 空空的雷达弹整体低于红外弹均值（0.44），其中 BIN-4 最低
+     · 空空的雷达弹整体低于红外弹均值（0.44），其中 CLA-4 最低
        —— 设定里点名它是"能与最好的红外弹比肩"的那一枚
      · 对地 / 反大型弹保持高值：它们不装抗干扰设备，也没必要装
    ============================================================ */
 var FLARE_RD = {
   /* 空空：主动雷达导引头 + 抗干扰设备，整体比红外弹难骗 */
-  mrm: 0.30,   // BIN-4 中继 —— 全场最难被箔丝骗到的一枚（设定点名）
-  arm: 0.32,   // BIN-8 追云
-  dl6: 0.33,   // BIN-6
+  mrm: 0.30,   // CLA-4 中继 —— 全场最难被箔丝骗到的一枚（设定点名）
+  arm: 0.32,   // SPO-8 追云
   dl4: 0.34,   // DAR-4 砾石
-  vbn: 0.38,   // BIN-9
+  /* BIN-6 / BIN-9 原来也在这里，但它们是红外弹 —— 下面的循环本来就会
+     跳过它们，留着只是两行死数据，删掉。 */
   hva: 0.40,   // SPO-9 落雷
-  vlar: 0.42,  // DAR-12 极远
+  ss6: 0.42,   // FAN-6 海墙（上游舰载）
+  vlar: 0.42,  // CLA-12 极远
   v17: 0.44,   // CLA-17 长杆
   dl9: 0.42,   // BAD-9 高墙（下游的防空拦截弹）
   sat: 0.46,   // SPO-6 云裂（对浮空平台）
-  vsr: 0.50,   // SPO-14 坍方（下游）
+  vsr: 0.50,   // BOX-14 坍方（下游）
 
   /* 对地 / 反大型：不装抗干扰设备，箔丝照样好使 */
   asl2: 0.68,  // GUT-12 重锤-B
@@ -2316,6 +2356,65 @@ var FLARE_RD = {
        而且会掩盖"哪种导引头吃哪种干扰弹"这件事。 */
     if (WEAPONS[k].seeker !== 'radar') continue;
     WEAPONS[k].flareRD = FLARE_RD[k];
+  }
+})();
+
+/* ============================================================
+   加固目标
+   设施模型 → 加固。对它们普通战斗部打折、子母/集束更狠，
+   侵彻弹（penetrator，GUT-12）全额 —— 见 entities.js 的 warheadK。
+   目前只有测控 / 雷达站：混凝土基座、天线罩外有防护。
+   ============================================================ */
+var HARD_MODELS = { radar: true };
+
+/* ============================================================
+   交战规则：阵列空域（靠近调节单元）里锁定哪些武器
+   **唯一判据**。game.js 的 launch 用它拦截，下面的 desc 生成也用它 ——
+   以前只有三件武器的 desc 手写了这句，而代码拦的是全部对面弹。
+   ============================================================ */
+function roeRestricted(w) {
+  return !!w && (w.kind === 'asm' || w.kind === 'agm' || w.kind === 'bomb');
+}
+
+/* ============================================================
+   desc 里的数字从数据里取
+
+   desc 可以写 {{字段}}，加载时（所有挂载表都已合并之后）替换成
+   当前数值 —— 改了数据，图鉴和机库里的文字跟着变，版本更新漏不掉。
+   以前全是手写数字：转弯率、冷却、单点挂载量都和数据对不上过。
+   ============================================================ */
+(function () {
+  function deg(r) { return Math.round(r * 180 / Math.PI); }
+  function pct(x) { return Math.round(x * 100) + '%'; }
+  function num(x) { return (Math.round(x * 100) / 100).toString(); }
+  var HARD_K_TEXT = { cluster: 0.2, other: 0.6 };   // 与 entities.js 的 HARD_K 同值
+  var DERIVED = {
+    coneDeg: function (w) { return deg(w.lockCone || 0); },
+    lockKm: function (w) { return num((w.lockDist || 0) / 1000); },
+    flarePct: function (w) { return pct(w.flare || 0); },
+    flareRDPct: function (w) { return pct(w.flareRD !== undefined ? w.flareRD : (w.flare || 0)); },
+    lockResistPct: function (w) { return pct(w.lockResist || 0); },
+    lockReducePct: function (w) { return pct(w.lockReduce || 0); },
+    interceptConeDeg: function (w) { return deg(w.interceptCone || 0); },
+    interceptPct: function (w) { return pct(w.interceptChance || 0); },
+    highAltPct: function (w) { return pct(w.highAltChance || 0); },
+    volleys: function (w) { return Math.floor((w.perPoint || 0) / Math.max(1, w.salvo || 1)); },
+    hardPct: function (w) { return pct(w.cluster ? HARD_K_TEXT.cluster : HARD_K_TEXT.other); },
+    loftAlt: function (w) { return w.loft ? w.loft.alt : 0; },
+    loftDiveKm: function (w) { return w.loft ? num(w.loft.dive / 1000) : 0; }
+  };
+  for (var k in WEAPONS) {
+    if (!Object.prototype.hasOwnProperty.call(WEAPONS, k)) continue;
+    var w = WEAPONS[k];
+    if (typeof w.desc !== 'string') continue;
+    w.desc = w.desc.replace(/\{\{(\w+)\}\}/g, function (all, f) {
+      if (DERIVED[f]) return String(DERIVED[f](w));
+      if (typeof w[f] === 'number') return num(w[f]);
+      return all;
+    });
+    if (roeRestricted(w) && (w.fits && w.fits.length)) {
+      w.desc += '<br><b>靠近调节单元（阵列空域）时被交战规则禁用。</b>';
+    }
   }
 })();
 
@@ -2387,7 +2486,7 @@ var VOICES = {
     ],
     spotted: [
       { who: 'VESPER-3', cls: 'ally', tx: '<b>发射装置激活！</b>他们有我们的高度。', gap: 1.0 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '地形遮蔽，现在。把山放在你和它之间。', gap: 0.8 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '高度压到一千五以下，现在。回云底下面去 —— 这片海上没有山可以躲。', gap: 0.8 }
     ],
     relayDown: [
       { who: 'VESPER-2', cls: 'ally', tx: '一号中继平台掉下去了。它在漏气 —— 这东西下沉要四十分钟。', gap: 1.3 },
@@ -2400,7 +2499,7 @@ var VOICES = {
     ],
     ambush: [
       { who: 'VESPER-3', cls: 'ally', tx: '<b>右转脱离！右转脱离！</b>', gap: 0.9 },
-      { who: '枯河', cls: 'enemy', tx: '这里是枯河。目标发现我们了。', gap: 1.1 },
+      { who: '旱沟', cls: 'enemy', tx: '这里是旱沟。目标发现我们了。', gap: 1.1 },
       { who: '石桥', cls: 'enemy', tx: '那就别躲了。全体，攻击。', gap: 0.9 }
     ],
     /* 基地挨炸 —— "有东西从南边过来了"那句话的兑现 */
@@ -2430,14 +2529,14 @@ var VOICES = {
   /* ==================== 任务 3 · 线 ==================== */
   m3: {
     start: [
-      { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，这是最后一个。', gap: 1.0 },
+      { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，今天往上走。', gap: 1.0 },
       { who: 'VESPER-2', cls: 'ally', tx: "<b>明白，照办</b>。", gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '两万米。下游派了「灰烬」级播撒机上来。', gap: 1.3 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '它们带的不是碘化银。是<b>反凝结核</b> —— 撒下去能让整条季风线哑掉好几年。', gap: 1.5 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '它们带的不是碘化银。是<b>反凝结核</b> —— 撒下去能让整条季风线哑掉两个季节。', gap: 1.5 },
       { who: 'VESPER-2', cls: 'ally', tx: '而我们要在三架飞机上，两万米，把它们全拦下来。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '对。注意你们的动压 —— <b>那个高度没有"加速"这回事。</b>', gap: 1.4 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '<b>交战规则：阵列空域内，20 公斤以上战斗部全部锁定。</b>你们只有机炮。', gap: 1.4 },
-      { who: 'VESPER-3', cls: 'ally', tx: '……机炮。在两万米。', gap: 1.1 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '<b>交战规则：单元五公里内，对地弹、反舰弹和炸弹全部锁定。</b>你们只剩机炮和空空弹。', gap: 1.4 },
+      { who: 'VESPER-3', cls: 'ally', tx: '……空空弹在两万米，舵面跟纸一样。最后还是机炮。', gap: 1.1 },
       { who: 'VESPER-2', cls: 'ally', tx: '那个高度弹道更平。别抱怨了，习惯它。', gap: 0.9 }
     ],
     aceAppears: [
@@ -2520,7 +2619,7 @@ var VOICES = {
     ],
     spotted: [
       { who: 'VESPER-3', cls: 'ally', tx: '低空有碎云。高度一上去，他们的雷达就看得见。', gap: 1.1 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '那就别上去。反辐射弹不需要你有高度。', gap: 0.9 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '那就别上去。雷达站是固定靶，贴着云底投放就够得着。', gap: 0.9 }
     ],
     radarDown: [
       { who: 'VESPER-2', cls: 'ally', tx: '三座雷达全哑了。这片空域现在是空的。', gap: 1.2 },
@@ -2542,7 +2641,7 @@ var VOICES = {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，第二梯队上来了。', gap: 1.1 },
       { who: 'VESPER-2', cls: 'ally', tx: '<b>收到</b>。', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '四架 F-9。这不是第一梯队那批人 —— 他们不抢高度，只在对你有能量的那层等你。', gap: 1.9 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '四架玄武岩，开飞机的是老兵。这不是第一梯队那批人 —— 他们不抢高度，只在对你有能量的那层等你。', gap: 1.9 },
       { who: 'VESPER-3', cls: 'ally', tx: '在这条高度上，一次失速改出失败就是三分钟的下坠。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '还有一架预警机在后面调度。它会一直给他们补人。', gap: 1.5 },
       { who: 'VESPER-2', cls: 'ally', tx: '那就先让它闭嘴。', gap: 0.9 }
@@ -2554,7 +2653,7 @@ var VOICES = {
       { who: 'VESPER-2', cls: 'ally', tx: '长机，你的动压掉下来了。这条高度没有"加速"这回事。', gap: 1.1 }
     ],
     half: [
-      { who: 'SEXTANT', cls: 'cmd', tx: '一半的 F-9 没了。剩下的在往北退 —— 他们在等预警机给新目标。', gap: 1.5 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '一半的玄武岩没了。剩下的在往南退 —— 他们在等预警机给新目标。', gap: 1.5 }
     ],
     win: [
       { who: 'SEXTANT', cls: 'cmd', tx: '第二梯队清空。这段高度是我们的了。', gap: 1.3 },
@@ -2573,7 +2672,7 @@ var VOICES = {
       { who: 'VESPER-2', cls: 'ally', tx: '云底多少？', gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>九百米。</b>云顶三千四。你要钻的那层只有两公里半高。', gap: 1.5 },
       { who: 'SEXTANT', cls: 'cmd', tx: '下游的舰船补给点就在那层云下面。两条海蝎级登陆舰在往岸上运弹药。', gap: 1.8 },
-      { who: 'VESPER-3', cls: 'ally', tx: '外面有一条房角石级巡洋舰画着防空圈。', gap: 1.3 },
+      { who: 'VESPER-3', cls: 'ally', tx: '外面有一条邓氏鱼级巡洋舰画着防空圈。', gap: 1.3 },
       { who: 'SEXTANT', cls: 'cmd', tx: '云里你也看不见。雷达光点会丢 —— 用眼睛。', gap: 1.2 }
     ],
     spotted: [
@@ -2600,7 +2699,7 @@ var VOICES = {
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，紧急。下游的攻击机群出发了。', gap: 1.2 },
       { who: 'VESPER-2', cls: 'ally', tx: '打哪里？', gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>打浮岛。</b>座头鲸就在我们身后 —— 它不能再挨一次。', gap: 1.6 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '六架 G-6 鲣鸟带对海弹从北面低空进来，后面跟着两架巨砾轰炸机。', gap: 1.7 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '六架砂岩和片岩带对海弹从北面低空进来，后面跟着两架巨砾轰炸机。', gap: 1.7 },
       { who: 'VESPER-3', cls: 'ally', tx: '他们这次不是来找我们的。', gap: 1.1 },
       { who: 'SEXTANT', cls: 'cmd', tx: '对。所以你要在他们到投放线之前把他们拦住。', gap: 1.3 },
       { who: 'VESPER-2', cls: 'ally', tx: '编队里还有抹香鲸和蓝鲸。三条船，一条也不能沉。', gap: 1.4 }
@@ -2631,8 +2730,8 @@ var VOICES = {
       { who: 'VESPER-2', cls: 'ally', tx: '目标？', gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '三条海蝎级登陆舰，两条菊石级护卫，四条三叶虫快艇 —— 一个营。', gap: 1.7 },
       { who: 'SEXTANT', cls: 'cmd', tx: '只要它们靠岸，岛上就会多出一个不需要谈判的据点。', gap: 1.6 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '<b>登陆窗口五个小时。你已经过去两个小时。</b>', gap: 1.5 },
-      { who: 'VESPER-3', cls: 'ally', tx: '所以我们有三分钟把三条船留在海上。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '<b>他们的掩护火网五分钟后展开。</b>在那之前，你们头上只有两架护航。', gap: 1.5 },
+      { who: 'VESPER-3', cls: 'ally', tx: '所以我们有五分钟把三条船留在海上。', gap: 1.2 },
       { who: 'VESPER-2', cls: 'ally', tx: '别算得这么死。先上去。', gap: 0.9 }
     ],
     windowClosing: [
@@ -2661,7 +2760,7 @@ var VOICES = {
       { who: 'VESPER-2', cls: 'ally', tx: '<b>明白，照办</b>。', gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '我们要把他们的指挥链从中间摘掉：预警机、舰上指挥所、以及把它们连起来的人。', gap: 1.9 },
       { who: 'VESPER-3', cls: 'ally', tx: '他们把指挥所摆在了正面。', gap: 1.1 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '对。指挥舰在编队正中央，外面两层护航，上面那架信天翁是冬港。', gap: 1.8 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '对。指挥舰在编队正中央，外面两层护航，上面那架玄武岩是冬港。', gap: 1.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '再说一遍他的呼号：<b>冬港。一座还在用水的镇子。</b>', gap: 1.6 },
       { who: 'VESPER-3', cls: 'ally', tx: '我一直在想他上次说的那句话。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '想完这场再想。上去。', gap: 0.9 }

@@ -283,6 +283,12 @@ var Ent = (function () {
     for (k in pts) {
       if (!Object.prototype.hasOwnProperty.call(pts, k)) continue;
       var ammo = WEAPONS[k].ammo || 0;
+      /* 但预算不能超过机翼上实际挂得下的量：w.ammo 是"这架飞机打一仗的预算"，
+         以前直接拿来当弹药池，于是 KA-7 一组轻挂点（2 点 × 2 发 = 4）
+         能打出 44 发 v9。上游弹按 `挂点数 × perPoint` 封顶；
+         下游弹 perPoint 是 0（没有挂载表），仍然只按 w.ammo。 */
+      var per = WEAPONS[k].perPoint || 0;
+      if (per > 0) ammo = Math.min(ammo, pts[k] * per);
       var arr = [];
       /* 与玩家同一条规矩：储备少于挂架数时，多出来的挂点一开始就是空的
          （SLOT_EMPTY 永远不会被减到 0，见 stepAircraft 的冷却段） */
@@ -742,8 +748,12 @@ var Ent = (function () {
       turn: w.turn,
       prox: w.prox,
       owner: o.owner || null,
-      reDone: false,
       trailTimer: 0,
+      /* 双导引头（BIN-9 `twinSeeker`）：一次诱饵只能骗掉其中一个，
+         剩下的那个继续咬着 —— 要骗走这枚弹得连中两次。见 breakLock。 */
+      seekers: w.twinSeeker ? 2 : 1,
+      /* 本机第一次进入定向能拦截包线时已经掷过骰（见 game.js 的 updateDEW）。 */
+      dewRolled: null,
       seekerOn: true,
       lostTime: 0,
       /* 这一枚弹被同一次交战里的诱饵骗过几次。
@@ -793,9 +803,28 @@ var Ent = (function () {
     var cone = w.lockCone || 0.6;
     var maxD = (w.lockDist || 4000) * 1.5;
     var best = null, bs = 0;
+    /* 对地 / 对海的红外弹（GUT-9、TUM-7）找的是**地面热源**，不是飞机。
+       以前这里一律扫 world.actors —— 一枚滑翔锤丢了地面目标之后，
+       会转头去追天上路过的敌机。现在对面弹只在 world.targets 里挑。 */
+    if (w.target !== 'air') {
+      var tl = world.targets || [];
+      for (var j = 0; j < tl.length; j++) {
+        var g = tl[j];
+        if (!g.alive || g.team === m.team || g.team > 1) continue;   // 中立（team 2）谁都不认
+        if (!weaponMatchesTarget(w, g)) continue;
+        var tg = M3.sub(g.pos, m.pos);
+        var dg = M3.len(tg);
+        if (dg > maxD) continue;
+        var og = M3.angleBetween(m.fwd, M3.mul(tg, 1 / Math.max(1, dg)));
+        if (og > cone) continue;
+        var sg = (0.6 + (g.radius || 10) / 30) * (1 - og / cone) / (1 + dg / 1500);
+        if (sg > bs) { bs = sg; best = g; }
+      }
+      return best;
+    }
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
-      if (!e.alive || e.team === m.team) continue;
+      if (!e.alive || e.team === m.team || e.team > 1) continue;   // 中立（team 2）谁都不认
 
       /* 骗过它的那一架：只在**盲飞期**内放过，之后照样可以重新咬住。
          以前这里是无条件 `continue` —— 一次诱饵 = 这枚弹永久咬不到你，
@@ -813,6 +842,28 @@ var Ent = (function () {
     return best;
   }
 
+  /* 盲飞期结束的那一帧：导引头重新睁眼，骗走它的诱饵云还亮不亮？
+
+     还亮、还在视场里 → 没有记忆的导引头可能**再咬回那团云**（概率是
+     当初被骗概率的一半），盲飞延长到云熄灭为止。每次被骗只判一次。
+     带 `decoyMemory` 的弹（CLA-4）认得那团云，不会被它第二次骗走 ——
+     它重新搜索时只看真目标。 */
+  var DECOY_LIFE = 2.6;
+  function decoyRecheck(m) {
+    var dc = m.decoy;
+    dc.done = true;
+    if (m.w.decoyMemory) return;
+    var tau = m.age - dc.t0;
+    var remain = DECOY_LIFE - tau;
+    if (remain <= 0.05) return;
+    var cp = M3.add(dc.p, M3.mul(dc.v, tau));
+    var to = M3.sub(cp, m.pos);
+    var d = M3.len(to);
+    if (d < 1) return;
+    if (M3.angleBetween(m.fwd, M3.mul(to, 1 / d)) > (m.w.lockCone || 0.6)) return;
+    if (Math.random() < dc.p2) m.reLockT = remain;
+  }
+
   function stepMissile(m, dt, world) {
     if (!m.alive) return;
     var w = m.w;
@@ -820,6 +871,7 @@ var Ent = (function () {
     /* 被诱饵骗走之后的盲飞计时；归零之后才重新允许捕获。
        递减必须发生在导引段**之前**，否则捕获分支永远读不到 0。 */
     if (m.reLockT > 0) m.reLockT -= dt;
+    if (m.decoy && !m.decoy.done && m.reLockT <= 0) decoyRecheck(m);
     if (m.age > m.life) { killMissile(m, world, false); return; }
 
     // ---- 动力段 ----
@@ -840,10 +892,16 @@ var Ent = (function () {
       m.speed = M3.len(m.vel);
     } else {
       var powered = m.age < effectiveLife(w, m.pos.y);
+      /* 高空专用弹（highAltImmune，SPO-9）的大舵面在稠密空气里是负担：
+         低空加速慢、滑翔段掉速快。按相对密度插值 —— 两万米以上不受影响，
+         海平面推力只剩 55%、滑翔阻力 ×1.6。这就是 desc 里那句
+         "低空阻力大、加速慢"的落点。 */
+      var rhoR = w.highAltImmune ? Math.min(1, airDensity(m.pos.y) / RHO0) : 0;
       if (powered) {
-        m.speed = Math.min(m.speed + w.boost * dt, w.speed * (1 + Math.max(0, (12000 - m.pos.y) / 60000)));
+        m.speed = Math.min(m.speed + w.boost * (1 - 0.45 * rhoR) * dt,
+          w.speed * (1 + Math.max(0, (12000 - m.pos.y) / 60000)));
       } else {
-        m.speed = Math.max(m.speed - 140 * dt, 170);
+        m.speed = Math.max(m.speed - 140 * (1 + 0.6 * rhoR) * dt, 170);
       }
     }
 
@@ -876,7 +934,6 @@ var Ent = (function () {
         m.target = acq;
         m.seekerOn = true;
         m.lostTime = 0;
-        m.reDone = false;
       }
     }
 
@@ -929,11 +986,29 @@ var Ent = (function () {
          但预测准的弹，打机动目标反而比一枚只会死咬尾巴的灵活弹更有效。 */
       var lead = (w.lead === undefined) ? 0.6 : w.lead;
       var aim = M3.add(t.pos, M3.mul(tvel, tGo * lead));
+
+      /* 高抛 / 攻顶弹道（`w.loft`，GUT-25、BOX-14）。
+
+         水平距离还大于 `loft.dive` 时，瞄准点被抬到目标上方 `loft.alt` 米
+         （不超过水平距离的 0.4 倍，免得近距发射也去爬高）——
+         弹先爬升、平飞过去，进入末段才压头俯冲。只对水面 / 地面目标生效。 */
+      if (w.loft && t.kind === 'target') {
+        var hx = aim.x - m.pos.x, hz = aim.z - m.pos.z;
+        var hd = Math.sqrt(hx * hx + hz * hz);
+        if (hd > w.loft.dive) {
+          aim = M3.V(aim.x, aim.y + Math.min(w.loft.alt, hd * 0.4), aim.z);
+        }
+      }
       var desired = M3.norm(M3.sub(aim, m.pos));
 
-      // 视场限制：目标偏出 ±75° 视为丢失
+      /* 视场限制：目标偏出导引头视场视为丢失。
+
+         视场取 max(±77°, 锁定锥)。以前写死 1.35 rad —— 于是 TOR-6
+         （hobs，锁定锥 ±88°）在 77–88° 之间锁住的目标，出膛半秒就被判丢失，
+         大离轴这项卖点在最需要它的那一段反而不成立。 */
+      var fov = w.hobs ? Math.max(1.35, w.lockCone || 0) : 1.35;
       var off = M3.angleBetween(m.fwd, los);
-      if (off > 1.35) {
+      if (off > fov) {
         m.lostTime += dt;
         if (m.lostTime > 0.5) m.seekerOn = false;
       } else {
@@ -954,13 +1029,23 @@ var Ent = (function () {
         var Bo = M3.orthonormalize(m.fwd, m.up);
         m.fwd = Bo.fwd; m.up = Bo.up; m.right = Bo.right;
 
+        /* 无动力制导弹（GUT-9 滑翔锤、PEJ-30 铁蒺藜）：修正的是**速度矢量**。
+
+           以前这里只转了 m.fwd，而 ballistic 弹的位置靠 vel 积分、
+           每帧末尾又把 fwd 掰回 vel 方向 —— 等于导引头算完了、舵面没动，
+           "有制导"的炸弹其实全是自由落体。现在把 vel 转到新的 fwd 上、
+           保持速率不变：能量仍然只来自投放初速与重力，弹翼只负责改方向。 */
+        if (w.ballistic) {
+          m.vel = M3.mul(m.fwd, M3.len(m.vel));
+        }
+
         /* 转弯消耗动能。
            没有这一条，导弹的动力段之外照样能满过载无限机动，
            玩家的桶滚和 3/9 线规避全都没有意义 —— 因为对手不累。
            现在它必须为每一次急转付出速度。 */
         var used = Math.min(want, maxTurn) / Math.max(1e-5, dt);   // 实际转弯率 rad/s
         var load = M3.clamp(used / 3.0, 0, 1);
-        m.speed = Math.max(170, m.speed - load * 62 * dt);
+        if (!w.ballistic) m.speed = Math.max(170, m.speed - load * 62 * dt);
       }
 
       // 近炸
@@ -973,7 +1058,8 @@ var Ent = (function () {
 
          两种导引头走两条路，但**共用同一个盲飞计时**：
            ir     → irAcquire（在视场与捕获距离里挑红外特征最明显的）
-           radar  → 只有 reAcquire 型才重获（BIN-4 / SUT-11 / SUT-7）
+           radar  → 只有 reAcquire 型才重获（目前只有 CLA-4；SUT-11 / SUT-7
+                    也带这个标记，但它们是红外弹，走的是上面那条）
 
          盲飞期内谁都别想重锁 —— 那正是诱饵买到的时间。 */
       m.seekerOn = false;
@@ -985,7 +1071,6 @@ var Ent = (function () {
           m.target = acq2;
           m.seekerOn = true;
           m.lostTime = 0;
-          m.reDone = false;
           t = acq2;
         }
       }
@@ -993,14 +1078,19 @@ var Ent = (function () {
       // 雷达弹：只有 reAcquire 型会重获，而且同样要等在盲飞期之后
       if (!t && w.reAcquire && m.reLockT <= 0 && world) {
         var best = null, bd = 1e9;
+        var rcone = w.lockCone || 0.6;
         for (var i = 0; i < world.actors.length; i++) {
           var e = world.actors[i];
-          if (!e.alive || e.team === m.team) continue;
+          if (!e.alive || e.team === m.team || e.team > 1) continue;   // 中立（team 2）谁都不认
           /* 欺骗源在盲飞期后**可以被重新咬住** —— 只要它还在
-             导引头的捕获距离内。这一条以前写成"永久跳过"，
-             等于一次诱饵换来永久免疫。 */
+             导引头的捕获距离与锁定锥内。这一条以前写成"永久跳过"，
+             等于一次诱饵换来永久免疫。锥角限制是后加的：导引头只看得见
+             弹头前方，不能捕获身后的东西。 */
           var d2 = M3.dist2(e.pos, m.pos);
-          if (d2 < bd && d2 < 2600 * 2600) { bd = d2; best = e; }
+          if (!(d2 < bd && d2 < 2600 * 2600)) continue;
+          var dd = Math.sqrt(d2);
+          if (dd > 1 && M3.angleBetween(m.fwd, M3.mul(M3.sub(e.pos, m.pos), 1 / dd)) > rcone) continue;
+          bd = d2; best = e;
         }
         if (best) {
           m.target = best;
@@ -1024,7 +1114,12 @@ var Ent = (function () {
       }
     }
 
-    if (m.pos.y <= 0) { killMissile(m, world, false); return; }
+    if (m.pos.y <= 0) {
+      /* 子母 / 集束弹落地就是抛撒完成：按覆盖半径结算一片（见 clusterBurst）。 */
+      if (w.cluster && world) { m.pos.y = 0; clusterBurst(m, world); return; }
+      killMissile(m, world, false);
+      return;
+    }
 
     /* ---- 尾迹：只有带发动机的才拉烟 ----
 
@@ -1065,7 +1160,7 @@ var Ent = (function () {
      ============================================================ */
   /* 反辐射弹的判据（`w.antiRadar`）。
 
-     这个字段曾经被从 BIN-8 上删掉过，理由写得很实在：全项目没有任何
+     这个字段曾经被从 SPO-8 上删掉过，理由写得很实在：全项目没有任何
      地方读它，世界里既没有"雷达开机状态"、也没有预警机 ——
      一枚只有文案的反辐射弹，实际表现和普通雷达弹毫无区别。
 
@@ -1080,15 +1175,73 @@ var Ent = (function () {
     return false;                         // 普通战斗机不构成反辐射目标
   }
 
+  /* ============================================================
+     加固目标与战斗部
+
+     `HARD_MODELS`（data.js）列出哪些设施模型是**加固**的。对它们：
+       penetrator（GUT-12）   全额伤害 —— 侵彻战斗部就是为这个造的
+       cluster（子母 / 集束）  只剩 HARD_CLUSTER_K —— 破片啃不开混凝土
+       其他战斗部              HARD_K
+     ============================================================ */
+  var HARD_K = 0.6, HARD_CLUSTER_K = 0.2;
+  function isHard(t) {
+    return !!(t && t.kind === 'target' &&
+      (t.hard || (typeof HARD_MODELS !== 'undefined' && HARD_MODELS[t.model])));
+  }
+  function warheadK(w, t) {
+    if (!w || !isHard(t)) return 1;
+    if (w.penetrator) return 1;
+    return w.cluster ? HARD_CLUSTER_K : HARD_K;
+  }
+
+  /* 对设施 / 舰船结算伤害。game.js 会通过 setTargetHitHandler 注册它的
+     hitTarget（击毁计数、无线电、误击调节单元的处罚都在那里）；
+     没注册时（工具脚本里）退回最小实现。 */
+  var targetHitHandler = null;
+  function setTargetHitHandler(fn) { targetHitHandler = fn; }
+  function hitSurface(tg, dmg, world, source) {
+    if (!tg.alive) return;
+    if (targetHitHandler) { targetHitHandler(tg, dmg, source); return; }
+    tg.hp -= dmg;
+    if (tg.hp <= 0) killGround(tg, world);
+  }
+  function hitAny(e, dmg, world, source) {
+    if (e.kind === 'target') hitSurface(e, dmg, world, source);
+    else damage(e, dmg, world, source);
+  }
+
+  /* 子母 / 集束弹的面杀伤（`w.cluster` = 覆盖半径，米）。
+
+     只打**水面 / 地面目标** —— 子弹药是往下撒的，打不到天上的飞机。
+     半径内每个目标吃满额伤害（再乘加固系数），边缘不衰减：
+     子弹药是均匀铺开的，不是一个爆心。 */
+  function clusterBurst(m, world) {
+    m.alive = false;
+    var R = m.w.cluster;
+    explode(world.particles, m.pos, 1.4, 22);
+    SFX.boom(0.9);
+    var tl = world.targets || [];
+    for (var i = 0; i < tl.length; i++) {
+      var g = tl[i];
+      if (!g.alive || g.team === m.team || g.team > 1) continue;   // 中立（team 2）谁都不认
+      var dx = g.pos.x - m.pos.x, dz = g.pos.z - m.pos.z;
+      var reach = R + (g.radius || 8);
+      if (dx * dx + dz * dz > reach * reach) continue;
+      if (Math.abs(g.pos.y - m.pos.y) > reach + 60) continue;
+      hitSurface(g, m.dmg * warheadK(m.w, g), world, m.owner);
+    }
+  }
+
   function detonate(m, t, world) {
+    if (m.w && m.w.cluster) { clusterBurst(m, world); return; }
     m.alive = false;
     explode(world.particles, m.pos, 1.0, 14);
     SFX.boom(0.75);
-    if (t && t.alive && M3.dist(t.pos, m.pos) < m.prox + 14) {
-      var dmg = m.dmg;
+    if (t && t.alive && M3.dist(t.pos, m.pos) < m.prox + 14 + (t.kind === 'target' ? (t.radius || 0) : 0)) {
+      var dmg = m.dmg * warheadK(m.w, t);
       /* 反辐射弹对**正在辐射**的目标伤害翻倍 —— 它找的就是那部雷达。 */
       if (m.w && m.w.antiRadar && isRadiating(t)) dmg *= 2;
-      damage(t, dmg, world, m.owner);
+      hitAny(t, dmg, world, m.owner);
     }
   }
 
@@ -1201,6 +1354,14 @@ var Ent = (function () {
         continue;
       }
 
+      /* 双导引头（BIN-9）：这一组只骗掉了其中一个，另一个还咬着。
+         下一组再骗中才真正脱锁 —— 而那一组同样吃上面的抗欺骗递减。 */
+      if (m.seekers > 1) {
+        m.seekers--;
+        ineffective++;
+        continue;
+      }
+
       m.target = null;
       m.seekerOn = false;
       m.lostTime = 1;
@@ -1209,6 +1370,17 @@ var Ent = (function () {
          结果一次诱饵就永久关掉了这枚弹的重捕获。见 makeMissile 的注释。 */
       m.reLockT = 1.4;
       m.spoofed = a;        // 记住是谁骗的：重捕获时优先避开它
+      /* 骗走它的那一团诱饵云。它跟着载机的 0.22 倍速度往后、往下飘，
+         亮 DECOY_LIFE 秒。盲飞期结束时它要是还亮着、还在视场里，
+         没有记忆的导引头有一半原概率**再咬回这团云**（见 decoyRecheck）；
+         带 decoyMemory 的（CLA-4）认得它，直接略过。 */
+      m.decoy = {
+        p: M3.clone(a.pos),
+        v: M3.add(M3.mul(a.vel, 0.22), M3.mul(a.up, -40)),
+        t0: m.age,
+        p2: chance * 0.5,
+        done: false
+      };
       broke++;
     }
     /* 把"这组诱饵没起作用"告诉上层（玩家 HUD / 无线电）。
@@ -1370,7 +1542,7 @@ var Ent = (function () {
      ============================================================ */
   function damage(ent, amt, world, source) {
     if (!ent.alive) return false;
-    // 附加装甲吊舱（BAD-3 护盾）的全向减伤。只有玩家会带，上限 60%。
+    // 附加装甲吊舱（JDA-3 护盾）的全向减伤。只有玩家会带，上限 60%。
     if (ent.armor) amt *= (1 - M3.clamp(ent.armor, 0, 0.6));
     ent.hp -= amt;
     if (ent.hp <= 0) {
@@ -1399,7 +1571,9 @@ var Ent = (function () {
     if (world) {
       /* 设施/舰船的击毁要单独记一笔：主循环的 world.killed 只数飞机，
          没有这一行"摧毁 3 座浮空平台"在结算上就完全不体现。 */
-      if (world.groundKilled !== undefined) world.groundKilled++;
+      if (world.groundKilled !== undefined && ent.team === 1 && !ent.friendlyAsset) {
+        world.groundKilled++;           // 只有敌方的才算战果：调节单元、准绳、中立船不加分
+      }
       var s = (ent.radius || 8) / 6;
       explode(world.particles, ent.pos, s, 22 + (ent.radius | 0));
       SFX.bigHit();
@@ -1585,6 +1759,9 @@ var Ent = (function () {
     spawnParticle: spawnParticle, stepParticles: stepParticles, explode: explode,
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
     detonate: detonate,
+    /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
+    clusterBurst: clusterBurst, isHard: isHard, warheadK: warheadK,
+    setTargetHitHandler: setTargetHitHandler,
     makeTarget: makeTarget, stepTarget: stepTarget,
     randUnit: randUnit
   };

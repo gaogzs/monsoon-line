@@ -858,7 +858,7 @@ if (Ent && M3 && me && world) {
       bad.push('红外弹 ' + (irRate * 100).toFixed(0) + '%，预期 ' + (wantIR * 100).toFixed(0) + '%');
     }
     if (wantRD === undefined) {
-      bad.push('BIN-4 没有 flareRD —— 雷达弹应当有箔丝概率（见 data.js 的 FLARE_RD）');
+      bad.push('CLA-4 没有 flareRD —— 雷达弹应当有箔丝概率（见 data.js 的 FLARE_RD）');
     } else if (Math.abs(rdRate - wantRD) > 0.045) {
       bad.push('雷达弹 ' + (rdRate * 100).toFixed(0) + '%，预期 ' + (wantRD * 100).toFixed(0) + '%');
     }
@@ -981,7 +981,7 @@ if (Ent && M3 && me && world) {
     const w2 = sandbox.Game.__world();
     const bad = [];
 
-    // 一枚 BIN-4「中继」，刚刚被本机的诱饵骗掉
+    // 一枚 CLA-4「中继」，刚刚被本机的诱饵骗掉
     const mm = Ent.makeMissile({
       weapon: 'mrm', team: 1,
       pos: M3.V(pl.pos.x, pl.pos.y, pl.pos.z + 1200),
@@ -1011,7 +1011,52 @@ if (Ent && M3 && me && world) {
     }
 
     if (bad.length) bad.forEach(fail);
-    else ok('诱饵只买到一段时间：盲飞期内不重锁，1.4 s 后 BIN-4 重新咬住本机');
+    else ok('诱饵只买到一段时间：盲飞期内不重锁，1.4 s 后 CLA-4 重新咬住本机');
+  }
+
+  /* ---- 无动力制导弹真的会修正弹道 ----
+
+     GUT-9 / PEJ-30 曾经只转 m.fwd、不转 vel —— 导引头算完了舵面没动，
+     "制导炸弹"全是自由落体。这里从投放包线内的几组距离 / 高度
+     平飞投放，统计命中静止地面目标的比例；再顺带确认集束弹的面杀伤
+     会波及覆盖半径内的第二个目标。 */
+  {
+    const TG = (x, z) => Ent.makeTarget({ x: x, y: 0, z: z, hp: 99999, radius: 10, ground: true, team: 1 });
+    const drop = (wid, d, alt, extra) => {
+      const tg = TG(0, 0);
+      const fw = { actors: [], targets: [tg].concat(extra || []), missiles: [], particles: [] };
+      const mm = Ent.makeMissile({
+        weapon: wid, team: 0, pos: M3.V(0, alt, -d),
+        fwd: M3.V(0, 0, 1), speed: 300 + 70, target: tg, owner: null
+      });
+      fw.missiles.push(mm);
+      for (let f = 0; f < 60 * 60 && mm.alive; f++) Ent.stepMissile(mm, 1 / 60, fw);
+      return { hit: tg.hp < 99999, extra: extra };
+    };
+    const CASES = {
+      asl: [[3000, 1500], [3000, 3000], [4500, 1500], [4500, 3000], [4500, 4500], [6000, 4500]],
+      v30: [[1500, 1500], [2000, 800], [2000, 1500], [2400, 1500], [2400, 2400]]
+    };
+    const bad = [];
+    const rep = [];
+    for (const wid in CASES) {
+      let hit = 0;
+      const miss = [];
+      CASES[wid].forEach(c => {
+        if (drop(wid, c[0], c[1]).hit) hit++;
+        else miss.push(c[0] + 'm@' + c[1] + 'm');
+      });
+      const rate = hit / CASES[wid].length;
+      rep.push(WEAPONS[wid].name + ' ' + hit + '/' + CASES[wid].length);
+      if (rate < 0.8) bad.push(WEAPONS[wid].name + ' 投放包线内命中率只有 ' + (rate * 100).toFixed(0) + '%，未命中：' + miss.join('、'));
+    }
+    // 集束：覆盖半径内的第二个目标也要掉血
+    const side = TG(WEAPONS.v30.cluster * 0.7, 0);
+    drop('v30', 2000, 1500, [side]);
+    if (!(side.hp < 99999)) bad.push('PEJ-30 集束弹没有波及覆盖半径内的第二个目标（cluster 字段没生效）');
+
+    if (bad.length) bad.forEach(fail);
+    else ok('无动力制导弹会修正弹道：' + rep.join(' · ') + '；集束弹面杀伤生效');
   }
 
   /* ---- 飞控：中心附近的前下方目标应当推杆 ---- */
@@ -1979,11 +2024,11 @@ if (Ent && M3 && me && world) {
     const n5 = countStoresOf(wing);
     if (n5 !== 2) bad.push('KA-7 应当画出 2 枚 GIR-9，实际 ' + n5);
 
-    // 4. 任务写定的吊舱也要看得见：玄武岩挂 DAR-4 + ZUN-6
+    // 4. 任务写定的吊舱也要看得见：玄武岩挂 DAR-4 + SAV-6
     //    （吊舱先占通用挂点，制式弹占重挂点）
     const gal = npc('gal31', 'dl4', ['vzu']);
     const n6 = countStoresOf(gal);
-    if (n6 !== 4) bad.push('GAL-31 挂 DAR-4 + ZUN-6 应当画出 4 件，实际 ' + n6);
+    if (n6 !== 4) bad.push('GAL-31 挂 DAR-4 + SAV-6 应当画出 4 件，实际 ' + n6);
     if (!gal.ammoPool || gal.ammoPool.dl4 !== W3.dl4.ammo) {
       bad.push('GAL-31 没有建起弹药池');
     }
@@ -1995,12 +2040,12 @@ if (Ent && M3 && me && world) {
     const n7 = countStoresOf(gal);
     if (n7 !== 2) bad.push('DAR-4 打光后干扰吊舱也跟着消失了（剩 ' + n7 + ' 件）');
 
-    // 4b. 吊舱与制式弹**共存**：片岩（重 + 通用）挂 BIN-6 + ZUN-6 ——
+    // 4b. 吊舱与制式弹**共存**：片岩（重 + 通用）挂 BIN-6 + SAV-6 ——
     //     吊舱占外侧通用挂点、导弹保住重挂点。可视挂架少了两个，
     //     但弹药池不能跟着改：AI 该打几发还是几发。
     const mixed = npc('m27', 'dl6', ['vzu']);
     const n9 = countStoresOf(mixed);
-    if (n9 !== 4) bad.push('ROK-27 挂 BIN-6 + ZUN-6 应当画出 4 件，实际 ' + n9);
+    if (n9 !== 4) bad.push('ROK-27 挂 BIN-6 + SAV-6 应当画出 4 件，实际 ' + n9);
     if (mixed.ammoPool.dl6 !== W3.dl6.ammo) {
       bad.push('挂了吊舱之后导弹的弹药池被改了（' + mixed.ammoPool.dl6 + '）');
     }
@@ -2010,12 +2055,12 @@ if (Ent && M3 && me && world) {
     }
 
     // 4c. 吊舱不能把制式弹挤到一个挂点都不剩：砂岩（通用 + 机腹）挂
-    //     BIN-9 + ZUN-6 —— 吊舱若从第一组往后占（吃掉 light），
+    //     BIN-9 + SAV-6 —— 吊舱若从第一组往后占（吃掉 light），
     //     而这枚弹挂不上 belly，机翼上就一枚弹都画不出来，可 AI 照样发射。
     const spray = npc('spray', 'vbn', ['vzu']);
     const n10 = countStoresOf(spray);
     if (n10 !== 4) {
-      bad.push('砂岩挂 BIN-9 + ZUN-6 应当画出 4 件（导弹不能被吊舱挤掉），实际 ' + n10);
+      bad.push('砂岩挂 BIN-9 + SAV-6 应当画出 4 件（导弹不能被吊舱挤掉），实际 ' + n10);
     }
 
     // 5. 玩家的"空置"组不该凭空长出当前选中的那枚弹
@@ -2156,8 +2201,10 @@ if (Ent && M3 && me && world) {
     // 1. 一架上挂三种射程的空空弹：按距离挑"够得着里面最短的那件"
     //    c11 的组：A 翼尖 / B 重挂 / C 通用 —— srm 4.2 km / mrm 8.6 / v17 12.5
     const mix = npcOf('c11', { A: 'srm', B: 'v17', C: 'mrm' });
-    if (!mix.ammoPool || mix.ammoPool.srm !== W4.srm.ammo ||
-        mix.ammoPool.v17 !== W4.v17.ammo || mix.ammoPool.mrm !== W4.mrm.ammo) {
+    /* 弹药池 = min(w.ammo, 挂点数 × perPoint)：预算不能超过机翼上实际挂得下的 */
+    const capOf = wid => Math.min(W4[wid].ammo, (mix.slotCd[wid] || []).length * W4[wid].perPoint);
+    if (!mix.ammoPool || mix.ammoPool.srm !== capOf('srm') ||
+        mix.ammoPool.v17 !== capOf('v17') || mix.ammoPool.mrm !== capOf('mrm')) {
       bad.push('逐组挂载没有建成弹药池：' + JSON.stringify(mix.ammoPool));
     }
     const at = (a, t, d) => Ent4.chooseWeapon(a, t, d);
@@ -2340,7 +2387,7 @@ if (Ent && M3 && me && world) {
     else ok('水面目标航路：沿航点推进、fwd 单位化、loop 回绕 / 非 loop 停住 / despawn 退场');
   }
 
-  /* ---- BIN-8 追云：一枚对空的重型拦截弹，制空/截击机必须挂得上 ----
+  /* ---- SPO-8 追云：一枚对空的重型拦截弹，制空/截击机必须挂得上 ----
 
      它原来被标成"反辐射弹"、要求 strike（对地火控），于是只有攻击机
      和多用途机能挂 —— 而它其实是对空的，最该带它的恰恰是 D-14、F-9
@@ -2353,11 +2400,11 @@ if (Ent && M3 && me && world) {
     const arm = W3.arm;
 
     if (!arm) {
-      bad.push('找不到 BIN-8（arm）');
+      bad.push('找不到 SPO-8（arm）');
     } else {
       // 不该再有对地门槛
       if (arm.needs && arm.needs.length) {
-        bad.push('BIN-8 仍然带有能力门槛 ' + JSON.stringify(arm.needs) +
+        bad.push('SPO-8 仍然带有能力门槛 ' + JSON.stringify(arm.needs) +
           ' —— 它是对空弹，不该要求对地火控');
       }
       /* antiRadar 现在是**有机制**的（`entities.js` 的 `isRadiating()` +
@@ -2365,7 +2412,7 @@ if (Ent && M3 && me && world) {
          因为没人读"，现在要求"必须标" —— 世界里已经有预警机和
          "雷达开机状态"了。行为本身由上面的反辐射用例覆盖。 */
       if (!arm.antiRadar) {
-        bad.push('BIN-8 没有 antiRadar —— 世界里已经有预警机与雷达开机状态，' +
+        bad.push('SPO-8 没有 antiRadar —— 世界里已经有预警机与雷达开机状态，' +
           '这条语义应当落地');
       }
 
@@ -2376,14 +2423,14 @@ if (Ent && M3 && me && world) {
         const hasHeavy = (ac.hardpointGroups || []).some(g => arm.fits.indexOf(g.kind) >= 0);
         const needOK = !arm.needs || arm.needs.every(n => (ac.caps || []).indexOf(n) >= 0);
         if (!(hasHeavy && needOK)) {
-          bad.push(ac.name + ' 挂不上 BIN-8（有重挂点=' + hasHeavy +
+          bad.push(ac.name + ' 挂不上 SPO-8（有重挂点=' + hasHeavy +
             ' 门槛通过=' + needOK + '）—— 重型拦截弹正该由它们来带');
         }
       });
     }
 
     if (bad.length) bad.forEach(fail);
-    else ok('BIN-8 已去掉对地门槛：制空/截击机（D-14、F-9、GAL-31）均能挂载');
+    else ok('SPO-8 已去掉对地门槛：制空/截击机（D-14、F-9、GAL-31）均能挂载');
   }
 
   /* ---- 两架高空机的性格必须真的分开 ----
@@ -3391,7 +3438,7 @@ if (Ent && M3 && me && world) {
   /* ---- ① 被动吊舱的加成字段必须在顶层 ---- */
   {
     const W11 = sandbox.WEAPONS, bad = [];
-    /* ZUN-6 原来写的是 passiveEffect: { lockResist: 0.30 } —— 多包了一层，
+    /* SAV-6 原来写的是 passiveEffect: { lockResist: 0.30 } —— 多包了一层，
        而 passiveEffects() 读的是 w.lockResist。结果是六个被动吊舱里
        唯一一个加成失效的，而且完全静默。 */
     for (const k in W11) {
@@ -3895,7 +3942,7 @@ if (Ent && M3 && me && world) {
      推导出来的话，新武器用错词根就测不出来了。 */
   {
     const RAFSI = ['CEL', 'TOR', 'SUT', 'GIR', 'CLA', 'SPO', 'GUT', 'PEJ',
-      'GUS', 'ZUN', 'DAR', 'BIN', 'BAD', 'CAV', 'DIL'];
+      'GUS', 'ZUN', 'JDA', 'FAN', 'DAR', 'BIN', 'BAD', 'SAV', 'TUM', 'BOX', 'CAV', 'DIL'];
     // 上游：按用途分类，同用途共用首字母；舰载型在尾部追加一个字母
     const UP_PREFIX = ['D', 'DB', 'F', 'G', 'KA', 'J'];
     // 下游：按设计局分类
@@ -4070,6 +4117,15 @@ if (Ent && M3 && me && world) {
         }
       }
       if (!bad) ok('资料库动态条目全部可生成（' + dyn.length + ' 条）');
+      // 数值占位符与挂载图鉴：不许出现 undefined / NaN / 未替换的 {{键}}
+      for (const e of dyn) {
+        let h = '';
+        try { h = e.build(); } catch (err) { continue; }
+        const m = /undefined|NaN|\{\{[\w.]+\}\}/.exec(h);
+        if (m) fail('图鉴「' + e.title + '」含有 ' + m[0]);
+      }
+      const inv2 = C.find(e => e.id === 'inv2');
+      if (inv2 && /无制导/.test(inv2.build()) === false) fail('挂载图鉴没有把无制导弹标成「无制导」');
     }
   }
 
@@ -4392,6 +4448,75 @@ if (Ent && M3 && me && world) {
   }
 } else {
   fail('拿不到 Ent / world，跳过干扰测试');
+}
+
+/* ============================================================
+   舰艇对空：按阵营挑目标
+   我方舰艇（team 0）带上舰空弹之后，只能打敌机，永远不朝玩家/僚机打；
+   中立（team 2）从不开火；NPC 弹药池不超过 挂点数 × perPoint。
+   ============================================================ */
+try {
+  const W = sandbox.Game.__world();
+  const pl = sandbox.Game.__player();
+  const Ent = sandbox.Ent, M3 = sandbox.M3, WEAPONS = sandbox.WEAPONS, AIRCRAFT = sandbox.AIRCRAFT;
+  if (!W || !pl || !sandbox.Game.__updateTargets) throw new Error('拿不到 world / player / __updateTargets');
+  const saved = { targets: W.targets, actors: W.actors, missiles: W.missiles };
+  const bad = [];
+  pl.alive = true; pl.pos = M3.V(0, 3000, 0);
+  const ship = Ent.makeTarget({ team: 0, ttype: 'ship', x: 0, z: 2000, hp: 900, radius: 40 });
+  ship.weapon = 'dl9'; ship.fireCd = 0;
+  const foe = Ent.makeAircraft({ type: AIRCRAFT[0].id, team: 1, pos: M3.V(3000, 3000, 6000) });
+  foe.team = 1; foe.pos = M3.V(3000, 3000, 6000);
+  W.targets = [ship]; W.actors = [pl, foe]; W.missiles = [];
+
+  let shotsAtFriend = 0, shotsAtFoe = 0, killed = false;
+  for (let f = 0; f < 60 * 40 && !killed; f++) {
+    sandbox.Game.__updateTargets(1 / 60);
+    for (const m of W.missiles) {
+      if (m.owner === ship && !m.counted) {
+        m.counted = true;
+        if (m.target === foe) shotsAtFoe++;
+        else if (m.target && m.target.team === 0) shotsAtFriend++;
+        if (m.team !== 0) bad.push('我方舰艇的弹阵营是 ' + m.team);
+      }
+      Ent.stepMissile(m, 1 / 60, W);
+    }
+    W.missiles = W.missiles.filter(m => m.alive);
+    pl.pos = M3.V(0, 3000, 0);                  // 玩家停在射程内，以防被当作目标
+    if (!foe.alive) killed = true;
+    else foe.pos = M3.V(3000, 3000, 6000);      // 敌机不动，只看舰艇能不能打下来
+  }
+  if (shotsAtFriend) bad.push('我方舰艇朝友方/玩家发射了 ' + shotsAtFriend + ' 枚');
+  if (!shotsAtFoe) bad.push('我方舰艇带了 dl9 却没有朝射程内的敌机开火');
+  if (!killed) bad.push('我方舰艇 40 秒内没打下静止的敌机（发射 ' + shotsAtFoe + ' 枚）');
+  if (!(pl.hp > 0)) bad.push('玩家被自家舰艇的弹打伤至死');
+
+  // 中立不开火
+  const neu = Ent.makeTarget({ team: 2, ttype: 'ship', x: 0, z: 2000, hp: 500 });
+  neu.weapon = 'dl9'; neu.fireCd = 0;
+  const foe2 = Ent.makeAircraft({ type: AIRCRAFT[0].id, team: 1, pos: M3.V(0, 3000, 4000) });
+  foe2.team = 1; foe2.pos = M3.V(0, 3000, 4000);
+  W.targets = [neu]; W.actors = [pl, foe2]; W.missiles = [];
+  for (let f = 0; f < 600; f++) sandbox.Game.__updateTargets(1 / 60);
+  if (W.missiles.length) bad.push('中立（team 2）目标开火了 ' + W.missiles.length + ' 枚');
+
+  // NPC 弹药池封顶
+  for (const ac of AIRCRAFT) {
+    const a = Ent.makeAircraft({ type: ac.id, team: 1, pos: M3.V(0, 3000, 0), special: ac.special });
+    if (!a.ammoPool) continue;
+    for (const wid in a.ammoPool) {
+      const w = WEAPONS[wid];
+      if (!(w.perPoint > 0)) continue;
+      const cap = (a.slotCd[wid] || []).length * w.perPoint;
+      if (a.ammoPool[wid] > cap) bad.push(ac.id + ' 的 ' + wid + ' 弹药池 ' + a.ammoPool[wid] + ' 超过挂载容量 ' + cap);
+    }
+  }
+
+  W.targets = saved.targets; W.actors = saved.actors; W.missiles = saved.missiles;
+  if (bad.length) bad.forEach(fail);
+  else ok('舰艇对空按阵营挑目标：我方舰艇打下敌机（' + shotsAtFoe + ' 枚）、从不朝玩家打；中立不开火；NPC 弹药池不超过挂载容量');
+} catch (e) {
+  fail('舰艇对空测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
 /* ============================================================

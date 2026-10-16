@@ -329,7 +329,8 @@ if (a.pos.y <= 2) { a.pos.y = 2; kill(a, world, true); }    // 撞海
 speed: o.speed || 120,          // launch() 传的是载机速度 + 70
 vel:   w.ballistic ? norm(fwd) * speed : (0,0,0),
 life:  w.vsLife, age: 0, dmg: w.dmg, turn: w.turn, prox: w.prox,
-seekerOn: true, lostTime: 0, reDone: false
+seekerOn: true, lostTime: 0,
+seekers: w.twinSeeker ? 2 : 1, dewRolled: null
 ```
 
 `age > life` 就消失（总寿命，不是动力段）。**无动力弹的初速必须在这里给**：
@@ -377,9 +378,9 @@ desired = normalize(aim - m.pos);
 | 武器 | lead | 行为 |
 |---|---|---|
 | `srm` TOR-2 | **0.38** | 基础红外弹，刻意做得很笨 |
-| `vlar` DAR-12 | **0.90** | 全表最高，飞向解算出来的最优拦截点 |
+| `vlar` CLA-12 | **0.90** | 全表最高，飞向解算出来的最优拦截点 |
 | `v17` CLA-17 | 0.86 | 冲压远距弹 |
-| `mrm` BIN-4 | 0.78 | 主动雷达中距弹 |
+| `mrm` CLA-4 | 0.78 | 主动雷达中距弹 |
 | `otr` TOR-1 | 0.32 | 群岛国的旧货 |
 | `hos` TOR-6 | **0.30** | 全表最低，离轴角换来的代价 |
 
@@ -407,13 +408,15 @@ B = M3.turnToward(m.fwd, m.up, desired, maxTurn);
 `sqrt(0.0985) ≈ 0.31`）起就被 0.34 的下限兜住**，
 所以 18 km 以上函数实际返回 **0.34**。
 一枚海平面 2.45 rad/s 的格斗弹（SUT-11），在 20 km 只剩约 0.83 rad/s
-（2.45 × 0.34；它 desc 里写的 3.4 rad/s 与数据不符，以 `turn` 为准）——**这就是"高空导弹退化成一门有制导的炮"的实现**。
+（2.45 × 0.34；desc 里的转弯率现在由 `{{turn}}` 模板从数据生成）——**这就是"高空导弹退化成一门有制导的炮"的实现**。
 
 `highAltImmune`（只有 `hva` SPO-9）把下限抬到 0.78：舵面比同级大一倍，
 "过载不随空气变稀而崩塌"。这是"高空拦截弹"在这个游戏里唯一说得通的定义。
 
-**注意**：数据里几乎每枚弹都写着 `highAltScale: true`，但**没有任何代码读它**——
-`turnFactor` 是无条件应用的。那个字段目前只是数据侧的标注。
+代价在低空：动力段推力 ×(1 − 0.45·ρ/ρ₀)、滑翔掉速 ×(1 + 0.6·ρ/ρ₀)，
+即海平面推力只剩 55%、滑翔阻力 ×1.6，两万米以上几乎不受影响。
+
+`turnFactor` 对所有弹无条件应用（旧的 `highAltScale` 标注字段已删除）。
 
 ### 转弯消耗动能
 
@@ -422,8 +425,15 @@ var want  = M3.angleBetween(m.fwd, desired);           // 本帧需要转过的�
 B = M3.turnToward(m.fwd, m.up, desired, maxTurn);      // 然后才转
 var used  = min(want, maxTurn) / max(1e-5, dt);        // 实际转弯率 rad/s
 var load  = clamp(used / 3.0, 0, 1);
-m.speed   = max(170, m.speed - load * 62 * dt);
+if (!w.ballistic) m.speed = max(170, m.speed - load * 62 * dt);
 ```
+
+**无动力制导弹（`ballistic`，GUT-9 / PEJ-30）**导引转的是**速度矢量**：
+`vel = fwd × |vel|`，保持速率，不吃这条能量消耗（能量只来自投放初速与重力）。
+以前只转了 `fwd`、位置却按 `vel` 积分，等于"有制导"的炸弹全是自由落体。
+
+**高抛（`w.loft = {alt, dive}`，GUT-25 / BOX-14）**：对地面目标、水平距离 > `dive` 时，
+瞄准点抬到目标上方 `min(alt, 水平距离 × 0.4)`，末段才俯冲。
 
 **没有这一条，"躲导弹"在物理上就不可能**：导弹在动力段之外照样能满过载
 无限机动，玩家的桶滚和 3/9 线规避全都没有意义——因为对手不累。
@@ -439,18 +449,21 @@ m.speed   = max(170, m.speed - load * 62 * dt);
 
 ```js
 off = angleBetween(m.fwd, los);
-if (off > 1.35) { m.lostTime += dt; if (m.lostTime > 0.5) m.seekerOn = false; }
+fov = w.hobs ? max(1.35, w.lockCone) : 1.35;
+if (off > fov) { m.lostTime += dt; if (m.lostTime > 0.5) m.seekerOn = false; }
 else            { m.lostTime = 0; ...绕轴转向... }
 ```
 
-即目标偏出 **±75°** 持续 **0.5 秒** → 丢失。
+即目标偏出 **±77°**（`hobs` 弹取 max(77°, 锁定锥)，TOR-6 / GIR-9）持续 **0.5 秒** → 丢失。
 
-雷达弹的 `reAcquire`（BIN-4 等，见 `entities.js` 注释）：丢失目标后
-搜索 **2.6 km** 内最近的敌机重新锁定。红外弹不看这个字段，走 `irAcquire()`
-自主寻的。两条路**共用盲飞计时 `m.reLockT`**：被诱饵骗走后的这段时间里
+雷达弹的 `reAcquire`（CLA-4 等，见 `entities.js` 注释）：丢失目标后
+搜索 **2.6 km** 内、锁定锥内最近的敌机重新锁定。红外弹不看这个字段，走 `irAcquire()`
+自主寻的（对地红外弹只在 `world.targets` 里找）。两条路**共用盲飞计时 `m.reLockT`**：被诱饵骗走后的这段时间里
 谁都不能重锁，过了之后欺骗源也**可以**被重新咬住。
 （以前是用 `m.reDone` / `m.spoofed` 做成"一次诱饵换永久免疫"，
-诱饵应该只买到一段时间，所以改成了计时器。）
+诱饵应该只买到一段时间，所以改成了计时器；`reDone` 已删除。）
+盲飞期满那一帧还有一次 `decoyRecheck`：骗走它的诱饵云若还亮着且在视场里，
+没有 `decoyMemory` 的弹有半概率再咬回去（见 [weapons.md](weapons.md)）。
 
 ### 激光制导（休眠分支）
 
@@ -513,18 +526,17 @@ b.life -= dt;                      // life = gunRange / w.speed
 
 ## 定向能拦截
 
-在 `game.js` 的 `updateDEW(dt, actor)`。每帧判定：
+在 `game.js` 的 `updateDEW(dt, actor)`。**每枚来袭弹只判一次**：
 
 ```js
 chance = (actor.pos.y > 18000 && w.highAltChance) ? w.highAltChance : w.interceptChance;
-if (Math.random() > chance * dt / 1.2) continue;
+if (m.dewRolled === actor.id) continue;
+m.dewRolled = actor.id;
+if (!(Math.random() < chance)) continue;
 ```
 
-`dt / 1.2` 是把"整个拦截窗口内 55% 成功率"折算成每帧概率，
-窗口长度按导弹在这段距离的飞行时间（约 1.2 秒）估算。
-
-**改这个公式要同时想清楚**：现在 `chance = 0.55` 对应的实际成功率
-大约就是 55%，因为 1.2 秒的窗口里累积接近一次完整判定。
+以前按"约 1.2 秒窗口"折成每帧概率连续掷，实际累积取决于接近速度
+（迎头快弹的 55% 只剩约 37%）。现在 `chance = 0.55` 就是每枚弹被烧掉的概率。
 
 成功一次消耗一枚充能（`spCharges`），烧毁导弹并播 `laser()` 音效；
 充能由 `spChargeT` 按 `w.recharge`（18 s）逐发恢复，

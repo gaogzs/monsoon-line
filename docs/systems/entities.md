@@ -46,7 +46,7 @@
 | `clearMountIssues` | `clearMountIssues()` | 清空上表（测试用） |
 | `makeMissile` | `makeMissile(o) → m` | 造导弹/炸弹。`o = {weapon, team, pos, fwd, speed, target, owner}` |
 | `stepMissile` | `stepMissile(m, dt, world)` | 导弹每帧：动力段→导引→位置→近炸→尾迹 |
-| `effectiveLife` | `effectiveLife(w, y) → s` | 动力段时长，冲压弹在 18 km 以上缩短 |
+| `effectiveLife` | `effectiveLife(w, y) → s` | 动力段时长，冲压弹在 18 km 以上缩短（`stepMissile` 与尾迹颜色都用它） |
 | `breakLock` | `breakLock(a, world) → bool` | 投放一组干扰弹（热焰弹 + 箔丝）并尝试欺骗来袭弹 |
 | `openEcm` | `openEcm(actor, wid, threatSkill)` | 电子战吊舱开机（认知电子战闭环的入口） |
 | `passiveEffects` | `passiveEffects([{wid, n}]) → {lockResist, armor, lockRange, flareBonus, silentLock}` | 汇总被动吊舱效果（`armor` 封顶 0.55）。玩家（`game.js` 同名包装按挂点组展开）与敌机 `pods`（`missions.js`）共用 |
@@ -56,7 +56,11 @@
 | `spawnParticle` | `spawnParticle(list, pos, vel, life, size, color, opt)` | 生成一个粒子。`opt = {grow, alpha, drag, grav}` |
 | `stepParticles` | `stepParticles(list, dt)` | 粒子每帧：寿命 → 位移 → 阻力 → 重力 |
 | `explode` | `explode(list, pos, scale, count)` | 爆炸：多色火球 + 黑烟 |
-| `detonate` | `detonate(m, t, world)` | 近炸命中判定（反辐射弹对辐射源伤害 ×2） |
+| `detonate` | `detonate(m, t, world)` | 近炸命中判定：`cluster` 弹转 `clusterBurst`；地面目标判定距离再加 `radius`；伤害 × `warheadK`（反辐射弹对辐射源再 ×2）；经 `hitAny` 分流到 `damage` / 设施回调 |
+| `clusterBurst` | `clusterBurst(m, world)` | 子母弹面杀伤：半径 `w.cluster`（+目标 `radius`）内每个敌方地面目标吃满额 `dmg × warheadK`；`game.js` 的 `scanShot` 也直接调它 |
+| `isHard` | `isHard(t) → bool` | 加固目标：`t.hard` 或 `HARD_MODELS[t.model]` |
+| `warheadK` | `warheadK(w, t) → 系数` | 战斗部对目标的系数：非加固 1；加固时 `penetrator` 1、`cluster` 0.2、其余 0.6 |
+| `setTargetHitHandler` | `setTargetHitHandler(fn)` | `game.js` 注册 `hitTarget(tg, dmg, source)`，制导弹 / 子母弹打设施都走它（击毁计数、误击处罚）；未注册时退回 `hp -= dmg` + `killGround` |
 | `damage` | `damage(ent, amt, world, source) → bool` | 对**飞机**结算伤害（含装甲减伤），返回是否击杀 |
 | `kill` | `kill(ent, world, groundImpact, source)` | 击落飞机：爆炸 + 音效 + `source.kills++` |
 | `killGround` | `killGround(ent, world)` | 摧毁目标物：按半径缩放爆炸 + `SFX.bigHit()` + `world.groundKilled++` |
@@ -65,7 +69,7 @@
 | `stepTarget` | `stepTarget(t, dt, world)` | 目标物每帧：航路或漂移 + 受损下沉 |
 | `randUnit` | `randUnit() → 单位向量` | 球面均匀随机方向（爆炸、干扰弹用） |
 
-**不导出的内部函数**：`killMissile(m, world, hit)`（`detonate` 虽然也导出了，但正常只在 `stepMissile` 内部调用）。外部模块要击落导弹请直接置 `m.alive = false`（`updateDEW` 就是这么做的）。
+**不导出的内部函数**：`killMissile(m, world, hit)`；`irAcquire(m, world)`（红外重捕获 —— `w.target !== 'air'` 的弹只扫 `world.targets`）；`decoyRecheck(m)`（盲飞期结束时判诱饵云二次欺骗，`DECOY_LIFE = 2.6`）；`hitSurface` / `hitAny`（伤害分流）；`isRadiating`；`buildNpcMounts`。（`detonate` 虽然也导出了，但正常只在 `stepMissile` 内部调用。）外部模块要击落导弹请直接置 `m.alive = false`（`updateDEW` 就是这么做的）。
 
 ---
 
@@ -88,7 +92,8 @@
   special, spAmmo, spCd,
   slotCd:{},                           // { 武器id: [槽1剩余, 槽2剩余, ...] }
   /* 挂载：玩家那套由 startMission 按机库配置另建；NPC 由 makeAircraft
-     末尾的 buildNpcMounts() 建（弹药取 w.ammo，槽数 = 挂点数）。
+     末尾的 buildNpcMounts() 建（弹药取 min(w.ammo, 挂点数 × perPoint)，
+     perPoint 为 0 的下游弹只按 w.ammo；槽数 = 挂点数）。
      pods 是任务写定的被动吊舱，机制与外观（mountPlan）都用它。 */
   ammoPool, pods,
   spActive, spCharges, spChargeT,      // ECM 生效 / DEW 充能
@@ -128,7 +133,7 @@
 { kind:'missile', team, weapon, w, model, alive,
   pos, fwd, up, right, speed, vel,
   target, age, life, dmg, turn, prox,
-  owner, reDone, trailTimer, seekerOn, lostTime,
+  owner, trailTimer, seekers, dewRolled, seekerOn, lostTime,
   decoyTries, reLockT }
 ```
 
@@ -136,7 +141,9 @@
 - `vel` 只在**无动力弹**（`w.ballistic`）里独立累积；有发动机的弹每帧 `vel = fwd × speed`。
 - `decoyTries` / `reLockT` 是诱饵的两个计数器：前者控制"越投越难骗"，
   后者是骗中之后的盲飞期（见 §4.5）。两者**都不因成功而清零**。
-- 运行期追加：`spoofed`（骗到它的飞机，只在 `reLockT > 0` 期间被避开）、
+- `seekers`：导引头数，`twinSeeker`（BIN-9）为 2，`breakLock` 每骗中一次先扣一个，扣到 1 才真正脱锁。
+- `dewRolled`：定向能拦截已对哪架飞机掷过骰（`game.js` `updateDEW`，每枚弹只判一次）。
+- 运行期追加：`decoy`（`{p, v, t0, p2, done}`，骗走它的那团诱饵云，供 `decoyRecheck`）、`spoofed`（骗到它的飞机，只在 `reLockT > 0` 期间被避开）、
   `laserLost`（激光照射丢失，当前无武器使用）。
 
 ### 3.3 子弹 `b`
@@ -175,7 +182,7 @@
   走位移而不是线段方向，是为了在拐弯处也给出连续朝向）。
   走完最后一段：`loop` 回绕，否则调 `onArrive(t, world)` 停住；`despawn` 则退场。
   `speed` 是**米/秒** —— `SHIPS[].speed` 是节，接入时自己 ×0.514。
-- `weapon` 非空时由 `game.js` `updateTargets()` 当成防空阵地开火（**只打玩家**）；`team` 默认 1。
+- `weapon` 非空时由 `game.js` `updateTargets()` 当成防空阵地开火（`pickTargetFor` 按阵营选目标：team 1 玩家优先、team 0 只打敌机、team 2 不开火，见 [ai.md](ai.md)）；`team` 默认 1。
 - 任务脚本追加：`friendlyAsset`（打坏扣分）、`vital`（**写入后无人读取**）。
 
 ### 3.6 世界对象 `world`
@@ -259,12 +266,14 @@ keydown Enter / 鼠标右键
 ### 4.4 一次命中的结算链路
 
 ```
-导引弹：stepMissile → dist < prox+6   → detonate → 若 dist < prox+14 → damage(target)
+导引弹：stepMissile → dist < prox+6   → detonate
+    ├ w.cluster → clusterBurst（落地 pos.y<=0 时也触发）
+    └ 若 dist < prox+14(+radius) → hitAny：飞机 damage / 设施 hitTarget 回调，伤害 × warheadK
 无制导弹/子弹：resolveBullets → scanShot
     ├ 对飞机：raySphere(prev, dir, a.pos, 7.5)，命中半径**写死 7.5**
     └ 对目标：raySphere(prev, dir, tg.pos, tg.radius || 8)
        ├ 飞机 → Ent.damage(a, dmg, world, owner) → hp≤0 → Ent.kill()
-       └ 目标 → hitTarget()（game.js）→ hp≤0 → Ent.killGround()
+       └ 目标 → 子母弹：Ent.clusterBurst；否则 hitTarget(dmg × warheadK)（game.js）→ hp≤0 → Ent.killGround()
 ```
 
 - `Ent.kill()` 按结构完整度决定爆炸规模（`hp>150` 用 3.2 / 26 个粒子，否则 2.2 / 20），并给 `source.kills++`。
@@ -286,12 +295,15 @@ keydown Enter / 鼠标右键
             └ random() < chance 时
                  → m.target=null；seekerOn=false；lostTime=1；
                    reLockT=1.4（盲飞期：这之前谁都不能重新捕获）
+                   （seekers>1 时只扣一个导引头，不脱锁）
                    spoofed=a（盲飞期内优先避开这架，之后可以重咬）
+                   decoy={p,v,t0,p2}（盲飞期满时 decoyRecheck 判诱饵云二次欺骗；
+                   CLA-4 decoyMemory 免疫）
       ← 返回值只表示"投放动作发生了"；
         a.decoysBroke / a.decoysIneffective 才是命中数与无效数
 ```
 
-`flare` 字段本身就是"被干扰概率"：**越大越容易被骗**。当前数值里雷达弹平均比红外弹更容易被骗，与直觉相反，属于已知待修问题（见 `entities.js` 里那段注释）。
+`flare` 字段本身就是"被干扰概率"：**越大越容易被骗**。雷达弹走 `FLARE_RD`（`flareRD`），空空雷达弹整体比红外弹难骗（见 [data.md](data.md)）。
 
 **抗欺骗递减**（`m.decoyTries`）是防止"诱饵无限强"的那一环：
 同一枚弹每被投放一次，成功率乘 0.62（地板 0.03），并且**不因一次成功而清零**。

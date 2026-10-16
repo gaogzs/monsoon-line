@@ -34,7 +34,7 @@ CAMPAIGNS.push({
   loc: '北纬十二度 · 分水海盆',
   period: '2078.03.14 – 2078.04.25',
   desc: '十六年里，调节场把雨往北推了四公里一个周期。2078 年三月，' +
-    '这份偏移量被公开，下游带着四亿人的账南下。上游在分水方向只有一个中队 —— ' +
+    '这份偏移量被公开，下游带着四亿人的账北上。上游在分水方向只有一个中队 —— ' +
     '它守不住整条季风线，只守得住一件事：让飞机还能继续飞。',
   missions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 });
@@ -51,7 +51,7 @@ CAMPAIGNS.push({
   loc: '分水海盆中央 · 编号空白空域',
   period: '2078.05 起 · 无终止日期',
   desc: '双方默认不再往海盆中央派侦察机，也从不宣布那里中立。' +
-    '每个还剩油的中队都往那儿派单机巡逻，谁都不承认自己在找谁。' +
+    '每个还剩油的中队都往那儿派小编队巡逻，谁都不承认自己在找谁。' +
     '一片没有名字的空域，一份没有人签字的停火，和每天照常发生的遭遇战。',
   missions: [10]
 });
@@ -79,7 +79,10 @@ function spawnEnemy(w, o) {
     x: o.x, y: o.y, z: o.z,
     fwd: o.fwd || M3.V(0, 0, -1),
     speed: o.speed || 300,
-    special: o.special || 'dl6',
+    /* 显式传 null = 不带任何制式弹（预警机、轰炸机、播撒机）。
+       只有**没写** special 时才退回 dl6 —— 原来用 `||`，null 也被
+       换成了 dl6，于是一架没有武器的预警机机翼下挂着两发格斗弹。 */
+    special: o.special === undefined ? 'dl6' : o.special,
     throttle: 0.8,
     /* 任务写定的吊舱要一路传到飞机上：它不只是机制（下面那段
        passiveEffects），还要作为**实体挂载**画在挂得住的挂点组上
@@ -121,7 +124,7 @@ function spawnEnemy(w, o) {
   a.behavior = o.behavior || 'pursue';
   a.wave = o.wave || 0;
 
-  /* 被动吊舱（任务脚本指定，例如下游的 ZUN-6「迷雾」）。
+  /* 被动吊舱（任务脚本指定，例如下游的 SAV-6「迷雾」）。
 
      走 Ent.passiveEffects —— 与玩家那套**同源**。在这条路子接通之前，
      敌机不存在任何"抗锁定"能力：他们挂什么吊舱都只是数据表里的一行字。 */
@@ -204,6 +207,7 @@ function spawnAewc(w, o) {
     team: o.team === undefined ? 0 : o.team,
     x: o.x, y: o.y, z: o.z,
     fwd: M3.V(0, 0, 1), speed: 220,
+    special: null,              // 无武装：预警机是眼睛，不是枪手
     callsign: o.label || null,
     behavior: 'recon'
   });
@@ -213,6 +217,33 @@ function spawnAewc(w, o) {
   if (a.ai) a.ai.role = 'support';    // 它不是来打架的
   a.route = { loiter: true, wp: o.a, exit: o.b, alt: o.y, arrive: 2600 };
   return a;
+}
+
+/* 冬港。第 3 关与第 10 关是同一个人、同一架飞机 —— 所以只在这里写一次。
+
+   GAL-31「玄武岩」：下游飞得最高的一型（升限 19 000 m），也是那批
+   在 15 公里以上飞了半辈子的老兵开的飞机。起始高度压在升限以下 ——
+   摆在升限之上，AI 的升限段第一帧就会把他往下压。
+
+   phys 覆盖说的是**人**，不是改装：同一架飞机，在他手里转得比
+   资料库那一栏快。早先第 3 关给他一架 ROK-27（升限 15 000 却放在
+   21 000 m）、第 10 关给他上游的 D-33 —— 两关是两架不同的飞机，
+   其中一架还是对面的。 */
+function spawnWinterport(w, o) {
+  var ace = spawnEnemy(w, {
+    ac: 'gal31',
+    x: o.x, y: o.y, z: o.z,
+    fwd: M3.V(0, 0, -1), speed: 470,
+    special: 'dl4', loadout: { A: 'dl4', B: 'vbn' },
+    skill: o.skill, callsign: '冬港 WINTERPORT'
+  });
+  ace.isAce = true;
+  ace.phys = { vMax: 585, vMil: 470, vStall: 128, accel: 32, decel: 34, pitch: 0.66, roll: 3.2, yaw: 0.28, hp: 165 };
+  ace.maxHp = 165; ace.hp = 165;
+  ace.label = 'WINTERPORT · 冬港';
+  ace.bigTarget = true;
+  w.ace = ace;
+  return ace;
 }
 
 function spawnTarget(w, o) {
@@ -289,10 +320,10 @@ MISSIONS.push({
     '警告：编队上方有护航，两侧有不明回波'
   ],
   threats: [
-    'ROK-27「片岩」截击机 ×5（侦察构型，自卫为主）',
+    'ROK-27「片岩」×5（侦察构型，自卫为主）',
     'VAC-14「砂岩」护航攻击机 ×2',
-    'D-21「贼鸥」隐形战斗机 ×2（带 ZUN-6 抗锁定吊舱）',
-    'BIN-6「燧火」红外格斗弹 / TOR-1「旧锭」格斗弹',
+    'ROK-27「片岩」×2（带 SAV-6「迷雾」抗锁定吊舱，从高处压下来）',
+    'BIN-6「燧火」红外格斗弹 / BIN-9「双生」双导引头格斗弹',
     '无地面防空威胁'
   ],
   intel: `风速 <b>18 m/s</b> 西风 · 云底 3200 m · 能见度 24 km<br>
@@ -354,7 +385,7 @@ MISSIONS.push({
         x: (i - 0.5) * 5200, y: 8600, z: 20800,
         fwd: M3.V(0, 0, -1),
         speed: 300,
-        special: 'otr',
+        special: 'vbn',
         skill: 0.40,
         behavior: 'escort',
         escort: true,
@@ -363,18 +394,18 @@ MISSIONS.push({
       });
     }
 
-    /* 两架 D-21「贼鸥」从高处压下来 —— 这一关的"意外"。
+    /* 两架 ROK-27「片岩」从高处压下来 —— 这一关的"意外"。
 
-       隐形、带 ZUN-6「迷雾」吊舱：玩家会先看到五个缓慢的测绘回波，
+       带 SAV-6「迷雾」吊舱（挂外侧 B 组，格斗弹在内侧 A 组）：玩家会先看到五个缓慢的测绘回波，
        在咬第一个目标时才发现有人从侧后方上来了。
        设定里"他们在测量，不是在打仗"说的是测绘队 —— 而一支测绘队
        从来不需要自己带保镖。 */
     for (i = 0; i < 2; i++) {
       spawnEnemy(w, {
-        ac: 'c21',
+        ac: 'm27',
         x: (i - 0.5) * 3000, y: 10200, z: 23500,
         fwd: M3.V(0, 0, -1), speed: 360,
-        special: 'srm', loadout: { B: 'srm' },
+        special: 'dl6', loadout: { A: 'dl6' },
         pods: ['vzu'],
         skill: 0.62,
         callsign: downstreamCallsign(7 + i),
@@ -499,10 +530,12 @@ MISSIONS.push({
   ],
   threats: [
     'BAD-9「高墙」远程防空导弹（4 个阵地，射程 9 km）',
-    'ROK-27「片岩」截击机（任务中段出现）',
+    'ROK-40「巨砾」轰炸机 ×2（直扑前进基地）',
+    '测控平台全毁后：GAL-31「玄武岩」×4 / ROK-27「片岩」×2 从北面进场',
+    '海面：BLO-8「菊石」（舰空弹）/ BLO-2「三叶虫」快艇',
     '地形：海面，无地形遮蔽可用'
   ],
-  intel: `云底 <b>900 m</b> · 云顶 4200 m · 中继平台高度 <b>4000 m</b><br>
+  intel: `云底 <b>900 m</b> · 云顶 3400 m · 中继平台高度 <b>4000 m</b><br>
     对空雷达探测高度下限约 <b>1500 m</b><br>
     防空浮台间距 5 km，存在雷达覆盖缝隙 —— 但很窄`,
   map: [
@@ -591,7 +624,9 @@ MISSIONS.push({
        它不参与走位，只是停在那儿 —— 但这片海域从此不只有浮台。 */
     spawnShip(w, {
       model: 'orca', team: 0, label: '虎鲸 ORCA',
-      x: -2600, z: -20000, hp: 900
+      x: -2600, z: -20000, hp: 900,
+      // 32 单元舰空弹垂发（SHIPS 表的 arms）：会替基地打来袭的敌机
+      weapon: 'ss6', fireCd: 5
     });
 
     /* ---- 两架 ROK-40：这一关真正的威胁 ----
@@ -607,7 +642,7 @@ MISSIONS.push({
         ac: 'rok40',
         x: br.x, y: 4300, z: -14000,
         fwd: M3.V(0, 0, 1), speed: 250,
-        special: 'dl6', skill: 0.30,
+        special: null, skill: 0.30,        // 弹舱里的东西由 onArrive 结算，不走导弹
         callsign: downstreamCallsign(17 + i)
       });
       bmb.route = {
@@ -628,10 +663,11 @@ MISSIONS.push({
 
        它们不是这一关的目标，是"海面上还有别的船"这件事本身：
        一艘 27 节的护卫舰沿着封锁线来回巡逻，一艘 40 节的快艇
-       贴着水面目视接触。两艘都挂着 BAD-9，都会向被照到的目标开火。 */
+       贴着水面目视接触。菊石带 BAD-9 舰空弹，会向被照到的目标开火；
+       三叶虫只有反舰弹和一门遥控炮，没有防空。 */
     spawnShip(w, {
       model: 'ammonite', label: '菊石 AMMONITE',
-      x: -9000, z: 22000, hp: 420,
+      x: -9000, z: 22000, hp: 420, weapon: 'dl9',
       route: { wp: [{ x: -9000, z: 22000 }, { x: 9000, z: 22000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
@@ -710,18 +746,18 @@ MISSIONS.push({
       w.radio.play('m2', 'radarDown');
       // 下游截击机从北面进场
       var k;
-      /* 三架 GAL-31 打头、两架 ROK-27 跟进、一架 F-9 在高空看着。
+      /* 三架 GAL-31 打头、两架 ROK-27 跟进、第四架 GAL-31 在高空看着。
          高峰军工制造局的重型截击机专为这种场合造的：
          从高空俯冲下来打一轮中距弹，然后脱离再爬升。 */
       for (k = 0; k < 6; k++) {
         var isHeavy = (k < 3);
         var isHigh = (k === 5);
         var e = spawnEnemy(w, {
-          ac: isHigh ? 'c9' : (isHeavy ? 'gal31' : 'm27'),
+          ac: (isHigh || isHeavy) ? 'gal31' : 'm27',
           x: -2200 + k * 900, y: isHigh ? 17500 : (isHeavy ? 7600 : 3200), z: 24000,
           fwd: M3.V(0, 0, -1), speed: isHigh ? 470 : (isHeavy ? 430 : 340),
-          special: isHigh ? 'hva' : (isHeavy ? 'dl4' : 'dl6'),
-          loadout: isHigh ? { A: 'hva' } : null,
+          special: (isHigh || isHeavy) ? 'dl4' : 'dl6',
+          loadout: (isHigh || isHeavy) ? { A: 'dl4', B: 'vbn' } : null,
           skill: k === 0 ? 0.72 : 0.5,
           callsign: downstreamCallsign(5 + k)
         });
@@ -778,28 +814,28 @@ MISSIONS.push({
 它们携带的不是碘化银，是<b>反凝结核</b> ——
 一种能在那一层高度把冰核"吃掉"的化合物。
 撒下去，整条季风线会在两个季节里失去响应能力。</p>
-<p>在这个高度，空气密度只有海平面的 <b>7.2%</b>。
+<p>在这个高度，空气密度只有海平面的 <b>7.8%</b>。
 导弹的舵面几乎失效，可用过载掉到个位数 G；
 而机炮的弹道比在任何高度都平直。</p>
-<p>上游公约派了三架飞机上来。<span class="am">交战规则：阵列空域内，
-20 公斤以上战斗部全部锁定 —— 你们只有机炮。</span></p>
-<p>而对面来的那个人，在这条高度上已经飞了 <b>2600 个小时</b>。
+<p>上游公约派了三架飞机上来。<span class="am">交战规则：调节单元 5 公里内，
+对地、反舰弹与炸弹全部锁定 —— 只剩机炮和空空弹。</span></p>
+<p>而对面来的那个人，是下游航空军的战役指挥官。
 他的呼号不是任何一个消失的村庄 —— 那是下游唯一一座还在用水井的镇子。</p>`,
 
   objectives: [
     '击落全部 8 架「灰烬」级播撒机',
     '不得损毁调节单元（DIL-4）',
-    '阵列空域内重武器锁定 —— 只有机炮',
-    '注意：护航编队五架，另有不明国籍巡逻机一架'
+    '单元 5 km 内对地 / 反舰弹与炸弹锁定 —— 只剩机炮和空空弹',
+    '注意：护航编队四架，另有群岛国巡逻机一架'
   ],
   threats: [
     '「灰烬」级播撒机 ×8（大型、低速、结构脆弱但数量多）',
-    'GAL-31 / VAC-14 / D-33 / ROK-27 护航编队',
+    'GAL-31「玄武岩」×2（高层）/ ROK-27「片岩」×2（15 km 以下）护航编队',
     'ROK-2「石英」预警机（调度整片空域的敌方增援）',
     'WINTERPORT「冬港」—— 下游航空军战役指挥官',
     'GAL-44「磁石」随队干扰机（九公里内雷达被压哑）'
   ],
-  intel: `高度 <b>19 500 m</b> · 密度 0.076 kg/m³ · 温度 −57 ℃<br>
+  intel: `高度 <b>19 500 m</b> · 密度 0.095 kg/m³ · 温度 −57 ℃<br>
     在此高度你<b>无法加速</b>，只能靠进入战斗前攒下的能量<br>
     机炮有效射程翻倍至 <b>约 2.6 km</b>，但抓窗口的时间极短<br>
     调节单元货舱内有 <b>340 kg</b> 碘化银 —— 别把它们打炸<br>
@@ -845,20 +881,28 @@ MISSIONS.push({
 
     /* 八架播撒机，两排四列。
 
+       机体是 GAL-31 的改型：下游能把东西送到 19 公里的只有高峰军工
+       那一型（升限 19 000 m）。原来用的是 ROK-27（升限 15 000 m），
+       摆在 18 900 m 上，AI 的升限段会一直把它往下压 —— 而"降到
+       16 000 以下"恰好就是这一关的投放判据。
+       不带任何弹：它是运货的，special: null。
+
        原来六架挤在 3 km 宽的队形里，玩家一个高速通场就能扫掉一半 ——
        拉成 4 列 × 4.5 km 间距之后，每一次进入只能处理一个窗口。 */
     for (i = 0; i < 8; i++) {
       var sx = (i % 4 - 1.5) * 4500;
       var sz = 15000 + Math.floor(i / 4) * 3000;
       var s = spawnEnemy(w, {
-        x: sx, y: 18900, z: sz,
+        ac: 'gal31',
+        x: sx, y: 18600, z: sz,
         fwd: M3.V(0, 0, -1), speed: 210,
-        special: 'dl6', skill: 0.25,
+        special: null, skill: 0.25,
         behavior: 'recon',
         callsign: downstreamCallsign(9 + i)
       });
       s.recon = true;
       s.model = 'sower';
+      s.name = '「灰烬」级播撒机';
       s.phys = { vMax: 280, vMil: 240, vStall: 150, accel: 8, decel: 20, pitch: 0.30, roll: 1.2, yaw: 0.20, hp: 340 };
       s.maxHp = 340; s.hp = 340;
       s.radius = 22;
@@ -890,7 +934,8 @@ MISSIONS.push({
       x: -9000, y: 11000, z: 21000,
       fwd: M3.V(0, 0, -1), speed: 340,
       special: 'vsc', skill: 0.55,
-      callsign: '焦炬 TORCH'
+      // 呼号是村名（设定 8.7）。原来写的「焦炬 TORCH」是它挂的那台吊舱的名字
+      callsign: '苦井 BITTERWELL'
     });
     jammer.route = {
       phase: 'ingress',
@@ -910,20 +955,22 @@ MISSIONS.push({
 
     /* 四架护航，下游的标准搭配：便宜的负责数量，贵的负责质量。
 
-       两架 GAL-31 守在高处（一架带 ZUN-6 抗锁定吊舱），
-       一架 D-33「信天翁」在正上方做格斗掩护，
-       一架群岛国的「浪花」巡逻机在 12 公里处——它不属于下游，
-       但政变之后那座岛上的旗子已经换过三次了。
+       两架 GAL-31 守在高处（升限 19 000 m，摆在 18–19 km），
+       两架 ROK-27 在 15 公里以下托底（它的升限就是 15 000 m）——
+       其中一架带 SAV-6 抗锁定吊舱。
+       一架群岛国的「浪花」巡逻机在 9 公里处（它的升限是 10 000 m）——
+       它不属于下游，但政变之后那座岛上的旗子已经换过三次了。
 
-       吊舱必须挂在**有 light 或 belly 组**的机型上：ZUN-6 的
-       npcFits 是 ['light','belly']，而 GAL-31 只有重挂与外侧
-       （heavy + light）—— 它挂得上。ROK-27 挂在 B 组外侧。 */
+       每一架的高度都在自己的升限以下：早先 VAC-14（升限 13 000）
+       摆在 19 800、浪花摆在 12 000，进场第一帧就被升限段往下压。
+       吊舱必须挂在**有 light 或 belly 组**的机型上：SAV-6 的
+       npcFits 是 ['light','belly']，ROK-27 挂在 B 组外侧。 */
     var escorts = [
-      { ac: 'vac14', x: -6000, y: 19800, sp: 'vbn', pod: null, sk: 0.58 },
-      { ac: 'gal31', x: 6000, y: 20600, sp: 'dl4', pod: null, sk: 0.64 },
-      { ac: 'm27', x: -3000, y: 19400, sp: 'dl6', pod: ['vzu'], sk: 0.66 },
-      { ac: 'c33', x: 0, y: 20100, sp: 'swm', loadout: { A: 'swm', B: 'v11' }, pod: null, sk: 0.72 },
-      { ac: 'spray', team: 2, x: -9000, y: 12000, sp: 'otr', loadout: { A: 'otr' }, pod: null, sk: 0.30 }
+      { ac: 'gal31', x: -6000, y: 18400, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.62 },
+      { ac: 'gal31', x: 6000, y: 18800, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.66 },
+      { ac: 'm27', x: -3000, y: 14600, sp: 'dl6', pod: ['vzu'], sk: 0.66 },
+      { ac: 'm27', x: 0, y: 14200, sp: 'dl6', loadout: { A: 'dl4', B: 'dl6' }, pod: null, sk: 0.70 },
+      { ac: 'spray', team: 2, x: -9000, y: 9200, sp: 'otr', loadout: { A: 'otr' }, pod: null, sk: 0.30 }
     ];
     for (i = 0; i < escorts.length; i++) {
       var es = escorts[i];
@@ -936,7 +983,7 @@ MISSIONS.push({
            骑在包线外。各型按自己的巡航速度进场更省事也更对。 */
         special: es.sp, loadout: es.loadout || null,
         /* 下游的教条是"先让对手瞎掉，再打"（设定集 5.1）——
-           编队里永远有一架带干扰吊舱。ZUN-6「迷雾」的锁抗让玩家
+           编队里永远有一架带干扰吊舱。SAV-6「迷雾」的锁抗让玩家
            更难锁定带它的那一架：想安静地咬它，就得先处理那台吊舱。 */
         pods: es.pod,
         skill: es.sk, callsign: downstreamCallsign(15 + i)
@@ -985,16 +1032,7 @@ MISSIONS.push({
     if (!w.aceSpawned && sowers <= 4) {
       w.aceSpawned = true;
       w.radio.play('m3', 'aceAppears');
-      var ace = spawnEnemy(w, {
-        x: 500, y: 21000, z: 15000,
-        fwd: M3.V(0, 0, -1), speed: 470,
-        special: 'dl4', skill: 0.96, callsign: '冬港 WINTERPORT'
-      });
-      ace.isAce = true;
-      ace.phys = { vMax: 540, vMil: 430, vStall: 118, accel: 30, decel: 36, pitch: 0.66, roll: 3.2, yaw: 0.30, hp: 165 };
-      ace.maxHp = 165; ace.hp = 165;
-      ace.label = 'WINTERPORT · 冬港';
-      w.ace = ace;
+      spawnWinterport(w, { x: 500, y: 18600, z: 15000, skill: 0.96 });
     }
 
     // 王牌血量过半 → 阶段二台词
@@ -1064,28 +1102,28 @@ MISSIONS.push({
 
   objectives: [
     '摧毁下游水面编队全部舰艇（5 艘）',
-    '摧毁 2 座岸基雷达站',
-    '注意：编队内三型舰艇，BLO-24「房角石」级武库舰是核心目标',
+    '摧毁 2 座雷达浮台',
+    '注意：编队内四型舰艇，BLO-24「房角石」级武库舰是核心目标',
     '海面有 BLO-6「海豚」级护卫舰在己方一侧 —— 不要误击'
   ],
   threats: [
     'BLO-24「房角石」级武库舰（312 个垂发井）',
     'BLO-16「邓氏鱼」级巡洋舰 ×1 / BLO-8「菊石」级 ×2',
     'BLO-2「三叶虫」级导弹快艇（40 节，贴海机动）',
-    'BAD-9「高墙」防空导弹（岸基阵地 ×2，射程 9 km）',
-    'BIN-4「中继」中距拦截（编队防空）'
+    'BAD-9「高墙」舰空弹（邓氏鱼与两条菊石，射程 9 km）',
+    'ROK-27「片岩」×2（BOX-14「坍方」反舰弹）/ VAC-14「砂岩」×1（TUM-7「碎石」）—— 会去打你的船'
   ],
   intel: `海面 <b>6 级</b> · 云底 2600 m · 能见度 18 km<br>
     下游编队航向 <b>090°</b>，航速 14–20 节，正在展开成三列<br>
-    <span class="am">反舰弹 GUT-9「滑翔锤」与 SPO-6「云裂」都要求你进入 8–18 km</span><br>
+    <span class="am">SPO-22「锚」锁定距离 8.6 km、GUT-9「滑翔锤」只有 6 km —— 两种都得进到舰空弹的 9 km 圈里</span><br>
     对方舰空弹的锁定与被照高度有关 —— 贴海进入可以缩短他们的反应时间`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
     { x: 0, z: 8000, type: 'enemy', label: '武库舰 BLO-24' },
     { x: -14000, z: 16000, type: 'enemy', label: '巡洋舰 BLO-16' },
     { x: 14000, z: 16000, type: 'enemy', label: '菊石级 ×2' },
-    { x: -26000, z: 11000, type: 'sam', label: '岸基雷达站' },
-    { x: 26000, z: 11000, type: 'sam', label: '岸基雷达站' },
+    { x: -26000, z: 11000, type: 'sam', label: '雷达浮台' },
+    { x: 26000, z: 11000, type: 'sam', label: '雷达浮台' },
     { x: 0, z: -11000, type: 'base', label: '我方护卫舰' }
   ],
 
@@ -1100,26 +1138,28 @@ MISSIONS.push({
 
     /* 下游水面编队 —— 这一关的目标。
 
-       BLO-24 房角石是核心：312 个垂发井，甲板上最值钱的东西。
-       它在最内层，由巡洋舰与快艇挡在外面 —— 想打它得先穿过一整层防空。 */
+       BLO-24 房角石是核心：312 个垂发井装的是对海齐射，不是防空 ——
+       它自己只有两座近防炮（weapon: null）。防空圈是周围画的：
+       邓氏鱼与两条菊石都带 BAD-9 舰空弹（SHIPS 表的 arms）。
+       想打武库舰，得先穿过它们。 */
     spawnShip(w, {
       model: 'cameroceras', label: '房角石 BLO-24',
       x: 0, z: 16000, hp: 1800,
-      weapon: 'dl9', fireCd: 4
+      weapon: null
     });
     spawnShip(w, {
       model: 'dunkleosteus', label: '邓氏鱼 BLO-16',
-      x: -14000, z: 12000, hp: 900,
+      x: -14000, z: 12000, hp: 900, weapon: 'dl9', fireCd: 4,
       route: { wp: [{ x: -14000, z: 12000 }, { x: -14000, z: 24000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
       model: 'ammonite', label: '菊石 BLO-8 A',
-      x: 13000, z: 13000, hp: 420,
+      x: 13000, z: 13000, hp: 420, weapon: 'dl9',
       route: { wp: [{ x: 13000, z: 13000 }, { x: 24000, z: 6000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
       model: 'ammonite', label: '菊石 BLO-8 B',
-      x: 20000, z: 9000, hp: 420
+      x: 20000, z: 9000, hp: 420, weapon: 'dl9'
     });
     spawnShip(w, {
       model: 'trilobite', label: '三叶虫 BLO-2 A',
@@ -1127,13 +1167,13 @@ MISSIONS.push({
       route: { wp: [{ x: -6000, z: 24000 }, { x: 12000, z: 26000 }], speed: 20, loop: true }
     });
 
-    // 两座岸基雷达站
+    // 两座雷达浮台（这片是纯海域，没有"岸"）
     var radars = [
       { x: -26000, z: 11000 }, { x: 26000, z: 11000 }
     ];
     for (var i = 0; i < radars.length; i++) {
       spawnTarget(w, {
-        ttype: 'ground', model: 'radar', label: '岸基雷达站 ' + (i + 1),
+        ttype: 'ground', model: 'radar', label: '雷达浮台 ' + (i + 1),
         x: radars[i].x, y: 0, z: radars[i].z,
         hp: 220, radius: 10, ground: true, value: 200
       });
@@ -1145,38 +1185,39 @@ MISSIONS.push({
        也会被下游带对地弹的飞机当成目标（ai.js 的面目标判据）。 */
     spawnShip(w, {
       model: 'dolphin', team: 0, label: '海豚 DOLPHIN',
-      x: 0, z: -11000, hp: 600, weapon: null
+      x: 0, z: -11000, hp: 600, weapon: 'ss6', fireCd: 8   // 舰空弹 ×8：自卫级
     });
 
     /* 下游的空中掩护：三架，各带一件真的会去炸海面的东西。
 
-       **反大型目标弹是重挂专属**（SPO-6 / SPO-22 的 fits 只有 heavy），
-       而 DB-11 只有一个重挂点 —— 所以两枚分挂在两架上。
-       贼鸥的内埋弹舱则装得下 GUT-7。
+       全是下游自己的弹：BOX-14「坍方」反舰弹是重挂专属（npcFits 只有
+       heavy），挂在两架 ROK-27 的内侧 A 组；VAC-14 的 A 组挂 TUM-7
+       「碎石」、外侧 B 组挂 BIN-9 自卫。早先这里飞的是上游的 DB-11
+       与贼鸥，挂的也是上游的 SPO-6 / SPO-22。
 
        这一关里"海面上有什么"从此是双向的：你打他们的船，
        他们的飞机打你的船。 */
     spawnEnemy(w, {
-      ac: 'c11', team: 1,
+      ac: 'm27', team: 1,
       x: 8000, y: 6000, z: 22000,
       fwd: M3.V(0, 0, -1), speed: 380,
-      special: 'sat', loadout: { B: 'sat' },
+      special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
       skill: 0.68,
       callsign: downstreamCallsign(21)
     });
     spawnEnemy(w, {
-      ac: 'c11', team: 1,
+      ac: 'm27', team: 1,
       x: 11000, y: 5200, z: 24000,
       fwd: M3.V(0, 0, -1), speed: 380,
-      special: 'v22', loadout: { B: 'v22' },
+      special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
       skill: 0.62,
       callsign: downstreamCallsign(23)
     });
     spawnEnemy(w, {
-      ac: 'c21',
+      ac: 'vac14',
       x: -9000, y: 5500, z: 25000,
-      fwd: M3.V(0, 0, -1), speed: 380,
-      special: 'vgt', loadout: { A: 'vgt' },
+      fwd: M3.V(0, 0, -1), speed: 340,
+      special: 'vgt', loadout: { A: 'vgt', B: 'vbn' },
       skill: 0.64,
       callsign: downstreamCallsign(22)
     });
@@ -1286,14 +1327,15 @@ MISSIONS.push({
     '保护调节场管理局布缆船「准绳」（误击将失去上游信用）'
   ],
   threats: [
-    '对空雷达站 ×3（反辐射弹对它伤害翻倍）',
+    '对空雷达站 ×3',
     'BAD-9「高墙」远程防空阵地 ×2',
-    'GAL-44「磁石」随队干扰机（ZUN-14 压制场）',
-    'ROK-27 / GAL-31 截击编队'
+    'GAL-44「磁石」随队干扰机（SAV-14 压制场）',
+    'ROK-27 / GAL-31 截击编队',
+    'ROK-40「巨砾」×1（防线后方过境，BOX-14 反舰弹）'
   ],
   intel: `云底 <b>1800 m</b> · 能见度 12 km · 低空有碎云<br>
     三座雷达站呈三角布站，覆盖重叠区在中心 —— 那是「准绳」的位置<br>
-    开机中的雷达与干扰机，反辐射弹与红外弹的伤害翻倍<br>
+    SPO-8「追云」打开机中的干扰机伤害 ×2 —— 但它是空空弹，雷达站得用对地弹<br>
     <span class="am">先把干扰机打掉，否则你的雷达光点会一直丢</span>`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
@@ -1337,12 +1379,16 @@ MISSIONS.push({
 
     /* 管理局的布缆船「准绳」—— 中立，不能打，也躲不开。
 
-       team: 0 让它既进不了玩家的锁定循环（cycleTarget 只收 team===1），
-       也不会被下游带对地弹的飞机选中。它只是一个在那儿干活的东西。 */
-    spawnShip(w, {
-      model: 'skori', team: 0, label: '准绳 SKORI',
+       team: 2，与同属管理局的「标杆」一致：管理局是中立方，不是上游。
+       原来写 team: 0，等于把它算成**上游的**船 —— 下游带对面弹的飞机
+       会把它当目标（ai.js 的 nearestSurfaceTarget 只跳过 team > 1）。
+       team 2 退出交战语法：玩家锁不到，AI 不认它。
+       friendlyAsset：玩家误伤要扣分 —— 简报里"误击将失去上游信用"的落点。 */
+    var skori = spawnShip(w, {
+      model: 'skori', team: 2, label: '准绳 SKORI',
       x: -4000, z: 8000, hp: 700, weapon: null
     });
+    skori.friendlyAsset = true;
 
     /* 下游随队干扰机 GAL-44「磁石」。
        沿航线飞进来、开机、掉头走 —— 与轰炸机是同一套 route 机制。 */
@@ -1351,7 +1397,7 @@ MISSIONS.push({
       x: -14000, y: 11000, z: 24000,
       fwd: M3.V(0, 0, -1), speed: 340,
       special: 'vsc', skill: 0.55,
-      callsign: '焦炬 TORCH'
+      callsign: '旱湾 DRYBAY'
     });
     jammer.route = {
       phase: 'ingress',
@@ -1377,24 +1423,39 @@ MISSIONS.push({
         x: -4000 + i * 4000, y: heavy ? 13000 : 7000, z: 26000,
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'dl6',
-        loadout: heavy ? { A: 'dl4', B: 'v11' } : null,
+        loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
         skill: 0.58, callsign: downstreamCallsign(23 + i)
       });
     }
 
-    /* 一架 ROK-40 在防线后方，挂的是 GUT-30「远帆」远程巡航弹。
+    /* 一架 ROK-40 在防线后方过境，翼下重挂点挂两枚 BOX-14「坍方」。
 
-       它不来找你 —— 它来找那张网**外面**的东西：管理局的布缆船、
-       上游的补给船、以及任何在这片海上停留太久的目标。
-       12000 米、0.48 过载、雷达制导 —— 这是下游最远的一件对地武器。 */
+       它不来找你，也不空战（轰炸机不做规避）：沿航线从网的背后
+       横穿过去，目标是网**外面**的上游补给线（不在这张图上），
+       到点之后掉头回南边。它是一个**会自己走掉**的机会目标 ——
+       赶在它离场前打掉，那两枚弹就不会落到补给船上。
+       原来它挂的是上游的 GUT-30，且没有航线，于是被当成战斗机去缠斗。 */
     var cruise = spawnEnemy(w, {
       ac: 'rok40',
-      x: 0, y: 12000, z: 34000,
-      fwd: M3.V(0, 0, -1), speed: 250,
-      special: 'lcm', loadout: { A: 'lcm', B: 'lcm' },
+      x: 12000, y: 12000, z: 34000,
+      fwd: M3.V(-1, 0, 0), speed: 250,
+      special: 'vsr', loadout: { B: 'vsr' },
       skill: 0.4, callsign: downstreamCallsign(24)
     });
     cruise.bigTarget = true;
+    cruise.route = {
+      phase: 'ingress',
+      wp: M3.V(-14000, 0, 18000), alt: 12000, arrive: 2500,
+      exit: M3.V(-20000, 0, 40000), exitAlt: 12000,
+      onArrive: function (a, w2) {
+        if (w2 && w2.radio) {
+          w2.radio.raw({
+            who: 'SEXTANT', cls: 'cmd',
+            tx: '<i>巨砾到了投放点，正在掉头 —— 两枚反舰弹往北边的补给线去了。</i>', gap: 0.9
+          });
+        }
+      }
+    };
 
     /* 调节场管理局自己的高空勤务机 MERLI「水准」。
 
@@ -1408,7 +1469,7 @@ MISSIONS.push({
        弹开火"那种看不见的错误。
        `behavior: 'recon'` 让它在满血时不主动接战（见 ai.js 的开火段）。 */
     spawnEnemy(w, {
-      ac: 'a2', team: 2,
+      ac: 'a2', team: 2, special: null,   // 显式 null：不拿 spawnEnemy 缺省的 dl6
       x: 14000, y: 11000, z: 26000,
       fwd: M3.V(-1, 0, 0), speed: 260,
       skill: 0.30,
@@ -1476,8 +1537,9 @@ MISSIONS.push({
 /* ============================================================
    任务 6 · 第二梯队
 
-   下游把压箱底的那批人放进来了：F-9 高空截击机，
+   下游把压箱底的那批人放进来了：开 GAL-31 的老兵，
    一个在这条高度上飞了半辈子的人才有的编队纪律。
+   （早先这里飞的是上游的 F-9 —— 对面的飞机。）
    ============================================================ */
 MISSIONS.push({
   id: 'm6',
@@ -1493,31 +1555,31 @@ MISSIONS.push({
   prose: `
 <p>下游的第一梯队打光了。第二梯队是另一批人 ——
 他们不抢高度，不在低空缠斗，只是<b>在对你有能量的那层等你</b>。</p>
-<p>F-9「海燕」是为这条高度造的：冲压发动机在高空比在任何地方都好用，
-而它的飞行员平均飞行时数是对手的两倍。他们后面还有一架预警机在调度。</p>
+<p>GAL-31「玄武岩」是为这条高度造的：低空笨得没法看，可它的战场从来不在低空。
+开它的是下游压箱底的那批老兵 —— 在 15 公里以上飞了半辈子的人。
+他们后面还有一架预警机在调度。</p>
 <p><span class="am">在这个高度你没有第二条命：一次失速改出失败，
 就是三分钟的下坠。</span></p>`,
 
   objectives: [
-    '击落 F-9「海燕」截击机 ×4',
+    '击落 GAL-31「玄武岩」老兵编队 ×4',
     '击落 ROK-2「石英」预警机（它会持续分配增援）',
-    '清除护航的 ROK-27 / GAL-31',
+    '清除护航的 ROK-27 ×4',
     '保持能量优势：本空域高度 18 000 m 以上，失控即败'
   ],
   threats: [
-    'F-9「海燕」高空高速截击机 ×4',
+    'GAL-31「玄武岩」重型截击机 ×4（老兵驾驶）',
     'ROK-2「石英」预警机（30 km 搜敌 + 目标分配）',
-    'GAL-31「玄武岩」重型截击机 ×2',
-    'ROK-27「片岩」×2',
-    'SPO-9「落雷」大战斗部拦截弹'
+    'ROK-27「片岩」×4（两架带 SAV-6 抗锁定吊舱）',
+    'DAR-4「砾石」中距弹 / BIN-9「双生」双导引头格斗弹'
   ],
   intel: `高度 <b>18 000 m</b> · 密度 0.12 kg/m³ · 温度 −57 ℃<br>
-    F-9 的升限 <b>21 000 m</b>，比你高一层 —— 别跟它拼爬升<br>
+    GAL-31 的升限 <b>19 000 m</b>，比你高一层 —— 别跟它拼爬升<br>
     预警机在战线后方 35 km，打掉它，增援会晚到或者干脆不来<br>
-    <span class="am">本空域动压只有低空的四成，导弹可用过载同样缩水</span>`,
+    <span class="am">同样的空速，这里的动压只有海平面的十分之一 —— 导弹可用过载同样缩水</span>`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: -3000, z: 20000, type: 'enemy', label: 'F-9 编队' },
+    { x: -3000, z: 20000, type: 'enemy', label: '玄武岩编队' },
     { x: 0, z: 32000, type: 'site', label: '石英 QUARTZ' },
     { x: 6000, z: 24000, type: 'enemy', label: '护航' }
   ],
@@ -1537,36 +1599,36 @@ MISSIONS.push({
     w.wings[2].speed = 480;
     w.wings[3].speed = 480;
 
-    // 四架 F-9，两两一组拉开 8 km
+    /* 四架 GAL-31 老兵，两两一组拉开 6 km。
+
+       高度压在升限（19 000 m）以下：17 800–18 700 m，正好比玩家高一层。
+       GAL-31 的格斗性能比原来的 F-9 差，所以 skill 比原来各高一点 ——
+       这一关难在"人"，与设定一致。 */
     var i;
     for (i = 0; i < 4; i++) {
-      spawnEnemy(w, {
-        ac: 'c9',
-        x: -3000 + (i % 2) * 6000, y: 19000 + Math.floor(i / 2) * 900,
+      var vet = spawnEnemy(w, {
+        ac: 'gal31',
+        x: -3000 + (i % 2) * 6000, y: 17800 + Math.floor(i / 2) * 900,
         z: 22000 + Math.floor(i / 2) * 4000,
         fwd: M3.V(0, 0, -1),
-        special: 'hva',
-        /* v17 是重挂弹（fits: ['heavy']），F-9 的 B 组是 light —— 挂不上。
-           要中距弹就用 BIN-4「中继」（fits: light/heavy/belly）。 */
-        loadout: { A: 'hva', B: 'mrm' },
-        skill: i === 0 ? 0.85 : 0.68,
+        special: 'dl4',
+        loadout: { A: 'dl4', B: 'vbn' },
+        skill: i === 0 ? 0.88 : 0.72,
         callsign: downstreamCallsign(27 + i)
       });
+      vet.veteran = true;
     }
 
-    // 两架 GAL-31 + 两架 ROK-27
+    /* 四架 ROK-27 护航，压在自己的升限（15 000 m）以下。
+       两架带 SAV-6 —— 下游教条是"编队里永远有一架带干扰吊舱"。 */
     for (i = 0; i < 4; i++) {
-      var heavy = (i < 2);
       spawnEnemy(w, {
-        ac: heavy ? 'gal31' : 'm27',
-        x: 3000 + i * 3500, y: heavy ? 16500 : 15000, z: 26000,
+        ac: 'm27',
+        x: 3000 + i * 3500, y: 14200 + (i % 2) * 500, z: 26000,
         fwd: M3.V(0, 0, -1),
-        special: heavy ? 'dl4' : 'dl6',
-        loadout: heavy ? { A: 'dl4', B: 'v11' } : null,
-        /* 吊舱挂在 ROK-27 上，不挂 GAL-31 —— 下游教条是"编队里永远
-           有一架带干扰吊舱"，而两型都挂得上（ZUN-6 的 npcFits 是
-           ['light','belly']）。挂在外侧那架上，被咬的时候更显眼。 */
-        pods: heavy ? null : ['vzu'],
+        special: 'dl6',
+        loadout: (i % 2) ? null : { A: 'dl4', B: 'dl6' },
+        pods: (i % 2) ? ['vzu'] : null,
         skill: 0.6, callsign: downstreamCallsign(31 + i)
       });
     }
@@ -1580,7 +1642,7 @@ MISSIONS.push({
     });
 
     w.objective = '击落下游第二梯队';
-    w.objectiveSub = 'F-9 4 · 护航 4 · 预警机 1';
+    w.objectiveSub = '玄武岩 4 · 护航 4 · 预警机 1';
   },
 
   tick: function (w, dt) {
@@ -1588,9 +1650,9 @@ MISSIONS.push({
     for (i = 0; i < w.actors.length; i++) {
       var a = w.actors[i];
       if (a.team !== 1 || !a.alive) continue;
-      if (a.type === 'c9') f9++; else others++;
+      if (a.veteran) f9++; else others++;
     }
-    w.objectiveSub = 'F-9 ' + f9 + ' · 其余 ' + others;
+    w.objectiveSub = '玄武岩 ' + f9 + ' · 其余 ' + others;
 
     if (!w.flags.contact && w.time > 4) {
       w.flags.contact = true;
@@ -1644,14 +1706,14 @@ MISSIONS.push({
 
   objectives: [
     '摧毁 2 艘 BEI-9「海蝎」级登陆舰',
-    '摧毁 BLO-24「房角石」级巡洋舰（防空圈核心）',
+    '摧毁 BLO-16「邓氏鱼」级巡洋舰（防空圈核心）',
     '压制或击落 GAL-44 干扰机',
     '尽量保持在 1500 m 以下 —— 雷达暴露意味着被锁定'
   ],
   threats: [
-    'BLO-24「房角石」级巡洋舰（96 单元垂发）',
+    'BLO-16「邓氏鱼」级巡洋舰（舰空弹 ×8，编队旗舰）',
     'BEI-9「海蝎」级登陆舰 ×2（武装薄弱、结构脆弱）',
-    'GAL-44「磁石」干扰机（ZUN-14 压制场）',
+    'GAL-44「磁石」干扰机（SAV-14 压制场）',
     'BAD-9 舰空弹（低空进入可缩短反应时间）'
   ],
   intel: `云底 <b>900 m</b> · 云顶 3400 m · 能见度 6 km<br>
@@ -1660,7 +1722,7 @@ MISSIONS.push({
     低云会削弱光电与红外导引 —— 也可以被你利用`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: -2000, z: 12000, type: 'enemy', label: '巡洋舰 BLO-24' },
+    { x: -2000, z: 12000, type: 'enemy', label: '巡洋舰 BLO-16' },
     { x: 8000, z: 16000, type: 'enemy', label: '登陆舰 ×2' },
     { x: -9000, z: 18000, type: 'relay', label: '干扰机' }
   ],
@@ -1674,9 +1736,11 @@ MISSIONS.push({
     spawnWingman(w, 2, -180, 12, -280);
     spawnWingman(w, 3, 180, 12, -280);
 
-    // 巡洋舰在正面画防空圈
+    /* 巡洋舰在正面画防空圈 —— 邓氏鱼（BLO-16），下游唯一的巡洋舰。
+       原来这里放的是房角石（BLO-24），而它是武库舰，不是巡洋舰；
+       "96 单元垂发"则是上游抹香鲸的数字。 */
     spawnShip(w, {
-      model: 'cameroceras', label: '房角石 BLO-24',
+      model: 'dunkleosteus', label: '邓氏鱼 BLO-16',
       x: -2000, z: 12000, hp: 1600,
       route: { wp: [{ x: -2000, z: 12000 }, { x: 6000, z: 14000 }], speed: 13, loop: true },
       weapon: 'dl9', fireCd: 4
@@ -1700,7 +1764,8 @@ MISSIONS.push({
       x: -9000, y: 7000, z: 24000,
       fwd: M3.V(0, 0, -1), speed: 320,
       special: 'vsc', skill: 0.5,
-      callsign: '灰烬 ASH'
+      // 「灰烬」是第 3 关播撒机的级名，不能再拿来当呼号
+      callsign: '碱滩 SALTFLAT'
     });
     jammer.route = {
       phase: 'ingress',
@@ -1772,7 +1837,7 @@ MISSIONS.push({
 /* ============================================================
    任务 8 · 燧石
 
-   敌机第一次真的来炸东西：G-6 攻击机带着 GUT-9 进场。
+   敌机第一次真的来炸东西：VAC-14 攻击机带着 TUM-7 进场。
    玩家在这一关是替海面上的东西挡弹的人。
    ============================================================ */
 MISSIONS.push({
@@ -1789,24 +1854,24 @@ MISSIONS.push({
   prose: `
 <p>下游第 4 战术联队终于等到了他们要的东西：一个能打到上游浮岛的窗口。
 浮岛就是那片海上的机场 —— <b>它被打中一次，调节场上空的巡逻就会断一整班。</b></p>
-<p>他们来的是攻击机群，不是截击机群。G-6「鲣鸟」在低空排成两条线，
+<p>他们来的是攻击机群，不是截击机群。VAC-14「砂岩」在低空排成两条线，
 每条线上都挂着对海弹药；后面跟着两架巨砾轰炸机。</p>
 <p>你的任务是让他们到不了投放线。<span class="am">这一次要挡的是弹，不是飞机。</span></p>`,
 
   objectives: [
-    '击落/驱离全部 G-6「鲣鸟」攻击机（6 架）',
+    '击落全部攻击机（VAC-14「砂岩」×5 + ROK-27「片岩」×1）',
     '击落 2 架 ROK-40「巨砾」轰炸机',
     '保护上游编队：浮岛「座头鲸」、巡洋舰「抹香鲸」、支援舰「蓝鲸」（任意一艘被击沉即失败）',
     '不要飞出编队上空 40 km —— 防空圈之外没人替你挡弹'
   ],
   threats: [
-    'G-6「鲣鸟」攻击机 ×6（挂 GUT-9「滑翔锤」对海弹）',
-    'ROK-40「巨砾」轰炸机 ×2',
+    'VAC-14「砂岩」攻击机 ×5（TUM-7「碎石」对面弹）/ ROK-27 ×1（BOX-14「坍方」反舰弹）',
+    'ROK-40「巨砾」轰炸机 ×2（沿航线进场，在约 9 km 外放 BOX-14）',
     'GAL-31 / VAC-14 护航编队 ×4',
     'ROK-2「石英」预警机（调度攻击窗口）'
   ],
   intel: `上游编队速度 <b>25–30 节</b>，正在北上<br>
-    敌攻击机从低空进入，投放包线约 8–12 km<br>
+    敌攻击机从低空进入，投放包线约 7–9 km<br>
     浮岛的战损已经很高，它不能再挨一次<br>
     <span class="am">攻击机带的是对面弹 —— 它们会优先打船，不会先来找你</span>`,
   map: [
@@ -1814,7 +1879,7 @@ MISSIONS.push({
     { x: 0, z: -6000, type: 'base', label: '座头鲸（浮岛）' },
     { x: -9000, z: -3000, type: 'base', label: '抹香鲸' },
     { x: 9000, z: -3000, type: 'base', label: '蓝鲸' },
-    { x: 0, z: 24000, type: 'enemy', label: '鲣鸟攻击机群' },
+    { x: 0, z: 24000, type: 'enemy', label: '砂岩攻击机群' },
     { x: 6000, z: 30000, type: 'site', label: '石英 QUARTZ' }
   ],
 
@@ -1829,59 +1894,85 @@ MISSIONS.push({
 
     /* 上游编队 —— 这一关必须保护的东西，全部 team: 0。
 
-       三艘都是 `weapon: null`：它们不还击（上游海军在这片海域
-       做的是防空哨的活，而拦截是玩家的事）。 */
+       两条战舰按 SHIPS 表的 arms 带 FAN-6「海墙」舰空弹：抹香鲸 96 单元
+       垂发（fireCd 短），座头鲸有 16 发舰空弹。它们会打来袭的敌机
+       （从不朝玩家打）—— 但攻击机贴海进、放完弹就走，拦截主要还是玩家的事。
+       蓝鲸只有近防炮，不算防空火力（weapon: null）。 */
     var fb = spawnShip(w, {
       model: 'humpback', team: 0, label: '座头鲸 HUMPBACK',
-      x: 0, z: -6000, hp: 2600, weapon: null
+      x: 0, z: -6000, hp: 2600, weapon: 'ss6', fireCd: 8
     });
     w.baseTarget = fb;
     w.baseHpFull = fb.maxHp;
     w.guarded = [];
     w.guarded.push(spawnShip(w, {
       model: 'spermwhale', team: 0, label: '抹香鲸 SPERMWHALE',
-      x: -9000, z: -3000, hp: 1500, weapon: null
+      x: -9000, z: -3000, hp: 1500, weapon: 'ss6', fireCd: 3
     }));
     w.guarded.push(spawnShip(w, {
       model: 'bluewhale', team: 0, label: '蓝鲸 BLUEWHALE',
       x: 9000, z: -3000, hp: 1200, weapon: null
     }));
 
-    /* 六架 G-6 鲣鸟：两条线，每线三架。
+    /* 六架攻击机：两条线，每线三架。五架 VAC-14「砂岩」+ 一架 ROK-27。
 
-       它们带的是 GUT-9「滑翔锤」—— 一种有制导头的对海弹，
-       AI 会自己去找海面目标。这就是这一关第一次出现的机制：
-       **敌机会真的去炸船**。 */
+       VAC-14 内侧 A 组挂 TUM-7「碎石」（下游通用对面弹，有导引头），
+       外侧 B 组挂 BIN-9 自卫。AI 会自己去找海面目标 —— 这就是这一关
+       第一次出现的机制：**敌机会真的去炸船**。
+       最后一架换成 ROK-27，A 组挂 BOX-14「坍方」反舰弹 —— 打大型目标的
+       那一发，重挂专属。早先这六架是上游的 G-6，挂的是上游的 GUT-9 / GUT-12。 */
     var i;
     for (i = 0; i < 6; i++) {
       var lane = Math.floor(i / 3);
-      /* 最后一架挂的是 GUT-12「重锤-B」—— 加固目标侵彻弹。
-         它比 GUT-9 重、装药更深，是整队里唯一带得动它的那一架
-         （asl2 的 fits 是 heavy/belly，need strike）。 */
       var isSledge = (i === 5);
-      spawnEnemy(w, {
-        ac: 's6',
+      var st = spawnEnemy(w, {
+        ac: isSledge ? 'm27' : 'vac14',
         x: (i % 3 - 1) * 3500 + (lane ? 1500 : -1500),
         y: lane ? 3000 : 2600,
         z: 22000 + lane * 3000,
         fwd: M3.V(0, 0, -1),
-        special: isSledge ? 'asl2' : 'asl',
-        loadout: { A: isSledge ? 'asl2' : 'asl', B: 'asl' },
+        special: isSledge ? 'vsr' : 'vgt',
+        loadout: isSledge ? { A: 'vsr', B: 'dl6' } : { A: 'vgt', B: 'vbn' },
         skill: 0.6, callsign: downstreamCallsign(40 + i)
       });
+      st.striker = true;
     }
 
-    // 两架 ROK-40 轰炸机：它们沿航线飞，目标是浮岛
+    /* 两架 ROK-40 轰炸机：沿航线飞，目标是编队。
+
+       轰炸机不空战、不规避（ai.js 的 updateRoute），所以走 route：
+       低空进到编队北面约 9 km 的投放点，各放一枚 BOX-14「坍方」，
+       然后掉头。投放由 onArrive 直接调 fireMissile —— 航线单位不走
+       空战 AI 的开火段。原来它们没有航线、挂的是上游的 GUT-30，
+       于是两架四发轰炸机在跟战斗机缠斗。 */
+    function bomberRelease(a, w2) {
+      var best = null, bd = 1e12;
+      for (var bi = 0; bi < w2.targets.length; bi++) {
+        var bt = w2.targets[bi];
+        if (!bt.alive || bt.team !== 0) continue;
+        var d2 = M3.dist2(bt.pos, a.pos);
+        if (d2 < bd) { bd = d2; best = bt; }
+      }
+      if (!best || !w2.fireMissile) return;
+      Ent.setWeapon(a, 'vsr');
+      if (a.spAmmo > 0) w2.fireMissile(a, best);
+    }
     for (i = 0; i < 2; i++) {
       var bmb = spawnEnemy(w, {
         ac: 'rok40',
         x: (i - 0.5) * 5000, y: 5000, z: 26000,
         fwd: M3.V(0, 0, -1), speed: 250,
-        special: 'lcm', loadout: { A: 'lcm', B: 'lcm' },
+        special: 'vsr', loadout: { B: 'vsr' },
         skill: 0.3,
         callsign: downstreamCallsign(46 + i)
       });
       bmb.bigTarget = true;
+      bmb.route = {
+        phase: 'ingress',
+        wp: M3.V((i - 0.5) * 6000, 0, 4500), alt: 4500, arrive: 1500,
+        exit: M3.V((i - 0.5) * 16000, 0, 34000), exitAlt: 6000,
+        onArrive: bomberRelease
+      };
     }
 
     // 四架护航
@@ -1892,7 +1983,7 @@ MISSIONS.push({
         x: -9000 + i * 6000, y: heavy ? 9000 : 4000, z: 28000,
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'vbn',
-        loadout: heavy ? { A: 'dl4', B: 'v11' } : null,
+        loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
         skill: 0.62, callsign: downstreamCallsign(48 + i)
       });
     }
@@ -1913,7 +2004,7 @@ MISSIONS.push({
     for (i = 0; i < w.actors.length; i++) {
       var a = w.actors[i];
       if (a.team !== 1 || !a.alive) continue;
-      if (a.type === 's6') attackers++;
+      if (a.striker) attackers++;
       else if (a.type === 'rok40') bombers++;
     }
     var fl = 0;
@@ -1971,7 +2062,8 @@ MISSIONS.push({
    任务 9 · 登陆窗口
 
    第一次给出"时限"：下游的两栖船团正在横渡海峡。
-   三小时内不打断它，岛上就会多出一个他们不需要谈判的据点。
+   掩护火网五分钟后展开（timeLimit 300 秒）；在那之前不打断它，
+   岛上就会多出一个他们不需要谈判的据点。
    ============================================================ */
 MISSIONS.push({
   id: 'm9',
@@ -2003,7 +2095,8 @@ MISSIONS.push({
     'BEI-9「海蝎」级登陆舰 ×3（目标）',
     'BLO-8「菊石」级巡逻护卫舰 ×2',
     'BLO-2「三叶虫」级导弹快艇 ×4',
-    'D-21「贼鸥」战斗机 ×2（在船团上空掩护）',
+    'ROK-27「片岩」×2（一架带 SAV-6 吊舱，一架挂 BOX-14 反舰弹）',
+    'VAC-14「砂岩」攻击机 ×1（低空压着船团头顶）',
     '时限 300 秒'
   ],
   intel: `海峡宽 <b>40 km</b> · 海况 3 级 · 能见度 20 km<br>
@@ -2071,36 +2164,36 @@ MISSIONS.push({
       });
     }
 
-    /* 两架贼鸥在船团上空掩护。
+    /* 两架 ROK-27 在船团上空掩护。
 
-       一架挂格斗弹（掩护），一架挂 SPO-14「坍方」反舰弹 ——
-       它们不只是来护航的，也会去打你的东西。SPO-14 是**下游的反舰弹**，
-       npcFits 是 ['heavy']，所以它挂在 gal31 的重挂点上（贼鸥挂不了）。 */
+       一架挂格斗弹 + SAV-6 吊舱（掩护），一架挂 BOX-14「坍方」反舰弹 ——
+       它们不只是来护航的，也会去打你的东西。BOX-14 的 npcFits 是
+       ['heavy']，挂在 ROK-27 的内侧 A 组。反舰弹归多用途机，
+       不归 GAL-31 那种截击机（早先挂在 GAL-31 上）。 */
     spawnEnemy(w, {
-      ac: 'c21',
+      ac: 'm27',
       x: -2000, y: 8000, z: 20000,
       fwd: M3.V(0, 0, -1),
-      special: 'srm', loadout: { B: 'srm' },
+      special: 'dl6', loadout: { A: 'dl6' },
       pods: ['vzu'],
       skill: 0.7, callsign: downstreamCallsign(52)
     });
     spawnEnemy(w, {
-      ac: 'gal31',
+      ac: 'm27',
       x: 3000, y: 8500, z: 22000,
       fwd: M3.V(0, 0, -1),
-      special: 'vsr', loadout: { A: 'vsr', B: 'v11' },
+      special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
       skill: 0.72, callsign: downstreamCallsign(53)
     });
 
-    /* 一架 G-6「鲣鸟」在低空压着登陆船团的头顶。
-
-       它挂的是 PEJ-30「铁蒺藜」—— 集束弹，光电制导（fits: heavy/belly，
-       所以挂在重挂点 A 上；B/C 是 light，挂不了它）。 */
+    /* 一架 VAC-14「砂岩」在低空压着登陆船团的头顶。
+       A 组挂 TUM-7「碎石」对面弹，B 组挂 BIN-9 自卫。
+       （早先是上游的 G-6 挂上游的 PEJ-30。） */
     spawnEnemy(w, {
-      ac: 's6',
+      ac: 'vac14',
       x: 6000, y: 2800, z: 26000,
       fwd: M3.V(0, 0, -1),
-      special: 'v30', loadout: { A: 'v30', B: 'asl' },
+      special: 'vgt', loadout: { A: 'vgt', B: 'vbn' },
       skill: 0.62, callsign: downstreamCallsign(54)
     });
 
@@ -2180,7 +2273,7 @@ MISSIONS.push({
 指挥链摘掉：预警机、舰上指挥所、以及那个把它们连起来的人。</p>
 <p>他们也很清楚这一点。所以指挥所不在后方 ——
 它在这一片空域的正中间，被两层护航包着，
-而上面那架「信天翁」的飞行员已经在这条高度上飞了半辈子。</p>
+而上面那架「玄武岩」的飞行员已经在这条高度上飞了半辈子。</p>
 <p><b>他的呼号是冬港。</b>下游有四千多个消失的村庄被刻在石碑上，
 而冬港不在上面 —— 那是一座<b>还在用</b>的镇子。
 <span class="am">上游情报花了三周才想明白这件事意味着什么：
@@ -2188,24 +2281,24 @@ MISSIONS.push({
 
   objectives: [
     '击落 ROK-2「石英」预警机',
-    '摧毁 BLO-24「房角石」级指挥舰',
-    '击落 D-33「信天翁」—— 呼号「冬港」',
+    '摧毁 BLO-16「邓氏鱼」级巡洋舰（下游编队旗舰、舰上指挥所）',
+    '击落 GAL-31「玄武岩」—— 呼号「冬港」',
     '清除 ROK-27 / GAL-31 护航编队'
   ],
   threats: [
-    'D-33「信天翁」×1（冬港本人，skill 极高）',
+    'GAL-31「玄武岩」×1（冬港本人，skill 极高）',
     'ROK-2「石英」预警机',
-    'BLO-24「房角石」级指挥舰（96 单元垂发，在正中央）',
+    'BLO-16「邓氏鱼」级旗舰（舰空弹只够自保，在正中央）',
     'GAL-31 / ROK-27 双层护航 ×6',
-    'SPO-9「落雷」与 BIN-8「追云」重型拦截弹'
+    'DAR-4「砾石」中距弹 / BIN-9「双生」双导引头格斗弹'
   ],
-  intel: `高度 <b>17 000 m</b> · 密度 0.13 kg/m³ · 温度 −57 ℃<br>
+  intel: `高度 <b>17 000 m</b> · 密度 0.14 kg/m³ · 温度 −57 ℃<br>
     指挥舰在编队正中央 —— 想打它得先穿过两层护航<br>
     预警机在 30 km 外，它每 40 秒给下游分配一次目标<br>
-    <span class="am">冬港的 D-33 在 19 500 m，比你的起步高度高一层</span>`,
+    <span class="am">冬港的 GAL-31 在 18 600 m，比你的起步高度高一层</span>`,
   map: [
     { x: 0, z: 0, type: 'base', label: '进入点' },
-    { x: 0, z: 18000, type: 'enemy', label: '指挥舰 BLO-24' },
+    { x: 0, z: 18000, type: 'enemy', label: '旗舰 BLO-16' },
     { x: -12000, z: 14000, type: 'enemy', label: '护航' },
     { x: 12000, z: 14000, type: 'enemy', label: '护航' },
     { x: 0, z: 34000, type: 'site', label: '石英 QUARTZ' }
@@ -2224,11 +2317,14 @@ MISSIONS.push({
     w.wings[2].pos.y = 17000;
     w.wings[3].pos.y = 17000;
 
-    /* 指挥舰：不带防空武器（它的防空靠护航与预警机），
-       所以它是一个"必须在护航被撕开之后才能碰到"的目标。 */
+    /* 指挥舰：邓氏鱼（BLO-16），下游分水编队的旗舰（SHIPS 表的 role）。
+       它带 8 发 BAD-9 舰空弹 —— 只够自保，够不到一万七千米的你；
+       真正的防空靠护航与预警机，所以它是一个"必须在护航被撕开、
+       自己降下来之后才能碰到"的目标。
+       早先这里写的是房角石（BLO-24，武库舰）。 */
     spawnShip(w, {
-      model: 'cameroceras', label: '指挥舰 BLO-24',
-      x: 0, z: 18000, hp: 2000, weapon: null
+      model: 'dunkleosteus', label: '邓氏鱼 BLO-16',
+      x: 0, z: 18000, hp: 2000, weapon: 'dl9', fireCd: 5
     });
 
     // 两层护航
@@ -2243,7 +2339,7 @@ MISSIONS.push({
         z: 14000 + (i % 3) * 2500,
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'dl6',
-        loadout: heavy ? { A: 'arm', B: 'v11' } : null,
+        loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
         pods: heavy ? null : ['vzu'],
         skill: 0.68 + (i > 3 ? 0.08 : 0),
         callsign: downstreamCallsign(56 + i)
@@ -2257,22 +2353,10 @@ MISSIONS.push({
       a: M3.V(8000, 0, 34000), b: M3.V(-8000, 0, 37000)
     });
 
-    /* 冬港。D-33「信天翁」，起始高度比玩家高一层。
-
-       它用的是玩家可飞的机型 —— 这一关的对手不是"一架更强的飞机"，
-       而是一个更会用它的人。skill 0.98 意味着它几乎不犯决策错误。 */
-    var ace = spawnEnemy(w, {
-      ac: 'c33',
-      x: 2000, y: 19500, z: 26000,
-      fwd: M3.V(0, 0, -1), speed: 470,
-      special: 'swm', loadout: { A: 'swm', B: 'v11' },
-      skill: 0.98,
-      callsign: '冬港 WINTERPORT'
-    });
-    ace.isAce = true;
-    ace.label = 'WINTERPORT · 冬港';
-    ace.bigTarget = true;
-    w.ace = ace;
+    /* 冬港。与第 3 关同一架 GAL-31（见 spawnWinterport），
+       起始高度比玩家高一层、压在升限以下。
+       skill 0.98 意味着他几乎不犯决策错误。 */
+    spawnWinterport(w, { x: 2000, y: 18600, z: 26000, skill: 0.98 });
 
     w.objective = '斩断下游指挥链';
     w.objectiveSub = '预警机 1 · 指挥舰 1 · 冬港';
@@ -2288,7 +2372,7 @@ MISSIONS.push({
     }
     for (i = 0; i < w.targets.length; i++) {
       var t = w.targets[i];
-      if (t.alive && t.team === 1 && t.model === 'cameroceras') ships++;
+      if (t.alive && t.team === 1 && t.model === 'dunkleosteus') ships++;
     }
     w.objectiveSub = '预警机 ' + aews + ' · 指挥舰 ' + ships +
       ' · 护航 ' + escorts + ' · 冬港 ' + (w.ace && w.ace.alive ? '在空' : '已落');
@@ -2328,7 +2412,7 @@ MISSIONS.push({
     }
     for (i = 0; i < w.targets.length; i++) {
       var t = w.targets[i];
-      if (t.alive && t.team === 1 && t.model === 'cameroceras') return false;
+      if (t.alive && t.team === 1 && t.model === 'dunkleosteus') return false;
     }
     return true;
   },
@@ -2344,6 +2428,13 @@ MISSIONS.push({
    随机在 spawn() 里**一次做完**，tick() 只读队列 —— 逐帧掷骰
    会让目标数抖动，也会让冒烟测试不可复现。
    ============================================================ */
+/* 第四周的下游机型 → 制式挂载（全是下游弹） */
+var SK_FITS = {
+  m27:   { sp: 'dl6', lo: { A: 'dl4', B: 'dl6' } },
+  gal31: { sp: 'dl4', lo: { A: 'dl4', B: 'vbn' } },
+  vac14: { sp: 'vbn', lo: { A: 'vbn', B: 'vbn' } }
+};
+
 MISSIONS.push({
   id: 'sk1',
   no: 'SKIRMISH',
@@ -2359,7 +2450,7 @@ MISSIONS.push({
 <p>停火没有条约，只有一个说法：<b>第四周</b>。
 意思是"又一周过去了，谁都没承认自己还在打"。</p>
 <p>双方默认不再往海盆中央派侦察机，也从不宣布那里中立。
-于是每个还剩油的中队都往那儿派单机巡逻 —— 谁都不承认自己在找谁。</p>
+于是每个还剩油的中队都往那儿派小编队巡逻 —— 谁都不承认自己在找谁。</p>
 <p>两边的飞机在同一段航路上相遇，谁先转到对方尾后谁就先开火。
 打完各回各的甲板，<b>第二天再飞</b>。</p>
 <p><span class="am">这里的每一场遭遇战都不会出现在战报里。
@@ -2373,8 +2464,8 @@ MISSIONS.push({
   ],
   threats: [
     '未知机型与未知数量（每个批次独立随机）',
-    '上游与下游的单机巡逻队 —— 以及分水群岛国的不明回波',
-    '本空域没有预警机支援，也没有地面引导'
+    '下游的巡逻编队 —— 以及一架不参与交战的分水群岛国巡逻机',
+    '本空域没有地面引导；SEXTANT 只在 30 km 外看着，不指挥'
   ],
   intel: `空域编号 <b>未分配</b> · 云底 2800 m · 能见度 22 km<br>
     敌机从四个方向进入，批次之间间隔约 40 秒<br>
@@ -2403,12 +2494,24 @@ MISSIONS.push({
       a: M3.V(9000, 0, -30000), b: M3.V(-9000, 0, -25000)
     });
 
+    /* 群岛国的一架「潮线」在海面附近游荡 —— 背景，team 2。
+       早先它被放进敌方机型池（team 1），于是"不明回波"成了下游的僚机。 */
+    spawnEnemy(w, {
+      ac: 'k8', team: 2,
+      x: -9000, y: 3800, z: 9000,
+      fwd: M3.V(1, 0, 0), speed: 240,
+      special: 'otr', skill: 0.30,
+      behavior: 'recon'
+    });
+
     /* 六个批次，一次性掷骰。
 
-       机型池只放**战机**：随机遭遇说的是两个中队的单机巡逻，
-       不该出现舰船或地面设施。数量随批次递增（2→6），
-       技能与高度也随机 —— 每次进来的敌情都不一样。 */
-    var pool = ['m27', 'gal31', 'vac14', 'c9', 'c21', 'c33', 'k8'];
+       机型池只放**下游战机**（team 1 就是下游）：早先池里混着上游的
+       F-9 / D-21 / D-33 和群岛国的潮线 —— 这里的敌人是下游的巡逻队。
+       ROK-27 写两次：它是下游的主力，出现得最多。
+       每型配自己的制式弹（SK_FITS），不再一律 dl6。
+       数量随批次递增（2→6），技能与高度也随机。 */
+    var pool = ['m27', 'm27', 'gal31', 'vac14'];
     var queue = [];
     for (var b = 0; b < 6; b++) {
       var n = 2 + Math.floor(b * 0.8);            // 2,2,3,4,5,6
@@ -2477,7 +2580,7 @@ MISSIONS.push({
           ac: e.ac,
           x: px, y: e.alt, z: pz,
           fwd: fwd, speed: M3.rnd(280, 380),
-          special: 'dl6',
+          special: SK_FITS[e.ac].sp, loadout: SK_FITS[e.ac].lo,
           skill: e.skill,
           callsign: downstreamCallsign(60 + w.skBatch * 8 + i)
         });
