@@ -260,12 +260,12 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
   ```js
   if (thrIn)                       player.throttle += thrIn * dt * 0.62;
   else if (player.throttle > 1.0)  player.throttle = max(1.0,  throttle - dt*1.6);
-  else if (player.throttle < 0.04) player.throttle = min(0.04, throttle + dt*1.6);
+  else if (player.throttle < THR_IDLE) player.throttle = min(THR_IDLE, throttle + dt*1.6);   // THR_IDLE = 0.04
   if (keys.KeyX) player.throttle = THR_MAX;
   if (keys.KeyZ) player.throttle = 0;
   ```
 
-  加力（`> 1.0`）与减速板（`< 0.04`）都是**按住才有效的瞬时态**：松手后自动回落到军推区间的边界，回落速率 `dt * 1.6` 比推进的 `0.62` 快、又不是瞬间弹回。这正是 [hud.md](hud.md#引擎出力带thrtape) 警告“别拿它们当稳定读数去测”的原因。`player.ab = throttle > 1.0`、`player.brake = throttle < 0.04`。
+  加力（`> 1.0`）与减速板（`< THR_IDLE`，0.04）都是**按住才有效的瞬时态**：松手后自动回落到军推区间的边界，回落速率 `dt * 1.6` 比推进的 `0.62` 快、又不是瞬间弹回。这正是 [hud.md](hud.md#引擎出力带thrtape) 警告“别拿它们当稳定读数去测”的原因。`player.ab = throttle > 1.0`、`player.brake = throttle < THR_IDLE`。HUD 读数按慢车 0% / 军推 100% 标度，见 [hud.md](hud.md#引擎出力带thrtape)。
 - 高 G 机动（`G`）：只有 `demand = |pitch| + |roll| > 0.55` 且 `speed > vStall * 1.30` 才生效 —— 否则它就成了一个无脑常开的加速器。生效时 `gLoad` 用 `M3.smooth(..., HIG_MAX, 9, dt)` 拉起；速度代价由 `stepAircraft` 的转弯掉速自然产生（角速度放大约 1.9 倍，掉速随之放大）；松手用 `M3.smooth(..., 1, 6, dt)` 落回。
 - 机炮：`wantGun = mouse.left || keys.Space` → `Ent.fireGun`，`SFX.gun(wantGun && player.gunAmmo > 0)`（有按键没弹时不出声）。
 
@@ -314,23 +314,20 @@ fy2 = clamp(camDir.y, -SIN_LIM, SIN_LIM);
 // 急转时视线先甩、速度没跟上，这个分量一秒内 290 → −110 → 200，镜头前后伸缩
 camSpeedBack += (clamp(p.speed / 7.5, 0, 90) - camSpeedBack) * (1 - exp(-1.5 * dt));
 back = S.camDist + camSpeedBack;
-// 急转时视线先甩、速度没跟上，这个分量一秒内 290 → −110 → 200，镜头前后伸缩
-camSpeedBack += (clamp(p.speed / 7.5, 0, 90) - camSpeedBack) * (1 - exp(-1.5 * dt));
-back = S.camDist + camSpeedBack;
-camOff = smoothOffset(camOff, wantOff, 1 - Math.exp(-7.5 * dt));  // 方向 slerp + 长度单独插值（lerpV 走弦会把镜头拉近）
+off0 = M3.rotAxis(camDir * -back, (0,1,0), camYaw);
 wantOff = off0 + (0, S.camHeight + camPitch * 70, 0);
 wantOff -= camDir * frameDeficit(wantOff, camDir, fr);       // 静态底座
 camOff = smoothOffset(camOff, wantOff, 1 - Math.exp(-7.5 * dt));  // 方向 slerp + 长度单独插值（lerpV 走弦会把镜头拉近）
 viewOff = 按 S.camFrame 处理 camOff;                          // 只影响本帧，不写回
 Renderer.setCamera(p.pos + viewOff, camDir, (0,1,0), S.fov);
 ```
+
+世界坐标这一点是“稳定”的另一半：**滚转时镜头不会绕着飞机转圈**。
+
 #### 出画处理（`S.camFrame`）
 
 > **目前只开放 0 静态拉远**：设置里的选项已隐藏，`loadSettings` 强制 `camFrame = 0`。
 > 1 / 2 两种的代码与测试保留，要放出来时把 `SET_GROUPS` 里注释掉的那项加回来、去掉强制归零即可。
-世界坐标这一点是“稳定”的另一半：**滚转时镜头不会绕着飞机转圈**。
-
-#### 出画处理（`S.camFrame`，设置 → 视角 → 出画处理）
 飞机在镜头系里的位置是 `−off`：深度 `f`、竖直 `u`、水平 `r`；`u / (f·tan半视场)` 就是画面归一化纵坐标（±1 = 边缘）。
 
 - **静态底座（三种模式共用）**：`frameDeficit` 用**目标偏移** `wantOff` 算飞机要落进画面 `FRAME_FILL = 0.7` 以内、深度不小于 6 m 还得再退多少，并进 `wantOff`。设定本身放不下（距离 2、高度 10、FOV 38）时自动拉开，设定不变这段距离就不变。
@@ -488,8 +485,8 @@ var queue = [], timer = 0, box = null, live = [];
 | 想改什么 | 在哪 |
 |---|---|
 | `dt` 上限 / 异常兜底 | `loop()` 里的 `0.05` / `0.016` |
-| 油门量程上限 | `THR_MAX = 1.25` |
-| 油门推进 / 回落 / 加力与减速板阈值 | `controlPlayer()` 里的 `0.62` / `dt * 1.6` / `1.0` / `0.04` |
+| 油门量程上限 / 减速板阈值（慢车） | `THR_MAX = 1.25` / `THR_IDLE = 0.04` |
+| 油门推进 / 回落 / 加力阈值 | `controlPlayer()` 里的 `0.62` / `dt * 1.6` / `1.0` |
 | 高 G 倍率 | `HIG_MAX = 1.90`（掉速见 `entities.js` 的 `TURN_BLEED`） |
 | 高 G 触发门槛 | `controlPlayer()` 里的 `demand > 0.55`、`vStall * 1.30` |
 | 相机俯仰限位 | `updateCamera()` 里的 `CAM_PITCH_LIM = 89°` |

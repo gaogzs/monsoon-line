@@ -374,11 +374,29 @@ var HUD = (function () {
     text(ctx, label, x, top - 10, DIM, FS, 'center');
   }
 
-  /* 引擎出力带 —— 军推 = 100%，加力超出到 125%（油门轴上限 1.25）。
+  /* 油门轴 → THR 读数（%）。三段各自线性：
+       减速板  油门 0 → THR_IDLE   读数 −25 → 0（青）
+       军推    THR_IDLE → 1        读数 0 → 100
+       加力    1 → THR_MAX         读数 100 → 125（琥珀）
+     以前读数直接是"油门杆 × 100"，慢车停在 4%，看起来像还剩 4% 推力 ——
+     其实飞行模型里没有推力，油门只决定一个目标速度，4% 就是慢车。
+     减速板在物理上是开 / 关两态（油门低于 THR_IDLE 就全开），负数段只表示
+     杆位，−5% 和 −25% 的减速效果一样。
+     两个分界点必须与 game.js 的 THR_IDLE / THR_MAX 一致（smoke 有断言）。 */
+  var THR_IDLE = 0.04, THR_MAX = 1.25;
+  var THR_PCT_LO = -25, THR_PCT_HI = 125;
+  function thrPercent(thr) {
+    thr = M3.clamp(thr, 0, THR_MAX);
+    if (thr < THR_IDLE) return THR_PCT_LO * (THR_IDLE - thr) / THR_IDLE;
+    if (thr <= 1) return (thr - THR_IDLE) / (1 - THR_IDLE) * 100;
+    return 100 + (thr - 1) / (THR_MAX - 1) * (THR_PCT_HI - 100);
+  }
 
-     为什么是 125%：本作各机加力把最高速度抬高约 25%（vMax / vMil ≈ 1.24–1.29），
-     油门轴的加力段也正好是 1.0 → 1.25。读数直接就是"油门杆 × 100"，
-     不用换算；军推在 100% 这一点上，"有没有开加力"一眼就能看出。
+  /* 引擎出力带 —— 慢车 = 0%，军推 = 100%，加力超出到 125%，减速板往下到 −25%。
+
+     为什么加力到 125%：本作各机加力把最高速度抬高约 25%（vMax / vMil ≈ 1.24–1.29），
+     油门轴的加力段也正好是 1.0 → 1.25。军推在 100% 这一点上，
+     "有没有开加力"一眼就能看出；慢车在 0%，"有没有张减速板"也一样。
 
      为什么不用上面那个 tape()：tape 是**滚动带**，指针永远钉在中心，
      它读得出"数值是多少"，读不出"现在在不在加力区、还剩多少余量"。
@@ -394,36 +412,40 @@ var HUD = (function () {
      注意它显示的是**油门杆位置**，不是速度，也不是推力 —— 三者都不同。 */
   function thrTape(ctx, x, top, hgt, thr, ab, brake) {
     var y0 = top + hgt;
-    var pct = M3.clamp(thr, 0, 1.25) * 100;   // 1.25 = game.js 的 THR_MAX
-    var k = pct / 125;                         // 带子满量程 = 125%
+    var pct = thrPercent(thr);
+    var span = THR_PCT_HI - THR_PCT_LO;
+    var yOf = function (v) { return y0 - (v - THR_PCT_LO) / span * hgt; };
     var col = brake ? CY : (ab ? AMBER : GREEN);
-    var yMil = y0 - hgt * (100 / 125);
+    var yMil = yOf(100), yIdle = yOf(0);
 
-    // 加力区（100%–125%）底色
+    // 加力区（100%–125%）、减速板区（−25%–0%）底色
     ctx.fillStyle = 'rgba(255,176,58,0.10)';
     ctx.fillRect(x - 5, top, 10, yMil - top);
+    ctx.fillStyle = 'rgba(69,214,255,0.10)';                 // = CY
+    ctx.fillRect(x - 5, yIdle, 10, y0 - yIdle);
 
     ctx.strokeStyle = DIM; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, y0); ctx.stroke();
 
-    // 刻度：每 10% 短刻，每 25% 长刻并标数字（0 / 25 / 50 / 75 / 100 / 125）
-    for (var v = 0; v <= 125; v += 5) {
+    // 刻度：每 10% 短刻，每 25% 长刻并标数字（−25 / 0 / 25 / 50 / 75 / 100 / 125）
+    for (var v = THR_PCT_LO; v <= THR_PCT_HI; v += 5) {
       var isMaj = (v % 25 === 0);
       if (!isMaj && v % 10 !== 0) continue;
-      var y = y0 - (v / 125) * hgt;
+      var y = yOf(v);
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x - (isMaj ? 14 : 7), y);
       ctx.stroke();
-      if (isMaj) text(ctx, String(v), x - 18, y + 4, v > 100 ? AMBER : DIM, FS, 'right');
+      if (isMaj) text(ctx, String(v), x - 18, y + 4, v > 100 ? AMBER : (v < 0 ? CY : DIM), FS, 'right');
     }
 
-    // 军推上限（100%）
+    // 军推上限（100%）与慢车（0%）
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.fillRect(x - 8, yMil, 16, 1.5);
+    ctx.fillRect(x - 8, yIdle, 16, 1.5);
 
-    // 指针：当前出力
-    var py = y0 - k * hgt;
+    // 指针：当前油门
+    var py = yOf(pct);
     ctx.fillStyle = col;
     ctx.beginPath();
     ctx.moveTo(x, py); ctx.lineTo(x + 13, py - 7); ctx.lineTo(x + 13, py + 7);
@@ -1740,6 +1762,7 @@ var HUD = (function () {
     draw: draw, banner: banner, hitMark: hitMark,
     computeNEZ: computeNEZ, computeEnvelope: computeEnvelope, radarXY: radarXY,
     offscreenRect: offscreenRect, drawAlerts: drawAlerts, ALERT_ORDER: ALERT_ORDER,
+    thrPercent: thrPercent, THR_IDLE: THR_IDLE, THR_MAX: THR_MAX,
     GREEN: GREEN, AMBER: AMBER, CY: CY, RED: RED
   };
 })();
