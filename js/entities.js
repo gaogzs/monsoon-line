@@ -1620,6 +1620,7 @@ var Ent = (function () {
     var n = Math.max(1, Math.round(rps * 0.033));
     if (n > a.gunAmmo) n = a.gunAmmo;
     a.gunAmmo -= n;
+    if (a.isPlayer && world) world.gunRounds = (world.gunRounds || 0) + n;
 
     /* 子弹寿命由**射程**算出，而不是写死 2.2 秒。
 

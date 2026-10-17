@@ -1157,7 +1157,7 @@ var Game = (function () {
       flags: {},
       objective: '', objectiveSub: '',
       roeBlocked: false, detected: false,
-      killed: 0, hitsLanded: 0, shotsFired: 0,
+      killed: 0, hitsLanded: 0, shotsFired: 0, gunRounds: 0, gunHits: 0,
       /* 友军的击落单独记：进战报，但不进综合评定（见 finish）。
          killed 只数玩家自己的。 */
       wingKilled: 0, shipKilled: 0,
@@ -2303,7 +2303,10 @@ var Game = (function () {
         var t = M3.raySphere(prev, dir, a.pos, 7.5);
         if (t >= 0 && t <= segLen) {
           b.alive = false;
-          if (b.owner && b.owner.isPlayer) world.hitsLanded++;
+          if (b.owner && b.owner.isPlayer) {
+            world.hitsLanded++;
+            if (b.kind === 'bullet') world.gunHits++;
+          }
           Ent.damage(a, b.dmg, world, b.owner);
           Ent.spawnParticle(world.particles, b.pos, M3.V(0, 0, 0), 0.22, 1.4, '#ffdd88', { grow: true });
           SFX.hit();
@@ -2319,7 +2322,10 @@ var Game = (function () {
         var r = tg.radius || 8;
         var t2 = M3.raySphere(prev, dir, tg.pos, r);
         if (t2 >= 0 && t2 <= segLen) {
-          if (b.owner && b.owner.isPlayer) world.hitsLanded++;
+          if (b.owner && b.owner.isPlayer) {
+            world.hitsLanded++;
+            if (b.kind === 'bullet') world.gunHits++;
+          }
           /* 子母弹撞上设施 = 就地抛撒，按覆盖半径结算一片（Ent.clusterBurst）。 */
           if (b.w && b.w.cluster) {
             b.pos = M3.add(prev, M3.mul(dir, t2));
@@ -3098,7 +3104,10 @@ var Game = (function () {
     state = 'debrief';
     SFX[win ? 'fanfare' : 'fail']();
 
-    var acc = world.shotsFired > 0 ? world.hitsLanded / world.shotsFired : 0;
+    /* 机炮精度 = 机炮命中发数 / 机炮射出发数。以前分母是 shotsFired
+       （导弹 / 特种武器的发射次数），分子却是子弹命中数 —— 一场只打
+       两枚导弹、机炮命中三十发的任务会算出 1500%，还连带把综合评定撑大。 */
+    var acc = world.gunRounds > 0 ? Math.min(1, world.gunHits / world.gunRounds) : 0;
     var hull = player.alive ? player.hp / player.maxHp : 0;
     var penalty = (world.friendlyLoss || 0);
     /* 地面/海面目标单独计分，权重低于一架飞机（1000）—— 否则"打设施"
@@ -3127,8 +3136,8 @@ var Game = (function () {
       /* 友军战果：只展示，不进上面的 score。 */
       ['友军击落', (world.wingKilled || 0) + (world.shipKilled || 0)],
       ['地面 / 海面目标', gk],
-      ['发射 / 命中', world.shotsFired + ' / ' + world.hitsLanded],
-      /* 只算机炮：hitsLanded 由子弹命中累加，导弹命中不记（见 scanShot）。
+      ['机炮 射出 / 命中', world.gunRounds + ' / ' + world.gunHits],
+      /* 只算机炮：gunHits / gunRounds 都只数子弹，导弹和无制导弹不记。
          所以这一栏写"命中率"会让一场反舰任务的读数看起来很差 ——
          叫"机炮精度"说的才是它真正测的东西。 */
       ['机炮精度', (acc * 100).toFixed(0) + '%'],
