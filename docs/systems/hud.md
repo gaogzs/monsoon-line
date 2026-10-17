@@ -207,6 +207,11 @@ ry = dz * fz + dx * fx;     // 前
 目标点（导弹 = 小圆；友机 = 绿圆；敌机 = 红三角；任务目标 = 小方框）。
 超出范围的目标贴到环上（`out: true`）。
 
+**远处的调节单元不上 HUD。** 每关头顶几十个单元，全标出来雷达边缘会排一圈灰点、
+屏幕上满是灰箭头。`farCell(t, p)`：`model === 'cell'` 且离本机超过 10 km
+（`CELL_HUD_RANGE2`）就为真，罗盘标记、雷达光点、目标框 / 屏外箭头三处都先过它。
+近了才需要看清它在哪。
+
 **电子战会在这块屏幕上留下痕迹。** `suppressed`（被敌方压制）或
 `ewPower`（自己正在开机干扰，**干扰是双向的**）不为零时，敌方光点会
 按强度随机丢失、剩下的也会偏一点 —— 这就是设定 7.3 里那句
@@ -590,6 +595,7 @@ ctx.strokeText(t, x, y);
 | 雷达半径与范围 | `drawRadar()` 里的 `U(104)` / `12000` |
 | 右下角布局（RWR + STORES） | `hmiLayout()` |
 | 屏外标记的安全矩形 | `offscreenRect()`（让开区）与 `edgePoint()`（落点） |
+| 调节单元上 HUD 的距离（10 km） | `CELL_HUD_RANGE2` / `farCell()` |
 | 俯仰刻度范围 | `drawPitchLadder()` 里的 `LIM = 40` |
 | 告警阈值 | `drawWarnings()` |
 | 颜色 | `hud.js` 顶部 `GREEN / AMBER / CY / RED / DIM` |

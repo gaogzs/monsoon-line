@@ -47,7 +47,6 @@
 | `loadoutPenalty(lf)` | 函数 | — | `game.js` 面板 + `entities.js` 物理 |
 | `FLARE_RD` | 对象 | 14 键 → 注入 `flareRD`（只给雷达弹） | `breakLock()` |
 | `HARD_MODELS` | 对象 | 1 键（`radar`） | `entities.js` `isHard` / `warheadK`（加固目标的战斗部系数） |
-| `roeRestricted(w)` | 函数 | — | `game.js` `launch()` 的 ROE 拦截、desc 末尾的 ROE 提示（同一判据） |
 | `VOICES` | 对象 | 11 个任务（`m1`–`m10` + `sk1`） | `game.js` 的 `Radio` |
 
 规模数字会随内容增长，以上是核对 `data.js` 时的值——数错不会报错，只当参考。
@@ -289,8 +288,8 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 （`bigTarget` 现在只是 `missions.js` 写在**实体**上的标签）。
 
 **desc 模板**：`desc` 里可以写 `{{字段}}` 与派生量（`coneDeg` `lockKm` `hardPct` `loftAlt` …），
-`data.js` 末尾的 IIFE 在所有补丁表合并之后替换成当前数值；玩家挂得上且 `roeRestricted(w)` 为真的武器
-再自动追加一句交战规则提示。完整列表见 [weapons.md](weapons.md#特殊标记)。
+`data.js` 末尾的 IIFE 在所有补丁表合并之后替换成当前数值。
+以前还会给重武器自动追加一句交战规则提示（`roeRestricted()`），随武器锁定一起删了。完整列表见 [weapons.md](weapons.md#特殊标记)。
 
 **被动吊舱专属字段**（`passive: true` 才有）：`lockResist` `lockRangeBonus` `flareBonus` `armorBonus` `silentLock`。汇总在 `entities.js` 的 `Ent.passiveEffects(list)`（`game.js` 只负责把挂载点分组翻译成 `{wid,n}` 列表；**敌机的 `o.pods` 走同一个函数**）：`lockResist` 取最大值，其余按挂载点数累加，`armor` 上限 0.55、`lockRange` 上限 1.9；`silentLock` 是布尔，任一被动测距吊舱即可点亮。
 

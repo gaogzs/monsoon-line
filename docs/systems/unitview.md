@@ -18,7 +18,7 @@
 | 文件 | `js/unitview.js`，全中文注释 |
 | 加载位置 | `index.html` 里紧随 `hud.js` 之后（**必须在 `codex.js` / `data.js` / `models.js` / `planform.js` 之后**） |
 | 依赖 | `M3`（相机与向量）、`MODELS`、`PLANFORM`、`AIRCRAFT`、`SHIPS`、`WEAPONS`（只为了显示机炮名） |
-| 输出 | 全局 `var UnitView`，五个方法 |
+| 输出 | 全局 `var UnitView`，七个方法 |
 | DOM | 只**生成字符串**；插入由 `game.js` 负责。挂载时只找 `#uvCanvas` / `#uvPlan` 两个 id |
 | 校验 | `tools/smoke.js` 里"单位详情页"一组断言（4 条） |
 
@@ -33,13 +33,20 @@
 ```js
 UnitView.html(kind, id)     // → HTML 字符串（详情页全文）
 UnitView.mount(kind, id)    // 把 3D 预览挂到 #uvCanvas 上并开始旋转
+UnitView.mountModel(cvs, model, keepAngle)   // 把任意模型挂到任意 canvas 上转（机库预览、图鉴 s4 都用它）
+UnitView.composeLoadout(ac, loadout)        // → 机体 + 挂载物合成的一个模型（机库预览用）
 UnitView.stop()             // 停止动画、断开 canvas 引用
 UnitView.renderModel(cvs, model, yaw, pitch)   // 渲染一帧（工具与测试直接调它）
 UnitView.findUnit(kind, id) // → { kind, rec, model, modelKey } 或 null
 ```
 
-`kind` 只有两个取值：`'aircraft'`（查 `AIRCRAFT`）与 `'ship'`（查 `SHIPS`）。
-所以详情页的总数就是两张表的长度之和：当前 **33 页 = 17 机型 + 16 舰船**，加一条记录就多一页，不需要登记。
+`kind` 有三个取值：`'aircraft'`（查 `AIRCRAFT`）、`'ship'`（查 `SHIPS`）与 `'weapon'`
+（查 `WEAPONS[id]`，模型是 `MODELS.store(w)`，俯视栏改由 `PLANFORM.paintStore` 画 640×300）。
+详情页的总数就是三张表里被图鉴列出的条目之和，加一条记录就多一页，不需要登记。
+
+**图鉴之外的调用方**：`mountModel()` 不依赖 `#uvCanvas`，谁给 canvas 就挂谁 ——
+机库的 `#hangar3d`（`game.js`，`keepAngle = true`）与图鉴 `s4` 的 `#cxCell3d`
+（`codex.js` 条目的 `mount()`，挂 `MODELS.cell`）。同一时刻只有一个预览在转，`stop()` 照旧收尾。
 
 **`html()` 与 `mount()` 是分开的两步**，因为 `game.js` 是先 `innerHTML =` 再挂载的：
 字符串里只有占位 `<canvas id="uvCanvas">`，真正的初始化必须等它进了 DOM。
@@ -83,20 +90,22 @@ else { if (player && world) render(); else { Renderer.begin(); Renderer.end(); }
 
 ## 渲染算法
 
-### 两趟：先量范围，再画面
+### 缩放：按包围球，不按投影外框
 
 相机绕模型中心的球面位置由 `yaw` / `pitch` 决定，永远看向包围盒中心。
 
-**第一趟**：把所有顶点变换到相机空间，量出屏幕包围盒；
-据此算一个缩放系数，让整机**始终占画面约 84%**：
+**缩放只由包围球决定，不随转角变化**：相机距离是 `bd.r × 3.4`，
+包围球在屏幕上的投影半径是 `r·focal/dist`，让它占画面**短边的 52%**：
 
 ```js
-var k = Math.min(W * 0.84 / (maxX - minX), H * 0.84 / (maxY - minY));
+var k = (Math.min(W, H) * 0.52) / Math.max(1e-6, bd.r * cam.focal / dist);
 ```
 
-这样一架 8 米的无人机和一条 210 米的补给舰都会正好填满画框，
-而且转到任何角度都不会溢出 —— 长条形目标的投影宽度随方位角变化很大
-（正侧视最长、正前方最短），固定缩放一定会在某个角度溢出。
+这样一架 8 米的无人机和一条 210 米的补给舰都会填满画框，任何角度都装得下。
+以前按每一帧投影出来的屏幕外框自动适配（占 84%）：长条形的模型转到侧面时外框长、
+转到正面时外框短，镜头看起来一会儿拉远一会儿推近 —— 改成包围球就不晃了。
+
+**第一趟**：把所有顶点变换到相机空间（记下是否在相机前方）。
 
 **第二趟**：逐面算法线与深度，按深度降序（远的先画）填充。
 
@@ -225,7 +234,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 | `game.js` 的 `buildCodex()` 开头 | 每切一次条目/单位就重建一次 DOM，不停的话 rAF 会越积越多 |
 | `game.js` 的 `show(id)` 里（`id !== 'codex'` 时） | 离开资料库这一屏 —— 否则它在后台一直烧 CPU，还画在一个已经隐藏的 canvas 上 |
 
-`mount()` 自己也会先调 `stop()`，所以重复挂载是安全的。
+`mount()` 与 `mountModel()` 自己也会先调 `stop()`，所以重复挂载是安全的。
 
 ---
 
@@ -245,8 +254,8 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 
 | 模块 | 怎么用 |
 |---|---|
-| `game.js` | `buildCodex()` 生成并挂载；`show()` 负责停；单位链接由 `bindCodexUnits()` 的事件委托接住 |
-| `codex.js` | 两个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:c11">` |
+| `game.js` | `buildCodex()` 生成并挂载（单位页调 `mount()`，带 `mount()` 的条目由条目自己挂）；`show()` 负责停；单位链接由 `bindCodexUnits()` 的事件委托接住；机库调 `mountModel()` + `composeLoadout()` |
+| `codex.js` | 三个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:c11">`（`ship:` / `weapon:` 同理）；`s4` 条目的 `mount()` 直接调 `mountModel()` |
 | `css/style.css` | `.uv-*` 一族类 |
 | `tools/render-units.js` | 直接用 `renderModel()` 把 33 个单位各渲染一张 PNG |
 | `tools/shot-unitview.js` | 生成最小页面，交给无头 Chrome 截详情页的**布局** |
@@ -297,7 +306,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 |---|---|
 | 旋转速度 | `YAW_RATE`（rad/s） |
 | 预览视场 | `FOV`（度） |
-| 画面占比 | `renderModel()` 里的 `0.84` |
+| 画面占比 | `renderModel()` 里的 `0.52`（包围球投影半径 / 短边） |
 | 帧率上限 | `FRAME_MIN` |
 | 拖动灵敏度 | `onDragMove()` 里的 `0.010` / `0.008` |
 | 俯仰限位 | `PITCH_LIMIT` |

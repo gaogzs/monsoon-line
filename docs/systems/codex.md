@@ -1,10 +1,10 @@
 # 资料库（资料 / CODEX）
 
-代码：`js/codex.js`（1231 行）· 渲染与导航在 `js/game.js` 的 `buildCodex()` · DOM 在 `index.html` 的 `#scr-codex`
+代码：`js/codex.js`（1333 行）· 渲染与导航在 `js/game.js` 的 `buildCodex()` · DOM 在 `index.html` 的 `#scr-codex`
 
 一句话职责：**codex.js 只提供数据与"生成函数"**——不碰 DOM、不写样式、不决定导航；条目在 `game.js` 里被遍历、拼字符串、塞进 `#codexNav` / `#codexBody`。
 
-> 世界设定的完整散文版本在 [docs/world/SETTING.md](../world/SETTING.md)。
+> 世界设定的完整散文版本在 [docs/world/SETTING.md](../world/SETTING.md)，战役情节在 [docs/world/CAMPAIGN.md](../world/CAMPAIGN.md)。
 > 两者的关系是本文件最需要注意的部分，见下文「与 SETTING.md 的关系」。
 
 ---
@@ -42,6 +42,7 @@
 | `sub` | string | ✅ | ✅ | 正文标题下那行变成 `undefined`（没有兜底判断） |
 | `html` | HTML string | ✅ | ❌ | — |
 | `build` | function | ❌ | ✅ | 两者都没有时正文为空（不会报错） |
+| `mount` | function | 可选 | 可选 | 没有就不调。`buildCodex()` 在 `innerHTML` 写完之后调它，给条目挂需要真 DOM 的小部件（目前只有 `s4` 的 3D 预览） |
 
 渲染逻辑只有这一行在做分派：
 
@@ -194,7 +195,12 @@ document.getElementById('codexBody').innerHTML =
   '<div class="cx-title">' + e.title + '</div>' +
   '<div class="cx-sub">' + e.sub + '</div>' +
   '<div class="cx-text">' + body + '</div>';
+if (typeof e.mount === 'function') e.mount();   // DOM 就位之后再挂
 ```
+
+**`s4` 的 3D 预览**：正文里放一个 `<canvas class="uv-3d" id="cxCell3d">`，`mount()` 取到它后调
+`UnitView.mountModel(cvs, MODELS.cell)` —— 与机型详情页同一个转台。离开页面由 `UnitView.stop()` 收尾，和以前一样。
+`smoke.js` 检查 `s4.mount` 存在且调用不抛异常。
 
 **全部是 `innerHTML` 直拼**：条目里的 HTML（`<table class="cx-table">` `<h4>` `<span class="am">`）会原样生效；`title` / `sub` 缺字段就渲染成字面量 `undefined`。
 
@@ -214,11 +220,13 @@ for (const e of dyn) {
 
 ## 与 SETTING.md 的关系
 
-两者讲同一批设定（平流层作战、自适应循环、逻辑语、四方势力……），但**职责完全不同**：
+两者讲同一批设定（平流层作战、自适应循环、逻辑语、四方势力……），但**职责完全不同**。
+战役情节已拆到 `CAMPAIGN.md`；对应地，资料库里**只有「战役」分类（`cmp1` / `cmp2`）讲战役**，
+其余条目只写世界本身——不提任务名、冬港、VESPER、政变，也不说"本作"。加新条目照这个分法放。
 
 | | `docs/world/SETTING.md` | `js/codex.js` |
 |---|---|---|
-| 形态 | 纯散文（1278 行），可单独阅读、离线分发 | 游戏内 HTML 片段，靠 `buildCodex()` 渲染 |
+| 形态 | 纯散文（约 1230 行），可单独阅读、离线分发 | 游戏内 HTML 片段，靠 `buildCodex()` 渲染 |
 | 与代码的关系 | **零绑定**。数字全是手抄的 | 图鉴三页现场读数据表；叙事页里的数字走 `{{键}}` 占位符现读 |
 | 谁会看 | 想通读世界观的人 | 游戏里的玩家 |
 
@@ -242,7 +250,7 @@ for (const e of dyn) {
 | `gunTable`、`gun.k3.*` | `WEAPONS` 中 `kind === 'gun'` 的全部条目（s2 机炮表、t1/s2 射程、初速、每秒发数、飞行时间） |
 | `w.e4.*` / `w.l2.*` | ZUN-4 的 `lockReduce` / `cd`（来自 `STORE_COOLDOWN`）/ `duration`；GUS-2 的拦截半径、锥角、概率、充能 |
 | `w.v17.*` / `w.mrm.*` / `w.srm.*` | CLA-17 动力段、高空降级后动力段、转弯率、总飞行时间；对比用的 CLA-4 / TOR-2 |
-| `ms.*` | `MISSIONS`：任务总数、`altStart >= 17000` 的任务名单、m9 的 `timeLimit` |
+| `ms.*` | `MISSIONS`：现在只有 `cmp1` 用 `ms.m9.limit`（m9 的 `timeLimit`）。`ms.total` / `ms.highN` / `ms.highList` 仍定义着，但 `t1` 那句"几个任务在 18–22 km"已删（非战役条目不提任务），没人用 |
 
 规则：
 
@@ -266,7 +274,7 @@ for (const e of dyn) {
 | `s1` | CLA-17 燃烧 6→60 s、高空 60→14 s、转弯 0.9 | `life = 10`、高空 2.4 s、`turn = 1.00`，全部改为占位符 |
 | `s2` | 机炮"1000 米射程"、0.9 秒 | `k3.range = 1600` → 1.5 秒 |
 | `t1` | 18 km 密度 0.12、22 km 0.045 | `Ent.airDensity`：0.099（9.9%）、0.052 |
-| `t1` | "十一个任务中有两个"在 18–22 km | 由 `MISSIONS` 现数：3 个（线 / 第二梯队 / 指挥所） |
+| `t1` | "十一个任务中有两个"在 18–22 km | 曾改为 `ms.*` 现数；后来整句删掉（非战役条目不提任务） |
 
 （`t1` 的"可用过载随真空速**线性**下降"也是静态叙述的近似——实际机制是 `ctrlFactor` 按动压 `q = ½ρv²` 缩放，对速度是二次的。）
 
@@ -305,7 +313,7 @@ for (const e of dyn) {
 |---|---|
 | `data.js` | `inv1` / `inv2` / `inv3` 的数据源（`AIRCRAFT` / `WEAPONS` / `SHIPS`）；`_rngTxt` 调 `missileRange()`。**加载在 codex.js 之后** |
 | `game.js` | `buildCodex()` 是唯一的消费者：建导航、渲染正文、`show('codex')` 时懒执行 |
-| `unitview.js` | 图鉴里那两个 `cx-unit` 标记的落点：`game.js` 的委托拿到 `data-unit` 后调 `UnitView.html()` / `mount()` 换成详情页。`.cx-unit` 的样式也在那一族里 |
+| `unitview.js` | 图鉴里那两个 `cx-unit` 标记的落点：`game.js` 的委托拿到 `data-unit` 后调 `UnitView.html()` / `mount()` 换成详情页。`s4` 的 `mount()` 另外直接调 `UnitView.mountModel()` 挂调节单元的 3D 预览。`.cx-unit` 的样式也在那一族里 |
 | `index.html` | 提供 `#scr-codex` / `#codexNav` / `#codexBody` 三个锚点，以及入口按钮 `data-go="codex"` |
 | `css/style.css` | `.cx-table` `.cx-title` `.cx-sub` `.cx-text` `.cx-note` `.cx-cat` `.cx-item` `.cx-fly`，以及 `<span class="am">` / `cy` / `rd` 三个强调色 |
 | `tools/smoke.js` | 断言动态条目可生成且 ≥200 字符；导航按钮 `data-go="codex"` → `scr-codex` |

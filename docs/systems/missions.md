@@ -36,6 +36,7 @@
 | `spawnEnemy` | `spawnEnemy(w, o) → a` | 造一架敌机并推入 `w.actors`。`o` 字段见下表 |
 | `spawnWingman` | `spawnWingman(w, idx, slotX, slotY, slotZ) → a` | 造僚机（机型写死 `ucav`，队形相对长机），登记 `w.wings[idx]` |
 | `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets` |
+| `spawnCellField` | `spawnCellField(w, {xs, zs}) → [{x,y,z}]` | **调节单元阵列**：`xs × zs` 每个点一个 3×3 编组，推进 `w.targets` 与 `w.cells`，返回各组中心。见下文「调节单元阵列」 |
 | `spawnShip` | `spawnShip(w, o) → t` | **水面舰船**：按 `o.model` 查 `SHIPS` 表取 `hp/radius/value/label`（查不到回退 `SHIPS[0]`），直接调 `Ent.makeTarget` 并推入 `w.targets`；`team` 缺省 1、`fireCd` 缺省 `rnd(3,8)`；`o` 可覆盖 `hp/radius/value/label/team/drift/route/weapon/fireCd` |
 | `spawnAewc` | `spawnAewc(w, o) → a` | **空中预警机**：`spawnEnemy` + `a.aewc = true` + `route: {loiter:true, wp, exit}`。行为在 `game.js` 的 `updateAewc()` 里 |
 | `bombTheBase` | `bombTheBase(bomber, w)` | 轰炸机抵达投弹点的动作：48 个爆炸粒子 + 对 `w.baseTarget` 造成 340 伤害 |
@@ -182,12 +183,40 @@ v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，
 |---|---|
 | m1 | 群岛国 `k8` XAMSI「潮线」（`behavior: 'recon'`）+ 巡逻艇 `daplu`「屿」 |
 | m4 | 三条中立国民用船：`cross` 南十字、`icecore` 冰芯、`atoll` 环礁（沿航路巡航） |
-| m5 | 管理局勤务机 `a2` MERLI「水准」+ 测量船 `diklo`「标杆」 |
+| m5 | 管理局勤务机 `a2` MERLI「水准」（沿单元编组巡视）+ 测量船 `diklo`「标杆」 |
 
 这是"不做中立识别机制"下唯一干净的安排：要么能打、要么不在交战语法里，
 没有"能锁但不该打"的中间态。MERLI 只有一个机腹挂载组、而机腹挂不了任何
-空空弹，所以任务里**不给它写 `special` / `loadout`**（与设定"名义上没有武器"一致）；
-注意 MERLI 是**省略** `special`（没写 `null`），所以仍会拿到缺省的 `'dl6'`，只是挂不上、画不出来。
+空空弹，所以任务里显式写 **`special: null`**、不写 `loadout`（与设定"名义上没有武器"一致；
+以前是省略 `special`，会拿到缺省的 `'dl6'`，只是挂不上、画不出来）。`behavior: 'recon'`。
+
+MERLI 的活是**巡视检查单元状态**：`route: { wps, wpIdx: 0, wp, alt, arrive: 1500 }`，
+`wps` 是 m5 那几个单元编组中心（`spawnCellField` 的返回值）蛇形串起来——先沿左列往北、再沿右列往南——
+每个航点比该组基准高度低 1500 m（从下方看，也不会钻进单元里）。
+走的是 `ai.js` `updateRoute` 的 `wps` 分支：飞完一圈从头再来，永不退场，见 [ai.md](ai.md)。
+
+### 调节单元阵列 spawnCellField
+
+**每一关都有调节单元**（含 sk1）：玩家在哪一关都能爬到 18 km，爬上去就该看见它们。
+单元的样子和数值只写在 `spawnCellField` 这一处：
+
+- `o.xs × o.zs` 的笛卡尔积是各编组中心（按 20 km 一格摆，组间留 10 km 空当）
+- 每组 3×3，组内间距 `CELL_SPACING = 5000` m，水平再 ±300 m 抖动
+- 每组一个基准高度 `rnd(18500, 21000)`，组内每个单元再 ±500 m
+- 单元：`ttype: 'air'`、`model: 'cell'`、`hp: 400`、`radius: 34`、`drift: 14`、`team: 2`、`friendlyAsset`
+- 推进 `w.targets` 和 `w.cells`；返回 `[{x, y, z}]`（各组中心与基准高度，m5 用它铺 MERLI 的航线）
+
+| 关卡 | m1 | m2 | m3 | m4 | m5 | m6 | m7 | m8 | m9 | m10 | sk1 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 编组 | 2 | 3 | 1 | 6 | 6 | 3 | 4 | 2 | 3 | 6 | 4 |
+| 单元 | 18 | 27 | 9 | 54 | 54 | 27 | 36 | 18 | 27 | 54 | 36 |
+
+几十个单元的代价由三处裁剪兜住：`render()` 不画 30 km 外的（`CELL_DRAW_RANGE2`）、
+HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）、`scanShot` 先比高度差再求交。
+`smoke.js` 逐关检查：单元数在 9–60 之间、高度 17.5–21.5 km、`team 2` + `friendlyAsset`、都在 `targets` 里。
+
+**没有交战规则锁定。** 单元附近什么武器都能打，后果只有误伤扣分（`friendlyLoss`）；
+文字上只剩一句"谨慎使用重型武器"。
 
 `spawnWingman` 写死的部分：机型 `ucav`、阵营 0、`isDrone: true`、`special: 'v9'`、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
 
@@ -262,15 +291,13 @@ v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，
 | `baseWarnT` | m2 | 低血量反复提醒的节流计时 |
 | `dangerAltitude` | m2 / m4 / m5 / m7 / m9 | 低于此高度可躲地面雷达（`updateTargets` 读）；**默认 1500**，m7 设 1500、m4/m5 设 2600/1800 |
 | `detected` | m2 / m4 / m5 / m7 / m9 | 被雷达照射；防空阵地开火的前置条件。**由任务脚本自己写**（一帧延迟） |
-| `roeActive` | m3 | 声明了但全项目没人读 |
-| `roeBlocked` | m3 | 交战规则生效区；**`launch()` 真正读的是这个** |
-| `cells[]` | m3 | 3×3 调节单元，与 `targets[]` 是同一批对象 |
+| `cells[]` | 全部关卡 | 调节单元（`spawnCellField`），与 `targets[]` 是同一批对象 |
 | `ace` / `aceSpawned` | m3、m10 | 王牌冬港（m3 与 m10 各一次） |
 | `guarded[]` | m8 | 必须保护的上游编队（沉任一即判负） |
 | `skQueue` / `skBatch` | sk1 | 随机遭遇的六个批次（`spawn()` 一次性生成） |
 | `timeLimit` / `timeLeft` | `newWorld()` | 关卡时限；`startMission` 从 `mission.timeLimit` 落进来；归零时 `game.js` 播一句"时间到"并 `finish(false)` |
 | `groundKilled` | `newWorld()`，`Ent.killGround` 累加 | 被摧毁的地面/海面目标数（结算单列一行，`finish()` 里 `gk * 400`；低于一架飞机的 1000，免得"打不还手的设施"成为刷分捷径） |
-| `friendlyLoss` | `game.js` `hitTarget` 写、`finish()` 读 | 误伤扣分 |
+| `friendlyLoss` | `game.js` `hitTarget` 写、`finish()` 读 | 误伤扣分（玩家打掉 `friendlyAsset` 一次 +1） |
 
 ---
 
@@ -303,7 +330,7 @@ E = x·cosθ + z·sinθ;  N = −x·sinθ + z·cosθ;   // θ = axis
 | 起点 | 7600 m / 330 m/s，距编队 22 km | 1400 m / 340 m/s，距中继网 30 km | 19500 m / 520 m/s，加力 |
 | 核心机制 | 基础拦截，动压充足 | 低空突防 vs 防空网 | 极高空、能量战 |
 | 教学/张力点 | "把机头对准敌机" | "云下看不见敌人，也看不见你" | "这个高度没有加速这回事" |
-| 特殊规则 | 测绘机受损后会逃跑且不主动开火 | 必须保护前进基地 | 阵列空域内重武器受限 |
+| 特殊规则 | 测绘机受损后会逃跑且不主动开火 | 必须保护前进基地 | 播撒机在单元中间穿行，误伤扣分 |
 | 唯一失败条件 | 玩家阵亡 | 玩家阵亡，或基地被毁 | 玩家阵亡，或 ≥2 架播撒机降到 14000 m 以下 |
 
 | | m4 空白海域 | m5 静默的航标 | m6 第二梯队 |
@@ -325,7 +352,7 @@ E = x·cosθ + z·sinθ;  N = −x·sinθ + z·cosθ;   // θ = axis
 
 **m2** 是有"必须保护的东西"的关卡之一。设计是一条**因果链**：三个浮空中继平台把地面测控平台的信号中继回南边 → 打掉地面测控平台触发下游截击机伏击 → 两架 ROK-40 轰炸机沿固定航线炸掉玩家的前进基地。`lose()` 在基地被毁时直接判负，**哪怕中继网已经拆干净**。天气是核心约束：云底 900 m，而平台在 4000 m；爬到 1500 m 以上就会被雷达看见（`w.detected`），这时四个防空浮台才会开火。本关还放了两艘下游巡逻舰与一架石英预警机当"环境"——它们不计入胜利条件。
 
-**m3** 把飞行模型推到边界：20 km、密度只有海平面 7.2%。交战规则"20 公斤以上战斗部全部锁定"逼玩家用机炮——而高空弹道平直、机炮有效射程反而提升到约 2.6 km。3×3 调节单元是**中立目标**（`team: 2`）：不受锁定循环青睐，但双方流弹都能打坏。八架播撒机两排四列、间距 4.5 km；掉到 4 架时王牌**冬港**进场，血量过半后主动往下带。
+**m3** 把飞行模型推到边界：20 km、密度只有海平面 7.2%。播撒机就在调节单元中间穿行，简报只说"谨慎使用重型武器"——没有武器锁定，靠误伤扣分让玩家自己掂量；该高度导弹本身也退化，而高空弹道平直、机炮有效射程反而提升到约 2.6 km。单元是一个编组（`spawnCellField(w, {xs:[0], zs:[9000]})`，压在进入点与播撒机群之间），**中立目标**（`team: 2`）：不进锁定循环，但双方流弹都能打坏。八架播撒机两排四列、间距 4.5 km；掉到 4 架时王牌**冬港**进场，血量过半后主动往下带。
 
 **m4–m10** 的共同点：战场尺度进一步拉大（进入点到目标 18–34 km），舰船与设施成为可打击目标，`world.groundKilled` 与限时机制开始被使用。
 
@@ -408,24 +435,24 @@ spawn()
 
 2. **`makeTarget` 的 `team` 默认是 1（敌方）。** 友方设施必须显式写 `team: 0`，否则 `cycleTarget()` 会把自家基地纳入锁定循环——而且因为它距离最近、`value` 最小，按下 F 先锁上的就是自己人。m2 的前进基地就是这么踩过坑才补上 `team: 0` 的。
 
-3. **中立调节单元用 `team: 2`，不是 `team: 1`。** `cycleTarget` 只收集 `team === 1` 的目标物，所以玩家锁不到单元；但 `scanShot` 只跳过同阵营，所以双方子弹都能打坏它。误伤扣分在 `game.js` `hitTarget` 里按 `model === 'cell' && source.isPlayer` 累加 `friendlyLoss`——注意它不看 `team`。
+3. **中立调节单元用 `team: 2`，不是 `team: 1`。** `cycleTarget` 只收集 `team === 1` 的目标物，所以玩家锁不到单元；但 `scanShot` 只跳过同阵营，所以双方子弹都能打坏它。误伤扣分在 `game.js` `hitTarget` 里按 `friendlyAsset && source.isPlayer` 累加一次 `friendlyLoss`——注意它不看 `team`；AI 流弹打掉的不扣分，SEXTANT 那句"你打爆了一个调节单元"也只在玩家打的时候说。
 
-4. **交战规则只拦三类 `kind`。** `launch()` 里硬编码的是 `wp.kind === 'asm' || 'agm' || 'bomb'`，**`aam` 空空弹不在拦截列表里**。m3 的"只有机炮"实际是"重武器与对面弹被拦 + 该高度导弹本身退化"，别以为 ROE 拦住了所有导弹。
+4. **没有交战规则锁定。** 旧版 m3 的 `roeBlocked` / `roeActive` / `launch()` 拦截已整个删掉，`smoke.js` 断言不留残余。单元附近"谨慎使用重型武器"只是文字，约束靠误伤扣分。别再加回按空域锁武器的分支。
 
 5. **`w.detected` 是任务自己写的，且有一帧延迟。** 它只由 `m2.tick` 赋值，而 `updateTargets()` 在主循环里跑在 `mission.tick()` **之前**——所以开火判定用的是上一帧的 `detected`。m1 / m3 没有地面防空，`detected` 保持 `false`。
 
 6. **`escort` 标签的含义因关而异。** m1 的护航 `a.ai.escort = true`，被排除在目标计数与胜利条件外；m3 的两架护航没有这个标签，属于"必须全部击落"的 `team 1` 单位（`win()` 只看 `team === 1 && alive`）。
 
-7. **飞完航线的单位会"自灭"。** `AI.updateRoute` 在最后一段飞完后直接 `a.alive = false`，而 `game.js` 的击落统计是 `team === 1 && !alive` 计数——以前逃生成功的轰炸机也会被算成"击落"；现在 `updateRoute` 离场时会标 `a.escaped`，`killCredit()` 不给它记功。
+7. **飞完航线的单位会"自灭"。** `AI.updateRoute` 在最后一段飞完后直接 `a.alive = false`，而 `game.js` 的击落统计是 `team === 1 && !alive` 计数——以前逃生成功的轰炸机也会被算成"击落"；现在 `updateRoute` 离场时会标 `a.escaped`，`killCredit()` 不给它记功。`route.loiter`（预警机）与 `route.wps`（MERLI）两种航线永不退场。
 
 8. **`sower` 与 `ace` 只换了 `phys`，没换 `ac`。** 两者都由 `spawnEnemy` 以默认机型 `m27` 创建，之后覆写 `model` 与 `phys`；`a.ac` 仍然指向 ROK-27 条目，所以 `ctrlFloor` / `ctrlFull` 来自 ROK-27。改这两架的气动时记得 `ctrlFactor` 读的是 `a.ac`。
 
-9. **`m2` 的中继平台 `t.vital = true` 没有任何人读。** 胜利条件按 `model === 'relay'` 计数，不靠 `vital`。同理 m1 的 `a.firingAllowed`、m3 的 `w.roeActive`、`w.baseHpFull` 都是"写了没人读"的字段。
+9. **`m2` 的中继平台 `t.vital = true` 没有任何人读。** 胜利条件按 `model === 'relay'` 计数，不靠 `vital`。同理 m1 的 `a.firingAllowed`、`w.baseHpFull` 都是"写了没人读"的字段。
    （`timeLimit` **不再是**这类字段 —— 它现在由主循环倒计时并统一判负，见 [game.md](game.md#newworld)。）
 
 10. **生成器函数是全局的，没有命名空间。** `spawnEnemy` / `spawnWingman` / `spawnTarget` / `spawnAewc` / `spawnShip` / `bombTheBase` 都挂在 `window` 上，`index.html` 的加载顺序里 `missions.js` 排在 `game.js` 之前。加新生成器时注意别与其它模块重名。
 
-11. **`w.cells` 与 `w.targets` 是同一批对象的两个视图。** `spawnTarget` 只推 `w.targets`，m3 之后手动 `w.cells.push(c)`。遍历"所有可摧毁物"用 `targets`，遍历"调节单元阵列"用 `cells`，`win()` 用的是 `targets`。
+11. **`w.cells` 与 `w.targets` 是同一批对象的两个视图。** `spawnTarget` 只推 `w.targets`，`spawnCellField` 再把单元推进 `w.cells`。别在关卡里手写单元循环。遍历"所有可摧毁物"用 `targets`，遍历"调节单元阵列"用 `cells`，`win()` 用的是 `targets`。
 
 12. **`flags.dropped` 复用了 `bossHit` 台词。** 播撒机降到 16000 m 以下时播的是"他在掉高度！动压撑不住了！"——那是给王牌准备的台词，`VOICES.m3` 里没有专门的投放警告事件。改文案时注意这一处复用。
 
@@ -452,9 +479,11 @@ spawn()
 5. **把新关的全局下标写进某个战役的 `missions` 数组。** 不写会触发
    `preflight()` 的"没有归属任何战役"——选关界面永远列不到它，
    而这是最容易漏掉、也最难在运行时看出来的一步。
-6. 跑 `node tools/smoke.js`：它会自动加载全部脚本、跑十一关各 240 帧，检查 NaN、卡死与异常，
+6. `spawn()` 里调一次 `spawnCellField(w, {xs, zs})` 铺调节单元（每一关都有），
+   `smoke.js` 会查它有没有、数量是否在 9–60 之间。
+7. 跑 `node tools/smoke.js`：它会自动加载全部脚本、跑十一关各 240 帧，检查 NaN、卡死与异常，
    并断言战役覆盖率与"战役内关卡数"。
-7. 开机自检（`game.js` `preflight()`）会检查：`spawn/tick/win/lose` 都是函数、
+8. 开机自检（`game.js` `preflight()`）会检查：`spawn/tick/win/lose` 都是函数、
    `VOICES[id]` 存在、每关恰好归属一个战役。它**不检查**
    `prose` / `objectives` / `map` 是否存在——漏了会在简报页静默变空。
 
@@ -480,7 +509,8 @@ spawn()
 | 王牌死战阈值 | m3 `tick()` 里 `w.ace.hp < w.ace.maxHp * 0.5` |
 | 播撒机投放警告高度 | m3 `tick()` 里的 `s.pos.y < 16000` |
 | 播撒机逃跑判定高度 | m3 `lose()` 里的 `s.pos.y < 14000` |
-| 交战规则生效范围 | m3 `tick()` 里"距任一存活单元 5000 m" |
+| 调节单元的编组位置 / 数量 | 各关 `spawn()` 里 `spawnCellField` 的 `xs` / `zs` |
+| 单元间距 / 高度 / 数值 | `missions.js` `CELL_SPACING` 与 `spawnCellField` |
 | 误伤扣分金额 | `game.js` `finish()`：`friendlyLoss * 2500` |
 | 简报地图比例 / 位置 | `game.js` `drawMap()` 的 `R = 17000` 与 `cy = H*0.72` |
 | 下游呼号池 | `data.js` `CS_DOWNSTREAM` + `downstreamCallsign()` |

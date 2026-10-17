@@ -48,6 +48,7 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 |---|---|
 | [DESIGN.md](DESIGN.md) | **总设计文档** —— 架构、模块划分、数据流、关键约定、已知问题 |
 | [world/SETTING.md](world/SETTING.md) | **世界设定集** —— 可以脱离代码单独阅读 |
+| [world/CAMPAIGN.md](world/CAMPAIGN.md) | **战役设定** —— 分水岭行动的开战、各阶段、人物线、编年（从 SETTING.md 拆出） |
 | [VERSIONING.md](VERSIONING.md) | **版本号规则** —— 涨哪一位、怎么自动分配、发版流程 |
 | [../CHANGELOG.md](../CHANGELOG.md) | **更新日志** —— 玩家在游戏内「更新记录」页看到的那份，数据源在这里 |
 
@@ -68,7 +69,7 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 | [systems/flight-model.md](systems/flight-model.md) | `js/entities.js` | 大气、动压、姿态积分、导弹动力学 |
 | [systems/entities.md](systems/entities.md) | `js/entities.js` | 运行时实体、世界对象、发射/命中/装填链路、粒子 |
 | [systems/ai.md](systems/ai.md) | `js/ai.js` | 控制律、状态机、编队指令、难度 |
-| [systems/weapons.md](systems/weapons.md) | `js/data.js` + `js/entities.js` | 武器编号体系、导引、拦截、交战规则 |
+| [systems/weapons.md](systems/weapons.md) | `js/data.js` + `js/entities.js` | 武器编号体系、导引、拦截、调节单元附近开火 |
 | [systems/loadout.md](systems/loadout.md) | `js/data.js` + `js/game.js` | **挂载系统** —— 分组挂载点、齐射数、重量惩罚 |
 | [systems/missions.md](systems/missions.md) | `js/missions.js` | 十一关的战场生成、触发器、加新关的清单 |
 

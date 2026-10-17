@@ -131,8 +131,8 @@ rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
 | `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | `game.js` `updateDEW`、`entities.js` `stepAircraft` | 定向能吊舱 |
 
 desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派生量），
-`data.js` 末尾在所有挂载表合并之后替换成当前数值；交战规则那一句由
-`roeRestricted(w)` 统一追加（只加给玩家挂得上的，`fits` 非空）—— 与 `game.js` 的拦截判据同源。
+`data.js` 末尾在所有挂载表合并之后替换成当前数值。desc 不再自动追加任何交战规则句子
+（武器锁定机制已整个删掉，见[调节单元附近开火](#调节单元附近开火)）。
 派生量全表（`DERIVED`）：`coneDeg` `lockKm` `flarePct` `flareRDPct` `lockResistPct` `lockReducePct`
 `interceptConeDeg` `interceptPct` `highAltPct` `volleys` `hardPct` `loftAlt` `loftDiveKm`；
 其余 `{{x}}` 取 `w[x]` 的数值，取不到就原样保留。`hardPct` 的 0.2 / 0.6 是在
@@ -362,7 +362,7 @@ rate = 1 / (w.nezer ? 1.5
    `spCd` 与第 0 个槽、播语音提示。冷却期间返回 `false`。
 2. **`kind === 'dew'`**：自动系统，手动发射一律返回 `false`
    （玩家按发射键会得到一句"GUS-2 是自动拦截系统"）。
-3. **弹药类**：依次检查备弹、找**一个就绪的发射槽**、交战规则。
+3. **弹药类**：依次检查备弹、找**一个就绪的发射槽**。没有按空域锁武器的分支。
 
 ```js
 var nShot = Math.max(1, Math.min(wp.salvo || 1, actor.spAmmo));
@@ -551,25 +551,15 @@ if (!(Math.random() < chance)) continue;
 
 ---
 
-## 交战规则（ROE）
+## 调节单元附近开火
 
-第三阶段「线」的核心约束：**阵列空域内禁止 20 kg 以上战斗部**。
+**没有交战规则锁定。** 旧版 m3 的"阵列空域 5 km 内禁用 `asm / agm / bomb`"
+（`roeRestricted()`、`world.roeBlocked`、`launch()` 拦截、HUD"交战规则生效"、desc 末尾那句提示）已整个删掉。
 
-```js
-// data.js：function roeRestricted(w) { return w.kind === 'asm' || 'agm' || 'bomb'; }
-if (actor.isPlayer && w.roeBlocked && roeRestricted(wp)) {
-  Radio.raw({ who: 'SEXTANT', ..., tx: '交战规则限制 —— 该武器在阵列空域内被锁定。' });
-  return false;
-}
-```
-
-`world.roeBlocked` 由 `missions.js` 的 M3 `tick()` 每帧计算：
-玩家距离任一**存活**的调节单元 5 km 以内就置真。机炮与所有
-空空弹（`kind: 'aam'`）不受影响，所以玩家在 M3 里被迫用机炮去啃
-调节单元阵列周围的目标。
-
-判据只有 `data.js` 的 `roeRestricted()` 一处：武器 desc 末尾的交战规则提示也由它生成，
-两边不会再对不上。
+现在每一关头顶都有调节单元（见 [missions.md](missions.md#调节单元阵列-spawncellfield)），
+`launch()` 不看它们。约束只剩后果：单元是 `team: 2` + `friendlyAsset`，
+玩家的弹打掉一个记一次 `friendlyLoss`（结算扣分）。
+文字上只剩一句"谨慎使用重型武器"——m3 简报 / 目标、m3 的 SEXTANT 电台、一条帮助提示、图鉴 `s2` / `s4`。
 
 ---
 
@@ -615,4 +605,3 @@ if (actor.isPlayer && w.roeBlocked && roeRestricted(wp)) {
 | 一次按键打出的发数 | 武器自己的 `salvo` |
 | 干扰弹冷却与粒子数 | `entities.js` `breakLock()` |
 | 定向能拦截窗口折算（1.2 s） | `game.js` `updateDEW()` |
-| 交战规则禁用的武器类别 | `game.js` `launch()` 的 `roeBlocked` 分支 |

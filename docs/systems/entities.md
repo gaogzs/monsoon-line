@@ -60,6 +60,7 @@
 | `clusterBurst` | `clusterBurst(m, world)` | 子母弹面杀伤：半径 `w.cluster`（+目标 `radius`）内每个敌方地面目标吃满额 `dmg × warheadK`；`game.js` 的 `scanShot` 也直接调它 |
 | `isHard` | `isHard(t) → bool` | 加固目标：`t.hard` 或 `HARD_MODELS[t.model]` |
 | `warheadK` | `warheadK(w, t) → 系数` | 战斗部对目标的系数：非加固 1；加固时 `penetrator` 1、`cluster` 0.2、其余 0.6 |
+| `hitSurface` | `hitSurface(tg, dmg, world, source)` | 对设施 / 舰船结算一次伤害：有回调走 `hitTarget`，没有就 `hp -= dmg` + `killGround`。`hitAny` 的设施分支就是它；`smoke.js` 也直接调它测误伤计数 |
 | `setTargetHitHandler` | `setTargetHitHandler(fn)` | `game.js` 注册 `hitTarget(tg, dmg, source)`，制导弹 / 子母弹打设施都走它（击毁计数、误击处罚）；未注册时退回 `hp -= dmg` + `killGround` |
 | `damage` | `damage(ent, amt, world, source) → bool` | 对**飞机**结算伤害（含装甲减伤），返回是否击杀 |
 | `kill` | `kill(ent, world, groundImpact, source)` | 击落飞机：爆炸 + 音效 + `source.kills++` |
@@ -195,13 +196,14 @@
 // newWorld() —— 所有关卡都有
 { time, actors[], missiles[], bullets[], particles[], targets[], wings{},
   player, flags{}, objective, objectiveSub,
-  roeBlocked, detected,
+  detected,
   killed, hitsLanded, shotsFired,
   fireMissile(actor, target), radio }
 
 // 任务脚本追加（见 missions.md §3）
-{ baseTarget, baseHpFull, dangerAltitude, roeActive, baseWarnT,
+{ baseTarget, baseHpFull, dangerAltitude, baseWarnT,
   cells[], ace, aceSpawned, friendlyLoss }
+// cells[] 每一关都有（missions.js spawnCellField），与 targets[] 是同一批对象
 ```
 
 `flags` 是**自由字典**：任务脚本用它做一次性触发（`flags.tallyDone`、`flags.ambushDone`…），不分区、不清理，加新键时务必用独一无二的名字。
@@ -246,7 +248,6 @@ keydown Enter / 鼠标右键
   → fireSpecial()            game.js：查 kind / 弹药 / spCd / 目标类型匹配
   → launch(player, t, world) game.js
       ├ 找槽：slotCd[special] 里第一个 ≤0 的槽（找不到就按不出去）
-      ├ 交战规则：roeBlocked 且 kind 是 asm/agm/bomb → 拒绝
       ├ 由槽下标算挂点位置：side = si%2 ? +1 : −1，rank = floor(si/2)
       ├ for q in 0..(salvo−1): Ent.makeMissile(...) → world.missiles.push
       ├ spAmmo −= nShot；slotArr[si] = w.cd；spCd = min(slotArr)
@@ -273,7 +274,7 @@ keydown Enter / 鼠标右键
     └ 若 dist < prox+14(+radius) → hitAny：飞机 damage / 设施 hitTarget 回调，伤害 × warheadK
 无制导弹/子弹：resolveBullets → scanShot
     ├ 对飞机：raySphere(prev, dir, a.pos, 7.5)，命中半径**写死 7.5**
-    └ 对目标：raySphere(prev, dir, tg.pos, tg.radius || 8)
+    └ 对目标：|Δy| > radius + 本帧弹道长 → 跳过；否则 raySphere(prev, dir, tg.pos, tg.radius || 8)
        ├ 飞机 → Ent.damage(a, dmg, world, owner) → hp≤0 → Ent.kill()
        └ 目标 → 子母弹：Ent.clusterBurst；否则 hitTarget(dmg × warheadK)（game.js）→ hp≤0 → Ent.killGround()
 ```
@@ -281,6 +282,7 @@ keydown Enter / 鼠标右键
 - `Ent.kill()` 按结构完整度决定爆炸规模（`hp>150` 用 3.2 / 26 个粒子，否则 2.2 / 20），并给 `source.kills++`。
 - `Ent.damage()` **会**扣装甲减伤（`ent.armor`；`damage()` 钳在 60%，但 `passiveEffects()` 汇总时已封顶 55%）；`hitTarget()` **不会**——目标物不吃装甲，这是刻意的（装甲是飞机的挂载件）。
 - 无制导弹也走 `scanShot`：它们没有导引头，唯一能命中的方式就是撞上去。
+- `scanShot` 对目标物先比高度差：每关头顶几十个调节单元，低空的弹不必逐个求交。
 
 ### 4.5 干扰弹链路
 
@@ -384,13 +386,13 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 
 8. **AI 每次开火前都会重新选弹，而且它现在也有 `slotCd` 了。** `ai.js` 调 `Ent.chooseWeapon()` 挑一件（对空 / 对面 + 够得着的里面射程最短），`Ent.setWeapon()` 把它设成 `a.special`——这就是"AI 换武器"的全部，没有独立的选弹状态。以前 NPC 的 `slotCd` 是空对象，`launch()` 对它退回单冷却 `spCd`；现在 `buildNpcMounts()` 会按挂点数建槽（实体挂载要靠它判断"这一发还在不在"）。这不改变 AI 的射速 —— `ai.js` 的 `s.shootT = rnd(2.6, 5.2) × (1.6 − 0.6·skill)` 通常比槽冷却长。
 
-9. **`hitTarget()` 里 `var penal = ...` 算了没用。** 真正的误伤扣分是紧接着那段 `source.isPlayer` 判断累加 `world.friendlyLoss`。别把这个变量当成扣分依据。
+9. **误伤只在 `hitTarget()` 的 `penal` 那一处记。** `penal = friendlyAsset && source.isPlayer`，为真就 `friendlyLoss++`；`cell` 分支以前又加了一次（打掉一个单元算两次），已删，那里只剩 SEXTANT 那句"你打爆了一个调节单元"，也只在玩家打的时候说。加新的处罚分支别再自己累加。
 
 10. **写死 `7.5 m` 的飞机命中半径与 `radius` 字段并存。** 飞机的大小编码在 `scanShot()`，目标物的大小编码在 `t.radius`，两者不同源，改大飞机不会改变它被弹体命中的判定。
 
 11. **看门狗的根因没定位。** 任何飞机静止超过 1.5 秒会被强制重置姿态与速度并 `console.warn`。这是兜底，不是修好了——警告里带有当时的速度、姿态、操控输入，下次真触发时它就是定位起点。
 
-12. **`spSalvo` / `t.vital` / `a.firingAllowed` / `world.roeActive` / `world.baseHpFull` / `a.gunHeat` 都是"写了没人读"的字段。** 看到它们别以为对应机制存在（`gunHeat` 还在每帧递减，但没有任何地方读它——机炮过热是个没做完的机制）。
+12. **`spSalvo` / `t.vital` / `a.firingAllowed` / `world.baseHpFull` / `a.gunHeat` 都是"写了没人读"的字段。** 看到它们别以为对应机制存在（`gunHeat` 还在每帧递减，但没有任何地方读它——机炮过热是个没做完的机制）。
 
 13. **`fits` 是"玩家能不能挂"，不是"挂不挂得上"。** 下游弹的 `fits` 是空数组（玩家拿不到实物），而空数组是 truthy —— 拿它当"挂点适配"判据会把敌机的挂载全部过滤掉。所以 `Ent.fitsKind()` 分两张表：玩家 `fits`、NPC `npcFits`。加新武器时别只填一张。
 

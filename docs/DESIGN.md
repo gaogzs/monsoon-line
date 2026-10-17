@@ -136,7 +136,7 @@ requestAnimationFrame(loop)
   time, actors[], missiles[], bullets[], particles[], targets[],
   wings{}, player, flags{},
   objective, objectiveSub,
-  roeBlocked, detected,
+  detected,
   killed, hitsLanded, shotsFired,
   groundKilled,                       // 被摧毁的地面/海面目标，单独计分
   timeLimit, timeLeft,                // 关卡时限（秒），0 = 不限时
@@ -428,7 +428,7 @@ requestAnimationFrame(loop)
 | — | **BIN-9 双导引头**（`twinSeeker`） | 名字叫"双生"，要连中两次诱饵才脱锁 |
 | — | **TOR-6 大离轴真的成立**（`hobs`：出膛视场 = max(77°, 锁定锥)） | 原来视场写死 77°，锁定锥 88° 锁上的目标出膛半秒就丢 |
 | — | **对地红外弹只找地面热源** | 丢了地面目标的 GUT-9 / TUM-7 会转头追天上的飞机 |
-| — | **desc 数字与图鉴页从数据生成**（`{{字段}}` 模板、`roeRestricted()` 单一判据） | 手写的转弯率 / 冷却 / 挂载量与数据对不上过多次，ROE 提示与拦截判据也各写一份 |
+| — | **desc 数字与图鉴页从数据生成**（`{{字段}}` 模板） | 手写的转弯率 / 冷却 / 挂载量与数据对不上过多次（当时的 ROE 提示与拦截判据也各写一份；交战规则锁定后来整个删掉了） |
 | — | **我方舰艇能开火**：新弹 FAN-6（`ss6`），`pickTargetFor` 按阵营选目标 | 以前地面火力只会打玩家，我方船没法带武器；现在 team 0 只打敌机，team 2 不开火。见 [ai.md](systems/ai.md#水面--地面目标的对空射击gamejs) |
 | — | **NPC 弹药按挂点封顶**：`min(w.ammo, 挂点 × perPoint)` | KA-7 两个轻挂点能打 44 发 GIR-9 |
 | — | **GUS-2 每枚来袭弹只掷一次骰**（`m.dewRolled`） | 每帧折算概率的实际成功率随接近速度漂移，迎头快弹 55% 只剩约 37% |

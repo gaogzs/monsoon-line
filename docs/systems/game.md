@@ -165,12 +165,14 @@ hits / banner 计时衰减
 
 ```
 Renderer.begin()
-pushModel 目标物（MODELS[t.model]）→ 飞机（含 sweep）→ pushStores(a) → 导弹 → Renderer.flush()
+pushModel 目标物（MODELS[t.model]；30 km 外的调节单元跳过）→ 飞机（含 sweep）→ pushStores(a) → 导弹 → Renderer.flush()
 drawTracers()                     ← game.js 自己的曳光，加色混合，画在模型之上
 Renderer.drawParticles(world.particles);  Renderer.end()
 HUD.draw(world, player, 0, S)     ← 在 end() 之后，所以不跟着抖；dt 传的是 0（渲染不推进 HUD 的计时）
-banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标引导的 CMD 瞄准环
+banner / hitMark / “被对空雷达截获”闪烁 / 鼠标引导的 CMD 瞄准环
 ```
+
+调节单元每关 9–54 个、大多在远处，`render()` 用 `CELL_DRAW_RANGE2`（30 km 的平方）把远的直接跳过 —— 雾里一个点，画了也看不见。HUD 那边另有一道 10 km 的 `farCell()`（见 [hud.md](hud.md)）。
 
 曳光长度按距离自适应（`min(90, max(13, bDist * 0.045))`）—— 固定 13 米在 1500 米外只有 0.5°，看起来像“弹速很慢”。
 
@@ -183,7 +185,7 @@ banner / hitMark / ROE 生效提示 / “被对空雷达截获”闪烁 / 鼠标
 { time, actors: [], missiles: [], bullets: [], particles: [], targets: [],
   wings: {}, player: null, flags: {},
   objective: '', objectiveSub: '',
-  roeBlocked: false, detected: false,
+  detected: false,
   killed: 0, hitsLanded: 0, shotsFired: 0,
   timeLimit: 0, timeLeft: 0, groundKilled: 0 }
 ```
@@ -387,7 +389,7 @@ else                    ok = dist < lockDist * 1.35 && -dir.y > -0.10;   // 距�
 - **一次按键只打 1 枚**（占 1 个槽），但 `nShot = min(wp.salvo || 1, spAmmo)` 枚会从**同一个槽**里连续出膛 —— “三联装”是“按一下出三枚”，不是“一个挂点占三个槽”。弹体从同一发射位置出膛，不做偏移。
 - 发射位置按槽号排布：`side = (si2 % 2) ? 1 : -1`、`rank = floor(si2 / 2)`，机体坐标上偏出 `2.4 + rank * 1.9` 米。
 - `ecm` 单独一条：开机设 `spActive = wp.duration`、`spCd = wp.cd`（也占第 0 槽），播 `SFX.laser()` 与一句无线电；`dew` 直接 `return false`（自动系统）。
-- **交战规则**：`actor.isPlayer && w.roeBlocked` 且武器是 `asm / agm / bomb` 时拒绝发射，并让 `SEXTANT` 播报“该武器被锁定”。
+- **没有交战规则拦截**：旧的 `roeBlocked` 分支已删，调节单元附近开火只有误伤扣分这一种后果。
 - **无目标也允许发射**（无制导弹与“打出去自己找”的弹都不该被拦）。出声：玩家 `SFX.missile()` + `shotsFired++`；AI 距离玩家 < 6000 m 时 `SFX.missileFar()`。
 
 `cycleSpecial()`（`R`）只在 `loadoutList.length >= 2` 时切 `wpIdx`，然后 `syncWeapon()` 把槽数组里**最快就绪的槽**折算成 `spCd`。切枪**不清零 `lockProgress`**：换弹种类后“还锁不锁得住”应由新武器的参数重判，清零会让“对同一个敌人连打几种弹”这个多挂载玩法打不出来。
@@ -425,14 +427,14 @@ var WD_LIMIT = 1.5;
 | 机库 | `buildHangar()` → `buildHardpointEditor()` | `AIRCRAFT` + `WEAPONS` + `loadouts` |
 | 战役选择 | `buildCampaignList()` | `CAMPAIGNS[]` + `cleared`（进度） |
 | 简报 | `buildBrief()` + `buildMissionList()` + `drawMap()` | `MISSIONS[missionIdx]` + `CAMPAIGNS[activeCampaign]` |
-| 资料库 | `buildCodex()` | `CODEX[]`（条目可给 `html` 或 `build()`） |
+| 资料库 | `buildCodex()` | `CODEX[]`（条目可给 `html` 或 `build()`，可选 `mount()`） |
 | 更新记录 | `buildChangelog()` | `CHANGELOG.releases[]`（`js/changelog.js`，自动生成） |
 | 结算 | `finish()` | 当场算出的 `score / rank / rows` |
 
 - `buildSettingsInto(container)` 先 `container.innerHTML = ''`，再按 `SET_GROUPS` 的组标题、`makeSetRow(item)` 逐项生成；`range / select / toggle` 三种控件各一支分支。改设置项**只需动 `SET_GROUPS` + `DEFAULTS`**，独立设置页与暂停菜单自动同步。视角用 `select`（而不是热切换）是刻意的：视角误触的代价是一瞬间失去态势感知，必须“主动选、确认”。
 - `buildHelpHTML(forPause)` 返回**两种排版**：`true` 单栏（暂停菜单，`<h4>` + `<table>`）、`false` 双栏（独立手册，两个 `.help-col`）。早期两处是两份独立 HTML，改一个忘一个。
 - 机库是**唯一让玩家做长期规划的地方**，所以 `buildHangar()` 每次都重算：`resolveLoadout` / `loadoutMass` / `passiveEffects` → 六维条显示**挂载之后**的实际值（缩水段用暗红标出并写净损失）→ 挂载点编辑器 → 俯视图 `PLANFORM.draw()`。选机体时重置 `activeHpGroup`；`loadouts[ac.id]` 只在第一次访问时按 `defaultLoadout` 初始化，之后留着玩家的改动。
-- `buildBrief()` 末尾一定调 `drawMap(m)`；地图**不画陆地** —— 战役全在纯海域上进行，画岛等于承诺一片不存在的地形。`buildCodex()` 的条目支持 `build()` 动态生成，图鉴那几条必须动态出，否则改了 `data.js` 文档就对不上。
+- `buildBrief()` 末尾一定调 `drawMap(m)`；地图**不画陆地** —— 战役全在纯海域上进行，画岛等于承诺一片不存在的地形。`buildCodex()` 的条目支持 `build()` 动态生成，图鉴那几条必须动态出，否则改了 `data.js` 文档就对不上。条目带 `mount()` 的，在 `innerHTML` 写进去之后再调（DOM 要先就位）—— `s4` 用它挂调节单元的 3D 预览。
 - `buildChangelog()` 只画不写：版本号与条目全在 `CHANGELOG`（`js/changelog.js`）里，而它是 `tools/release.js` 从根目录 `CHANGELOG.md` 生成的。**发新版本不需要改这个函数**，只改 `CHANGELOG.md` 再跑一次生成脚本。条目文本里的 `**强调**` 与 `` `代码` `` 由 `clInline()` 还原成 `<b>` / `<code>`，而且**先转义再还原** —— 顺序反过来的话，转义会把刚生成出来的标签一起逃掉。`js/changelog.js` 缺失时（开发中直接开 `index.html`）降级成一句提示，与版本戳同一种处理。
 
 ---

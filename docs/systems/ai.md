@@ -351,6 +351,12 @@ a.route = {
 到点后 `wp` 与 `exit` 互换，在两点之间来回飞、永不退场 —— 击落是唯一让它
 消失的方式。轰炸机是**事件**，预警机得一直在那儿看着。
 
+**巡视型**（`route.wps`，m5 的管理局勤务机 MERLI「水准」）：一串航点
+`{ wps: [V…], wpIdx, wp, alt, arrive }`。到点就 `wpIdx = (wpIdx + 1) % wps.length`、
+`wp = wps[wpIdx]`、`alt = wp.y`（每个航点自带高度），有 `onArrive` 就调一次；
+飞完一圈从头再来，永不退场。到点判定里它**先于** `loiter` 检查。
+m5 的航点是单元编组中心、比编组基准高度低 1500 m，见 [missions.md](missions.md#调节单元阵列-spawncellfield)。
+
 **三段**：`ingress`（进场）→ 到点触发 `onArrive`，把 `wp` 换成 `exit`、
 `alt` 换成 `exitAlt` → `egress`（脱离）。飞完最后一段就 `alive = false`
 自行消失，不会掉头回来再打一遍。
