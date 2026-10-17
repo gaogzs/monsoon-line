@@ -1686,7 +1686,16 @@ var Ent = (function () {
   }
 
   /* 炮口位置（side 0 = 左，1 = 右）。子弹出膛与火光共用这一份。 */
+  /* 模型上画了炮管的机型，按炮管口的机体坐标 [|x|, y, z] 出膛。
+     G-6 的 CEL-7 两根炮管在机头下方 (±0.28, -0.78, 10.2)，
+     以前统一用"机头前 6 m、左右 0.7 m"，火光和弹道都落在机身里面。 */
+  var GUN_MUZZLE = { s6: [0.28, -0.78, 10.2] };
   function gunMuzzle(a, side) {
+    var g = GUN_MUZZLE[a.model];
+    if (g) {
+      return M3.add(a.pos, M3.add(M3.mul(a.right, side ? g[0] : -g[0]),
+        M3.add(M3.mul(a.up, g[1]), M3.mul(a.fwd, g[2]))));
+    }
     return M3.add(a.pos, M3.add(M3.mul(a.fwd, 6), M3.mul(a.right, side ? 0.7 : -0.7)));
   }
 

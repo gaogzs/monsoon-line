@@ -62,6 +62,31 @@ var Radio = (function () {
 })();
 
 /* ============================================================
+   系统提示 —— 屏幕中下方，一次只显示一条，新的顶掉旧的
+   ============================================================ */
+var SysNote = (function () {
+  var timer = null;
+  function show(html, opt) {
+    opt = opt || {};
+    var box = document.getElementById('sysnote');
+    if (!box) return;
+    box.innerHTML = '<div class="sys-line' + (opt.warn ? ' warn' : '') + '">' + html + '</div>';
+    var line = box.firstChild;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      line.style.opacity = '0';
+      timer = setTimeout(function () { if (line.parentNode) line.parentNode.removeChild(line); }, 400);
+    }, (opt.dur || 2.2) * 1000);
+  }
+  function clear() {
+    clearTimeout(timer);
+    var box = document.getElementById('sysnote');
+    if (box) box.innerHTML = '';
+  }
+  return { show: show, clear: clear };
+})();
+
+/* ============================================================
    游戏
    ============================================================ */
 var Game = (function () {
@@ -141,7 +166,7 @@ var Game = (function () {
        那些行的淡出是靠战斗循环里的 Radio.update() 推进的，
        一旦回到菜单就再没人管它们 —— 于是最后几条会永远挂在屏幕上。
        （从战斗中返回主菜单后残留的通讯记录就是这个原因。） */
-    if (id) Radio.clear();
+    if (id) { Radio.clear(); SysNote.clear(); }
 
     /* 资料库的详情页有一个常驻的 requestAnimationFrame 在转模型，
        离开这一屏必须停掉 —— 否则它在后台一直烧 CPU（而且画在
@@ -1277,7 +1302,7 @@ var Game = (function () {
     /* 判据只有一处：data.js 的 roeRestricted() —— 武器 desc 末尾那句
        交战规则提示也是由它生成的，两边不会再对不上。 */
     if (actor.isPlayer && w.roeBlocked && roeRestricted(wp)) {
-      Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>交战规则限制 —— 该武器在阵列空域内被锁定。</b>', gap: 0.9 });
+      SysNote.show('<b>交战规则限制 —— 该武器在阵列空域内被锁定。</b>', { warn: true });
       return false;
     }
     /* 无目标也允许发射。
@@ -1441,6 +1466,7 @@ var Game = (function () {
     camPos = M3.add(p.pos, M3.V(0, 30, -110));
 
     Radio.clear();
+    SysNote.clear();
     Radio.play(mission.id, 'start');
 
     banner = { t: 3.4, title: mission.no.replace('OPERATION ', 'OPERATION '), sub: mission.name + '   //   ' + mission.en, col: HUD.AMBER };
@@ -1537,13 +1563,9 @@ var Game = (function () {
       player.ewPower = 0;
       player.ewWid = null;
     }
-    Radio.raw({
-      who: CALLSIGN.player, cls: 'ally',
-      tx: player.emcon
-        ? '<b>EMCON-Δ 电磁静默。</b>雷达关机，数据链断开。'
-        : '解除静默，雷达开机。',
-      gap: 0.6
-    });
+    SysNote.show(player.emcon
+      ? '<b>EMCON-Δ 电磁静默。</b>雷达关机，数据链断开。'
+      : '解除静默，雷达开机。');
     SFX.confirm();
   }
 
@@ -1635,10 +1657,7 @@ var Game = (function () {
        得重新等整圈转完。可"对同一个敌人连打几种弹"正是多挂载的意义 ——
        先一枚雷达弹逼它做机动，再补一枚红外弹，这一套打不出来，
        挂载系统就只剩下"选一发威力最大的"这一个玩法了。 */
-    Radio.raw({
-      who: CALLSIGN.player, cls: 'ally',
-      tx: '挂载切换：<b>' + w.name + ' 「' + w.cn + '」</b>', gap: 0.5
-    });
+    SysNote.show('挂载切换：<b>' + w.name + ' 「' + w.cn + '」</b>');
     SFX.confirm();
   }
 
@@ -1671,7 +1690,7 @@ var Game = (function () {
     var w = WEAPONS[player.special];
     if (w.kind === 'ecm') { launch(player, null, world); return; }
     if (w.kind === 'dew') {
-      Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: 'GUS-2 是自动拦截系统，无需手动发射。', gap: 0.6 });
+      SysNote.show('GUS-2 是自动拦截系统，无需手动发射。');
       return;
     }
     if (player.spAmmo <= 0) { SFX.loseLock(); return; }
@@ -1696,7 +1715,7 @@ var Game = (function () {
     if (t) {
       var mism = targetMismatch(w, t);
       if (mism) {
-        Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: mism, gap: 0.7 });
+        SysNote.show(mism, { warn: true });
         SFX.fail();
         return;
       }
