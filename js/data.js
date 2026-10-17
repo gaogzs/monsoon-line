@@ -994,7 +994,7 @@ var SHIPS = [
   {
     id: 'daplu',
     model: 'daplu',
-    hull: 'DAPLU Mk.1',
+    hull: '屿级',
     name: 'Daplu',
     cn: '屿',
     cls: '巡逻艇',
@@ -1025,7 +1025,7 @@ var SHIPS = [
   {
     id: 'skori',
     model: 'skori',
-    hull: 'SKORI',
+    hull: '准绳级',
     name: 'Skori',
     cn: '准绳',
     cls: '布缆船',
@@ -1054,7 +1054,7 @@ var SHIPS = [
   {
     id: 'diklo',
     model: 'diklo',
-    hull: 'DIKLO',
+    hull: '标杆级',
     name: 'Diklo',
     cn: '标杆',
     cls: '海洋测量船',
@@ -1082,7 +1082,7 @@ var SHIPS = [
   {
     id: 'cross',
     model: 'cross',
-    hull: 'MV SOUTHERN CROSS',
+    hull: '南十字号',
     name: 'Southern Cross',
     cn: '南十字',
     cls: '重货船 / 滚装',
@@ -1112,7 +1112,7 @@ var SHIPS = [
   {
     id: 'icecore',
     model: 'icecore',
-    hull: 'R/V ICECORE',
+    hull: '冰芯号',
     name: 'Icecore',
     cn: '冰芯',
     cls: '水文调查船',
@@ -1141,7 +1141,7 @@ var SHIPS = [
   {
     id: 'atoll',
     model: 'atoll',
-    hull: 'OSV ATOLL',
+    hull: '环礁号',
     name: 'Atoll',
     cn: '环礁',
     cls: '观察船',

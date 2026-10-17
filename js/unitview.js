@@ -461,11 +461,8 @@ var UnitView = (function () {
 
     /* 标题读法按装备类型分：
          机型 —— 型号在前，中文名在后（D-14 旗鱼），英文绰号跟在后面小字
-         军舰 —— 只写级名（蓝鲸级），英文名小字；舰种在副标题里。
-                 上下游军舰不挂字母数字编号，hull 字段存的就是级名
-         其他船 —— 船名在前，中文名在后（MV SOUTHERN CROSS 南十字） */
-    var isClass = !isAir && /级$/.test(r.hull || '');
-    var name = isAir ? (r.name + ' ' + r.cn) : (isClass ? r.hull : (r.hull + ' ' + r.cn));
+         舰船 —— 只写级名或船名（蓝鲸级、南十字号），英文名小字；舰种在副标题里 */
+    var name = isAir ? (r.name + ' ' + r.cn) : r.hull;
     var nick = isAir ? (r.nick || '') : (r.name || '');
     var sub = isAir
       ? [r.faction, r.role].filter(Boolean).join(' · ')
