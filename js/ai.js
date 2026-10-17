@@ -398,6 +398,7 @@ var AI = (function () {
       evadeT: 0,
       msl: null,
       flareT: 0,
+      flareBurst: 0,      // 这一串诱饵还剩几组没放
       shootT: 0,
       burstT: 0,
       ewResist: 0,        // 对敌方电子战的适应度（设定 7.3"对手也在学"）
@@ -667,6 +668,17 @@ var AI = (function () {
       }
     }
 
+    // 诱饵连放：一串放完（或放光）之后才开始 1.8 s 的决策冷却
+    if (s.flareBurst > 0) {
+      if (a.flares <= 0) {
+        s.flareBurst = 0;
+        s.flareT = 1.8;
+      } else if (a.flareCd <= 0 && Ent.breakLock(a, world)) {
+        s.flareBurst--;
+        if (s.flareBurst === 0) s.flareT = 1.8;
+      }
+    }
+
     /* ---------- 4. 分派行为 ---------- */
     var desired;
     var throttle = 0.85, ab = false;
@@ -676,9 +688,13 @@ var AI = (function () {
       desired = r.dir;
       throttle = r.throttle;
       ab = r.ab;
-      if (s.flareT <= 0 && a.flares > 0 && a.flareCd <= 0) {
-        s.flareT = 1.8;
-        Ent.breakLock(a, world);
+      /* 决定放诱饵时不是只丢一组，而是随机连放 2–5 组（每组之间
+         由 breakLock 的 flareCd 隔 0.45 s）。只丢一组在现在的诱饵规则下
+         几乎骗不到弹 —— 同一枚弹被反复投放会越来越难骗，
+         但一组都没骗到就等于没放。连放的后续几组在下面统一处理，
+         这样中途切出 evade 也会把这一串放完。 */
+      if (s.flareT <= 0 && !s.flareBurst && a.flares > 0 && a.flareCd <= 0) {
+        s.flareBurst = 2 + Math.floor(Math.random() * 4);
       }
     } else if (s.mode === 'extend') {
       // 向低威胁方向脱离，同时保持能量
