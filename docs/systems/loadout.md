@@ -221,7 +221,7 @@ function canCarry(ac, w) {
 `getLoadout(ac)` 按需初始化，结构就是"组号 → 武器键"：
 
 ```js
-loadouts['c11'] = { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
+loadouts['c11'] = { A: 'srm', B: 'v11', C: 'oep' }
 ```
 
 默认值取自机型的 `defaultLoadout`，未指定的组是 `null`（空置）。
