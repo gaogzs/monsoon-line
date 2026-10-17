@@ -1361,6 +1361,29 @@ if (Ent && M3 && me && world) {
     else ok('追尾镜头：地平线稳定、俯仰钳在 89°、全程不抽动');
   }
 
+  /* ---- 鼠标引导时镜头俯仰软膝 ----
+     以前 72°·tanh 实际只到 61°。现在 78° 以下镜头完全跟瞄准，
+     拉满 89° 时镜头约 85°，且永远低于 89° 的硬限位（正交基余量）。 */
+  {
+    const CP = sandbox.Game.__camPitch;
+    const D = Math.PI / 180;
+    const bad = [];
+    const top = CP.softKnee(CP.AIM_LIM, CP.KNEE, CP.LIM) / D;
+    if (top < 84 || top > 87) bad.push('瞄准拉满时镜头俯仰 ' + top.toFixed(2) + '°（应在 84°–87°）');
+    if (CP.LIM >= 89 * D) bad.push('软膝上限 ' + (CP.LIM / D).toFixed(1) + '° 没留在 89° 硬限位之下');
+    for (let a = 0; a <= 78; a += 1) {
+      if (Math.abs(CP.softKnee(a * D, CP.KNEE, CP.LIM) - a * D) > 1e-12) { bad.push(a + '° 被压了（78° 以下应原样）'); break; }
+    }
+    let prev = -Infinity;
+    for (let a = -89; a <= 89; a += 0.25) {
+      const v = CP.softKnee(a * D, CP.KNEE, CP.LIM);
+      if (v < prev) { bad.push('软膝不单调（' + a + '°）'); break; }
+      prev = v;
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('镜头俯仰软膝：78° 以下原样，瞄准 89° 时镜头 ' + top.toFixed(1) + '°');
+  }
+
   /* ---- 追尾镜头：出画处理（静态拉远 / 侧滑软钳 / 拉远带滞回） ----
      以前出画就用滞后的 camOff 瞬间后推，平滑又把深度拉回，
      大机动时镜头前后反复跳。这里复现 updateCamera 里 camOff 那段，
@@ -1856,11 +1879,17 @@ if (Ent && M3 && me && world) {
         fwd: M3.V(0, 0, 1), up: M3.V(0, 1, 0), right: M3.V(1, 0, 0),
         phys: { pitch: 0.76, roll: 3.0, yaw: 0.30 }, ctrlAuth: 1, ctrl: {}
       };
-      let tot = 0;
+      let tot = 0, tailRoll = 0, tailN = 0, tailErr = 0;
       for (let t = 0; t < T; t += dt) {
-        AI.steerTo(a, aimFn(t), a.ctrl, a, dt);
+        const want = aimFn(t);
+        AI.steerTo(a, want, a.ctrl, a, dt);
         const c = a.ctrl;
         tot += a.phys.roll * dt * Math.abs(c.roll);
+        // 最后 2 秒：滚转杆量与机头误差（稳住了没有）
+        if (t > T - 2) {
+          tailRoll += Math.abs(c.roll); tailN++;
+          tailErr = Math.max(tailErr, Math.acos(Math.min(1, M3.dot(a.fwd, want))) / D);
+        }
         const pk = c.pitch >= 0 ? 1 : 0.5;
         let g = -a.phys.pitch * pk * dt * c.pitch;
         a.fwd = M3.rotAxis(a.fwd, a.right, g); a.up = M3.rotAxis(a.up, a.right, g);
@@ -1871,15 +1900,31 @@ if (Ent && M3 && me && world) {
         const B = M3.orthonormalize(a.fwd, a.up);
         a.fwd = B.fwd; a.up = B.up; a.right = B.right;
       }
-      return tot / D;
+      return { roll: tot / D, tailRoll: tailRoll / Math.max(1, tailN), tailErr };
     }
-    const r1 = totalRoll(t => dir(0, -Math.min(60 * t, 89) * D), 6);
-    const r2 = totalRoll(t => dir(-Math.max(0, t - 1.5) * 40 * D, -Math.min(50 * t, 70) * D), 6);
+    const r1 = totalRoll(t => dir(0, -Math.min(60 * t, 89) * D), 6).roll;
+    const r2 = totalRoll(t => dir(-Math.max(0, t - 1.5) * 40 * D, -Math.min(50 * t, 70) * D), 6).roll;
+    /* 往上同理：镜头俯仰放到约 85° 之后，鼠标引导会更常把瞄准点拉到正上方。
+       机体基只由 orthonormalize(fwd, up) 维护、不参考世界 up，本身没有极点；
+       但 steerTo 的"改平"参考是世界水平，竖直附近坡度是噪声 —— 要确认它不追噪声。 */
+    // 瞄准点偏开 15° 方位拉上去 —— 正对机头平面的话就是纯拉杆，测不出东西
+    const u3 = totalRoll(t => dir(15 * D, Math.min(60 * t, 89) * D), 6);
+    const r4 = totalRoll(t => dir(Math.max(0, t - 1.5) * 40 * D, Math.min(50 * t, 70) * D), 6).roll;
+    /* 停在 89° 时鼠标左右晃：方位角来回 ±60°。在极点附近这只是几度的真实位移，
+       飞机不该跟着方位角整圈地滚。 */
+    const r5 = totalRoll(t => dir(60 * D * Math.sin(t * 1.5), Math.min(60 * t, 89) * D), 8).roll;
     const bad = [];
     if (r1 > 250) bad.push('瞄准点拖到正下方后累计滚转 ' + r1.toFixed(0) + '°（在竖直附近原地连滚）');
     if (r2 > 420) bad.push('先俯冲再侧转累计滚转 ' + r2.toFixed(0) + '°（倒飞时改平方向翻号）');
+    if (u3.roll > 250) bad.push('瞄准点拖到正上方后累计滚转 ' + u3.roll.toFixed(0) + '°（在竖直附近原地连滚）');
+    if (u3.tailRoll > 0.05) bad.push('瞄准点停在正上方后还在滚（滚转杆量均值 ' + u3.tailRoll.toFixed(3) + '）');
+    if (u3.tailErr > 2) bad.push('瞄准点停在正上方后机头偏离 ' + u3.tailErr.toFixed(2) + '°（没稳住）');
+    if (r4 > 420) bad.push('先拉起再侧转累计滚转 ' + r4.toFixed(0) + '°');
+    if (r5 > 360) bad.push('停在正上方时左右晃鼠标累计滚转 ' + r5.toFixed(0) + '°（跟着方位角噪声连滚）');
     if (bad.length) bad.forEach(fail);
-    else ok('俯冲不连滚：拖到正下方累计滚转 ' + r1.toFixed(0) + '°，先下再侧 ' + r2.toFixed(0) + '°');
+    else ok('竖直附近不连滚：拖到正下方 ' + r1.toFixed(0) + '°，先下再侧 ' + r2.toFixed(0) +
+      '°；拖到正上方 ' + u3.roll.toFixed(0) + '°（停住后杆量 ' + u3.tailRoll.toFixed(3) +
+      '、误差 ' + u3.tailErr.toFixed(2) + '°），先上再侧 ' + r4.toFixed(0) + '°，正上方晃鼠标 ' + r5.toFixed(0) + '°');
   }
 
   /* ---- 两组挂架挂同一种武器：槽下标不能撞 ----

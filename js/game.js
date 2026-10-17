@@ -2583,6 +2583,19 @@ var Game = (function () {
   var EXTRA_DOWN = 0.8;        // C：收回速率（约 1–2 s 凑回）
   var EXTRA_HOLD = 0.6;        // C：需求消失后保持多久才开始收回
 
+  /* 鼠标引导时镜头俯仰的软膝：CAM_SOFT_KNEE 以下镜头完全跟瞄准方向，
+     之外 tanh 渐近 CAM_SOFT_LIM。瞄准拉满（AIM_PITCH_LIM = 89°）时镜头约 85.6°。
+
+     以前是 72°·tanh(x / 72°)：看着是"渐近 72°"，实际瞄准拉满时镜头只有
+     72·tanh(89/72) ≈ 61°，而且 30° 起就开始被压 —— 机头明显比镜头高。
+
+     上限停在 87° 而不是 89°：追尾镜头另有 89° 硬限位防正交基退化
+     （见 updateCamera 里 CAM_PITCH_LIM 的说明），软膝渐近 87°
+     永远碰不到它，|up| ≥ cos 87° ≈ 0.052，离退化阈值 1e-4 有 500 倍余量。
+     代价是拉到正上方时画面大半是天，俯仰刻度的消失阈值跟着放到了 87.7°。 */
+  var CAM_SOFT_KNEE = 78 * Math.PI / 180;
+  var CAM_SOFT_LIM = 87 * Math.PI / 180;
+
   function camBasis(camDir) {
     var r = M3.norm(M3.cross(M3.V(0, 1, 0), camDir));
     if (M3.len(r) < 0.5) r = M3.V(1, 0, 0);
@@ -2712,14 +2725,8 @@ var Game = (function () {
 
       // ② 俯仰：先钳位，再平滑
       var camPitchAng = Math.atan2(lookDir.y, Math.max(hlen, 1e-4));
-      /* 跟瞄准方向时俯仰做软限幅（tanh，渐近 72°）：瞄准点推到正上方时
-         镜头不会直挺挺对着天顶 —— 那里只有一片空天，云层、地平线和俯仰
-         刻度全都出画，画面会突然"变空"。准星这时落在画面中心偏上，
-         照样投影在瞄准方向上，看得见。 */
-      if (lookAim) {
-        var CAM_SOFT = 72 * Math.PI / 180;
-        camPitchAng = CAM_SOFT * Math.tanh(camPitchAng / CAM_SOFT);
-      }
+      // 跟瞄准方向时俯仰过一道软膝，见 CAM_SOFT_KNEE / CAM_SOFT_LIM 的说明
+      if (lookAim) camPitchAng = softKnee(camPitchAng, CAM_SOFT_KNEE, CAM_SOFT_LIM);
       camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
       if (camPitchSmooth === null) camPitchSmooth = camPitchAng;
       camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-pitchRate * dt));
@@ -3691,6 +3698,13 @@ var Game = (function () {
       softClampFrame: softClampFrame,
       stepFrameExtra: stepFrameExtra,
       FRAME_SOFT_LIM: FRAME_SOFT_LIM
+    },
+    // 鼠标引导时镜头俯仰的软膝
+    __camPitch: {
+      softKnee: softKnee,
+      KNEE: CAM_SOFT_KNEE,
+      LIM: CAM_SOFT_LIM,
+      AIM_LIM: AIM_PITCH_LIM
     }
   };
 })();
