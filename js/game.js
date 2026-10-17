@@ -406,9 +406,9 @@ var Game = (function () {
     '发射包线：锁定框淡橙 = 射程外，橙色 = 射程内，<b>红色 = NEZ 不可逃逸区</b>，此时发射敌机极难摆脱。',
     '能量机动：爬升掉速、俯冲增速。低速时舵效下降，谨防失速。',
     '导弹规避：把来袭导弹放在 3/9 线（正横），持续桶滚消耗其能量。',
-    '动压 Q：18 km 以上的空气密度只有海平面的 12%。低于 <b>12 kPa</b> 时舵面开始失效、导弹过载崩塌 —— 但机炮的弹道反而更平直。',
-    '交战规则：阵列空域内 20 kg 以上战斗部被禁用，重武器会自动锁定。',
-    '注意地面：低于 200 m 触发地形告警，撞地即任务失败。'
+    '动压 Q：18 km 以上的空气密度只有海平面的约 10%。动压低于 22 kPa 舵效开始下降，低于 <b>12 kPa</b> 告警，导弹也拉不动过载；机炮射程则会变远。',
+    '交战规则：阵列空域内对地弹、反舰弹与炸弹一律锁定，空空弹与机炮照常使用。',
+    '注意高度：低于 200 m 触发低高度告警，坠海即任务失败。'
   ];
 
   /** 操作说明。forPause=true 输出单栏（暂停菜单），否则输出双栏（独立手册页） */
@@ -530,7 +530,7 @@ var Game = (function () {
       sum += '<div class="ld-row empty"><span class="n">无挂载</span></div>';
     }
     sum += '<div class="ld-row"><span class="n">干扰弹</span>' +
-      '<span class="a">×8</span><span class="s">固定</span></div>';
+      '<span class="a">×80</span><span class="s">基数</span></div>';
 
     /* 挂载影响：逐项列出来。
        以前这里只有一句 "机动性 −(loadK×18)%" —— 那只取了俯仰一项，
@@ -557,7 +557,7 @@ var Game = (function () {
     }
     sum += '</div>';
     sum += '<div class="ld-note">编号前缀取自逻辑语词根 —— ' +
-      '环带工程自 2062 年起以逻辑语为签字语言，详见资料库。</div>';
+      '环带工程是最早把逻辑语用作签字语言的厂商，详见资料库。</div>';
     document.getElementById('acLoadout').innerHTML = sum;
 
     /* ---- 3D 预览：机体 + 当前挂载，改了挂载立刻换模型（转角保留） ---- */
@@ -985,12 +985,25 @@ var Game = (function () {
       g.beginPath(); g.moveTo(W * i / 6, 0); g.lineTo(W * i / 6, H); g.stroke();
       g.beginPath(); g.moveTo(0, H * i / 6); g.lineTo(W, H * i / 6); g.stroke();
     }
-    var R = 17000;
-    var cx = W / 2, cy = H * 0.72;
-    // 世界坐标 → 屏幕坐标。x 与 z 的缩放系数不同（地图是压扁的），
-    // 所以陆块在屏幕上也会被相应拉伸。
-    function MX(wx) { return cx + wx / R * (W * 0.45); }
-    function MY(wz) { return cy - wz / R * (H * 0.62); }
+    /* 地图**北朝上**。任务里的标记写的是世界坐标（与 spawn 用的同一套数），
+       这里按 mission.axis（世界 +z 的真方位）旋转成 东/北 再画：
+         E = x·cosθ + z·sinθ，N = −x·sinθ + z·cosθ
+       比例尺按全部标记自动取景，x / N 用同一个缩放，不再压扁。
+       type 'start' 的那一个是玩家进入点，画成箭头，dir 是它的世界航向（默认 +z）。 */
+    var th = (m.axis || 0) * Math.PI / 180;
+    var ct = Math.cos(th), st = Math.sin(th);
+    function EN(p) { return { e: p.x * ct + p.z * st, n: -p.x * st + p.z * ct }; }
+    var e0 = Infinity, e1 = -Infinity, n0 = Infinity, n1 = -Infinity;
+    for (i = 0; i < m.map.length; i++) {
+      var q = EN(m.map[i]);
+      e0 = Math.min(e0, q.e); e1 = Math.max(e1, q.e);
+      n0 = Math.min(n0, q.n); n1 = Math.max(n1, q.n);
+    }
+    var padX = 70, padY = 26;
+    var span = Math.max((e1 - e0) / (W - padX * 2 - 60), (n1 - n0) / (H - padY * 2), 1);
+    var ecx = (e0 + e1) / 2, ncy = (n0 + n1) / 2;
+    function SX(q) { return W / 2 + (q.e - ecx) / span; }
+    function SY(q) { return H / 2 - (q.n - ncy) / span; }
 
     /* 这里不再画陆地。
 
@@ -1000,16 +1013,26 @@ var Game = (function () {
        会发现海面上什么都没有。地图只画海面与任务标记，
        反而和实际看到的东西一致。 */
 
-    var cols = { base: '#4fe08a', enemy: '#ff4d4d', relay: '#ffb03a', sam: '#ff8b2a', site: '#45d6ff' };
+    var cols = { base: '#4fe08a', start: '#4fe08a', enemy: '#ff4d4d', relay: '#ffb03a', sam: '#ff8b2a', site: '#45d6ff' };
 
     for (i = 0; i < m.map.length; i++) {
       var p = m.map[i];
-      var x = MX(p.x);
-      var y = MY(p.z);
+      var qq = EN(p);
+      var x = SX(qq);
+      var y = SY(qq);
       var col = cols[p.type] || '#8fa3b2';
       g.strokeStyle = col; g.lineWidth = 1.6;
       g.beginPath();
-      if (p.type === 'enemy') {
+      if (p.type === 'start') {
+        // 玩家进入箭头：方向 = 世界航向 dir（度，0 = +z）旋到真方位
+        var hd = ((p.dir || 0) + (m.axis || 0)) * Math.PI / 180;
+        var ux = Math.sin(hd), uy = -Math.cos(hd);
+        g.lineWidth = 2;
+        g.moveTo(x - ux * 16, y - uy * 16); g.lineTo(x + ux * 12, y + uy * 12);
+        g.moveTo(x + ux * 12, y + uy * 12); g.lineTo(x + ux * 4 - uy * 5, y + uy * 4 + ux * 5);
+        g.moveTo(x + ux * 12, y + uy * 12); g.lineTo(x + ux * 4 + uy * 5, y + uy * 4 - ux * 5);
+        g.stroke();
+      } else if (p.type === 'enemy') {
         g.moveTo(x, y - 6); g.lineTo(x + 5, y + 4); g.lineTo(x - 5, y + 4); g.closePath();
         g.stroke();
       } else {
@@ -1020,16 +1043,14 @@ var Game = (function () {
       g.fillText(p.label, x + 8, y + 3);
     }
 
-    // 玩家进入箭头
-    g.strokeStyle = '#4fe08a'; g.lineWidth = 2;
-    g.beginPath(); g.moveTo(cx, cy + 26); g.lineTo(cx, cy - 6);
-    g.lineTo(cx - 5, cy + 2); g.moveTo(cx, cy - 6); g.lineTo(cx + 5, cy + 2);
-    g.stroke();
-
     g.fillStyle = 'rgba(143,163,178,0.75)';
     g.font = '10px Consolas,monospace';
-    g.fillText('N', 8, 16);
-    g.fillText('SCALE 1:170000', 8, H - 8);
+    g.fillText('N ↑', 8, 16);
+    // 比例尺：10 km 一段
+    var sl = 10000 / span;
+    g.strokeStyle = 'rgba(143,163,178,0.75)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(8, H - 14); g.lineTo(8, H - 10); g.lineTo(8 + sl, H - 10); g.lineTo(8 + sl, H - 14); g.stroke();
+    g.fillText('10 km', 12 + sl, H - 8);
   }
 
   /* ============================================================
@@ -1298,7 +1319,7 @@ var Game = (function () {
       return false;                       // 没有槽表就退回旧的单冷却
     }
 
-    /* 交战规则：阵列空域内禁止 20 kg 以上战斗部 */
+    /* 交战规则：阵列空域内禁用对地 / 反舰弹与炸弹（按类别） */
     /* 判据只有一处：data.js 的 roeRestricted() —— 武器 desc 末尾那句
        交战规则提示也是由它生成的，两边不会再对不上。 */
     if (actor.isPlayer && w.roeBlocked && roeRestricted(wp)) {
@@ -1391,6 +1412,8 @@ var Game = (function () {
     /* 关卡时限落到世界上。任务脚本声明 timeLimit，主循环负责倒计时与判负。 */
     world.timeLimit = mission.timeLimit || 0;
     world.timeLeft = world.timeLimit;
+    // 本关世界 +z 轴的真方位（罗盘、方位报读、简报地图都按它换算）
+    world.axis = mission.axis || 0;
 
     var ac = AIRCRAFT[selectedAC];
     var lo = getLoadout(ac);
@@ -2333,7 +2356,7 @@ var Game = (function () {
         Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>你打爆了一个调节单元！</b>340 公斤碘化银在那一层高度散开了。', gap: 1.2 });
         if (source && source.isPlayer) world.friendlyLoss = (world.friendlyLoss || 0) + 1;
       } else if (tg.model === 'relay') {
-        Radio.raw({ who: CALLSIGN.wing2, cls: 'ally', tx: '中继平台开始漏气 —— 它下沉要四十分钟。', gap: 1.0 });
+        Radio.raw({ who: CALLSIGN.wing2, cls: 'ally', tx: '中继平台已摧毁。', gap: 1.0 });
       } else if (tg.model === 'sam') {
         Radio.raw({ who: CALLSIGN.wing3, cls: 'ally', tx: '阵地没了。', gap: 0.8 });
       }
@@ -2419,7 +2442,9 @@ var Game = (function () {
      那个分支以前没被跑到，加了基地目标之后才暴露出来。 */
   function bearing(from, to) {
     var dx = to.x - from.x, dz = to.z - from.z;
-    var deg = (Math.atan2(dx, dz) * 180 / Math.PI + 360) % 360;
+    // 真方位：世界 +z 的真方位由本关 mission.axis 决定（world.axis）
+    var axis = (world && world.axis) || 0;
+    var deg = ((Math.atan2(dx, dz) * 180 / Math.PI + axis) % 360 + 360) % 360;
     return ('00' + deg.toFixed(0)).slice(-3);
   }
 
@@ -2940,7 +2965,7 @@ var Game = (function () {
       ctx.fillStyle = 'rgba(255,176,58,0.9)';
       ctx.font = 'bold 12px Consolas,monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('交战规则生效 —— 重武器锁定', Renderer.W / 2, Renderer.H - 108);
+      ctx.fillText('交战规则生效 —— 对地 / 反舰武器锁定', Renderer.W / 2, Renderer.H - 108);
       ctx.restore();
     }
     if (world.detected && player.alive) {
@@ -3122,16 +3147,16 @@ var Game = (function () {
     document.getElementById('dTable').innerHTML = html;
 
     var quotes = {
-      m1: '「他们测绘的不是地形。是调节单元什么时候会漂到哪。」',
+      m1: '「他们测的是调节单元什么时候会漂到哪。」',
       m2: '「海上没有山可以躲。你能躲进去的，只有云底和浪头之间那几百米。」',
-      m3: '「冬港是我出生的地方。它是唯一一个还有水的镇子 —— 因为它在调节场的北面。」',
-      m4: '「他们不是为一场交战造的船。是为一次齐射造的。」',
+      m3: '「冬港是我出生的地方。它在调节场北面，所以是唯一还有水的镇子。」',
+      m4: '「那几条船只为一次齐射而造。」',
       m5: '「先让对手瞎掉，再打。这句话我们听了很多年，现在轮到我们用。」',
       m6: '「在稀薄大气里，最会飞的人属于那支装备更差的空军。」',
       m7: '「雾保护你，也一样保护他。」',
-      m8: '「他们不是来找我们的。他们是来炸我们身后的东西的。」',
+      m8: '「他们要炸的是我们身后的东西。」',
       m9: '「海面上漂着很多东西。有些是他们的。」',
-      m10: '「他不是来复仇的。他是来做交易的。」'
+      m10: '「他来做交易的。」'
     };
     document.getElementById('dQuote').textContent = win ? quotes[mission.id] || '' :
       '任务失败。那片空域还在他们手里，而下一次出动要等下一班油。';

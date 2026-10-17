@@ -133,7 +133,7 @@ var AIRCRAFT = [
     desc: `
 <p>整个上游公约空军只有 <b>31 架</b>。它的存在理由只有一个：<b>两万米</b>。</p>
 <p>翼载压到 <b>240 kg/m²</b>，配上第三涵道在 20 公里高度仍能给出的推力，
-它是这个世界上少数几种能在那个高度维持 M2.0 以上机动的有人机。</p>
+它是这个世界上少数几种能在那个高度维持 M1.8 以上机动的有人机。</p>
 <p><b>第三涵道真正买来的是控制力矩，不只是推力。</b>
 空气稀薄到动压只剩一两千时，别的飞机操纵面已经抓不住空气 ——
 旗鱼还能转。实测同样在 20 公里、速度掉到 200 m/s：
@@ -179,9 +179,9 @@ var AIRCRAFT = [
 <p>一门 30mm 四管炮、一只 <b>14000 发</b>弹箱、和一口厚达 <b>38 毫米</b>的钛合金浴缸。
 这个设计逻辑从一百年前就没变过：把飞行员裹在装甲里，
 然后让他飞到防空炮火正中间去。</p>
-<p>两台自适应循环发动机塞在翼根，第三涵道的冷气流优先供给那口浴缸和弹药舱 ——
+<p>两台自适应循环发动机吊在两侧翼下短舱里，第三涵道的冷气流优先供给那口浴缸和弹药舱。
 G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。</p>
-<p><b>特点：</b>唯一能把机炮当主武器用的飞机。用它打空战是自杀，用它舔地是艺术。</p>`
+<p><b>特点：</b>唯一能把机炮当主武器用的飞机。空战别指望它，对地它最好用。</p>`
   },
 
   /* ============================================================
@@ -278,8 +278,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       非常壮观的方式自己拧断。这个问题困扰了工程师将近一百年，
       直到复合材料让机翼能按需要弯曲。
       <p>信天翁是上游公约第一架量产的前掠翼战斗机。
-      它飞不快，加速也一般，但<b>转得比这里任何一架都快</b> ——
-      在低速缠斗里，这个优势几乎没法用别的东西补回来。</p>`,
+      它飞不快，加速也一般，但<b>滚转比这里任何一架都快</b>，
+      低速缠斗时最灵活。</p>`,
     stats: { spd: 0.52, mob: 0.90, stl: 0.24, fire: 0.60, dur: 0.62, rng: 0.80 },
     phys: { vMax: 470, vMil: 380, vStall: 96, accel: 24, decel: 42, pitch: 0.74, roll: 2.81, yaw: 0.36, hp: 118 },
     gun: 'k3',
@@ -320,7 +320,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       全凭长机把目标参数喂过来。
       <p>上游公约对它的定位很直白：<b>一架 DB-11 带两架 KA-7，
       等于用一个人的编制换三个发射架。</b>
-      代价是它没有判断力 —— 长机被打掉，它就会原地盘旋到燃料耗尽。</p>`,
+      代价是它没有判断力：长机被打掉，它就只会原地盘旋。</p>`,
     stats: { spd: 0.50, mob: 0.76, stl: 0.32, fire: 0.42, dur: 0.28, rng: 0.38 },
     phys: { vMax: 460, vMil: 380, vStall: 96, accel: 26, decel: 44, pitch: 0.78, roll: 2.65, yaw: 0.40, hp: 58 },
     gun: 'k3',
@@ -517,7 +517,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
 
      群岛国不叫它战斗机，因为它的确不是：一架飞得慢、转得笨、
      但能在海上待很久的机器，机腹挂一副搜救吊舱，机头一门 20 mm 炮。
-     政变之后，它和「屿」级巡逻艇是这片海域里少数还会回应求救信号的东西。
+     政变之后，它和屿级巡逻艇是这片海域里少数还会回应求救信号的东西。
      ============================================================ */
   {
     id: 'spray',
@@ -534,7 +534,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     desc: `严格说它不算军用飞机：飞得慢、转得笨，
       唯一的本事是能在海上待六个小时。
       <p>机腹挂一副搜救吊舱、机头一门 20 毫米炮 —— 就这些。
-      政变之后，它和「屿」级巡逻艇是这片海域里少数几样
+      政变之后，它和屿级巡逻艇是这片海域里少数几样
       还会回应求救信号的东西。</p>`,
     stats: { spd: 0.28, mob: 0.30, stl: 0.10, fire: 0.26, dur: 0.52, rng: 0.92 },
     phys: { vMax: 340, vMil: 290, vStall: 82, accel: 14, decel: 36, pitch: 0.38, roll: 1.64, yaw: 0.30, hp: 110 },
@@ -566,8 +566,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     desc: `管理局自己的飞机。它的活是爬到两万米以上，
       给那些谁也靠不近的单元换零件 —— 那个高度上，
       飞得稳比飞得快重要得多。
-      名义上没有武器。不过在那个高度还没有人护航的，
-      通常也用不上武器。`,
+      名义上没有武器，只有一门自卫用的 CEL-2。`,
     stats: { spd: 0.30, mob: 0.22, stl: 0.20, fire: 0.10, dur: 0.72, rng: 0.86 },
     phys: { vMax: 310, vMil: 260, vStall: 78, accel: 11, decel: 34, pitch: 0.34, roll: 1.56, yaw: 0.26, hp: 180 },
     gun: 'k2',
@@ -1013,12 +1012,10 @@ var SHIPS = [
 <p>丹湾船厂把一条民用艇加了一门炮就交了出去。同型一共<b>四条</b>，
 政变之后它们挂着四种不同的旗 —— 其中一条的旗被撕掉了一半，
 一直没人去换。</p>
-<p>这是整个设定集里最能说明分水群岛国处境的一件装备：
-<b>船和上面的人都没有变，变的只是那条旗。</b></p>
+<p><b>船和上面的人都没变，变的只是旗。</b></p>
 <p>它跑不快、打不远、也没有任何像样的传感器。
-但它有一个别人都没有的身份：在政变之后的头两个月里，
-它是这片海域里少数几条<b>会回应求救信号</b>的船之一 ——
-另几条是群岛国的「浪花」巡逻机。</p>`
+但政变之后的头两个月里，它和群岛国的「浪花」巡逻机
+是这片海域里少数还<b>会回应求救信号</b>的东西。</p>`
   },
 
   /* ---------- 调节场管理局 ---------- */
@@ -1041,15 +1038,15 @@ var SHIPS = [
     vials: ['艏楼主绞盘', '艉部布缆机', '作业门架'],
     arms: ['无'],
     desc: `
-<p><b>skori 在逻辑语里是绳、索、缆。</b>它的名字不是比喻，是它的全部工作内容。</p>
+<p><b>skori 在逻辑语里是绳、索、缆。</b>这就是它的全部工作。</p>
 <p>第 7 号控制平台的四角锚系、九座控制平台之间的光纤、
 以及摆在海盆底上的那套水听器阵列 —— 这些线每一根都需要有人布、有人修。</p>
 <p><b>而切一条电缆比炸一座平台便宜得多。</b>整个战争期间，
 本作里没有出现过的"水下战"一直在这些平台上安静地进行：
-双方都在切对方的线。所以这条船永远在赶工，永远在去下一段的路上。</p>
+双方都在切对方的线。所以这条船一直在赶工。</p>
 <p>管理局是技术机构，它的船不挂军标、不带武器。
 值班员在无线电里确认损失时的语气，和确认一座平台被摧毁时一样 ——
-<b>那句话不是投降，也不是抗议。它只是记录。</b></p>`
+<b>只是记录，不带别的意思。</b></p>`
   },
   {
     id: 'diklo',
@@ -1205,7 +1202,7 @@ var WEAPONS = {
     /* 口径大、弹重 → 炮口跳动更大，散布比 CEL-3 再大一档。 */
     rpm: 3900, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
     range: 2000, highRange: 3100,
-    desc: 'G-6 专用。一发足以打穿装甲车辆的顶甲。'
+    desc: 'G-6 专用。一发足以打穿巡逻艇的上层建筑。'
   },
 
   /* ---------- 各势力自己的机炮 ----------
@@ -1323,8 +1320,10 @@ var WEAPONS = {
     turn: 1.35, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 9500,
     dmg: 52, ammo: 2, cd: 0.92, salvo: 1, flare: 0.35, prox: 28,
     target: 'air',
-    /* 反辐射：对**正在辐射**的目标伤害翻倍（判据见 entities.js 的
-       isRadiating）—— 预警机、开机中的干扰吊舱。
+    /* 反辐射：对**正在辐射**的**空中**目标伤害翻倍（判据见 entities.js 的
+       isRadiating）—— 未被压哑的预警机、开机中的干扰吊舱。
+       它是对空弹（target: 'air'），锁不了地面 / 海面目标，地面雷达站
+       不在反辐射范围内。
 
        这个字段被删过一次，理由写得很实在：全项目没有一处读它，
        世界里既没有"雷达开机状态"、也没有预警机，于是它只是一句
@@ -1334,15 +1333,15 @@ var WEAPONS = {
        它的主定位仍然是**重型拦截弹**（数值本来就在说这件事）：
        战斗部 52 与近炸半径 28 米都是全场最大，可用过载只有 1.35、
        锁定锥 26° —— 打机动的战斗机很吃力，打大目标是最好的一发。
-       反辐射只是**在那些大目标恰好开着雷达时**多给一倍。 */
+       反辐射只是**在目标恰好开着雷达时**多给一倍。 */
     antiRadar: true,
     desc: '重型拦截弹。战斗部 52 kg、近炸半径 28 米，两项都是全场最大 ——' +
       '目标不需要被直接命中，在 28 米内炸开就够了。' +
       '代价写在别处：可用过载只有 1.35，锁定锥 26°，是全场最难咬住人的一枚。' +
       '打机动的战斗机基本靠对方配合；打轰炸机、巡逻机这类大目标，' +
       '它一发就够。' +
-      '\n**对正在辐射的目标（预警机、开机中的干扰机）伤害翻倍** ——' +
-      '它找的就是那部雷达。',
+      '\n**对正在辐射的空中目标（未被压哑的预警机、开机中的干扰机）伤害翻倍** ——' +
+      '它找的就是那部机载雷达。它是对空弹，打不了地面雷达站。',
     stat: { dmg: 0.62, spd: 0.68, trn: 0.48, rng: 0.80, ecm: 0.18 }
   },
 
@@ -1592,7 +1591,7 @@ var WEAPONS = {
     turn: 2.55, seeker: 'ir', lockCone: 55 * Math.PI / 180, lockDist: 3400,
     dmg: 16, ammo: 8, cd: 0.17, salvo: 4, flare: 0.44, prox: 14,
     target: 'air',    desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下十六发，
-      一次齐射四枚 —— 它的用法不是"击落"，而是把蜂群从天上扫下来。
+      一次齐射四枚，用来把蜂群从天上扫下来。
       <b>拿去打有人机是浪费。</b>`,
     stat: { dmg: 0.16, spd: 0.44, trn: 0.72, rng: 0.28, ecm: 0.22 }
   },
@@ -1618,7 +1617,7 @@ var WEAPONS = {
     speed: 480, boost: 110, life: 30.0, vsLife: 42.0,
     turn: 0.48, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 14000,
     dmg: 300, ammo: 1, cd: 1.6, salvo: 1, flare: 0.85, prox: 36,
-    target: 'ground',    desc: `涡扇动力的对地巡航弹，射程是全家族里最远的。
+    target: 'ground',    desc: `涡扇动力的对地巡航弹，对地弹里射程最远。
       但它飞得慢、转弯迟钝 —— 一旦被拦，连躲的能力都没有。
       <b>它的生存性完全建立在"发射前没人发现你"上。</b>`,
     stat: { dmg: 0.86, spd: 0.30, trn: 0.14, rng: 1.00, ecm: 0.36 }
@@ -1822,7 +1821,7 @@ var WEAPONS = {
     fits: [], perPoint: 0, mass: 0,
     npcFits: ['light', 'belly'],
     desc: `下游的干扰吊舱，和上游的 ZUN-4 是两种哲学。
-      <b>它不跟你玩波形。</b>八千瓦的噪声直接灌进接收前端，
+      <b>它不跟你玩波形。</b>八百千瓦的噪声直接灌进接收前端，
       九公里以内所有人的雷达一起变成雪花 —— 包括预警机的数据链。
       <br><span class="rd">代价是它自己亮得像一支火炬：</span>
       开机的那八秒里，整片空域都知道你在哪。`,
@@ -2252,7 +2251,8 @@ var STORE_NEEDS = {
      注意：**删的只是挂载门槛，不是"反辐射"这个语义。**
      当时它还背着另一个问题 ——「没有机制支撑」。现在世界里有了
      预警机与"雷达开机状态"，所以 antiRadar 写回去了（见上面的 arm
-     条目与 entities.js 的 isRadiating）。 */
+     条目与 entities.js 的 isRadiating）—— 只对正在辐射的空中目标
+     （预警机、开机的干扰机）伤害翻倍，不打地面雷达站。 */
   asl2: ['strike'],      // 加固目标侵彻弹
   v25:  ['strike'],      // 防区外对地
   lcm:  ['strike'],      // 远程巡航弹
@@ -2495,39 +2495,39 @@ var VOICES = {
       { who: 'VESPER-2', cls: 'ally', tx: "<b>收到</b>。数据链清楚。", gap: 0.9 },
       { who: 'SEXTANT', cls: 'cmd', tx: '第 7 号控制平台的遥测断了两天。我们要知道为什么。', gap: 1.3 },
       { who: 'VESPER-2', cls: 'ally', tx: 'VESPER 2 就位。无线电检查，清楚响亮。', gap: 1.0 },
-      { who: 'VESPER-3', cls: 'ally', tx: 'VESPER 3 就位。……这天空闻起来不对。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '闭嘴，3 号。雷达上有回波，方位 030，正在越线。', gap: 1.6 },
+      { who: 'VESPER-3', cls: 'ally', tx: 'VESPER 3 就位。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '雷达上有回波，方位 190，正在越线。', gap: 1.6 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>五个目标，没有识别码。</b>拦截它们。', gap: 0.8 }
     ],
     tally: [
-      { who: 'VESPER-2', cls: 'ally', tx: '目视接触。他们在爬升，速度 400 节。', gap: 1.0 },
-      { who: 'VESPER-3', cls: 'ally', tx: '他们挂的不是炸弹。那是测绘吊舱 —— 和一台相干测风仪。', gap: 1.4 },
+      { who: 'VESPER-2', cls: 'ally', tx: '目视接触。目标爬升，速度 500 节。', gap: 1.0 },
+      { who: 'VESPER-3', cls: 'ally', tx: '识别挂载：测绘吊舱，相干测风仪。没有炸弹。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '……他们在测调节单元的漂移周期。', gap: 1.3 },
       { who: 'SEXTANT', cls: 'cmd', tx: '确认敌意。VESPER 1，<b>武器自由</b>。', gap: 0.6 }
     ],
     kill1: [
-      { who: 'VESPER-2', cls: 'ally', tx: '确认击落。漂亮，长机。', gap: 1.0 }
+      { who: 'VESPER-2', cls: 'ally', tx: '确认击落。', gap: 1.0 }
     ],
     kill2: [
-      { who: 'VESPER-3', cls: 'ally', tx: '第二个。他们开始散了。', gap: 1.0 }
+      { who: 'VESPER-3', cls: 'ally', tx: '第二个击落。目标编队散开。', gap: 1.0 }
     ],
     kill3: [
       { who: 'SEXTANT', cls: 'cmd', tx: '他们在转向脱离。继续压制。', gap: 1.0 }
     ],
     win: [
-      { who: 'VESPER-2', cls: 'ally', tx: '最后一个跑了。……他没往南飞。', gap: 1.4 },
-      { who: 'VESPER-3', cls: 'ally', tx: '他往主平台去了。往第 7 号站。', gap: 1.4 },
+      { who: 'VESPER-2', cls: 'ally', tx: '最后一个目标脱离。航向不是南。', gap: 1.4 },
+      { who: 'VESPER-3', cls: 'ally', tx: '航向指向第 7 号控制平台。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '记录到了。全体返航，油量优先。', gap: 1.3 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '<b>VESPER 1，这一仗赢得很好 —— 但我们的问题一个都没解决。</b>', gap: 0.6 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '<b>VESPER 1，打得好。可我们要问的一个也没问到。</b>', gap: 0.6 }
     ],
     allyDown: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 3 失去信号。……重复，3 号没有回应。', gap: 1.2 }
     ],
     playerHit: [
-      { who: 'VESPER-2', cls: 'ally', tx: '长机，你冒烟了！脱离，脱离！', gap: 1.0 }
+      { who: 'VESPER-2', cls: 'ally', tx: '长机受损，建议脱离。', gap: 1.0 }
     ],
     lowQ: [
-      { who: 'VESPER-2', cls: 'ally', tx: '长机，你的动压掉到 9 了。把机头压下去，不然你就成气球了。', gap: 1.0 }
+      { who: 'VESPER-2', cls: 'ally', tx: '长机动压低于 11。建议压机头增速。', gap: 1.0 }
     ],
     lose: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1 掉线了。……全体，撤回浮岛。', gap: 1.4 },
@@ -2542,29 +2542,29 @@ var VOICES = {
       { who: 'VESPER-3', cls: 'ally', tx: "<b>收到</b>。", gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '下游在铁砧海域上摆了三个浮空中继平台。它们一直在看我们。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>云底 900 米。</b>我建议你们走低一点。', gap: 1.3 },
-      { who: 'VESPER-2', cls: 'ally', tx: '走低一点。他说得好像我们有选择。', gap: 1.1 },
-      { who: 'VESPER-3', cls: 'ally', tx: '岛上还有两个控制平台。中继平台负责把它们的信号传回南边。', gap: 1.4 },
+      { who: 'VESPER-2', cls: 'ally', tx: '收到。降低高度。', gap: 1.1 },
+      { who: 'VESPER-3', cls: 'ally', tx: '海上还有两座测控平台。中继平台把它们的信号传回南边。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '那就把链条打断。祝你好运。', gap: 0.8 }
     ],
     spotted: [
       { who: 'VESPER-3', cls: 'ally', tx: '<b>发射装置激活！</b>他们有我们的高度。', gap: 1.0 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '高度压到一千五以下，现在。回云底下面去 —— 这片海上没有山可以躲。', gap: 0.8 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '高度压到一千五以下，现在。这片海上没有山可以躲。', gap: 0.8 }
     ],
     relayDown: [
-      { who: 'VESPER-2', cls: 'ally', tx: '一号中继平台掉下去了。它在漏气 —— 这东西下沉要四十分钟。', gap: 1.3 },
-      { who: 'VESPER-3', cls: 'ally', tx: '那就别让它有那四十分钟。打功率调节组件。', gap: 1.0 }
+      { who: 'VESPER-2', cls: 'ally', tx: '一号中继平台中弹，高度在掉。', gap: 1.3 },
+      { who: 'VESPER-3', cls: 'ally', tx: '建议打功率调节组件。', gap: 1.0 }
     ],
     radarDown: [
-      { who: 'VESPER-2', cls: 'ally', tx: '直接命中。他们的眼睛瞎了。', gap: 1.2 },
+      { who: 'VESPER-2', cls: 'ally', tx: '直接命中。雷达站失效。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '确认。整个铁砧海域的空情图刚刚空了一格。', gap: 1.4 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '……但我们的也空了一格。有东西从南边过来了。', gap: 1.0 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '……我们这边也有动静。有东西从北边过来了。', gap: 1.0 }
     ],
     ambush: [
       { who: 'VESPER-3', cls: 'ally', tx: '<b>右转脱离！右转脱离！</b>', gap: 0.9 },
       { who: '旱沟', cls: 'enemy', tx: '这里是旱沟。目标发现我们了。', gap: 1.1 },
       { who: '石桥', cls: 'enemy', tx: '那就别躲了。全体，攻击。', gap: 0.9 }
     ],
-    /* 基地挨炸 —— "有东西从南边过来了"那句话的兑现 */
+    /* 基地挨炸 —— "有东西从北边过来了"那句话的兑现 */
     baseHit: [
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>基地挨了炸弹。</b>谁去处理那两架轰炸机？', gap: 1.1 },
       { who: 'VESPER-2', cls: 'ally', tx: '我们在打中继平台。', gap: 0.9 },
@@ -2575,13 +2575,13 @@ var VOICES = {
     ],
     baseLost: [
       { who: 'SEXTANT', cls: 'cmd', tx: '前进基地没有了。', gap: 1.0 },
-      { who: 'VESPER-3', cls: 'ally', tx: '……我们连落的地方都没了。', gap: 1.2 },
+      { who: 'VESPER-3', cls: 'ally', tx: '前进基地信号丢失。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '返航，改降北岸。任务中止。', gap: 0.8 }
     ],
     win: [
       { who: 'SEXTANT', cls: 'cmd', tx: '空域清空。干得好，VESPER。', gap: 1.4 },
-      { who: 'VESPER-3', cls: 'ally', tx: '……那些是正规军。他们的编队纪律，那不是民兵。', gap: 1.5 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '我知道。这是我们下一步要谈的事。', gap: 0.8 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '……那些是正规军。看编队纪律就知道，不是民兵。', gap: 1.5 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '这是我们下一步要谈的事。', gap: 0.8 }
     ],
     lose: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1 失联。任务中止。', gap: 0.6 }
@@ -2594,25 +2594,25 @@ var VOICES = {
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，今天往上走。', gap: 1.0 },
       { who: 'VESPER-2', cls: 'ally', tx: "<b>明白，照办</b>。", gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '两万米。下游派了「灰烬」级播撒机上来。', gap: 1.3 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '它们带的不是碘化银。是<b>反凝结核</b> —— 撒下去能让整条季风线哑掉两个季节。', gap: 1.5 },
-      { who: 'VESPER-2', cls: 'ally', tx: '而我们要在三架飞机上，两万米，把它们全拦下来。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '对。注意你们的动压 —— <b>那个高度没有"加速"这回事。</b>', gap: 1.4 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '它们带的是<b>反凝结核</b>，不是碘化银。撒下去，整条季风线两个季节下不了雨。', gap: 1.5 },
+      { who: 'VESPER-2', cls: 'ally', tx: '三机编队，两万米。收到。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '对。注意动压，<b>那个高度没有"加速"这回事。</b>', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>交战规则：单元五公里内，对地弹、反舰弹和炸弹全部锁定。</b>你们只剩机炮和空空弹。', gap: 1.4 },
-      { who: 'VESPER-3', cls: 'ally', tx: '……空空弹在两万米，舵面跟纸一样。最后还是机炮。', gap: 1.1 },
-      { who: 'VESPER-2', cls: 'ally', tx: '那个高度弹道更平。别抱怨了，习惯它。', gap: 0.9 }
+      { who: 'VESPER-3', cls: 'ally', tx: '两万米空空弹机动性下降。建议机炮。', gap: 1.1 },
+      { who: 'VESPER-2', cls: 'ally', tx: '十八公里以上机炮射程增加约六成。', gap: 0.9 }
     ],
     aceAppears: [
       { who: 'SEXTANT', cls: 'cmd', tx: '等等。有个回波，就在你们上面。单机。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '……识别出来了。是冬港。', gap: 1.3 },
-      { who: 'VESPER-2', cls: 'ally', tx: '冬港？那不是个村子的名字。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '对。<b>那是下游唯一一座还在用水井的镇子。</b>', gap: 1.6 },
+      { who: 'VESPER-2', cls: 'ally', tx: '呼号「冬港」。不在已知呼号表内。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '冬港是个镇子。<b>下游唯一一座还在用水井的镇子。</b>', gap: 1.6 },
       { who: '冬港', cls: 'enemy', tx: '所以这就是他们派来的人。', gap: 1.4 },
       { who: '冬港', cls: 'enemy', tx: '三架飞机，一堆机炮，一个已经赢了十六年的联盟。', gap: 1.6 },
-      { who: '冬港', cls: 'enemy', tx: '你们知道最让我难受的是什么吗。', gap: 1.4 },
-      { who: '冬港', cls: 'enemy', tx: '<b>你们不是坏人。你们只是从来没有抬头看过那条线。</b>', gap: 1.2 }
+      { who: '冬港', cls: 'enemy', tx: '我最难受的是什么，你们知道吗。', gap: 1.4 },
+      { who: '冬港', cls: 'enemy', tx: '<b>你们不是坏人。可你们从来没抬头看过那条线。</b>', gap: 1.2 }
     ],
     bossHit: [
-      { who: 'VESPER-2', cls: 'ally', tx: '他在掉高度！动压撑不住了！', gap: 1.0 }
+      { who: 'VESPER-2', cls: 'ally', tx: '有播撒机在下降，它要开始投放了！', gap: 1.0 }
     ],
     bossPhase2: [
       { who: 'SEXTANT', cls: 'cmd', tx: '他放弃了能量优势。……他在往下带你们。', gap: 1.2 },
@@ -2621,17 +2621,16 @@ var VOICES = {
     aceKill: [
       { who: '冬港', cls: 'enemy', tx: '…………', gap: 1.4 },
       { who: '冬港', cls: 'enemy', tx: '冬港是我出生的地方。它还在。', gap: 1.7 },
-      { who: '冬港', cls: 'enemy', tx: '它是唯一一个还有水的镇子 —— 因为它在调节场的北面。', gap: 1.8 },
+      { who: '冬港', cls: 'enemy', tx: '它是唯一还有水的镇子，因为它在调节场北面。', gap: 1.8 },
       { who: '冬港', cls: 'enemy', tx: '它每多下一天雨，就有另一个地方少一天。', gap: 1.8 },
-      { who: 'VESPER-3', cls: 'ally', tx: '……他在往南飞。他没有跳伞。', gap: 1.4 },
+      { who: 'VESPER-3', cls: 'ally', tx: '目标往南脱离。未见跳伞。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '让他走。现在追上去，我们就是在替那份公告背书。', gap: 1.6 }
     ],
     win: [
       { who: 'SEXTANT', cls: 'cmd', tx: '播撒机群全部失效。调节场没有受损。', gap: 1.5 },
-      { who: 'VESPER-2', cls: 'ally', tx: '第 7 号站的遥测回来了。相位在往回调。', gap: 1.4 },
+      { who: 'VESPER-2', cls: 'ally', tx: '第 7 号控制平台遥测恢复。相位在回调。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '但下游没有撤。他们的船还在往外走。', gap: 1.5 },
-      { who: 'VESPER-3', cls: 'ally', tx: '船？', gap: 1.0 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '对。<b>他们不打算再抢高度了，他们打算让这片海没法用。</b>', gap: 1.7 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '<b>他们不抢高度了，要让这片海没法用。</b>', gap: 1.7 },
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1，回来加油。这一仗才刚开始。', gap: 0.9 }
     ],
     lose: [
@@ -2643,25 +2642,25 @@ var VOICES = {
   m4: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，任务变更。今天不打飞机。', gap: 1.2 },
-      { who: 'VESPER-2', cls: 'ally', tx: '不打飞机？', gap: 0.9 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '下游换了打法。他们发现拦不住我们，就打算让这片海没法用。', gap: 1.6 },
+      { who: 'VESPER-2', cls: 'ally', tx: '收到。', gap: 0.9 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '下游换了打法。拦不住我们，就要让这片海没法用。', gap: 1.6 },
       { who: 'SEXTANT', cls: 'cmd', tx: '海盆西北有一支水面编队正在展开：一条武库舰、一条巡洋舰、两条护卫、一条快艇。', gap: 1.8 },
-      { who: 'VESPER-3', cls: 'ally', tx: '三百多个垂发井……他们的船不是为交战造的，是为一次齐射造的。', gap: 1.5 },
+      { who: 'VESPER-3', cls: 'ally', tx: '武库舰识别：三百多个垂发单元。', gap: 1.5 },
       { who: 'SEXTANT', cls: 'cmd', tx: '水面还有我们的海豚级护卫舰。别把它当成目标。', gap: 1.3 },
-      { who: 'VESPER-2', cls: 'ally', tx: '<b>明白</b>。带反舰挂载，对海作战。', gap: 0.9 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '带反舰挂载，对海作战。', gap: 0.9 }
     ],
     spotted: [
-      { who: 'VESPER-3', cls: 'ally', tx: '<b>被照射了。</b>他们的相控阵盯上我们了。', gap: 1.0 },
+      { who: 'VESPER-3', cls: 'ally', tx: '<b>被照射。</b>舰载相控阵锁定。', gap: 1.0 },
       { who: 'SEXTANT', cls: 'cmd', tx: '压低高度，缩短他们的反应时间。', gap: 0.9 }
     ],
     hubHit: [
-      { who: 'VESPER-2', cls: 'ally', tx: '武库舰中弹！甲板上有东西在烧。', gap: 1.2 },
+      { who: 'VESPER-2', cls: 'ally', tx: '武库舰中弹，甲板起火。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '继续压。它的弹药库比它的船体值钱。', gap: 1.0 }
     ],
     win: [
-      { who: 'VESPER-3', cls: 'ally', tx: '编队散了。快艇在往南跑。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '好。但这不是他们唯一的一支编队。', gap: 1.5 },
-      { who: 'VESPER-2', cls: 'ally', tx: '……海上的仗才刚开始。', gap: 1.0 }
+      { who: 'VESPER-3', cls: 'ally', tx: '敌编队解散。快艇往西南脱离。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '好。他们还有别的编队。', gap: 1.5 },
+      { who: 'VESPER-2', cls: 'ally', tx: '收到。', gap: 1.0 }
     ],
     lose: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1 失去信号。海面还在他们手里。', gap: 0.8 }
@@ -2673,25 +2672,24 @@ var VOICES = {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，新任务：静默的航标。', gap: 1.1 },
       { who: 'SEXTANT', cls: 'cmd', tx: '下游在群岛南缘铺了一张网：三座对空雷达、两套远程防空、一架干扰机。', gap: 1.7 },
-      { who: 'VESPER-3', cls: 'ally', tx: '它们的教条是"先让对手瞎掉，再打"。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '那我们就先打掉会说话的东西。雷达、阵地、干扰机 —— 舰体不是目标。', gap: 1.6 },
-      { who: 'VESPER-2', cls: 'ally', tx: '慢着。管理局的布缆船在那片海面上。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '「准绳」在抢修光纤。它的位置在那张三座雷达的中心。', gap: 1.5 },
+      { who: 'VESPER-3', cls: 'ally', tx: '识别：对空雷达三，远程防空二，干扰机一。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '先打雷达、阵地和干扰机。舰体不是目标。', gap: 1.6 },
+      { who: 'VESPER-2', cls: 'ally', tx: '注意：管理局布缆船在目标海域。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '准绳级在抢修光纤，位置就在三座雷达中间。', gap: 1.5 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>它不会躲，也躲不开。别把弹扔到它身上。</b>', gap: 1.0 }
     ],
     spotted: [
-      { who: 'VESPER-3', cls: 'ally', tx: '低空有碎云。高度一上去，他们的雷达就看得见。', gap: 1.1 },
+      { who: 'VESPER-3', cls: 'ally', tx: '高度过高会被雷达发现。', gap: 1.1 },
       { who: 'SEXTANT', cls: 'cmd', tx: '那就别上去。雷达站是固定靶，贴着云底投放就够得着。', gap: 0.9 }
     ],
     radarDown: [
-      { who: 'VESPER-2', cls: 'ally', tx: '三座雷达全哑了。这片空域现在是空的。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '空得让他们心慌。继续。', gap: 0.9 }
+      { who: 'VESPER-2', cls: 'ally', tx: '三座雷达全部失效。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '继续。', gap: 0.9 }
     ],
     win: [
-      { who: 'SEXTANT', cls: 'cmd', tx: '空情网清除。准绳号还在抽水。', gap: 1.2 },
-      { who: 'VESPER-3', cls: 'ally', tx: '它连一句谢谢都没说。', gap: 1.0 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '管理局的人都这样。它们只报数据。', gap: 1.4 },
-      { who: 'VESPER-2', cls: 'ally', tx: '……那它们报的数据里，会不会也有我们打偏的那几发。', gap: 1.6 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '空情网清除。准绳级还在布缆。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '它一句谢谢都没说。管理局的人都这样，只报数据。', gap: 1.4 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '……我们打偏的那几发，大概也在它们的数据里。', gap: 1.6 }
     ],
     lose: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1 失联。那张网还在。', gap: 0.8 }
@@ -2703,23 +2701,23 @@ var VOICES = {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，第二梯队上来了。', gap: 1.1 },
       { who: 'VESPER-2', cls: 'ally', tx: '<b>收到</b>。', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '四架玄武岩，开飞机的是老兵。这不是第一梯队那批人 —— 他们不抢高度，只在对你有能量的那层等你。', gap: 1.9 },
-      { who: 'VESPER-3', cls: 'ally', tx: '在这条高度上，一次失速改出失败就是三分钟的下坠。', gap: 1.4 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '还有一架预警机在后面调度。它会一直给他们补人。', gap: 1.5 },
-      { who: 'VESPER-2', cls: 'ally', tx: '那就先让它闭嘴。', gap: 0.9 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '四架玄武岩，飞行员是老兵。他们不抢高度，就在你有能量的那层等你。', gap: 1.9 },
+      { who: 'VESPER-3', cls: 'ally', tx: '提示：该高度失速改出失败，下坠约三分钟。', gap: 1.4 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '还有一架预警机在后面给他们分配目标。', gap: 1.5 },
+      { who: 'VESPER-2', cls: 'ally', tx: '建议优先攻击预警机。', gap: 0.9 }
     ],
     contact: [
-      { who: 'VESPER-3', cls: 'ally', tx: '接触。他们在我们上面一层，速度差只有二十。', gap: 1.3 }
+      { who: 'VESPER-3', cls: 'ally', tx: '接触。目标在我方上方一层，速度差二十。', gap: 1.3 }
     ],
     lowQ: [
-      { who: 'VESPER-2', cls: 'ally', tx: '长机，你的动压掉下来了。这条高度没有"加速"这回事。', gap: 1.1 }
+      { who: 'VESPER-2', cls: 'ally', tx: '长机动压过低。建议压机头增速。', gap: 1.1 }
     ],
     half: [
-      { who: 'SEXTANT', cls: 'cmd', tx: '一半的玄武岩没了。剩下的在往南退 —— 他们在等预警机给新目标。', gap: 1.5 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '一半的玄武岩没了。剩下的在往东南退，等预警机给新目标。', gap: 1.5 }
     ],
     win: [
       { who: 'SEXTANT', cls: 'cmd', tx: '第二梯队清空。这段高度是我们的了。', gap: 1.3 },
-      { who: 'VESPER-3', cls: 'ally', tx: '他们退得很整齐。那不是被打散的样子。', gap: 1.4 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '他们退得很整齐，不像被打散的。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '……是有人让他们退的。', gap: 1.2 }
     ],
     lose: [
@@ -2731,24 +2729,23 @@ var VOICES = {
   m7: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，这一次走云下面。', gap: 1.1 },
-      { who: 'VESPER-2', cls: 'ally', tx: '云底多少？', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '<b>九百米。</b>云顶三千四。你要钻的那层只有两公里半高。', gap: 1.5 },
+      { who: 'VESPER-2', cls: 'ally', tx: '请求云底高度。', gap: 0.8 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '<b>九百米。</b>云顶三千四。', gap: 1.5 },
       { who: 'SEXTANT', cls: 'cmd', tx: '下游的舰船补给点就在那层云下面。两条海蝎级登陆舰在往岸上运弹药。', gap: 1.8 },
-      { who: 'VESPER-3', cls: 'ally', tx: '外面有一条邓氏鱼级巡洋舰画着防空圈。', gap: 1.3 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '云里你也看不见。雷达光点会丢 —— 用眼睛。', gap: 1.2 }
+      { who: 'VESPER-3', cls: 'ally', tx: '识别：邓氏鱼级巡洋舰一条，外围防空。', gap: 1.3 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '贴着云底飞，别让他们看见你。', gap: 1.2 }
     ],
     spotted: [
-      { who: 'VESPER-3', cls: 'ally', tx: '<b>被照射了！</b>高度！把高度压下去！', gap: 1.0 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '云下他们对你的锁定距离会短一半。下去。', gap: 0.9 }
+      { who: 'VESPER-3', cls: 'ally', tx: '<b>被照射！</b>建议降低高度。', gap: 1.0 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '压到一千五以下。下去。', gap: 0.9 }
     ],
     landersDown: [
-      { who: 'VESPER-2', cls: 'ally', tx: '两条登陆舰都在海上停住了。甲板上的车没卸下去。', gap: 1.4 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '他们会等下一次窗口。而每一次窗口都要付同样的代价。', gap: 1.4 }
+      { who: 'VESPER-2', cls: 'ally', tx: '两条登陆舰均已停航。', gap: 1.4 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '他们会等下一次窗口。下一次还是这个代价。', gap: 1.4 }
     ],
     win: [
-      { who: 'SEXTANT', cls: 'cmd', tx: '补给点被打断了。你在云里待了七分钟。', gap: 1.3 },
-      { who: 'VESPER-3', cls: 'ally', tx: '七分钟里我一次都没有真正看清过海面。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '那说明你做得对。', gap: 0.9 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '补给点被打断了。', gap: 1.3 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '全程没让他们看清你。做得对。', gap: 0.9 }
     ],
     lose: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1 从云里没出来。', gap: 0.8 }
@@ -2759,26 +2756,25 @@ var VOICES = {
   m8: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，紧急。下游的攻击机群出发了。', gap: 1.2 },
-      { who: 'VESPER-2', cls: 'ally', tx: '打哪里？', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '<b>打浮岛。</b>座头鲸就在我们身后 —— 它不能再挨一次。', gap: 1.6 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '六架砂岩和片岩带对海弹从北面低空进来，后面跟着两架巨砾轰炸机。', gap: 1.7 },
-      { who: 'VESPER-3', cls: 'ally', tx: '他们这次不是来找我们的。', gap: 1.1 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '对。所以你要在他们到投放线之前把他们拦住。', gap: 1.3 },
-      { who: 'VESPER-2', cls: 'ally', tx: '编队里还有抹香鲸和蓝鲸。三条船，一条也不能沉。', gap: 1.4 }
+      { who: 'VESPER-2', cls: 'ally', tx: '请求目标。', gap: 0.8 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '<b>打浮岛。</b>座头鲸就在我们身后，它不能再挨一次。', gap: 1.6 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '六架砂岩和片岩带对海弹从南面低空进来，后面跟着两架巨砾轰炸机。', gap: 1.7 },
+      { who: 'VESPER-3', cls: 'ally', tx: '目标航线不经过我方编队。', gap: 1.1 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '对。在他们到投放线之前拦住。', gap: 1.3 },
+      { who: 'VESPER-2', cls: 'ally', tx: '我方编队：座头鲸、抹香鲸、蓝鲸。', gap: 1.4 }
     ],
     fleetHit: [
-      { who: 'VESPER-3', cls: 'ally', tx: '<b>编队挨弹了！</b>抹香鲸舰艏进水。', gap: 1.1 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '我知道。把攻击机赶走 —— 那是你的活。', gap: 1.2 }
+      { who: 'VESPER-3', cls: 'ally', tx: '<b>编队中弹。</b>抹香鲸舰艏进水。', gap: 1.1 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '三条船一条也不能沉。把攻击机赶走。', gap: 1.2 }
     ],
     shipLost: [
-      { who: 'SEXTANT', cls: 'cmd', tx: '它沉了。编队的防空圈缺一角。', gap: 1.3 },
-      { who: 'VESPER-2', cls: 'ally', tx: '……', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '这不是你的错。但接下来每一发都要算准。', gap: 1.4 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '它沉了。', gap: 1.3 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '编队失去一条船。', gap: 1.4 }
     ],
     win: [
       { who: 'SEXTANT', cls: 'cmd', tx: '攻击机群全部脱离或击落。三条船都还在。', gap: 1.4 },
-      { who: 'VESPER-3', cls: 'ally', tx: '浮岛的甲板上有人在挥手。我看不清是骂我们还是谢我们。', gap: 1.6 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '都行。他们还在那儿，这就够了。', gap: 1.1 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '浮岛甲板上有人在挥手。是骂还是谢，我看不出来。', gap: 1.6 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '都行。人还在就够了。', gap: 1.1 }
     ],
     lose: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1 失去信号。浮岛的警报还在响。', gap: 0.8 }
@@ -2789,25 +2785,25 @@ var VOICES = {
   m9: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，登船警报。下游的两栖船团昨夜出港了。', gap: 1.4 },
-      { who: 'VESPER-2', cls: 'ally', tx: '目标？', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '三条海蝎级登陆舰，两条菊石级护卫，四条三叶虫快艇 —— 一个营。', gap: 1.7 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '只要它们靠岸，岛上就会多出一个不需要谈判的据点。', gap: 1.6 },
+      { who: 'VESPER-2', cls: 'ally', tx: '请求目标。', gap: 0.8 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '三条海蝎级登陆舰，两条菊石级护卫，四条三叶虫快艇，载一个营。', gap: 1.7 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '它们靠了岸，岛上就多一个不用谈判的据点。', gap: 1.6 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>他们的掩护火网五分钟后展开。</b>在那之前，你们头上只有两架护航。', gap: 1.5 },
-      { who: 'VESPER-3', cls: 'ally', tx: '所以我们有五分钟把三条船留在海上。', gap: 1.2 },
-      { who: 'VESPER-2', cls: 'ally', tx: '别算得这么死。先上去。', gap: 0.9 }
+      { who: 'VESPER-3', cls: 'ally', tx: '计时五分钟。目标：三条登陆舰。', gap: 1.2 },
+      { who: 'VESPER-2', cls: 'ally', tx: '收到。', gap: 0.9 }
     ],
     windowClosing: [
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>九十秒。</b>船团已经能看见岸了。', gap: 1.0 },
-      { who: 'VESPER-2', cls: 'ally', tx: '再来一次通场！', gap: 0.8 }
+      { who: 'VESPER-2', cls: 'ally', tx: '建议再做一次攻击通场。', gap: 0.8 }
     ],
     lastOne: [
-      { who: 'VESPER-3', cls: 'ally', tx: '还剩一条。它在往北转 —— 他要抢滩。', gap: 1.2 },
+      { who: 'VESPER-3', cls: 'ally', tx: '剩余一条，航向转北，判断为抢滩。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '别让它靠。这是最后一次机会。', gap: 0.9 }
     ],
     win: [
       { who: 'SEXTANT', cls: 'cmd', tx: '三条登陆舰全部失去行动能力。窗口关闭。', gap: 1.4 },
-      { who: 'VESPER-3', cls: 'ally', tx: '海面上漂着很多东西。有些是他们的。', gap: 1.5 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '……我会让救援舰过去。', gap: 1.3 },
+      { who: 'VESPER-3', cls: 'ally', tx: '海面有大量漂浮物。', gap: 1.5 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '……有些是他们的。我会让救援舰过去。', gap: 1.3 },
       { who: 'SEXTANT', cls: 'cmd', tx: '不管落在水里的是谁。', gap: 1.0 }
     ],
     lose: [
@@ -2820,43 +2816,41 @@ var VOICES = {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，这是最后一件事。', gap: 1.1 },
       { who: 'VESPER-2', cls: 'ally', tx: '<b>明白，照办</b>。', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '我们要把他们的指挥链从中间摘掉：预警机、舰上指挥所、以及把它们连起来的人。', gap: 1.9 },
-      { who: 'VESPER-3', cls: 'ally', tx: '他们把指挥所摆在了正面。', gap: 1.1 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '对。指挥舰在编队正中央，外面两层护航，上面那架玄武岩是冬港。', gap: 1.8 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '把他们的指挥链从中间摘掉：预警机、舰上指挥所，还有把它们连起来的人。', gap: 1.9 },
+      { who: 'VESPER-3', cls: 'ally', tx: '指挥舰位于敌编队正面。', gap: 1.1 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '对。指挥舰在编队正中央，两翼护航，上面那架玄武岩是冬港。', gap: 1.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '再说一遍他的呼号：<b>冬港。一座还在用水的镇子。</b>', gap: 1.6 },
-      { who: 'VESPER-3', cls: 'ally', tx: '我一直在想他上次说的那句话。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '想完这场再想。上去。', gap: 0.9 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '他上次说的那句话，打完再想。上去。', gap: 0.9 }
     ],
     contact: [
-      { who: 'VESPER-2', cls: 'ally', tx: '接触。两层护航，指挥舰在中间。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '先撕开外面那层，再进内圈。', gap: 0.9 }
+      { who: 'VESPER-2', cls: 'ally', tx: '接触。两翼护航，指挥舰在中间。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '先撕开一翼，再打指挥舰。', gap: 0.9 }
     ],
     aewDown: [
-      { who: 'VESPER-3', cls: 'ally', tx: '预警机掉了。他们的增援开始乱。', gap: 1.2 },
+      { who: 'VESPER-3', cls: 'ally', tx: '预警机击落。敌机失去目标分配。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '抓住这个窗口。', gap: 0.8 }
     ],
     cpDown: [
-      { who: 'VESPER-2', cls: 'ally', tx: '指挥舰进水。下游各机在各自找目标了。', gap: 1.3 },
+      { who: 'VESPER-2', cls: 'ally', tx: '指挥舰进水。敌机各自选择目标。', gap: 1.3 },
       { who: 'SEXTANT', cls: 'cmd', tx: '他们本来就更习惯那样。', gap: 1.0 }
     ],
     bossPhase2: [
       { who: 'SEXTANT', cls: 'cmd', tx: '冬港放弃高度了。他不想再打消耗战。', gap: 1.3 },
-      { who: 'VESPER-2', cls: 'ally', tx: '那就换个打法。', gap: 0.9 }
+      { who: 'VESPER-2', cls: 'ally', tx: '收到。', gap: 0.9 }
     ],
     aceKill: [
       { who: '冬港', cls: 'enemy', tx: '…………', gap: 1.4 },
       { who: '冬港', cls: 'enemy', tx: '我这次来，不是来要水的。', gap: 1.6 },
-      { who: '冬港', cls: 'enemy', tx: '是来谈一件事 —— 一桩十六年没人愿意开口的交易。', gap: 1.8 },
-      { who: 'VESPER-3', cls: 'ally', tx: '……他那架飞机没有冒烟。他是自己关的发动机。', gap: 1.6 },
+      { who: '冬港', cls: 'enemy', tx: '是来谈一桩十六年没人愿意开口的交易。', gap: 1.8 },
+      { who: 'VESPER-3', cls: 'ally', tx: '目标未见冒烟。发动机为人工关车。', gap: 1.6 },
       { who: 'SEXTANT', cls: 'cmd', tx: '让他落海。搜救会去捞他。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>他说的那句话，我一句都不想反驳。</b>', gap: 1.0 }
     ],
     win: [
-      { who: 'SEXTANT', cls: 'cmd', tx: '指挥链断了。下游在撤 —— 有序地撤，不是溃退。', gap: 1.6 },
-      { who: 'VESPER-2', cls: 'ally', tx: '……他们没有打赢，我们也没有。', gap: 1.4 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '对。雨季照常来了。', gap: 1.5 },
-      { who: 'VESPER-3', cls: 'ally', tx: '会下多久？', gap: 1.0 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '……没人知道。<b>这次没人知道。</b>', gap: 1.7 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '指挥链断了。下游在撤，撤得很有序。', gap: 1.6 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '……他们没打赢，我们也没有。', gap: 1.4 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '雨季照常来了。', gap: 1.5 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '会下多久，<b>这次没人知道。</b>', gap: 1.7 },
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1，返航。剩下的事不归我们管了。', gap: 0.9 }
     ],
     lose: [
@@ -2868,16 +2862,14 @@ var VOICES = {
   sk1: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，巡逻空域，编号空白。', gap: 1.1 },
-      { who: 'VESPER-2', cls: 'ally', tx: '又是这儿。', gap: 0.9 },
+      { who: 'VESPER-2', cls: 'ally', tx: '收到。', gap: 0.9 },
       { who: 'SEXTANT', cls: 'cmd', tx: '规则你知道：这里没有侦察机，也没有条约。', gap: 1.4 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '看到没有识别码的回波就自己处理。别把它们写进战报 —— 战报里没有这个编号。', gap: 1.8 },
-      { who: 'VESPER-3', cls: 'ally', tx: '……又是"第四周"。', gap: 1.1 },
-      { who: 'VESPER-2', cls: 'ally', tx: '别数了。数到最后一周也叫第四周。', gap: 1.2 }
+      { who: 'SEXTANT', cls: 'cmd', tx: '没有识别码的回波自己处理。别写进战报，战报里没有这个编号。', gap: 1.8 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '……还是"第四周"。别数了，数到最后一周也叫第四周。', gap: 1.2 }
     ],
     win: [
-      { who: 'VESPER-3', cls: 'ally', tx: '最后一个走了。他没往南飞，也没往北。', gap: 1.4 },
+      { who: 'VESPER-3', cls: 'ally', tx: '最后一个目标脱离。航向不南不北。', gap: 1.4 },
       { who: 'SEXTANT', cls: 'cmd', tx: '随便他。这片空域从来不负责收尾。', gap: 1.3 },
-      { who: 'VESPER-2', cls: 'ally', tx: '明天还是我们？', gap: 0.9 },
       { who: 'SEXTANT', cls: 'cmd', tx: '明天还是"第四周"。', gap: 1.0 }
     ],
     lose: [

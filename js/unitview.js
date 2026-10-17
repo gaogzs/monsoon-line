@@ -369,7 +369,7 @@ var UnitView = (function () {
       ['航速', s.speed + ' kn'],
       ['编制', s.crew + ' 人'],
       ['舰载武备', esc(s.arms.join(' · '))],
-      ['要害', esc(s.vials.join(' · '))]
+      ['要害（识别参考）', esc(s.vials.join(' · '))]
     ];
     if (!s.neutral) {
       rows.push(['结构 / 受击半径', s.hp + ' / ' + s.radius + ' m']);
@@ -438,7 +438,7 @@ var UnitView = (function () {
       (!pod && w.perPoint) ? ['单挂点', '×' + w.perPoint] : null,
       w.cd ? ['冷却', w.cd + ' s'] : null,
       w.mass ? ['质量', w.mass + ' kg'] : null,
-      ['可挂', fits.length ? esc(fits.join(' / ')) : '（下游制式 · 玩家无法挂载）'],
+      ['可挂', fits.length ? esc(fits.join(' / ')) : '（敌方或舰载制式 · 玩家无法挂载）'],
       (w.needs && w.needs.length && typeof _capLabel === 'function')
         ? ['机体要求', esc(w.needs.map(_capLabel).join(' / '))] : null,
       w.look ? ['外形', '长 ' + w.look.len + ' m · 弹径 ' + Math.round(w.look.dia * 1000) + ' mm'] : null

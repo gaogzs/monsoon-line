@@ -130,6 +130,10 @@ var HUD = (function () {
     }
     hdg = ((hdg % 360) + 360) % 360;
     p.heading = hdg;
+    /* 罗盘读的是**真方位**：世界 +z 不一定指北，每一关在 mission.axis 里
+       声明 +z 的真方位（见 missions.js 开头的说明）。p.heading 仍保留世界航向。 */
+    var axis = (world && world.axis) || 0;
+    hdg = (hdg + axis) % 360;
 
     // 背板
     ctx.fillStyle = 'rgba(6,14,20,0.5)';
@@ -172,7 +176,7 @@ var HUD = (function () {
     for (i = 0; i < marks.length; i++) {
       var t = marks[i];
       var dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z;
-      var th = Math.atan2(dx, dz) * 180 / Math.PI;
+      var th = Math.atan2(dx, dz) * 180 / Math.PI + axis;
       var diff = M3.wrapPi((th - hdg) * Math.PI / 180) * 180 / Math.PI;
       if (Math.abs(diff) > spanDeg / 2) continue;
       var mx = cx + diff / degPerPx;
@@ -1027,7 +1031,7 @@ var HUD = (function () {
 
     // 地面设施只有名字，没有呼号也没有机型
     if (isGnd) {
-      text(ctx, t.label || t.name || '地面设施',
+      text(ctx, t.label || t.name || '海面设施',
         s.x + sz + 7, s.y - sz + 8, col, FS, 'left');
       text(ctx, distTxt, s.x + sz + 7, s.y - sz + 21, dim, FS, 'left');
       return;
@@ -1115,7 +1119,7 @@ var HUD = (function () {
         ly += 14;
       }
     } else {
-      text(ctx, t.ttype === 'air' ? '浮空平台' : '地面设施', tx, ly, DIM, FS, 'left');
+      text(ctx, t.ttype === 'air' ? '浮空平台' : '海面设施', tx, ly, DIM, FS, 'left');
       ly += 14;
     }
 
@@ -1391,7 +1395,7 @@ var HUD = (function () {
       y += U(30);
     }
     if (p.pos.y < 200 && p.fwd.y < 0 && bl) {
-      text(ctx, 'TERRAIN  地形告警', W / 2, y, RED, F1, 'center');
+      text(ctx, 'TERRAIN  低高度告警', W / 2, y, RED, F1, 'center');
       y += U(30);
     }
     if (p.pos.y > 18000 && p.q < 12 && bl) {
