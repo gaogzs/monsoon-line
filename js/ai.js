@@ -325,7 +325,17 @@ var AI = (function () {
     if (Math.abs(span) < 1e-3) alpha = (st && st.planAlpha !== undefined) ? st.planAlpha : 0;
     else if (thC <= 0) alpha = 1;
     else if (thC >= 1e8) alpha = 0;
-    else {
+    else if (st && dt > 0) {
+      /* 玩家（鼠标引导）在**左右转**时用更宽的过渡带：0.4θc → 3θc。
+         典型战机 θc 只有 10° 左右，原来的 0.5θc → 1.5θc 意味着
+         鼠标横移十几度就整机滚满再拉杆。拉宽之后小幅度左右转
+         只压一部分坡度，剩下的交给偏航 + 斜拉杆，大幅度才滚满。
+         按目标的侧向分量 |sin φ| 混合：正上 / 正下方的目标仍走原来的
+         窄过渡带 —— 推杆俯冲时半滚不滚会在竖直附近原地连滚。 */
+      var sw = Math.abs(Math.sin(phi));
+      var uP = M3.clamp((theta / thC - (0.5 - 0.1 * sw)) / (1 + 1.6 * sw), 0, 1);
+      alpha = uP * uP * (3 - 2 * uP);
+    } else {
       var u = M3.clamp(theta / thC - 0.5, 0, 1);
       alpha = u * u * (3 - 2 * u);
     }
