@@ -244,7 +244,7 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 具体哪个键干什么见 [hud.md 的输入映射表](hud.md#输入映射)，下面只讲机制。
 
 ### 鼠标引导机头 `updateMouseAim(dt)`（战雷式）
-1. 瞄准方向存在世界坐标里：`aimYaw / aimPitch`（俯仰限 ±89°）。`mousemove` 用 `movementX/Y × AIM_SENS × FOV/56` 转动它；点击画布时 `requestPointerLock()`，菜单 / 暂停时 `releasePointer()` 交还指针。
+1. 瞄准方向存在世界坐标里：`aimYaw / aimPitch`（俯仰限 ±89°）。`mousemove` 用 `movementX/Y × AIM_SENS × FOV/56` 转动它；单个事件位移超过 `AIM_SPIKE_PX = 200` 的当尖峰丢掉（Chrome 锁定指针时偶发的巨大位移、未锁定时光标移出画布再移回的第一下 —— 不丢的话准星被甩到"随机"方向，镜头跟过去像被重置）；指针锁定先请求 `{ unadjustedMovement: true }`（原始位移，尖峰更少），不支持时退回普通锁定；点击画布时 `requestPointerLock()`，菜单 / 暂停时 `releasePointer()` 交还指针。
 2. `aimInit = false`（重生、`M` 切模式）时下一帧 `resetAim()` 从机头重新取。
 3. `AI.steerTo(player, aimDirNow(), player.ctrl, player, dt)` —— 传 `dt` 启用瞄准角速度前馈（见 [ai.md](ai.md)）；`player.aimDir` 供 HUD 画准星与机头连线。
 4. 追尾镜头（`S.camMode === 0`）在鼠标引导时跟 `aimDir` 而不跟机头，平滑系数 14；键盘直控时仍跟机头。这样准星固定在画面中心、机头标记去追它，机头才能真正收敛到准星上。跟 `aimDir` 时俯仰走 `camPitchFor(瞄准俯仰, S.fov)`：镜头上限是 `90° − FOV/2`，瞄准拉满 89° 时**天顶正好卡在画面上沿**（天底卡在下沿），CMD 贴着它 —— 看起来能一直朝正上方飞，只是光标推不过那条边。上限随 FOV 实时变（56° → 62°，38° → 71°，100° → 40°）。`k = max(0, 2·上限 − 89°)` 以下镜头 = 瞄准（FOV 56° 时 35° 以下准星在正中），之外 `k + (A − k)·r·(1 − (1 − t)^(1/r))` 平滑收到上限：衔接处斜率为 1、到 89° 时斜率为 0，全程单调。（以前是软膝 78° → 87°，拉满时画面几乎全是空天。）

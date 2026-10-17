@@ -2761,6 +2761,32 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 真实链路：鼠标位移尖峰要丢掉 ----
+     浏览器偶尔报一个几百上千像素的 movementX/Y（Chrome 锁定指针时的已知毛病、
+     未锁定时光标移出画布再移回）。不丢的话准星被瞬间甩到"随机"方向，
+     镜头跟过去，看起来就是镜头被重置。正常的鼠标位移照常生效。 */
+  {
+    const G = sandbox.Game, R = sandbox.Renderer, M3 = sandbox.M3;
+    const cvEl = sandbox.document.getElementById('cv');
+    G.startMission(0);
+    for (let f = 0; f < 60; f++) pump(1);
+    const pl = G.__player();
+    const ang = (a, b) => Math.acos(M3.clamp(M3.dot(a, b), -1, 1)) * 180 / Math.PI;
+    const before = M3.clone(pl.aimDir);
+    cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2, movementX: 900, movementY: -450 });
+    pump(1);
+    const afterSpike = M3.clone(pl.aimDir);
+    cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2, movementX: 40, movementY: 0 });
+    pump(1);
+    const moved = ang(afterSpike, pl.aimDir);
+    const bad = [];
+    // 一帧里飞机自己也在转，准星方向不变（世界系）—— 尖峰之后应几乎不动
+    if (ang(before, afterSpike) > 0.5) bad.push('位移尖峰把准星甩了 ' + ang(before, afterSpike).toFixed(1) + '°');
+    if (moved < 4) bad.push('尖峰之后正常的 40 px 位移只转了 ' + moved.toFixed(2) + '°（应约 5°）');
+    if (bad.length) bad.forEach(fail);
+    else ok('鼠标位移尖峰被丢掉（准星不动），之后正常位移照常（40 px → ' + moved.toFixed(1) + '°）');
+  }
+
   /* ---- 真实链路：CMD 顶在最上面左右拖，画面要跟着转 ----
      曾经镜头偏航从瞄准方向的水平投影反算，投影太短（≈83° 以上）就冻结：
      CMD 顶在 89° 时左右拖，罗盘和飞机在转、画面不转；一往下拖离开冻结区，

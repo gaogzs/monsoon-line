@@ -113,6 +113,7 @@ var Game = (function () {
      跟着镜头一起跑的屏幕点。aimInit = false 时下一帧从机头重新取。 */
   var aimYaw = 0, aimPitch = 0, aimInit = false;
   var AIM_SENS = 0.0022;           // rad / 像素
+  var AIM_SPIKE_PX = 200;          // 单个 mousemove 位移超过它就当尖峰丢掉（≈ 25°）
   var AIM_PITCH_LIM = 89 * Math.PI / 180;
   var last = 0;
   /* 机位现在由设置项 S.camMode 决定，没有热切换键 ——
@@ -151,9 +152,19 @@ var Game = (function () {
      取消暂停的那次按键、以及画布上的任何一次点击都算。 */
   function requestAimLock() {
     if (!cv || !aimMode || document.pointerLockElement === cv || !cv.requestPointerLock) return;
+    /* 先要"原始位移"（unadjustedMovement）：绕开系统鼠标加速，Chrome 在
+       Windows 上锁定指针时偶发的巨大 movementX/Y 尖峰也少得多。
+       浏览器不支持这个选项时 promise 会被拒绝，退回普通锁定。 */
     try {
-      var r = cv.requestPointerLock();
-      if (r && r.catch) r.catch(function () { /* 被拒绝就等下一次点击 */ });
+      var r = cv.requestPointerLock({ unadjustedMovement: true });
+      if (r && r.catch) {
+        r.catch(function () {
+          try {
+            var r2 = cv.requestPointerLock();
+            if (r2 && r2.catch) r2.catch(function () { /* 被拒绝就等下一次点击 */ });
+          } catch (err2) { /* 不支持就退回普通指针 */ }
+        });
+      }
     } catch (err) { /* 不支持就退回普通指针 */ }
   }
 
@@ -1567,9 +1578,15 @@ var Game = (function () {
       /* 鼠标位移转动瞄准方向。没拿到指针锁时 movementX/Y 照样有，
          只是指针会碰到窗口边缘 —— 能飞，但锁定后才是完整的手感。 */
       if (state === 'playing' && aimMode && !paused && aimInit) {
+        var mx = e.movementX || 0, my = e.movementY || 0;
+        /* 丢掉位移尖峰。浏览器偶尔会报一个几百上千像素的 movementX/Y：
+           Chrome 锁定指针时的已知毛病，以及没锁定时光标移出画布再移回来的
+           第一下。它会把准星瞬间甩到一个"随机"方向，镜头跟过去，看起来就是
+           镜头被重置。正常甩鼠标单个事件远到不了 AIM_SPIKE_PX。 */
+        if (Math.abs(mx) > AIM_SPIKE_PX || Math.abs(my) > AIM_SPIKE_PX) return;
         var fovK = (S.fov || 56) / 56;      // 放大视野时灵敏度跟着降，屏幕上的手感一致
-        aimYaw += (e.movementX || 0) * AIM_SENS * fovK;
-        aimPitch = M3.clamp(aimPitch - (e.movementY || 0) * AIM_SENS * fovK,
+        aimYaw += mx * AIM_SENS * fovK;
+        aimPitch = M3.clamp(aimPitch - my * AIM_SENS * fovK,
           -AIM_PITCH_LIM, AIM_PITCH_LIM);
       }
     });
