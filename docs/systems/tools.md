@@ -22,7 +22,7 @@
 |---|---|---|
 | `smoke.js` | 在无浏览器环境把整个游戏跑起来并断言 | **每次改完代码** |
 | `probe-missions.js` | **逐关验证"清空敌人之后到底能不能赢"**，并检查 NPC 挂载问题 | 加了新关卡、改了胜负条件之后 |
-| `release.js` | 算下一个版本号、追加 `CHANGELOG.md`、生成 `js/changelog.js` 与 `js/version.js` | **每次发一个版本** |
+| `release.js` | 按命令里给的版本号追加 `CHANGELOG.md` 草稿，生成 `js/changelog.js` 与 `js/version.js` | **每次发一个版本**（`node tools/release.js vX.Y.Z`） |
 | `stamp-version.js` | 只把上一次提交写进 `js/version.js`（版本号从 `CHANGELOG.md` 顶部读） | **每次 `git commit` 之前** |
 | `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
 | `render-ships.js` | 用真正的 `models.js` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
@@ -346,7 +346,8 @@ var BUILD_STAMP = {
 两种跑法，产物是同一个文件：
 
 ```bash
-node tools/release.js         # 发版：追加 CHANGELOG.md + 刷新两个生成物
+node tools/release.js vX.Y.Z  # 发版（版本号手动指定）：追加 CHANGELOG.md + 刷新两个生成物
+node tools/release.js         # 不发版，只刷新两个生成物
 node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md 顶部读）
 ```
 
@@ -385,7 +386,7 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 中间的转换交给 `release.js`。两边都是纯数据，界面（`buildChangelog()`）
 只负责画。详见 [DESIGN.md 6.9](../DESIGN.md#69-为什么更新日志要生成两次)。
 
-### 版本号怎么算
+### 版本号怎么定
 
 每个版本条目末尾带一个锚点：
 
@@ -394,12 +395,12 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 <!-- commit: 09c3686 -->
 ```
 
-`release.js` 读最上面那条的锚点，用 `git log <锚点>..HEAD` 取新提交，
-再按提交信息判涨哪一位（`feat!` / `[major]` / `BREAKING` → 主版本，
-`feat` / 含"新增" → 次版本，其余 → 修订）。加 `--dry` 只预览不落盘。
-如果这批改动**只碰了文档**（`docs/` 或任意 `.md`），它只刷新生成物、不涨版本号
-（理由见 VERSIONING.md 第 6 节）；确实要为纯文档改动发版时加 `--force`。
-规则全文在 [VERSIONING.md](../VERSIONING.md)。
+**版本号由人在命令里给**：`node tools/release.js v1.11.0`（`v` 可省略）。
+`release.js` 读最上面那条的版本号与锚点，检查新版本号格式正确、比当前版本大，
+再用 `git log <锚点>..HEAD` 取新提交，按前缀分成「新增 / 调整 / 修复 / 文档」草稿。
+加 `--dry` 只预览不落盘；不带版本号只刷新两个生成物、不发版。
+（以前按提交前缀自动判大 / 中 / 小版本，已取消 —— 前缀衡量不了"对玩家算多大"。）
+流程全文在 [VERSIONING.md](../VERSIONING.md)。
 
 ### 为什么不做成全自动
 
@@ -672,7 +673,7 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 | 挂载预览的取景 / 那七个配置 | `render-mounts.js` 的 `AZ` `EL` `FOV` `MARGIN` 与 `CASES` |
 | 版本戳显示位置 | `index.html` 的 `<div id="verStamp">`，由 `js/game.js` 的 `stampVersion()` 填 |
 | 更新记录页的样式 | `style.css` 的 `.cl-*`；数据在 `js/changelog.js`，条目文本由 `clInline()` 还原 `**粗**` / `` `代码` `` |
-| 涨版本号的判定规则 | `release.js` 的 `levelOf()`；改它必须同步改 [VERSIONING.md](../VERSIONING.md) 第 2 节 |
+| 版本号检查（格式 / 必须比当前大） | `release.js` 的 `normalizeVersion()` / `compareVersion()`；版本号本身由人在命令里给，见 [VERSIONING.md](../VERSIONING.md) 第 2 节 |
 | 改名影响哪些文件 / 旧→新对照表 | `rename-aircraft.js` 的 `FILES` / `PLANES` 数组 |
 | 命名体系校验的词根表 | `smoke.js` 的 `RAFSI` / `UP_PREFIX` / `DOWN_PREFIX` |
 

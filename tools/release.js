@@ -1,21 +1,22 @@
 #!/usr/bin/env node
 /* ============================================================
-   release.js —— 自动分配版本号 + 追加更新日志
+   release.js —— 发版（版本号手动指定）+ 追加更新日志
 
-   一条命令干完四件事：
-     1. 从 CHANGELOG.md 顶部那条读出当前版本号与提交锚点
-     2. git log <锚点>..HEAD 取出这批新提交，按规则算出下一个版本号
-     3. 把新版本追加到 CHANGELOG.md 顶部
+   **版本号完全由人定**，脚本不再按提交信息自动判大 / 中 / 小版本。
+   发版时把版本号写在命令里，脚本干四件事：
+     1. 从 CHANGELOG.md 顶部那条读出当前版本号与提交锚点，检查新版本号比它大
+     2. git log <锚点>..HEAD 取出这批新提交，按前缀分组成草稿
+     3. 把新版本追加到 CHANGELOG.md 顶部（标题与正文待润色）
      4. 由 CHANGELOG.md 生成 js/changelog.js（游戏内「更新记录」页读它），
         并刷新 js/version.js
 
-   规则写在 docs/VERSIONING.md 里 —— 那是权威，这里只是它的实现。
-   改判定规则请同时改两处，否则文档会开始说谎。
+   不带版本号只做第 4 步（重新生成两个生成物），不发版。
+   流程写在 docs/VERSIONING.md 里。
 
    用法：
-     node tools/release.js            正常发版
-     node tools/release.js --dry      只打印将要写入什么，不落盘
-     node tools/release.js --force    即使这批改动全是文档，也照样涨版本号
+     node tools/release.js                 只重新生成 js/changelog.js 与 js/version.js
+     node tools/release.js v1.11.0         发 v1.11.0（v 可省略）
+     node tools/release.js v1.11.0 --dry   只打印将要写入什么，不落盘
    ============================================================ */
 'use strict';
 
@@ -29,7 +30,8 @@ const JS_PATH = path.join(ROOT, 'js', 'changelog.js');
 const STAMP_PATH = path.join(ROOT, 'js', 'version.js');
 
 const DRY = process.argv.indexOf('--dry') >= 0;
-const FORCE = process.argv.indexOf('--force') >= 0;
+// 第一个不是 --xxx 的参数就是要发的版本号
+const VERSION_ARG = process.argv.slice(2).filter(a => !/^--/.test(a))[0] || '';
 
 /* ============================================================
    git
@@ -117,30 +119,26 @@ function tagOf(r) {
   return '小版本';
 }
 
-function bump(version, level) {
-  const p = version.replace(/^v/, '').split('.').map(Number);
-  if (level === 'major') return 'v' + (p[0] + 1) + '.0.0';
-  if (level === 'minor') return 'v' + p[0] + '.' + (p[1] + 1) + '.0';
-  return 'v' + p[0] + '.' + p[1] + '.' + (p[2] + 1);
+/** 'v1.2.3' / '1.2.3' → 'v1.2.3'；格式不对返回 '' */
+function normalizeVersion(s) {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(s || '').trim());
+  return m ? 'v' + (+m[1]) + '.' + (+m[2]) + '.' + (+m[3]) : '';
+}
+
+/** a > b 返回正数，相等 0，小于负数（按数字比，v1.10.0 > v1.9.0） */
+function compareVersion(a, b) {
+  const pa = a.replace(/^v/, '').split('.').map(Number);
+  const pb = b.replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] - pb[i];
+  return 0;
 }
 
 /* ============================================================
-   提交分类 —— 规则实现，权威在 docs/VERSIONING.md 第 2 节
+   提交分组 —— 只决定草稿里一条提交放在哪个小标题下，与版本号无关
    ============================================================ */
-function levelOf(subject) {
-  const s = String(subject || '').trim();
-  if (/BREAKING/.test(s)) return 'major';
-  if (/^\[major\]/i.test(s)) return 'major';
-  if (/^[a-z]+(\([^)]*\))?!:/.test(s)) return 'major';
-  if (/^feat(\([^)]*\))?:/i.test(s)) return 'minor';
-  if (/^(fix|docs|chore|refactor|test|style|perf)(\([^)]*\))?:/i.test(s)) return 'patch';
-  if (/新增|新加|新的|加一个|新功能|重做/.test(s)) return 'minor';
-  return 'patch';
-}
-
 function sectionOf(subject) {
   const s = String(subject || '').trim();
-  if (levelOf(s) === 'major' || levelOf(s) === 'minor') return '新增';
+  if (/^feat(\([^)]*\))?!?:/i.test(s) || /新增|新加|新功能|重做/.test(s)) return '新增';
   if (/^docs(\([^)]*\))?:/i.test(s) || /文档|注释里|说明/.test(s)) return '文档';
   if (/^fix(\([^)]*\))?:/i.test(s) || /修|修正|改回|补上/.test(s)) return '修复';
   return '调整';
@@ -266,33 +264,29 @@ function main() {
       '  ' + releases.length + ' 个版本\n');
   }
 
+  /* 不带版本号：只重新生成两个生成物，不发版。
+     版本号完全由人定 —— 脚本不再按提交信息判大 / 中 / 小版本。 */
+  if (!VERSION_ARG) {
+    console.log('  这批新提交 ' + commits.length + ' 条。没有指定版本号 —— 只重新生成 js/changelog.js 与 js/version.js');
+    console.log('  要发版：node tools/release.js vX.Y.Z（版本号自己定，见 docs/VERSIONING.md）');
+    refreshOnly(releases, top.version);
+    return;
+  }
+
+  const next = normalizeVersion(VERSION_ARG);
+  if (!next) {
+    console.error('  版本号格式不对：' + VERSION_ARG + '（要 vX.Y.Z 三段式，v 可省略）');
+    process.exit(1);
+  }
+  if (compareVersion(next, top.version) <= 0) {
+    console.error('  ' + next + ' 不比当前版本 ' + top.version + ' 大 —— 版本号只能往上走，用过的不能再用');
+    process.exit(1);
+  }
   if (!commits.length) {
-    console.log('  没有新提交 —— 只重新生成 js/changelog.js 与 js/version.js');
-    refreshOnly(releases, top.version);
-    return;
+    console.error('  锚点 ' + (anchor || '—') + ' 之后没有新提交，没有东西可发');
+    process.exit(1);
   }
 
-  /* 全是文档改动就只刷新生成物，不占版本号 —— 理由见 VERSIONING.md 第 6 节 */
-  const changed = git('diff --name-only ' + (anchor ? anchor + '..HEAD' : 'HEAD'))
-    .split('\n').filter(Boolean);
-  const docsOnly = changed.length > 0 && changed.every(f => /^(docs\/|.*\.md$)/.test(f));
-
-  if (docsOnly && !FORCE) {
-    console.log('  这批改动只碰了文档（' + changed.length + ' 个文件），不涨版本号。');
-    console.log('  想强制发版：node tools/release.js --force');
-    refreshOnly(releases, top.version);
-    return;
-  }
-
-  // 取最高的那一档
-  let level = 'patch';
-  for (const c of commits) {
-    const l = levelOf(c.subject);
-    if (l === 'major') { level = 'major'; break; }
-    if (l === 'minor') level = 'minor';
-  }
-
-  const next = bump(top.version, level);
   const groups = { 新增: [], 调整: [], 修复: [], 文档: [] };
   for (const c of commits) groups[sectionOf(c.subject)].push(c.subject);
 
@@ -310,7 +304,8 @@ function main() {
     body +
     '\n---\n\n';
 
-  console.log('  这批新提交 ' + commits.length + ' 条 → ' + level.toUpperCase() + ' → ' + next);
+  console.log('  这批新提交 ' + commits.length + ' 条 → ' + next + '（' +
+    tagOf({ minor: +next.split('.')[1], patch: +next.split('.')[2] }) + '）');
 
   /* 插入点：第一条版本标题所在的行首。
      找不到就说明 CHANGELOG.md 的骨架被改坏了，直接报错退出 ——
@@ -346,8 +341,8 @@ module.exports = {
   renderChangelogJs: renderChangelogJs,
   writeStamp: writeStamp,
   tagOf: tagOf,
-  bump: bump,
-  levelOf: levelOf,
+  normalizeVersion: normalizeVersion,
+  compareVersion: compareVersion,
   sectionOf: sectionOf,
   git: git,
   ROOT: ROOT

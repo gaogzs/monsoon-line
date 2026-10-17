@@ -17,7 +17,7 @@
    实现搬去了 tools/release.js —— 版本号、时间戳、更新日志三样东西
    来自同一份 CHANGELOG.md，各写各的迟早会不一致。
    这个脚本留在原地，是因为它是"只想刷新时间戳"时最轻的那条路径。
-   要发一个新版本请用：node tools/release.js
+   要发一个新版本请用：node tools/release.js vX.Y.Z（版本号手动指定）
    ============================================================ */
 'use strict';
 const release = require('./release.js');

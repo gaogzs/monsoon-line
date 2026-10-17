@@ -1952,7 +1952,7 @@ var Game = (function () {
 
     /* 末尾挂一句"这一页怎么来的"，顺手把版本号规则的位置告诉下一个改代码的人。 */
     html += '<div class="cl-foot">版本号规则见 docs/VERSIONING.md —— ' +
-      '每条提交都会由 tools/release.js 自动分配版本号并追加到这里。</div>';
+      '版本号发版时手动指定，由 tools/release.js 追加到这里。</div>';
 
     body.innerHTML = html;
   }
