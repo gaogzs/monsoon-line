@@ -29,6 +29,14 @@ const ORDER = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/s
 
 const problems = [];
 function fail(msg) { problems.push(msg); console.log('  \x1b[31mFAIL\x1b[0m  ' + msg); }
+function cmpVer(a, b) {
+  const pa = a.replace(/^v/, '').split('.').map(Number), pb = b.replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
 function ok(msg) { console.log('  \x1b[32mOK\x1b[0m    ' + msg); }
 
 /* ============================================================
@@ -363,7 +371,8 @@ console.log('\n== 更新记录 ==');
       if (!r.commit) badFmt.push(r.version + ' 缺 <!-- commit: --> 锚点（release.js 靠它算新改动）');
       const n = r.sections.reduce((s, x) => s + x.items.length, 0);
       if (!n) badFmt.push(r.version + ' 一条改动都没写');
-      if (prev !== null && !(r.version < prev)) desc = false;
+      // 按数字逐段比：字符串比较会把 v1.10.0 排在 v1.9.0 后面
+      if (prev !== null && !(cmpVer(r.version, prev) < 0)) desc = false;
       prev = r.version;
       order.push(r.version);
     }
