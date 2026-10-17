@@ -310,11 +310,14 @@ fy2 = clamp(camDir.y, -SIN_LIM, SIN_LIM);
 位置在**世界坐标**里算（不在机体坐标系）：
 
 ```js
-back = S.camDist + clamp(vFwd / 7.5, 0, 90);                 // 速度感距离
+// 速度感距离：按空速 p.speed，平滑速率 1.5/s。不能用 dot(vel, camDir) ——
+// 急转时视线先甩、速度没跟上，这个分量一秒内 290 → −110 → 200，镜头前后伸缩
+camSpeedBack += (clamp(p.speed / 7.5, 0, 90) - camSpeedBack) * (1 - exp(-1.5 * dt));
+back = S.camDist + camSpeedBack;
 off0 = M3.rotAxis(camDir * -back, (0,1,0), camYaw);
 wantOff = off0 + (0, S.camHeight + camPitch * 70, 0);
 wantOff -= camDir * frameDeficit(wantOff, camDir, fr);       // 静态底座
-camOff = M3.lerpV(camOff, wantOff, 1 - Math.exp(-7.5 * dt));  // 平滑的是相对偏移
+camOff = smoothOffset(camOff, wantOff, 1 - Math.exp(-7.5 * dt));  // 方向 slerp + 长度单独插值（lerpV 走弦会把镜头拉近）
 viewOff = 按 S.camFrame 处理 camOff;                          // 只影响本帧，不写回
 Renderer.setCamera(p.pos + viewOff, camDir, (0,1,0), S.fov);
 ```

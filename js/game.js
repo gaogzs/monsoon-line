@@ -114,6 +114,7 @@ var Game = (function () {
   var aimYaw = 0, aimPitch = 0, aimInit = false;
   var AIM_SENS = 0.0022;           // rad / 像素
   var AIM_SPIKE_PX = 200;          // 单个 mousemove 位移超过它就当尖峰丢掉（≈ 25°）
+  var AIM_SPIKE_PX = 200;          // 单个 mousemove 位移超过它就当尖峰丢掉（≈ 25°）
   var AIM_PITCH_LIM = 89 * Math.PI / 180;
   var last = 0;
   /* 机位现在由设置项 S.camMode 决定，没有热切换键 ——
@@ -133,6 +134,8 @@ var Game = (function () {
   var HIG_MAX = 1.90;
   var camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0), camPos = M3.V(0, 0, 0);
   var camOff = null;                 // 追尾镜头相对飞机的平滑偏移
+  var camSpeedBack = null;           // 速度感距离（平滑后，米），首帧惰性初始化
+  var CAM_SPEED_RATE = 1.5;          // 速度感距离的平滑速率（1/s）：加力 / 掉速时慢慢拉开、凑近
   var camExtra = 0, camExtraHold = 0; // 出画处理 C：额外拉远量与剩余保持时间
   var camYaw = 0, camPitch = 0;
   /* 追尾镜头的基准朝向。它不直接等于机头方向 —— 见 updateCamera 里的说明：
@@ -151,9 +154,19 @@ var Game = (function () {
      就再也拖不动了。浏览器只允许在用户手势里请求 —— 开始任务的那次点击、
      取消暂停的那次按键、以及画布上的任何一次点击都算。 */
   function requestAimLock() {
-    if (!cv || !aimMode || document.pointerLockElement === cv || !cv.requestPointerLock) return;
     /* 先要"原始位移"（unadjustedMovement）：绕开系统鼠标加速，Chrome 在
        Windows 上锁定指针时偶发的巨大 movementX/Y 尖峰也少得多。
+       浏览器不支持这个选项时 promise 会被拒绝，退回普通锁定。 */
+    if (!cv || !aimMode || document.pointerLockElement === cv || !cv.requestPointerLock) return;
+      var r = cv.requestPointerLock({ unadjustedMovement: true });
+      if (r && r.catch) {
+        r.catch(function () {
+          try {
+            var r2 = cv.requestPointerLock();
+            if (r2 && r2.catch) r2.catch(function () { /* 被拒绝就等下一次点击 */ });
+          } catch (err2) { /* 不支持就退回普通指针 */ }
+        });
+      }
        浏览器不支持这个选项时 promise 会被拒绝，退回普通锁定。 */
     try {
       var r = cv.requestPointerLock({ unadjustedMovement: true });
@@ -1495,6 +1508,7 @@ var Game = (function () {
     p.name = CALLSIGN.player;
     p.label = CALLSIGN.player;
     world.player = p;
+    camSpeedBack = null;
     world.actors.push(p);
     player = p;
 
@@ -1567,9 +1581,15 @@ var Game = (function () {
     });
     document.addEventListener('mouseup', function (e) {
       if (e.button === 0) mouse.left = false;
+        var mx = e.movementX || 0, my = e.movementY || 0;
+        /* 丢掉位移尖峰。浏览器偶尔会报一个几百上千像素的 movementX/Y：
+           Chrome 锁定指针时的已知毛病，以及没锁定时光标移出画布再移回来的
+           第一下。它会把准星瞬间甩到一个"随机"方向，镜头跟过去，看起来就是
+           镜头被重置。正常甩鼠标单个事件远到不了 AIM_SPIKE_PX。 */
+        if (Math.abs(mx) > AIM_SPIKE_PX || Math.abs(my) > AIM_SPIKE_PX) return;
       if (e.button === 2) mouse.right = false;
-    });
-    cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+        aimYaw += mx * AIM_SENS * fovK;
+        aimPitch = M3.clamp(aimPitch - my * AIM_SENS * fovK,
 
     cv.addEventListener('mousemove', function (e) {
       var r = cv.getBoundingClientRect();
@@ -2646,6 +2666,16 @@ var Game = (function () {
     var a = Math.abs(x);
     if (a <= knee) return x;
     var w = lim - knee;
+  /* 追尾镜头相对飞机的偏移往目标走一步：方向球面插值、长度单独插值。
+     以前对整个向量 lerpV —— 视线快速甩动时插值走的是弦，偏移长度变短，
+     镜头被拉近；甩完又弹回去。急转时这是镜头前后伸缩的第二个来源。 */
+  function smoothOffset(cur, want, k) {
+    var lc = M3.len(cur), lw = M3.len(want);
+    if (lc < 1e-6 || lw < 1e-6) return M3.lerpV(cur, want, k);
+    var dir = M3.slerpDir(M3.mul(cur, 1 / lc), M3.mul(want, 1 / lw), k);
+    return M3.mul(dir, lc + (lw - lc) * k);
+  }
+
     return (x < 0 ? -1 : 1) * (knee + w * Math.tanh((a - knee) / w));
   }
 
@@ -2763,10 +2793,18 @@ var Game = (function () {
       if (camPitchSmooth === null) camPitchSmooth = camPitchAng;
       camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-pitchRate * dt));
 
-      var cpc = Math.cos(camPitchSmooth), cps = Math.sin(camPitchSmooth);
-      var camDir = M3.V(Math.sin(camYawBase) * cpc, cps, Math.cos(camYawBase) * cpc);
+         速度感单独加一段沿视线向后的距离（有上限），
+         飞得多慢、往哪个方向掉，飞机都留在画面里同一个位置附近。
 
-      // ③ 视线钳位，保证 |y| 不超过限位
+         速度感按**空速** p.speed 算，再慢慢平滑（CAM_SPEED_RATE）。以前取的是
+         速度在视线方向上的分量 dot(vel, camDir)：急转时视线先甩出去、速度方向
+         还没跟上，这个分量一秒内能从 290 掉到 −110 再回到 200，镜头就在
+         49 m → 21 m → 29 m → 20 m 之间来回伸缩 —— 三种出画处理都在它下游，
+         选哪种都一样跳。空速本身同一段时间只是平滑地从 290 降到 200。 */
+      var wantSpeedBack = M3.clamp(p.speed / 7.5, 0, 90);
+      camSpeedBack = camSpeedBack === null ? wantSpeedBack
+        : camSpeedBack + (wantSpeedBack - camSpeedBack) * (1 - Math.exp(-CAM_SPEED_RATE * dt));
+      var back = S.camDist + camSpeedBack;
       var fy2 = M3.clamp(camDir.y, -SIN_LIM, SIN_LIM);
       var fh2 = camDir.x * camDir.x + camDir.z * camDir.z;
       if (fh2 > 1e-8) {
@@ -2777,7 +2815,7 @@ var Game = (function () {
 
       /* 位置在**世界坐标**的后方（不是机体坐标系）——
          这样滚转时镜头不会绕着飞机转圈，是"稳定"的另一半。 */
-      /* 跟随距离：以前直接对世界坐标 camPos 做一阶平滑，镜头稳态会落后
+      camOff = camOff ? smoothOffset(camOff, wantOff, 1 - Math.exp(-7.5 * dt)) : wantOff;
          v / 7.5 米 —— 高速时远、低速时近，失速下坠时这段滞后还变成竖直的，
          飞机就从画面里掉出去了。现在平滑的是**相对飞机的偏移**，
          速度感单独加一段沿视线向后的距离（只认沿视线向前的速度、有上限），

@@ -2787,6 +2787,67 @@ if (Ent && M3 && me && world) {
     else ok('鼠标位移尖峰被丢掉（准星不动），之后正常位移照常（40 px → ' + moved.toFixed(1) + '°）');
   }
 
+  /* ---- 真实链路：急转时镜头不能前后伸缩 ----
+     曾有两个来源，三种出画处理都在它们下游，选哪种都跳：
+       ① 速度感距离取 dot(vel, 视线)：视线先甩出去、速度没跟上，一秒内 290 → −110 → 200，
+          镜头 49 m → 21 m → 29 m → 20 m；
+       ② camOff 整体 lerpV：视线快速甩动时插值走弦，偏移变短、镜头被拉近。
+     左右猛甩、回甩（只有偏航，不涉及高度投影）期间，空速只在单调下降，
+     镜头距离也只能跟着单调收，不能来回伸缩。 */
+  {
+    const G = sandbox.Game, R = sandbox.Renderer, M3 = sandbox.M3;
+    const cvEl = sandbox.document.getElementById('cv');
+    G.startMission(0);
+    for (let f = 0; f < 60; f++) pump(1);
+    const pl = G.__player();
+    const script = [[30, 40], [0, 40], [-40, 40], [0, 30]];   // [每帧横向 px, 帧数]
+    let prev = null, lastS = 0, revs = 0, maxStep = 0, mn = 1e9, mx = 0;
+    for (const [mxp, n] of script) for (let i = 0; i < n; i++) {
+      cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2, movementX: mxp, movementY: 0 });
+      pump(1);
+      const dist = M3.len(M3.sub(pl.pos, R.getCam().pos));
+      mn = Math.min(mn, dist); mx = Math.max(mx, dist);
+      if (prev !== null) {
+        const d = dist - prev;
+        maxStep = Math.max(maxStep, Math.abs(d));
+        if (Math.abs(d) > 0.05) { const s = Math.sign(d); if (lastS && s !== lastS) revs++; lastS = s; }
+      }
+      prev = dist;
+    }
+    const bad = [];
+    if (revs > 1) bad.push('急转时镜头距离来回伸缩 ' + revs + ' 次（' + mn.toFixed(1) + '–' + mx.toFixed(1) + ' m）');
+    if (maxStep > 0.6) bad.push('急转时镜头距离一帧变 ' + maxStep.toFixed(2) + ' m');
+    if (bad.length) bad.forEach(fail);
+    else ok('真实链路：左右猛甩时镜头距离只随空速平滑收（' + mx.toFixed(1) + ' → ' + mn.toFixed(1) +
+      ' m，每帧 ≤ ' + maxStep.toFixed(2) + ' m，反向 ' + revs + ' 次）');
+  }
+
+  /* ---- 真实链路：鼠标位移尖峰要丢掉 ----
+     浏览器偶尔报一个几百上千像素的 movementX/Y（Chrome 锁定指针时的已知毛病、
+     未锁定时光标移出画布再移回）。不丢的话准星被瞬间甩到"随机"方向，
+     镜头跟过去，看起来就是镜头被重置。正常的鼠标位移照常生效。 */
+  {
+    const G = sandbox.Game, R = sandbox.Renderer, M3 = sandbox.M3;
+    const cvEl = sandbox.document.getElementById('cv');
+    G.startMission(0);
+    for (let f = 0; f < 60; f++) pump(1);
+    const pl = G.__player();
+    const ang = (a, b) => Math.acos(M3.clamp(M3.dot(a, b), -1, 1)) * 180 / Math.PI;
+    const before = M3.clone(pl.aimDir);
+    cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2, movementX: 900, movementY: -450 });
+    pump(1);
+    const afterSpike = M3.clone(pl.aimDir);
+    cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2, movementX: 40, movementY: 0 });
+    pump(1);
+    const moved = ang(afterSpike, pl.aimDir);
+    const bad = [];
+    // 一帧里飞机自己也在转，准星方向不变（世界系）—— 尖峰之后应几乎不动
+    if (ang(before, afterSpike) > 0.5) bad.push('位移尖峰把准星甩了 ' + ang(before, afterSpike).toFixed(1) + '°');
+    if (moved < 4) bad.push('尖峰之后正常的 40 px 位移只转了 ' + moved.toFixed(2) + '°（应约 5°）');
+    if (bad.length) bad.forEach(fail);
+    else ok('鼠标位移尖峰被丢掉（准星不动），之后正常位移照常（40 px → ' + moved.toFixed(1) + '°）');
+  }
+
   /* ---- 真实链路：CMD 顶在最上面左右拖，画面要跟着转 ----
      曾经镜头偏航从瞄准方向的水平投影反算，投影太短（≈83° 以上）就冻结：
      CMD 顶在 89° 时左右拖，罗盘和飞机在转、画面不转；一往下拖离开冻结区，
