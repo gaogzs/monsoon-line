@@ -410,7 +410,7 @@ var Game = (function () {
     '能量机动：爬升掉速、俯冲增速。低速时舵效下降，谨防失速。',
     '导弹规避：把来袭导弹放在 3/9 线（正横），持续桶滚消耗其能量。',
     '动压 Q：18 km 以上的空气密度只有海平面的约 10%。动压低于 22 kPa 舵效开始下降，低于 <b>12 kPa</b> 告警，导弹也拉不动过载；机炮射程则会变远。',
-    '交战规则：阵列空域内对地弹、反舰弹与炸弹一律锁定，空空弹与机炮照常使用。',
+    '调节单元悬在 18–22 km：在它们附近谨慎使用重型武器，打坏一个会按误击友方设施扣分。',
     '注意高度：低于 200 m 触发低高度告警，坠海即任务失败。'
   ];
 
@@ -1114,6 +1114,8 @@ var Game = (function () {
       '<div class="cx-sub">' + e.sub + '</div>' +
       '<div class="cx-text">' + body + '</div>';
     bindCodexUnits(bodyEl);
+    // 条目自带的小部件（例如 s4 的调节单元 3D 预览）在 DOM 就位之后再挂
+    if (typeof e.mount === 'function') e.mount();
   }
 
   /* 图鉴里的单位链接用**事件委托**，不逐个绑 ----
@@ -1159,7 +1161,7 @@ var Game = (function () {
       player: null,
       flags: {},
       objective: '', objectiveSub: '',
-      roeBlocked: false, detected: false,
+      detected: false,
       killed: 0, hitsLanded: 0, shotsFired: 0, gunRounds: 0, gunHits: 0,
       /* 友军的击落单独记：进战报，但不进综合评定（见 finish）。
          killed 只数玩家自己的。 */
@@ -1322,13 +1324,6 @@ var Game = (function () {
       return false;                       // 没有槽表就退回旧的单冷却
     }
 
-    /* 交战规则：阵列空域内禁用对地 / 反舰弹与炸弹（按类别） */
-    /* 判据只有一处：data.js 的 roeRestricted() —— 武器 desc 末尾那句
-       交战规则提示也是由它生成的，两边不会再对不上。 */
-    if (actor.isPlayer && w.roeBlocked && roeRestricted(wp)) {
-      SysNote.show('<b>交战规则限制 —— 该武器在阵列空域内被锁定。</b>', { warn: true });
-      return false;
-    }
     /* 无目标也允许发射。
 
        无制导弹本来就不需要目标；有导引头的弹打出去之后直飞，
@@ -2324,6 +2319,9 @@ var Game = (function () {
         var tg = world.targets[j];
         if (!tg.alive || tg.team === b.team) continue;
         var r = tg.radius || 8;
+        /* 高度差超过"半径 + 本帧弹道长"就不可能相交 —— 每关头顶几十个单元，
+           低空的弹不用逐个去求交。 */
+        if (Math.abs(b.pos.y - tg.pos.y) > r + segLen) continue;
         var t2 = M3.raySphere(prev, dir, tg.pos, r);
         if (t2 >= 0 && t2 <= segLen) {
           if (b.owner && b.owner.isPlayer) {
@@ -2363,8 +2361,11 @@ var Game = (function () {
       if (penal) world.friendlyLoss = (world.friendlyLoss || 0) + 1;
       Ent.killGround(tg, world);
       if (tg.model === 'cell') {
-        Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>你打爆了一个调节单元！</b>340 公斤碘化银在那一层高度散开了。', gap: 1.2 });
-        if (source && source.isPlayer) world.friendlyLoss = (world.friendlyLoss || 0) + 1;
+        /* 处罚已在上面的 penal 记过一次 —— 这里以前又加了一次，打掉一个单元算两次。
+           这句只在玩家打的时候说：流弹打掉的不该算到"你"头上。 */
+        if (source && source.isPlayer) {
+          Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>你打爆了一个调节单元！</b>340 公斤碘化银在那一层高度散开了。', gap: 1.2 });
+        }
       } else if (tg.model === 'relay') {
         Radio.raw({ who: CALLSIGN.wing2, cls: 'ally', tx: '中继平台已摧毁。', gap: 1.0 });
       } else if (tg.model === 'sam') {
@@ -2942,6 +2943,8 @@ var Game = (function () {
   /* ============================================================
      渲染
      ============================================================ */
+  var CELL_DRAW_RANGE2 = 30000 * 30000;
+
   function render() {
     if (state !== 'playing' || !world || !player) {
       // 菜单背景：慢速空镜头
@@ -2958,6 +2961,8 @@ var Game = (function () {
       if (!t.alive) continue;
       var mdl = MODELS[t.model];
       if (!mdl) continue;
+      // 调节单元每关几十个、大多在 30 km 外 —— 远处那些画出来也只是雾里一个点
+      if (t.model === 'cell' && M3.dist2(t.pos, player.pos) > CELL_DRAW_RANGE2) continue;
       Renderer.pushModel(mdl, t.pos, t.fwd, t.up, {});
     }
     // 飞机
@@ -2998,15 +3003,6 @@ var Game = (function () {
     }
     for (i = 0; i < hits.length; i++) {
       HUD.hitMark(ctx, Renderer.W, Renderer.H, hits[i].txt, hits[i].t / 1.1, hits[i].col);
-    }
-    if (world.roeBlocked && player.alive) {
-      ctx.save();
-      ctx.globalAlpha = 0.85;
-      ctx.fillStyle = 'rgba(255,176,58,0.9)';
-      ctx.font = 'bold 12px Consolas,monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('交战规则生效 —— 对地 / 反舰武器锁定', Renderer.W / 2, Renderer.H - 108);
-      ctx.restore();
     }
     if (world.detected && player.alive) {
       var bl = Math.sin(performance.now() * 0.01) > 0;

@@ -3824,6 +3824,83 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 调节单元：每一关头顶都有，不锁任何武器，误击只记一次 ----
+
+     v1.9 之前单元只在第 3 关出现。现在阵列由 spawnCellField 统一生成；
+     单元附近的武器禁用机制已整个删掉，这里也确认它没有残留。 */
+  {
+    const G = sandbox.Game, M3d = sandbox.M3;
+    const bad = [];
+    const counts = [];
+    for (let mi = 0; mi < sandbox.MISSIONS.length; mi++) {
+      G.startMission(mi);
+      const w = G.__world();
+      const cells = w.cells || [];
+      counts.push(sandbox.MISSIONS[mi].id + ':' + cells.length);
+      if (cells.length < 9 || cells.length > 60) bad.push(sandbox.MISSIONS[mi].id + ' 单元数 ' + cells.length);
+      for (const c of cells) {
+        if (c.team !== 2 || !c.friendlyAsset) { bad.push(sandbox.MISSIONS[mi].id + ' 单元不是中立受保护资产'); break; }
+        if (c.pos.y < 17500 || c.pos.y > 21500) { bad.push(sandbox.MISSIONS[mi].id + ' 单元高度 ' + c.pos.y.toFixed(0)); break; }
+        if (w.targets.indexOf(c) < 0) { bad.push(sandbox.MISSIONS[mi].id + ' 单元不在 targets 里'); break; }
+      }
+    }
+
+    // 武器禁用机制已删：判据函数和世界字段都不该还在
+    if (typeof sandbox.roeRestricted !== 'undefined' || typeof sandbox.nearCell !== 'undefined') {
+      bad.push('单元附近禁用武器的判据函数仍然存在');
+    }
+    G.startMission(0);
+    const w = G.__world(), pl = G.__player();
+    if ('roeBlocked' in w) bad.push('world 上仍有 roeBlocked 字段');
+
+    // 玩家打掉一个单元，误击只记一次（以前 penal 和 cell 分支各加一次）
+    const c0 = w.cells[0];
+    pl.pos = M3d.add(c0.pos, M3d.V(0, -1000, 0));
+    pump(1);
+    const before = w.friendlyLoss || 0;
+    sandbox.Ent.hitSurface(c0, 99999, w, pl);
+    if (c0.alive) bad.push('单元吃满伤害后仍存活');
+    if ((w.friendlyLoss || 0) - before !== 1) bad.push('玩家打掉一个单元，误击记了 ' + ((w.friendlyLoss || 0) - before) + ' 次');
+
+    /* 管理局勤务机「水准」：沿编组巡视 —— 飞 150 s，看它守不守得住巡视高度、
+       有没有真的往下一个编组走。（a2 推力弱，高空守不住高度时这里会报。） */
+    {
+      const m5 = sandbox.MISSIONS.findIndex(m => m.id === 'm5');
+      G.startMission(m5);
+      const w5 = G.__world(), p5 = G.__player();
+      const datum = w5.actors.find(a => a.ac === 'a2' || (a.route && a.route.wps));
+      if (!datum || !datum.route || !datum.route.wps) bad.push('m5 的勤务机没有巡视航线');
+      else {
+        /* 各编组高度不同，换航点时会爬 / 降一两千米 —— 所以不比"当前偏差"，
+           只看它有没有掉到最低航点以下（守不住高度就会一路往下掉）。 */
+        const floorY = Math.min.apply(null, datum.route.wps.map(v => v.y)) - 500;
+        let worst = 0, seenIdx = 0;
+        for (let f = 0; f < 150 * 60; f++) {
+          p5.pos = M3d.V(0, 9000, -16000); p5.hp = p5.maxHp;   // 玩家别掺和
+          pump(1);
+          if (!datum.alive) break;
+          worst = Math.max(worst, floorY - datum.pos.y);
+          seenIdx = Math.max(seenIdx, datum.route.wpIdx || 0);
+        }
+        if (!datum.alive) bad.push('勤务机在巡视中坠毁/消失');
+        else if (worst > 0) bad.push('勤务机守不住巡视高度，掉到最低航点下方 ' + (worst + 500).toFixed(0) + ' m');
+        if (seenIdx < 1) bad.push('勤务机 150 s 内没有到达第一个编组');
+        counts.push('水准到第' + seenIdx + '航点');
+      }
+    }
+
+    // 资料库 s4 的 3D 预览：条目带 mount，调用不抛异常
+    const s4 = sandbox.CODEX.find(e => e.id === 's4');
+    if (!s4 || typeof s4.mount !== 'function') bad.push('资料库 s4 没有 3D 预览的 mount');
+    else {
+      try { s4.mount(); sandbox.UnitView.stop(); } catch (e) { bad.push('s4 mount 抛异常：' + e.message); }
+      if (!/cxCell3d/.test(s4.html)) bad.push('s4 正文里没有预览画布');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('调节单元：' + counts.join(' ') + '；不锁武器、误击只记一次、s4 3D 预览可挂载');
+  }
+
   /* ---- 诊断：AI 追到极高空会不会卡住 ---- */
   {
     const G = sandbox.Game, M3d = sandbox.M3, q = sandbox.Ent;

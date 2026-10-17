@@ -454,7 +454,14 @@ var AI = (function () {
     /* 到点：执行该点的动作，然后转到下一段。
        最后一段飞完就自行消失 —— 轰炸机不会掉头回来再打一遍。 */
     if (dist < r.arrive) {
-      if (r.loiter) {
+      if (r.wps) {
+        /* 巡视型（管理局勤务机）：一串航点挨个飞、飞完从头再来，
+           每个航点自带高度 —— 永不退场，和预警机一样。 */
+        r.wpIdx = ((r.wpIdx || 0) + 1) % r.wps.length;
+        r.wp = r.wps[r.wpIdx];
+        r.alt = r.wp.y;
+        if (r.onArrive) r.onArrive(a, world);
+      } else if (r.loiter) {
         /* 盘旋型（预警机）。
 
            轰炸机是**事件**：飞到点、扔完弹、退场。

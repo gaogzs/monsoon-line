@@ -169,7 +169,7 @@ var HUD = (function () {
     if (world && (!S || S.targetMarkers !== false)) {
       if (world.targets) {
         for (var i = 0; i < world.targets.length; i++) {
-          if (world.targets[i].alive) marks.push(world.targets[i]);
+          if (world.targets[i].alive && !farCell(world.targets[i], p)) marks.push(world.targets[i]);
         }
       }
     }
@@ -548,6 +548,13 @@ var HUD = (function () {
     text(ctx, 'N', cx, cy - R - 6, DIM, FS, 'center');
   }
 
+  /* 调节单元每关头顶几十个：远处的不上 HUD（罗盘、雷达、目标框都一样），
+     不然雷达边缘会排一圈灰点、屏幕上满是灰箭头。近了才需要看清它在哪。 */
+  var CELL_HUD_RANGE2 = 10000 * 10000;
+  function farCell(t, p) {
+    return t.model === 'cell' && M3.dist2(t.pos, p.pos) > CELL_HUD_RANGE2;
+  }
+
   function radarXY(p, wp, cx, cy, R, range) {
     var dx = wp.x - p.pos.x, dz = wp.z - p.pos.z;
     var hl = Math.sqrt(p.fwd.x * p.fwd.x + p.fwd.z * p.fwd.z);
@@ -605,7 +612,7 @@ var HUD = (function () {
     if (world.targets) {
       for (i = 0; i < world.targets.length; i++) {
         var t = world.targets[i];
-        if (!t.alive) continue;
+        if (!t.alive || farCell(t, p)) continue;
         s = radarXY(p, t.pos, cx, cy, R, range);
         ctx.strokeStyle = (t.team === 2) ? '#8fa3b2'
           : (t.ttype === 'air' ? AMBER : '#8fa3b2');
@@ -867,7 +874,7 @@ var HUD = (function () {
     }
     if (world.targets) {
       for (i = 0; i < world.targets.length; i++) {
-        if (world.targets[i].alive) list.push(world.targets[i]);
+        if (world.targets[i].alive && !farCell(world.targets[i], p)) list.push(world.targets[i]);
       }
     }
 

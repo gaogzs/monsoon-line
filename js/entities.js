@@ -2051,7 +2051,7 @@ var Ent = (function () {
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
     clusterBurst: clusterBurst, isHard: isHard, warheadK: warheadK,
-    setTargetHitHandler: setTargetHitHandler,
+    setTargetHitHandler: setTargetHitHandler, hitSurface: hitSurface,
     makeTarget: makeTarget, stepTarget: stepTarget,
     randUnit: randUnit
   };

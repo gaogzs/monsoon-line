@@ -268,6 +268,46 @@ function spawnTarget(w, o) {
   return t;
 }
 
+/* 调节单元阵列。
+
+   分水群岛上空的每一片空域都在调节场底下 —— 不只是高空关：
+   玩家在哪一关都能爬到 18 km，爬上去就该看见单元。所以每一关的
+   spawn 都调一次这里，单元的样子和数值只写这一份。
+
+   布局照设定：九个一组（3×3），组内间距 5 km；`o.xs` × `o.zs` 是
+   各编组中心（按 20 km 一格摆，组与组之间留 10 km 空当）。
+   高度：每组一个基准（18 500–21 000 m），组内再各自浮动 ±500 m。
+
+   中立（team 2）+ friendlyAsset：谁都不能锁它，玩家打坏要扣分。
+   不锁任何武器 —— 在它们附近开火全凭玩家自己掂量。 */
+var CELL_SPACING = 5000;
+
+function spawnCellField(w, o) {
+  w.cells = w.cells || [];
+  var groups = [];
+  for (var a = 0; a < o.xs.length; a++) {
+    for (var b = 0; b < o.zs.length; b++) {
+      var g = { x: o.xs[a], z: o.zs[b], y: M3.rnd(18500, 21000) };
+      groups.push(g);
+      for (var i = -1; i <= 1; i++) {
+        for (var j = -1; j <= 1; j++) {
+          var c = spawnTarget(w, {
+            ttype: 'air', model: 'cell', label: '调节单元',
+            x: g.x + i * CELL_SPACING + M3.rnd(-300, 300),
+            y: g.y + M3.rnd(-500, 500),
+            z: g.z + j * CELL_SPACING + M3.rnd(-300, 300),
+            hp: 400, radius: 34, drift: 14, big: true, value: 0
+          });
+          c.friendlyAsset = true;      // 打坏要扣分
+          c.team = 2;                  // 中立：双方流弹都可能伤到它，玩家误伤要扣分
+          w.cells.push(c);
+        }
+      }
+    }
+  }
+  return groups;
+}
+
 /* 水面舰船。
 
    数值**不从任务里另抄一份** —— `SHIPS` 表（data.js）已经备好了
@@ -357,6 +397,7 @@ MISSIONS.push({
   /* ---------------- 战场生成 ---------------- */
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [0], zs: [0, 20000] });
     /* 战场尺度：起飞点与目标编队之间留出约 22 km。
        中距弹的锁定距离是 8–12 km，把编队摆在 8 km 外等于一进任务
        就直接进包线 —— 没有任何进入段可言。 */
@@ -572,6 +613,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [0], zs: [-20000, 0, 20000] });
     /* 这一关整条链条被拉长到约 30 km：进场点在东北端，
        中继网铺在中间，前进基地在你身后。进入段有了，
        而"来不及拦轰炸机"也才真的成立。 */
@@ -839,15 +881,15 @@ MISSIONS.push({
 <p>在这个高度，空气密度只有海平面的 <b>7.8%</b>。
 导弹的舵面几乎失效，可用过载掉到个位数 G；
 机炮射程则比低空远出六成。</p>
-<p>上游公约派了三架飞机上来。<span class="am">交战规则：调节单元 5 公里内，
-对地、反舰弹与炸弹全部锁定 —— 只剩机炮和空空弹。</span></p>
+<p>上游公约派了三架飞机上来。<span class="am">播撒机就在调节单元中间穿行 ——
+谨慎使用重型武器。</span></p>
 <p>而对面来的那个人，是下游航空军的战役指挥官。
 他的呼号不是哪个消失的村庄，是一座还在用水的镇子。</p>`,
 
   objectives: [
     '击落全部 8 架「灰烬」级播撒机',
     '不得损毁调节单元（DIL-4）',
-    '单元 5 km 内对地 / 反舰弹与炸弹锁定 —— 只剩机炮和空空弹',
+    '在单元附近谨慎使用重型武器',
     '两架以上播撒机降到 14 km 以下即任务失败',
     '清除空域内全部敌机',
     '注意：护航编队四架，另有群岛国巡逻机一架'
@@ -867,8 +909,8 @@ MISSIONS.push({
   map: [
     { x: 0, z: -6000, type: 'start', label: '进入点' },
     { x: 0, z: 15000, type: 'relay', label: '播撒机群' },
-    { x: 3600, z: 9000, type: 'relay', label: '单元' },
-    { x: -3600, z: 9000, type: 'relay', label: '单元' }
+    { x: 5000, z: 9000, type: 'relay', label: '单元' },
+    { x: -5000, z: 9000, type: 'relay', label: '单元' }
   ],
 
 
@@ -887,21 +929,9 @@ MISSIONS.push({
     w.wings[2].speed = 500;
     w.wings[3].speed = 500;
 
-    // 调节单元阵列：3×3，间距 3600 m（阵列面积约 7×7 km）
+    // 调节单元：一个编组（3×3，间距 5 km），压在进入点与播撒机群之间
     var i, j;
-    w.cells = [];
-    for (i = -1; i <= 1; i++) {
-      for (j = -1; j <= 1; j++) {
-        var c = spawnTarget(w, {
-          ttype: 'air', model: 'cell', label: '调节单元',
-          x: i * 3600, y: M3.rnd(18800, 20200), z: 9000 + j * 3600,
-          hp: 400, radius: 34, drift: 14, big: true, value: 0
-        });
-        c.friendlyAsset = true;      // 打坏要扣分
-        c.team = 2;                  // 中立：双方流弹都可能伤到它，玩家误伤要扣分
-        w.cells.push(c);
-      }
-    }
+    spawnCellField(w, { xs: [0], zs: [9000] });
 
     /* 八架播撒机，两排四列。
 
@@ -1016,7 +1046,6 @@ MISSIONS.push({
 
     w.objective = '拦截「灰烬」播撒机群';
     w.objectiveSub = '剩余 8';
-    w.roeActive = true;             // 交战规则限制
     w.flags.aceDone = false;
     w.aceSpawned = false;
   },
@@ -1034,14 +1063,6 @@ MISSIONS.push({
       if (w.targets[i].model === 'cell' && w.targets[i].alive) cellsAlive++;
     }
     w.objectiveSub = '播撒机 ' + sowers + ' · 护航 ' + planes + ' · 单元 ' + cellsAlive;
-
-    // 交战规则：靠近单元时重武器锁定
-    var nearCell = false;
-    for (i = 0; i < w.cells.length; i++) {
-      if (!w.cells[i].alive) continue;
-      if (M3.dist(w.cells[i].pos, w.player.pos) < 5000) { nearCell = true; break; }
-    }
-    w.roeBlocked = nearCell;
 
     // 播撒机降到 15000 以下开始投放（失败条件）
     for (i = 0; i < w.actors.length; i++) {
@@ -1157,6 +1178,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [-20000, 0, 20000], zs: [0, 20000] });
     p.pos = M3.V(0, 5200, -18000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 360;
@@ -1377,6 +1399,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    var cellGroups = spawnCellField(w, { xs: [-10000, 10000], zs: [0, 20000, 40000] });
     p.pos = M3.V(0, 9000, -16000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 400;
@@ -1489,22 +1512,30 @@ MISSIONS.push({
 
     /* 调节场管理局自己的高空勤务机 MERLI「水准」。
 
-       它不打架：任务是给那些谁也靠不近的调节单元换零件，
-       顺路在这片海盆上量几条基准线。它出现在这里的原因很具体 ——
-       管理局的设施遍布群岛，而这一关打的就是他们的海域。
+       它不打架：任务是沿着编组逐个巡视、检查调节单元的状态 ——
+       所以它的航线就是这一关头顶那几个编组的中心，蛇形串起来，
+       飞完一圈从头再来（ai.js updateRoute 的 wps 分支）。
+       巡视高度压在各组基准高度以下 1.5 km：从下方仰视检查，
+       也不会一头钻进单元里。
 
        **不挂武器**：它的挂载组只有机腹一个（belly），而机腹挂不了
        任何空空弹（可用的适配都是 tip / light / heavy）—— 这恰好与
        设定里那句"名义上没有武器"一致，也省掉了"AI 拿着不在机翼上的
        弹开火"那种看不见的错误。
        `behavior: 'recon'` 让它在满血时不主动接战（见 ai.js 的开火段）。 */
-    spawnEnemy(w, {
+    var patrol = [];
+    var half = cellGroups.length / 2;          // xs 两列：先沿左列往北，再沿右列往南
+    for (i = 0; i < half; i++) patrol.push(cellGroups[i]);
+    for (i = cellGroups.length - 1; i >= half; i--) patrol.push(cellGroups[i]);
+    var wps = patrol.map(function (g) { return M3.V(g.x, g.y - 1500, g.z); });
+    var datum = spawnEnemy(w, {
       ac: 'a2', team: 2, special: null,   // 显式 null：不拿 spawnEnemy 缺省的 dl6
-      x: 14000, y: 11000, z: 26000,
-      fwd: M3.V(-1, 0, 0), speed: 260,
+      x: wps[0].x, y: wps[0].y, z: wps[0].z - 8000,
+      fwd: M3.V(0, 0, 1), speed: 240,
       skill: 0.30,
       behavior: 'recon'
     });
+    datum.route = { wps: wps, wpIdx: 0, wp: wps[0], alt: wps[0].y, arrive: 1500 };
 
     /* 管理局的海洋测量船 DIKLO「标杆」——双体船，正在这片海盆上
        重测锚位。它和「准绳」是同一批船：一个在水下敲，一个在水上量。
@@ -1617,6 +1648,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [5000], zs: [0, 20000, 40000] });
     p.pos = M3.V(0, 18000, -14000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 500;
@@ -1759,6 +1791,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [-10000, 10000], zs: [0, 20000] });
     p.pos = M3.V(0, 2200, -14000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 330;
@@ -1915,6 +1948,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [0], zs: [0, 20000] });
     p.pos = M3.V(0, 6000, 4000);
     p.fwd = M3.V(0, 0, -1);        // 面朝北（本关 +z 真方位 170°），敌机从南面来
     p.speed = 380;
@@ -2146,6 +2180,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [0], zs: [0, 20000, 40000] });
     p.pos = M3.V(0, 4800, -16000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 340;
@@ -2340,6 +2375,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [-10000, 10000], zs: [0, 20000, 40000] });
     p.pos = M3.V(0, 17000, -18000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 480;
@@ -2515,6 +2551,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
+    spawnCellField(w, { xs: [-10000, 10000], zs: [-10000, 10000] });
     p.pos = M3.V(0, 6000, -6000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 350;
