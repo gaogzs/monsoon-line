@@ -1708,6 +1708,27 @@ if (Ent && M3 && me && world) {
       '；最大机头误差 ' + Math.max.apply(null, res.map(r => r.steadyErr)).toFixed(2) + '°');
   }
 
+  /* ---- 机头朝上失速要掉下来 ----
+     以前速度永远沿着机头、且有 0.42 vStall 的下限，竖直失速后飞机
+     会以四十多 m/s 一直往上"爬"。现在失速有独立的下沉速度。 */
+  {
+    const Ent3 = sandbox.Ent, M3 = sandbox.M3;
+    const a = Ent3.makeAircraft({ type: sandbox.AIRCRAFT[0].id, team: 0, x: 0, y: 4000, z: 0,
+      fwd: M3.V(0, 0, 1), speed: 220, throttle: 0 });
+    a.fwd = M3.V(0, 1, 0); a.up = M3.V(0, 0, -1); a.right = M3.cross(a.fwd, a.up);
+    const B = M3.orthonormalize(a.fwd, a.up); a.fwd = B.fwd; a.up = B.up; a.right = B.right;
+    const w = { actors: [a], targets: [], missiles: [], bullets: [], particles: [] };
+    let maxY = a.pos.y;
+    for (let t = 0; t < 20; t += 1 / 60) {
+      a.ctrl = a.ctrl || {};
+      sandbox.AI.steerTo(a, M3.V(0, 1, 0), a.ctrl, a, 1 / 60);   // 鼠标一直指着正上方
+      Ent3.stepAircraft(a, 1 / 60, w);
+      maxY = Math.max(maxY, a.pos.y);
+    }
+    if (a.pos.y > maxY - 800) fail('鼠标指着正上方、收油门失速 20 s 后高度 ' + a.pos.y.toFixed(0) + ' m，最高 ' + maxY.toFixed(0) + ' m —— 没有往下掉');
+    else ok('竖直失速会下坠：最高 ' + maxY.toFixed(0) + ' m，20 s 后 ' + a.pos.y.toFixed(0) + ' m');
+  }
+
   /* ---- 俯冲 / 竖直附近不能原地连滚 ----
      机头接近竖直时"机翼水平"没有定义，坡度只是数值噪声；倒飞时往左
      改平和往右改平一样远。两处都曾让飞机追着噪声或翻号的目标连滚好几圈
@@ -2159,7 +2180,7 @@ if (Ent && M3 && me && world) {
     });
 
     // 1. 一架上挂三种射程的空空弹：按距离挑"够得着里面最短的那件"
-    //    c11 的组：A 翼尖 / B 重挂 / C 通用 —— srm 4.2 km / mrm 8.6 / v17 12.5
+    //    c11 的组：A 机身前侧（轻）/ B 翼套（重）/ C 机腹 —— srm 4.2 km / mrm 8.6 / v17 12.5
     const mix = npcOf('c11', { A: 'srm', B: 'v17', C: 'mrm' });
     /* 弹药池 = min(w.ammo, 挂点数 × perPoint)：预算不能超过机翼上实际挂得下的 */
     const capOf = wid => Math.min(W4[wid].ammo, (mix.slotCd[wid] || []).length * W4[wid].perPoint);

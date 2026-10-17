@@ -593,7 +593,10 @@ var Ent = (function () {
   /* ============================================================
      飞机每帧更新
      ============================================================ */
+  var STALL_SINK_MAX = 140;          // 失速下沉速度上限（m/s）
+
   function stepAircraft(a, dt, world) {
+    if (a.gunFlashT > 0) a.gunFlashT -= dt;     // 炮口火光的余辉，见 flashRings
     if (!a.alive) return;
     var p = a.phys;
 
@@ -680,10 +683,12 @@ var Ent = (function () {
       a.right = M3.rotAxis(a.right, a.up, ang3);
     }
 
-    // 失速低头力矩
+    /* 失速低头力矩。以前是 0.55 —— 最深失速也只有十几度每秒，
+       飞控一顶就顶住了，机头能一直竖着。现在加大一倍，
+       深失速时玩家和飞控都压不住，机头自然往下掉。 */
     if (a.stall && a.pos.y > 60) {
       var st = (p.vStall - a.speed) / p.vStall;
-      var angS = 0.55 * st * dt;
+      var angS = 1.2 * st * dt;
       a.fwd = M3.rotAxis(a.fwd, a.right, angS);
       a.up = M3.rotAxis(a.up, a.right, angS);
     }
@@ -737,7 +742,22 @@ var Ent = (function () {
 
     // ---- 位置 ----
     var vPrev = a.vel || M3.mul(a.fwd, a.speed);
+    /* 失速下沉：速度不再永远沿着机头。
+
+       以前 vel = fwd × speed，而 speed 有 0.42 vStall 的下限 ——
+       机头朝上失速时重力只能把速度吃到下限，飞机就以四十多 m/s
+       一直"爬"上去。现在失速时升力 ∝ (v / vStall)² 托不住的那部分
+       重力累积成一个独立的竖直下沉速度：先悬停、再往下掉。
+       改出失速后下沉速度在一秒左右并回航迹。 */
+    if (a.stall && a.pos.y > 2) {
+      var vr = a.speed / p.vStall;
+      a.sink = Math.min(STALL_SINK_MAX, (a.sink || 0) + G * (1 - vr * vr) * dt);
+    } else if (a.sink) {
+      a.sink *= Math.exp(-dt / 0.9);
+      if (a.sink < 0.05) a.sink = 0;
+    }
     a.vel = M3.mul(a.fwd, a.speed);
+    if (a.sink) a.vel.y -= a.sink;
 
     /* 载荷因数（G 表）：加速度加上 1G 抵消重力，投到机体 up 轴。
        平飞 1G，推杆为负。做一点平滑，免得逐帧抖动。 */
@@ -1664,26 +1684,53 @@ var Ent = (function () {
         kind: 'bullet', team: a.team, alive: true,
         pos: muzzle,
         prev: M3.clone(muzzle),
+        side: a.gunSide,            // 哪一侧炮口：曳光尾巴接回当前炮口，见 game.js drawTracers
         vel: M3.add(M3.mul(dir, w.speed), a.vel),
         dmg: w.dmg, life: bulletLife, owner: a
       });
     }
 
-    /* 炮口火光（整轮开火只生成一次，不是每发子弹一次）。
-       注意 spawnParticle 的签名是 (list, pos, vel, life, size, ...) ——
-       这里原来把 size 写成了 3.2（米），直径六米多，比飞机还大，
-       所以整团火直接把机体盖住了。 */
-    /* 火光画在这一轮**每个**出过弹的炮口上，并且跟着飞机走（速度 = 机体速度）。
-       一轮常常是 2 发（左右各一），只画"最后一发"的话 gunSide 翻两次回到原位，
-       火光就永远停在同一侧。 */
-    var sides = n >= 2 ? [0, 1] : [a.gunSide];
-    for (var si = 0; si < sides.length; si++) {
-      var mz = gunMuzzle(a, sides[si]);
-      spawnParticle(world.particles, mz, M3.clone(a.vel),
-        0.055, 0.275, '#fff2c0', { grow: true });
-      spawnParticle(world.particles, mz, M3.mul(a.vel, 0.9),
-        0.10, 0.475, '#ffd070', { grow: true });
+    /* 炮口火光：只记"正在开火"，真正的画法在 flashRings。
+       以前每轮在炮口生成一对粒子、靠它们沿航迹漂开形成残影 ——
+       可每一圈的出生时刻受帧率和射速节流的取整影响，位置和年龄都不齐，
+       拖出来的是一串大小不一、间距忽大忽小的圆。 */
+    a.gunFlashT = 0.05;
+    a.gunFlashBoth = n >= 2;
+  }
+
+  /* 炮口火光的残影：每帧按**固定间距**沿机身向后排一串圆，
+     越往后越大、越淡。它们挂在飞机上（按机体坐标算），
+     所以无论帧率、射速、机动如何，间距永远均匀。
+     只在本帧画一次（不进 world.particles），停火后 0.05 s 内消失。 */
+  var FLASH_RINGS = 10;          // 圈数
+  var FLASH_STEP = 0.22;         // 相邻两圈的间距（米）
+  function flashRings(world) {
+    var out = [];
+    var acts = world.actors;
+    for (var i = 0; i < acts.length; i++) {
+      var a = acts[i];
+      if (!a.gunFlashT || a.gunFlashT <= 0) continue;
+      if (!a.alive) continue;
+      var sides = a.gunFlashBoth ? [0, 1] : [a.gunSide];
+      for (var si = 0; si < sides.length; si++) {
+        var mz = gunMuzzle(a, sides[si]);
+        // 炮口白芯
+        // 炮口白芯 —— 最亮的一点必须在炮口上，曳光也从这里接出去
+        out.push({ pos: mz, size: 0.30, color: '#fff6d8', alive: true, life: 1, life0: 1, alpha: 0.95 });
+        for (var k = 0; k < FLASH_RINGS; k++) {
+          var t = k / (FLASH_RINGS - 1);
+          out.push({
+            pos: M3.add(mz, M3.mul(a.fwd, -k * FLASH_STEP)),
+            size: 0.30 + 0.32 * t,
+            color: '#ffd070', alive: true, life: 1, life0: 1,
+            /* 加色混合下相邻几圈会叠在一起，单圈要淡：
+               以前 0.44 起步，叠出来最亮的反而是炮口后面一截 */
+            alpha: 0.20 * (1 - t) + 0.02
+          });
+        }
+      }
     }
+    return out;
   }
 
   /* 炮口位置（side 0 = 左，1 = 右）。子弹出膛与火光共用这一份。 */
@@ -1707,6 +1754,7 @@ var Ent = (function () {
     b.prev = b.pos;
     b.vel.y -= G * dt;
     b.pos = M3.add(b.pos, M3.mul(b.vel, dt));
+    b.steps = (b.steps || 0) + 1;      // 走了几帧：drawTracers 只让第一帧的曳光接回炮口
     b.life -= dt;
     if (b.life <= 0 || b.pos.y <= 0) b.alive = false;
   }
@@ -1997,7 +2045,7 @@ var Ent = (function () {
     mountIssues: mountIssues, clearMountIssues: clearMountIssues,
     makeMissile: makeMissile, stepMissile: stepMissile, effectiveLife: effectiveLife,
     breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects,
-    fireGun: fireGun, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
+    fireGun: fireGun, gunMuzzle: gunMuzzle, flashRings: flashRings, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
     spawnParticle: spawnParticle, stepParticles: stepParticles, explode: explode,
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
     detonate: detonate,

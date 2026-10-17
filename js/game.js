@@ -131,6 +131,7 @@ var Game = (function () {
      82 m/s²，和物理掉速叠在一起，三秒就能把 G-6 拉到失速以下。 */
   var HIG_MAX = 1.90;
   var camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0), camPos = M3.V(0, 0, 0);
+  var camOff = null;                 // 追尾镜头相对飞机的平滑偏移
   var camYaw = 0, camPitch = 0;
   /* 追尾镜头的基准朝向。它不直接等于机头方向 —— 见 updateCamera 里的说明：
      俯仰被限制在 ±89°，而且偏航要按最短角差平滑，否则翻过顶点时会瞬移。 */
@@ -199,8 +200,8 @@ var Game = (function () {
     volSfx: 85,
     muted: false,
     fov: 56,
-    camDist: 20,
-    camHeight: 13,
+    camDist: 10,
+    camHeight: 8,
     hudOpacity: 100,
     hudScale: 100,
     compass: true,
@@ -230,8 +231,8 @@ var Game = (function () {
         /* 机位选项暂时隐藏：座舱 / 目标视角问题太多，只开放追尾。
            相机代码保留，修好后把这一项加回来、去掉 loadSettings 里的强制归零即可。 */
         { k: 'fov', label: '视场角 FOV', type: 'range', min: 38, max: 100, unit: '°' },
-        { k: 'camDist', label: '镜头距离', type: 'range', min: 2, max: 30, unit: ' m' },
-        { k: 'camHeight', label: '镜头高度', type: 'range', min: -15, max: 60, unit: ' m' }
+        { k: 'camDist', label: '镜头距离', type: 'range', min: 2, max: 10, unit: ' m' },
+        { k: 'camHeight', label: '镜头高度', type: 'range', min: -15, max: 10, unit: ' m' }
       ]
     },
     {
@@ -259,7 +260,9 @@ var Game = (function () {
       }
     } catch (e) { /* 无痕模式或禁用存储时静默降级 */ }
     o.camMode = 0;     // 只开放追尾机位 —— 旧存档里选过座舱 / 目标的也拉回来
-    o.camDist = Math.min(30, Math.max(2, +o.camDist || DEFAULTS.camDist));   // 旧存档可能超出新范围
+    // 旧存档可能超出新范围（距离曾经到 30、高度到 60）
+    o.camDist = Math.min(10, Math.max(2, +o.camDist || DEFAULTS.camDist));
+    o.camHeight = isFinite(+o.camHeight) ? Math.min(10, Math.max(-15, +o.camHeight)) : DEFAULTS.camHeight;
     return o;
   }
 
@@ -1487,6 +1490,7 @@ var Game = (function () {
     camFwd = M3.clone(p.fwd);
     camUp = M3.V(0, 1, 0);
     camPos = M3.add(p.pos, M3.V(0, 30, -110));
+    camOff = null;
 
     Radio.clear();
     SysNote.clear();
@@ -2603,9 +2607,38 @@ var Game = (function () {
 
       /* 位置在**世界坐标**的后方（不是机体坐标系）——
          这样滚转时镜头不会绕着飞机转圈，是"稳定"的另一半。 */
-      var off0 = M3.rotAxis(M3.mul(camDir, -S.camDist), M3.V(0, 1, 0), camYaw);
-      var want = M3.add(p.pos, M3.add(off0, M3.V(0, S.camHeight + camPitch * 70, 0)));
-      camPos = M3.lerpV(camPos, want, 1 - Math.exp(-7.5 * dt));
+      /* 跟随距离：以前直接对世界坐标 camPos 做一阶平滑，镜头稳态会落后
+         v / 7.5 米 —— 高速时远、低速时近，失速下坠时这段滞后还变成竖直的，
+         飞机就从画面里掉出去了。现在平滑的是**相对飞机的偏移**，
+         速度感单独加一段沿视线向后的距离（只认沿视线向前的速度、有上限），
+         飞得多慢、往哪个方向掉，飞机都留在画面里同一个位置附近。 */
+      var vFwd = p.vel ? M3.dot(p.vel, camDir) : p.speed;
+      var back = S.camDist + M3.clamp(vFwd / 7.5, 0, 90);
+      var off0 = M3.rotAxis(M3.mul(camDir, -back), M3.V(0, 1, 0), camYaw);
+      var wantOff = M3.add(off0, M3.V(0, S.camHeight + camPitch * 70, 0));
+      camOff = camOff ? M3.lerpV(camOff, wantOff, 1 - Math.exp(-7.5 * dt)) : wantOff;
+
+      /* 保证飞机留在画面里。飞机在镜头系里的位置是 −camOff：
+         沿视线的深度 f、竖直偏移 u、水平偏移 r。镜头距离、高度、FOV、
+         方向键自由视角、窗口宽高比任一组合都可能让 |u| / f 或 |r| / f
+         超出半视场（例如距离 2、高度 10、FOV 38° 时机身在画面外 60° 多）。
+         超出时**只把镜头沿视线往后退**，直到机身中心落回画面中间
+         70% 的范围内 —— 不动高度和横向偏移，玩家的设定仍然生效，
+         只是近到放不下时自动拉开。最近也不贴到机身 6 米以内。 */
+      var cRight = M3.norm(M3.cross(M3.V(0, 1, 0), camDir));
+      if (M3.len(cRight) < 0.5) cRight = M3.V(1, 0, 0);
+      var cUp = M3.cross(camDir, cRight);
+      var rel = M3.mul(camOff, -1);
+      var fDep = M3.dot(rel, camDir);
+      var halfV = S.fov * Math.PI / 360;
+      var aspect = (cv && cv.height) ? cv.width / cv.height : 16 / 9;
+      var tanV = Math.tan(halfV) * 0.7;
+      var tanH = Math.tan(halfV) * aspect * 0.7;
+      var fNeed = Math.max(6,
+        Math.abs(M3.dot(rel, cUp)) / tanV,
+        Math.abs(M3.dot(rel, cRight)) / tanH);
+      if (fDep < fNeed) camOff = M3.sub(camOff, M3.mul(camDir, fNeed - fDep));
+      camPos = M3.add(p.pos, camOff);
 
       camFwd = camDir;
       camUp = M3.V(0, 1, 0);
@@ -2951,6 +2984,7 @@ var Game = (function () {
     drawTracers();
 
     Renderer.drawParticles(world.particles);
+    Renderer.drawParticles(Ent.flashRings(world));
     Renderer.end();
 
     // HUD
@@ -3061,6 +3095,20 @@ var Game = (function () {
       var dirv = M3.norm(b.vel);
       var bDist = M3.dist(b.pos, cam.pos);
       var trailLen = Math.min(90, Math.max(13, bDist * 0.045));
+      /* 尾巴不越过炮口，并且接在**当前**炮口上。
+         刚出膛的子弹在生成那一帧就已经飞出去十几米，飞机也往前走了 ——
+         若按世界坐标里的出膛点截，曳光会从炮口前方凭空出现；
+         若不截，13 米的最短尾迹会伸回机身里，看着像从机腹打出来。
+         所以尾巴长度取"子弹到当前炮口沿弹道的距离"：第一帧可伸，之后只截。 */
+      if (b.owner && b.owner.alive && b.side !== undefined) {
+        var mzNow = Ent.gunMuzzle(b.owner, b.side);
+        var ahead = M3.dot(M3.sub(b.pos, mzNow), dirv);
+        /* 只有出膛**第一帧**的子弹才接回炮口（补上它生成那一帧飞出去的空当）。
+           以前是"离炮口 60 米以内都接"—— 机头一转，前两三帧的子弹也被
+           硬连到新的炮口位置，扫出一把斜着的长线。之后的子弹只截不伸。 */
+        var young = (b.steps || 0) <= 1;
+        if (ahead > 0 && (young || ahead < trailLen)) trailLen = ahead;
+      }
       var tail = M3.project(cam, M3.sub(b.pos, M3.mul(dirv, trailLen)));
       if (!tail) tail = head;
 
