@@ -115,6 +115,7 @@ var Game = (function () {
   var AIM_SENS = 0.0022;           // rad / 像素
   var AIM_SPIKE_PX = 200;          // 单个 mousemove 位移超过它就当尖峰丢掉（≈ 25°）
   var AIM_SPIKE_PX = 200;          // 单个 mousemove 位移超过它就当尖峰丢掉（≈ 25°）
+  var AIM_SPIKE_PX = 200;          // 单个 mousemove 位移超过它就当尖峰丢掉（≈ 25°）
   var AIM_PITCH_LIM = 89 * Math.PI / 180;
   var last = 0;
   /* 机位现在由设置项 S.camMode 决定，没有热切换键 ——
@@ -133,6 +134,8 @@ var Game = (function () {
      82 m/s²，和物理掉速叠在一起，三秒就能把 G-6 拉到失速以下。 */
   var HIG_MAX = 1.90;
   var camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0), camPos = M3.V(0, 0, 0);
+  var camSpeedBack = null;           // 速度感距离（平滑后，米），首帧惰性初始化
+  var CAM_SPEED_RATE = 1.5;          // 速度感距离的平滑速率（1/s）：加力 / 掉速时慢慢拉开、凑近
   var camOff = null;                 // 追尾镜头相对飞机的平滑偏移
   var camSpeedBack = null;           // 速度感距离（平滑后，米），首帧惰性初始化
   var CAM_SPEED_RATE = 1.5;          // 速度感距离的平滑速率（1/s）：加力 / 掉速时慢慢拉开、凑近
@@ -151,9 +154,19 @@ var Game = (function () {
      屏幕管理
      ============================================================ */
   /* 鼠标引导要锁定指针：瞄准方向由鼠标位移驱动，没锁的话指针碰到屏幕边缘
+    /* 先要"原始位移"（unadjustedMovement）：绕开系统鼠标加速，Chrome 在
+       Windows 上锁定指针时偶发的巨大 movementX/Y 尖峰也少得多。
+       浏览器不支持这个选项时 promise 会被拒绝，退回普通锁定。 */
      就再也拖不动了。浏览器只允许在用户手势里请求 —— 开始任务的那次点击、
-     取消暂停的那次按键、以及画布上的任何一次点击都算。 */
-  function requestAimLock() {
+      var r = cv.requestPointerLock({ unadjustedMovement: true });
+      if (r && r.catch) {
+        r.catch(function () {
+          try {
+            var r2 = cv.requestPointerLock();
+            if (r2 && r2.catch) r2.catch(function () { /* 被拒绝就等下一次点击 */ });
+          } catch (err2) { /* 不支持就退回普通指针 */ }
+        });
+      }
     /* 先要"原始位移"（unadjustedMovement）：绕开系统鼠标加速，Chrome 在
        Windows 上锁定指针时偶发的巨大 movementX/Y 尖峰也少得多。
        浏览器不支持这个选项时 promise 会被拒绝，退回普通锁定。 */
@@ -235,12 +248,13 @@ var Game = (function () {
     // 0 = 追尾，1 = 座舱，2 = 目标。只能在这里改，没有热切换键。
     camMode: 0,
     // 追尾镜头飞机快出画时怎么办：0 = 静态拉远，1 = 侧滑软钳，2 = 拉远带滞回
-    camFrame: 0
-  };
-
-  var S = {};
-
-  var SET_GROUPS = [
+        { k: 'camHeight', label: '镜头高度', type: 'range', min: -15, max: 10, unit: ' m' }
+        /* 出画处理选项暂时隐藏，只用"静态拉远"（camFrame = 0）。侧滑软钳 / 拉远带滞回
+           的代码保留（updateCamera 里 camFrame 1 / 2 两支），要放出来时把下面这项加回来、
+           去掉 loadSettings 里的强制归零即可：
+           { k: 'camFrame', label: '出画处理', type: 'select', options: [
+             { v: 0, t: '静态拉远' }, { v: 1, t: '侧滑软钳' }, { v: 2, t: '拉远带滞回' }
+           ] } */
     {
       title: '音频',
       hint: '引擎是持续音，最容易变成底噪。嫌吵就把它单独压低，或者直接归零。',
@@ -271,7 +285,7 @@ var Game = (function () {
       title: '显示',
       items: [
         { k: 'hudScale', label: 'HUD 缩放', type: 'range', min: 70, max: 160, unit: '%' },
-        { k: 'hudOpacity', label: 'HUD 透明度', type: 'range', min: 25, max: 100, unit: '%' },
+    o.camFrame = 0;    // 出画处理只开放"静态拉远" —— 旧存档里选过另外两种的也拉回来
         { k: 'compass', label: '顶部指南针', type: 'toggle' },
         { k: 'pitchLadder', label: '俯仰刻度', type: 'toggle' },
         { k: 'targetMarkers', label: '目标方位标记', type: 'toggle' }
@@ -1495,6 +1509,7 @@ var Game = (function () {
     /* 被动测距（GUS-6 明瞳 / GUS-9 夜枭）：用被动方式锁定时，
        对方的 RWR 收不到告警 —— 见 ai.js 里 rwrT 的判定。 */
     p.silentLock = pe.silentLock;
+    camSpeedBack = null;
 
     /* 电子战的两项玩家状态：
          ewAuto  协处理器可否自主开机（设定 7.3 授予它的权限）
@@ -1567,9 +1582,15 @@ var Game = (function () {
     document.addEventListener('keyup', function (e) { keys[e.code] = false; });
 
     window.addEventListener('blur', function () {
+        var mx = e.movementX || 0, my = e.movementY || 0;
+        /* 丢掉位移尖峰。浏览器偶尔会报一个几百上千像素的 movementX/Y：
+           Chrome 锁定指针时的已知毛病，以及没锁定时光标移出画布再移回来的
+           第一下。它会把准星瞬间甩到一个"随机"方向，镜头跟过去，看起来就是
+           镜头被重置。正常甩鼠标单个事件远到不了 AIM_SPIKE_PX。 */
+        if (Math.abs(mx) > AIM_SPIKE_PX || Math.abs(my) > AIM_SPIKE_PX) return;
       keys = {};
-      mouse.left = mouse.right = false;
-      if (state === 'playing' && !paused) togglePause();
+        aimYaw += mx * AIM_SENS * fovK;
+        aimPitch = M3.clamp(aimPitch - my * AIM_SENS * fovK,
     });
 
     cv.addEventListener('mousedown', function (e) {
@@ -2646,6 +2667,16 @@ var Game = (function () {
 
   function camBasis(camDir) {
     var r = M3.norm(M3.cross(M3.V(0, 1, 0), camDir));
+  /* 追尾镜头相对飞机的偏移往目标走一步：方向球面插值、长度单独插值。
+     以前对整个向量 lerpV —— 视线快速甩动时插值走的是弦，偏移长度变短，
+     镜头被拉近；甩完又弹回去。急转时这是镜头前后伸缩的第二个来源。 */
+  function smoothOffset(cur, want, k) {
+    var lc = M3.len(cur), lw = M3.len(want);
+    if (lc < 1e-6 || lw < 1e-6) return M3.lerpV(cur, want, k);
+    var dir = M3.slerpDir(M3.mul(cur, 1 / lc), M3.mul(want, 1 / lw), k);
+    return M3.mul(dir, lc + (lw - lc) * k);
+  }
+
     if (M3.len(r) < 0.5) r = M3.V(1, 0, 0);
     return { r: r, u: M3.cross(camDir, r) };
   }
@@ -2763,10 +2794,18 @@ var Game = (function () {
       /* 鼠标引导时镜头跟**瞄准方向**，不跟机头 —— 这是战雷式操纵的另一半：
          准星永远在画面中心，机头标记去追它；镜头若跟机头，准星就会跟着
          机头一起跑，机头永远追不上。键盘直控时仍跟机头。
-         跟瞄准方向时平滑放快：它本来就是玩家直接拖的，慢了像在拖泥。 */
-      var lookAim = aimMode && aimInit && p.alive;
-      var lookDir = lookAim ? aimDirNow() : p.fwd;
-      var yawRate = lookAim ? 14 : 1.2, pitchRate = lookAim ? 14 : 9;
+         速度感单独加一段沿视线向后的距离（有上限），
+         飞得多慢、往哪个方向掉，飞机都留在画面里同一个位置附近。
+
+         速度感按**空速** p.speed 算，再慢慢平滑（CAM_SPEED_RATE）。以前取的是
+         速度在视线方向上的分量 dot(vel, camDir)：急转时视线先甩出去、速度方向
+         还没跟上，这个分量一秒内能从 290 掉到 −110 再回到 200，镜头就在
+         49 m → 21 m → 29 m → 20 m 之间来回伸缩 —— 三种出画处理都在它下游，
+         选哪种都一样跳。空速本身同一段时间只是平滑地从 290 降到 200。 */
+      var wantSpeedBack = M3.clamp(p.speed / 7.5, 0, 90);
+      camSpeedBack = camSpeedBack === null ? wantSpeedBack
+        : camSpeedBack + (wantSpeedBack - camSpeedBack) * (1 - Math.exp(-CAM_SPEED_RATE * dt));
+      var back = S.camDist + camSpeedBack;
       var hx = lookDir.x, hz = lookDir.z;
       var hlen = Math.sqrt(hx * hx + hz * hz);
 
@@ -2777,7 +2816,7 @@ var Game = (function () {
          罗盘和飞机在转、画面不转，一往下拖离开冻结区画面就猛地追过去。 */
       if (lookAim || hlen > 0.12) {
         var tYaw = lookAim ? aimYaw : Math.atan2(hx, hz);
-        var dYaw = tYaw - camYawBase;
+      camOff = camOff ? smoothOffset(camOff, wantOff, 1 - Math.exp(-7.5 * dt)) : wantOff;
         while (dYaw > Math.PI) dYaw -= Math.PI * 2;
         while (dYaw < -Math.PI) dYaw += Math.PI * 2;
         camYawBase += dYaw * (1 - Math.exp(-yawRate * dt));

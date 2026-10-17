@@ -314,14 +314,20 @@ fy2 = clamp(camDir.y, -SIN_LIM, SIN_LIM);
 // 急转时视线先甩、速度没跟上，这个分量一秒内 290 → −110 → 200，镜头前后伸缩
 camSpeedBack += (clamp(p.speed / 7.5, 0, 90) - camSpeedBack) * (1 - exp(-1.5 * dt));
 back = S.camDist + camSpeedBack;
-off0 = M3.rotAxis(camDir * -back, (0,1,0), camYaw);
+// 急转时视线先甩、速度没跟上，这个分量一秒内 290 → −110 → 200，镜头前后伸缩
+camSpeedBack += (clamp(p.speed / 7.5, 0, 90) - camSpeedBack) * (1 - exp(-1.5 * dt));
+back = S.camDist + camSpeedBack;
+camOff = smoothOffset(camOff, wantOff, 1 - Math.exp(-7.5 * dt));  // 方向 slerp + 长度单独插值（lerpV 走弦会把镜头拉近）
 wantOff = off0 + (0, S.camHeight + camPitch * 70, 0);
 wantOff -= camDir * frameDeficit(wantOff, camDir, fr);       // 静态底座
 camOff = smoothOffset(camOff, wantOff, 1 - Math.exp(-7.5 * dt));  // 方向 slerp + 长度单独插值（lerpV 走弦会把镜头拉近）
 viewOff = 按 S.camFrame 处理 camOff;                          // 只影响本帧，不写回
 Renderer.setCamera(p.pos + viewOff, camDir, (0,1,0), S.fov);
 ```
+#### 出画处理（`S.camFrame`）
 
+> **目前只开放 0 静态拉远**：设置里的选项已隐藏，`loadSettings` 强制 `camFrame = 0`。
+> 1 / 2 两种的代码与测试保留，要放出来时把 `SET_GROUPS` 里注释掉的那项加回来、去掉强制归零即可。
 世界坐标这一点是“稳定”的另一半：**滚转时镜头不会绕着飞机转圈**。
 
 #### 出画处理（`S.camFrame`，设置 → 视角 → 出画处理）
