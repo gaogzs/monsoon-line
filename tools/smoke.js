@@ -1361,6 +1361,111 @@ if (Ent && M3 && me && world) {
     else ok('追尾镜头：地平线稳定、俯仰钳在 89°、全程不抽动');
   }
 
+  /* ---- 追尾镜头：出画处理（静态拉远 / 侧滑软钳 / 拉远带滞回） ----
+     以前出画就用滞后的 camOff 瞬间后推，平滑又把深度拉回，
+     大机动时镜头前后反复跳。这里复现 updateCamera 里 camOff 那段，
+     用 Game.__camFrame 露出来的函数逐帧推，盯三件事：
+     镜头—飞机距离会不会来回"呼吸"、飞机会不会出画、设定放不下时能不能稳住。 */
+  {
+    const M3 = sandbox.M3;
+    const CF = sandbox.Game.__camFrame;
+    const dt = 1 / 60;
+    const bad = [];
+
+    // mode: 0 静态拉远 / 1 侧滑软钳 / 2 拉远带滞回；dirAt(i) 给第 i 帧的视线
+    function run(mode, steps, dirAt, opt) {
+      const fov = opt.fov, aspect = 16 / 9;
+      const ht = Math.tan(fov * Math.PI / 360);
+      const fr = { tanV: ht, tanH: ht * aspect };
+      let camOff = null, st = { extra: 0, hold: 0 };
+      const dists = [], screens = [];
+      for (let i = 0; i < steps; i++) {
+        const camDir = dirAt(i);
+        let want = M3.add(M3.mul(camDir, -opt.back), M3.V(0, opt.height, 0));
+        want = M3.sub(want, M3.mul(camDir, CF.frameDeficit(want, camDir, fr)));
+        camOff = camOff ? M3.lerpV(camOff, want, 1 - Math.exp(-7.5 * dt)) : want;
+        let view = camOff;
+        if (mode === 1) view = CF.softClampFrame(camOff, camDir, fr);
+        else if (mode === 2) {
+          st = CF.stepFrameExtra(st, CF.frameDeficit(camOff, camDir, fr), dt);
+          view = M3.sub(camOff, M3.mul(camDir, st.extra));
+        }
+        const rel = M3.mul(view, -1);
+        const r = M3.norm(M3.cross(M3.V(0, 1, 0), camDir));
+        const u = M3.cross(camDir, r);
+        const f = M3.dot(rel, camDir);
+        screens.push(f <= 0 ? Infinity : Math.max(
+          Math.abs(M3.dot(rel, u)) / (f * fr.tanV),
+          Math.abs(M3.dot(rel, r)) / (f * fr.tanH)));
+        dists.push(f);          // 沿视线的深度 —— 飞机在画面里的大小只看它
+      }
+      let jump = 0;
+      for (let i = 1; i < dists.length; i++) jump = Math.max(jump, Math.abs(dists[i] - dists[i - 1]));
+      return { dists, screens, jump, minF: Math.min(...dists), maxScr: Math.max(...screens) };
+    }
+
+    const NAMES = ['静态拉远', '侧滑软钳', '拉远带滞回'];
+
+    // 1. 设定放不下：距离 2、高度 10、FOV 38 —— 三种模式收敛后都在画面内、静止
+    {
+      const fwd = M3.V(0, 0, 1);
+      for (let m = 0; m < 3; m++) {
+        const r = run(m, 300, () => fwd, { fov: 38, back: 2, height: 10 });
+        const tail = r.dists.slice(-60);
+        const still = Math.max(...tail) - Math.min(...tail);
+        const scr = r.screens[r.screens.length - 1];
+        if (scr > 0.7 + 1e-6) bad.push(NAMES[m] + '：设定放不下时飞机在画面 ' + scr.toFixed(2) + ' 处');
+        if (still > 1e-6) bad.push(NAMES[m] + '：设定放不下时镜头距离仍在变（' + still.toExponential(2) + ' m）');
+      }
+    }
+
+    /* 2. 快甩：视线来回甩 3 秒，距离 10、高度 8、低速（无速度感距离）。
+          "猛"那组（±120°、周期 1 s）下旧做法深度一帧跳过 26 m、最远推到 296 m；
+          新做法的深度变化只剩 camOff 平滑本身的滞后，一帧不到 2 m。
+          lerpV 在转弯时走弦，深度本来就会变浅一些 —— 那是平滑的固有行为，
+          三种模式都有，这里不拿它当"跳"。 */
+    const SWINGS = [
+      { name: '中等', amp: 90, period: 1.2 },
+      { name: '猛', amp: 120, period: 1.0 }
+    ];
+    for (const sw of SWINGS) {
+      const swing = (i) => {
+        const yaw = sw.amp * Math.PI / 180 * Math.sin(2 * Math.PI * i * dt / sw.period);
+        return M3.V(Math.sin(yaw), 0, Math.cos(yaw));
+      };
+      const opt = { fov: 56, back: 10, height: 8 };
+      const R = [0, 1, 2].map(m => run(m, 180, swing, opt));
+      const tag = sw.name + '快甩 ';
+
+      R.forEach((r, m) => {
+        if (r.jump > 3) bad.push(tag + NAMES[m] + '：深度一帧跳了 ' + r.jump.toFixed(2) + ' m');
+      });
+      if (R[1].maxScr > CF.FRAME_SOFT_LIM + 1e-6) {
+        bad.push(tag + '侧滑软钳：飞机跑到画面 ' + R[1].maxScr.toFixed(2) + ' 处（上限 ' + CF.FRAME_SOFT_LIM + '）');
+      }
+      // 侧滑软钳不动深度：除了被 6 m 下限托住的那几帧，深度和静态拉远逐帧相同
+      const moved = R[1].dists.some((f, i) => R[0].dists[i] >= 6 && Math.abs(f - R[0].dists[i]) > 1e-6);
+      if (moved) bad.push(tag + '侧滑软钳改变了镜头深度');
+      if (R[2].maxScr > 1) bad.push(tag + '拉远带滞回：飞机出画（画面 ' + R[2].maxScr.toFixed(2) + ' 处）');
+      if (R[2].minF < R[0].minF) bad.push(tag + '拉远带滞回：反而比静态拉远更近');
+      // 静态拉远本来就允许出画；猛甩下必须真的出画，否则这组场景测不出东西
+      if (sw.name === '猛' && R[0].maxScr <= 1) bad.push(tag + '场景太温和：静态拉远都没出画，测不出软钳和拉远');
+    }
+
+    // 3. 甩完回正：C 先保持，再慢慢收回
+    {
+      const st0 = { extra: 20, hold: 0.6 };
+      let st = st0;
+      for (let i = 0; i < 30; i++) st = CF.stepFrameExtra(st, 0, dt);   // 0.5 s，仍在保持
+      if (st.extra !== 20) bad.push('拉远带滞回：保持期内就开始收回（' + st.extra.toFixed(2) + '）');
+      for (let i = 0; i < 300; i++) st = CF.stepFrameExtra(st, 0, dt);  // 再 5 s
+      if (st.extra > 1) bad.push('拉远带滞回：5 秒后还没收回（' + st.extra.toFixed(2) + ' m）');
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('追尾镜头出画处理：设定放不下时稳住、软钳不改距离不出画、拉远不来回跳');
+  }
+
 
   /* ---- 轰炸机：沿航线飞、到点投弹、不参与空战 ----
      它和所有其他单位都不一样：没有目标选择、没有追击、没有规避。

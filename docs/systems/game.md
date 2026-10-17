@@ -309,13 +309,26 @@ fy2 = clamp(camDir.y, -SIN_LIM, SIN_LIM);
 位置在**世界坐标**里算（不在机体坐标系）：
 
 ```js
-off0 = M3.rotAxis(camDir * -S.camDist, (0,1,0), camYaw);
-want = p.pos + off0 + (0, S.camHeight + camPitch * 70, 0);
-camPos = M3.lerpV(camPos, want, 1 - Math.exp(-7.5 * dt));
-Renderer.setCamera(camPos, camDir, (0,1,0), S.fov);
+back = S.camDist + clamp(vFwd / 7.5, 0, 90);                 // 速度感距离
+off0 = M3.rotAxis(camDir * -back, (0,1,0), camYaw);
+wantOff = off0 + (0, S.camHeight + camPitch * 70, 0);
+wantOff -= camDir * frameDeficit(wantOff, camDir, fr);       // 静态底座
+camOff = M3.lerpV(camOff, wantOff, 1 - Math.exp(-7.5 * dt));  // 平滑的是相对偏移
+viewOff = 按 S.camFrame 处理 camOff;                          // 只影响本帧，不写回
+Renderer.setCamera(p.pos + viewOff, camDir, (0,1,0), S.fov);
 ```
 
 世界坐标这一点是“稳定”的另一半：**滚转时镜头不会绕着飞机转圈**。
+
+#### 出画处理（`S.camFrame`，设置 → 视角 → 出画处理）
+飞机在镜头系里的位置是 `−off`：深度 `f`、竖直 `u`、水平 `r`；`u / (f·tan半视场)` 就是画面归一化纵坐标（±1 = 边缘）。
+
+- **静态底座（三种模式共用）**：`frameDeficit` 用**目标偏移** `wantOff` 算飞机要落进画面 `FRAME_FILL = 0.7` 以内、深度不小于 6 m 还得再退多少，并进 `wantOff`。设定本身放不下（距离 2、高度 10、FOV 38）时自动拉开，设定不变这段距离就不变。
+- **0 静态拉远（默认）**：不做动态处理。急转时 `camOff` 跟不上视线，飞机可能短暂贴边或出画一瞬，约 0.3 s 内被平滑带回；镜头不会为了出画被额外推拉（转弯时 `lerpV` 走弦带来的深度变浅是平滑本身的滞后，三种模式都有）。
+- **1 侧滑软钳** `softClampFrame`：保持深度，把画面坐标过一道软膝 —— `FRAME_FILL` 以内原样，之外 `tanh` 渐近 `FRAME_SOFT_LIM = 0.9`。飞机大小不变、永不出画。
+- **2 拉远带滞回** `stepFrameExtra`：用滞后的 `camOff` 算需要的额外距离 `camExtra`；上升 rate 8，需求消失后保持 0.6 s，再以 rate 0.8 收回。连续机动期间一直保持远距离。
+
+**为什么旧做法会跳**：以前每帧用滞后的 `camOff` 判断，出画就瞬间沿视线后推并写回 `camOff`。大机动时误差在横向，纠正却在深度，平滑又把深度拉回 —— 推远、拉回、再推远，镜头前后“呼吸”。现在静态部分只看 `wantOff`，动态修正不写回平滑状态，两条反馈回路断开了。
 
 #### 为什么必须限位（正交基退化）
 镜头的“上”只有与视线不共线时才有定义。机头压到正上/正下时视线本身垂直，世界 `up` 与它共线，`M3.orthonormalize` 的退化保护只能临时换一根参考轴 —— 而 `|fwd.y|` 在极点附近逐帧抖动，参考轴就跟着反复横跳，画面来回侧翻。旧的“混合参考”只能把跳变抹成旋转，抹不掉极点本身；**把俯仰限住，镜头就永远到不了那个位置**，问题从根上消失。

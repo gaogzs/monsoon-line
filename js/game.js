@@ -132,6 +132,7 @@ var Game = (function () {
   var HIG_MAX = 1.90;
   var camFwd = M3.V(0, 0, 1), camUp = M3.V(0, 1, 0), camPos = M3.V(0, 0, 0);
   var camOff = null;                 // 追尾镜头相对飞机的平滑偏移
+  var camExtra = 0, camExtraHold = 0; // 出画处理 C：额外拉远量与剩余保持时间
   var camYaw = 0, camPitch = 0;
   /* 追尾镜头的基准朝向。它不直接等于机头方向 —— 见 updateCamera 里的说明：
      俯仰被限制在 ±89°，而且偏航要按最短角差平滑，否则翻过顶点时会瞬移。 */
@@ -208,7 +209,9 @@ var Game = (function () {
     pitchLadder: true,
     targetMarkers: true,
     // 0 = 追尾，1 = 座舱，2 = 目标。只能在这里改，没有热切换键。
-    camMode: 0
+    camMode: 0,
+    // 追尾镜头飞机快出画时怎么办：0 = 静态拉远，1 = 侧滑软钳，2 = 拉远带滞回
+    camFrame: 0
   };
 
   var S = {};
@@ -232,7 +235,12 @@ var Game = (function () {
            相机代码保留，修好后把这一项加回来、去掉 loadSettings 里的强制归零即可。 */
         { k: 'fov', label: '视场角 FOV', type: 'range', min: 38, max: 100, unit: '°' },
         { k: 'camDist', label: '镜头距离', type: 'range', min: 2, max: 10, unit: ' m' },
-        { k: 'camHeight', label: '镜头高度', type: 'range', min: -15, max: 10, unit: ' m' }
+        { k: 'camHeight', label: '镜头高度', type: 'range', min: -15, max: 10, unit: ' m' },
+        { k: 'camFrame', label: '出画处理', type: 'select', options: [
+          { v: 0, t: '静态拉远' },
+          { v: 1, t: '侧滑软钳' },
+          { v: 2, t: '拉远带滞回' }
+        ] }
       ]
     },
     {
@@ -263,6 +271,7 @@ var Game = (function () {
     // 旧存档可能超出新范围（距离曾经到 30、高度到 60）
     o.camDist = Math.min(10, Math.max(2, +o.camDist || DEFAULTS.camDist));
     o.camHeight = isFinite(+o.camHeight) ? Math.min(10, Math.max(-15, +o.camHeight)) : DEFAULTS.camHeight;
+    if (o.camFrame !== 0 && o.camFrame !== 1 && o.camFrame !== 2) o.camFrame = DEFAULTS.camFrame;
     return o;
   }
 
@@ -1486,6 +1495,8 @@ var Game = (function () {
     camUp = M3.V(0, 1, 0);
     camPos = M3.add(p.pos, M3.V(0, 30, -110));
     camOff = null;
+    camExtra = 0;
+    camExtraHold = 0;
 
     Radio.clear();
     SysNote.clear();
@@ -2546,6 +2557,81 @@ var Game = (function () {
   /* ============================================================
      相机
      ============================================================ */
+
+  /* ---------- 追尾镜头的"出画处理" ----------
+
+     飞机在镜头系里的位置是 −off：沿视线的深度 f、竖直偏移 u、水平偏移 r。
+     u / f 除以 tan(半视场) 就是飞机在画面上的归一化纵坐标（±1 = 画面边缘），
+     r / f 除以 tan(半视场)·宽高比 是横坐标。
+
+     以前只有一种做法：用滞后的 camOff 判断，出画就瞬间沿视线后推。
+     大机动时视线转得比 camOff 快，飞机横向偏到边 → 被推远 → 平滑又把
+     深度拉回 → 又出画 → 又推远。纠正的是深度，误差却在横向，
+     两者一直拉锯，镜头前后跳。现在拆成静态底座（三种模式共用）+
+     动态处理（设置里三选一）：
+
+       0 静态拉远   不做动态处理，只靠 camOff 平滑自然回中。
+                    急转时飞机可能短暂贴边甚至出画一瞬，但镜头不会为了出画被额外推拉。
+       1 侧滑软钳   画面 FRAME_FILL 以内不动，之外用 tanh 软压，渐近 FRAME_SOFT_LIM。
+                    只改横向/竖向，不改深度：飞机大小不变、永不出画。
+       2 拉远带滞回 需要时快速拉远（EXTRA_UP），需求消失后先保持 EXTRA_HOLD 秒
+                    再慢慢收回（EXTRA_DOWN）。连续机动期间保持远距离，不来回跳。 */
+  var FRAME_FILL = 0.7;        // 静态底座 / C：飞机中心要落在画面中间 70% 以内
+  var FRAME_SOFT_LIM = 0.9;    // B：软压的渐近上限，飞机中心不超过画面 90%
+  var FRAME_MIN_DEPTH = 6;     // 镜头最近不贴到机身 6 米以内
+  var EXTRA_UP = 8;            // C：拉远速率（约 0.12 s 跟上）
+  var EXTRA_DOWN = 0.8;        // C：收回速率（约 1–2 s 凑回）
+  var EXTRA_HOLD = 0.6;        // C：需求消失后保持多久才开始收回
+
+  function camBasis(camDir) {
+    var r = M3.norm(M3.cross(M3.V(0, 1, 0), camDir));
+    if (M3.len(r) < 0.5) r = M3.V(1, 0, 0);
+    return { r: r, u: M3.cross(camDir, r) };
+  }
+
+  /* 偏移 off 下要把飞机放进画面 FRAME_FILL 以内（且深度不小于
+     FRAME_MIN_DEPTH），镜头还得沿视线再退多少米。fr = { tanV, tanH }。 */
+  function frameDeficit(off, camDir, fr) {
+    var b = camBasis(camDir);
+    var rel = M3.mul(off, -1);
+    var need = Math.max(FRAME_MIN_DEPTH,
+      Math.abs(M3.dot(rel, b.u)) / (fr.tanV * FRAME_FILL),
+      Math.abs(M3.dot(rel, b.r)) / (fr.tanH * FRAME_FILL));
+    return Math.max(0, need - M3.dot(rel, camDir));
+  }
+
+  // 软膝：|x| ≤ knee 原样返回，之外渐近 lim，连续且一阶导连续
+  function softKnee(x, knee, lim) {
+    var a = Math.abs(x);
+    if (a <= knee) return x;
+    var w = lim - knee;
+    return (x < 0 ? -1 : 1) * (knee + w * Math.tanh((a - knee) / w));
+  }
+
+  /* B 侧滑软钳：保持深度，把飞机在画面上的坐标软压进 FRAME_SOFT_LIM。
+     静态底座已经保证稳态位置在 FRAME_FILL 以内，所以玩家设的高度/距离不受影响。
+     深度不足（视线甩得太快，镜头几乎到了飞机侧面甚至前方）时只能退到最小深度。 */
+  function softClampFrame(off, camDir, fr) {
+    var b = camBasis(camDir);
+    var rel = M3.mul(off, -1);
+    var f = Math.max(FRAME_MIN_DEPTH, M3.dot(rel, camDir));
+    var y = softKnee(M3.dot(rel, b.u) / (f * fr.tanV), FRAME_FILL, FRAME_SOFT_LIM);
+    var x = softKnee(M3.dot(rel, b.r) / (f * fr.tanH), FRAME_FILL, FRAME_SOFT_LIM);
+    var rel2 = M3.add(M3.mul(camDir, f),
+      M3.add(M3.mul(b.u, y * f * fr.tanV), M3.mul(b.r, x * f * fr.tanH)));
+    return M3.mul(rel2, -1);
+  }
+
+  // C 拉远带滞回：输入 { extra, hold } 与本帧需要的额外距离，返回新的 { extra, hold }
+  function stepFrameExtra(st, need, dt) {
+    if (need >= st.extra) {
+      return { extra: st.extra + (need - st.extra) * (1 - Math.exp(-EXTRA_UP * dt)), hold: EXTRA_HOLD };
+    }
+    var hold = Math.max(0, st.hold - dt);
+    if (hold > 0) return { extra: st.extra, hold: hold };
+    return { extra: st.extra + (need - st.extra) * (1 - Math.exp(-EXTRA_DOWN * dt)), hold: 0 };
+  }
+
   function updateCamera(dt) {
     var p = player;
     if (!p) return;
@@ -2661,29 +2747,31 @@ var Game = (function () {
       var back = S.camDist + M3.clamp(vFwd / 7.5, 0, 90);
       var off0 = M3.rotAxis(M3.mul(camDir, -back), M3.V(0, 1, 0), camYaw);
       var wantOff = M3.add(off0, M3.V(0, S.camHeight + camPitch * 70, 0));
+
+      /* 静态底座：设定本身放不下飞机时（例如距离 2、高度 10、FOV 38°，
+         机身在画面外 60° 多）沿视线往后退。用的是**目标偏移**而不是滞后的
+         camOff —— 设定不变，这段距离就不变，机动时不会跟着跳。 */
+      var halfTan = Math.tan(S.fov * Math.PI / 360);
+      var aspect = (cv && cv.height) ? cv.width / cv.height : 16 / 9;
+      var fr = { tanV: halfTan, tanH: halfTan * aspect };
+      wantOff = M3.sub(wantOff, M3.mul(camDir, frameDeficit(wantOff, camDir, fr)));
       camOff = camOff ? M3.lerpV(camOff, wantOff, 1 - Math.exp(-7.5 * dt)) : wantOff;
 
-      /* 保证飞机留在画面里。飞机在镜头系里的位置是 −camOff：
-         沿视线的深度 f、竖直偏移 u、水平偏移 r。镜头距离、高度、FOV、
-         方向键自由视角、窗口宽高比任一组合都可能让 |u| / f 或 |r| / f
-         超出半视场（例如距离 2、高度 10、FOV 38° 时机身在画面外 60° 多）。
-         超出时**只把镜头沿视线往后退**，直到机身中心落回画面中间
-         70% 的范围内 —— 不动高度和横向偏移，玩家的设定仍然生效，
-         只是近到放不下时自动拉开。最近也不贴到机身 6 米以内。 */
-      var cRight = M3.norm(M3.cross(M3.V(0, 1, 0), camDir));
-      if (M3.len(cRight) < 0.5) cRight = M3.V(1, 0, 0);
-      var cUp = M3.cross(camDir, cRight);
-      var rel = M3.mul(camOff, -1);
-      var fDep = M3.dot(rel, camDir);
-      var halfV = S.fov * Math.PI / 360;
-      var aspect = (cv && cv.height) ? cv.width / cv.height : 16 / 9;
-      var tanV = Math.tan(halfV) * 0.7;
-      var tanH = Math.tan(halfV) * aspect * 0.7;
-      var fNeed = Math.max(6,
-        Math.abs(M3.dot(rel, cUp)) / tanV,
-        Math.abs(M3.dot(rel, cRight)) / tanH);
-      if (fDep < fNeed) camOff = M3.sub(camOff, M3.mul(camDir, fNeed - fDep));
-      camPos = M3.add(p.pos, camOff);
+      /* 动态：camOff 跟不上视线时飞机会偏向画面边缘，三种处理见上面"出画处理"的说明。
+         修正只作用于本帧的镜头位置，不写回 camOff —— 平滑状态保持干净，
+         中途切换模式也不会留下残余。 */
+      var viewOff = camOff;
+      if (S.camFrame === 1) {
+        viewOff = softClampFrame(camOff, camDir, fr);
+      } else if (S.camFrame === 2) {
+        var ex = stepFrameExtra({ extra: camExtra, hold: camExtraHold },
+          frameDeficit(camOff, camDir, fr), dt);
+        camExtra = ex.extra;
+        camExtraHold = ex.hold;
+        viewOff = M3.sub(camOff, M3.mul(camDir, camExtra));
+      }
+      if (S.camFrame !== 2) { camExtra = 0; camExtraHold = 0; }
+      camPos = M3.add(p.pos, viewOff);
 
       camFwd = camDir;
       camUp = M3.V(0, 1, 0);
@@ -3596,7 +3684,14 @@ var Game = (function () {
     // 实体挂载的渲染：断言要能单独喂一架飞机进来数它画了几个挂载
     __pushStores: pushStores,
     // 水面目标的对空射击：断言要能单独推一帧，确认我方舰艇不朝玩家打
-    __updateTargets: updateTargets
+    __updateTargets: updateTargets,
+    // 追尾镜头出画处理：断言要能脱离整局游戏单独推镜头
+    __camFrame: {
+      frameDeficit: frameDeficit,
+      softClampFrame: softClampFrame,
+      stepFrameExtra: stepFrameExtra,
+      FRAME_SOFT_LIM: FRAME_SOFT_LIM
+    }
   };
 })();
 
