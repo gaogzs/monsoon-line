@@ -2583,18 +2583,29 @@ var Game = (function () {
   var EXTRA_DOWN = 0.8;        // C：收回速率（约 1–2 s 凑回）
   var EXTRA_HOLD = 0.6;        // C：需求消失后保持多久才开始收回
 
-  /* 鼠标引导时镜头俯仰的软膝：CAM_SOFT_KNEE 以下镜头完全跟瞄准方向，
-     之外 tanh 渐近 CAM_SOFT_LIM。瞄准拉满（AIM_PITCH_LIM = 89°）时镜头约 85.6°。
+  /* 鼠标引导时镜头俯仰与瞄准俯仰的映射：**天顶刚好卡在画面上沿**。
 
-     以前是 72°·tanh(x / 72°)：看着是"渐近 72°"，实际瞄准拉满时镜头只有
-     72·tanh(89/72) ≈ 61°，而且 30° 起就开始被压 —— 机头明显比镜头高。
+     瞄准方向（CMD）俯仰钳在 AIM_PITCH_LIM = 89°，永远过不了天顶；镜头若也
+     跟到 89°，画面就是一片空天，而且离正交基退化只差 1°。反过来，镜头俯仰
+     停在 90° − 半视场时，天顶正好投影在画面上沿 —— CMD 拉满时就贴着它，
+     看起来能一直朝正上方飞，只是光标永远推不过那条边。天底同理卡在下沿。
 
-     上限停在 87° 而不是 89°：追尾镜头另有 89° 硬限位防正交基退化
-     （见 updateCamera 里 CAM_PITCH_LIM 的说明），软膝渐近 87°
-     永远碰不到它，|up| ≥ cos 87° ≈ 0.052，离退化阈值 1e-4 有 500 倍余量。
-     代价是拉到正上方时画面大半是天，俯仰刻度的消失阈值跟着放到了 87.7°。 */
-  var CAM_SOFT_KNEE = 78 * Math.PI / 180;
-  var CAM_SOFT_LIM = 87 * Math.PI / 180;
+     上限随 FOV 变（设置里实时拖 FOV 也对）：FOV 56° → 62°，38° → 71°，100° → 40°。
+
+     映射：|瞄准| ≤ k 时镜头 = 瞄准（准星在画面正中）；之外
+         镜头 = k + (A − k)·r·(1 − (1 − t)^(1/r))，t = (|瞄准| − k)/(A − k)，r = (上限 − k)/(A − k)
+     在 k 处斜率为 1（衔接无折角），到 A 时正好等于上限且斜率为 0（平稳停住），全程单调。
+     k = max(0, 2·上限 − A)：FOV 56° 时 k = 35°，35° 以下准星都在正中。 */
+  function camPitchFor(aim, fovDeg) {
+    var A = AIM_PITCH_LIM;
+    var pMax = Math.PI / 2 - fovDeg * Math.PI / 360;
+    var x = Math.min(Math.abs(aim), A);
+    var k = Math.max(0, 2 * pMax - A);
+    if (x <= k) return aim;
+    var r = (pMax - k) / (A - k);
+    var t = (x - k) / (A - k);
+    return (aim < 0 ? -1 : 1) * (k + (A - k) * r * (1 - Math.pow(1 - t, 1 / r)));
+  }
 
   function camBasis(camDir) {
     var r = M3.norm(M3.cross(M3.V(0, 1, 0), camDir));
@@ -2712,9 +2723,13 @@ var Game = (function () {
       var hx = lookDir.x, hz = lookDir.z;
       var hlen = Math.sqrt(hx * hx + hz * hz);
 
-      // ① 偏航：最短角差平滑。接近垂直时水平投影塌缩，此时沿用上一帧。
-      if (hlen > 0.12) {
-        var tYaw = Math.atan2(hx, hz);
+      /* ① 偏航：最短角差平滑。
+         键盘直控时从机头的水平投影反算，接近垂直时投影塌缩、沿用上一帧。
+         鼠标引导时直接用 aimYaw —— 它在任何仰角都有定义。以前这里也走反算：
+         CMD 顶在 89° 时水平投影只有 cos 89° ≈ 0.017，一直卡在冻结区，左右拖时
+         罗盘和飞机在转、画面不转，一往下拖离开冻结区画面就猛地追过去。 */
+      if (lookAim || hlen > 0.12) {
+        var tYaw = lookAim ? aimYaw : Math.atan2(hx, hz);
         var dYaw = tYaw - camYawBase;
         while (dYaw > Math.PI) dYaw -= Math.PI * 2;
         while (dYaw < -Math.PI) dYaw += Math.PI * 2;
@@ -2725,8 +2740,8 @@ var Game = (function () {
 
       // ② 俯仰：先钳位，再平滑
       var camPitchAng = Math.atan2(lookDir.y, Math.max(hlen, 1e-4));
-      // 跟瞄准方向时俯仰过一道软膝，见 CAM_SOFT_KNEE / CAM_SOFT_LIM 的说明
-      if (lookAim) camPitchAng = softKnee(camPitchAng, CAM_SOFT_KNEE, CAM_SOFT_LIM);
+      // 跟瞄准方向时：天顶 / 天底刚好卡在画面上下沿，见 camPitchFor
+      if (lookAim) camPitchAng = camPitchFor(camPitchAng, S.fov);
       camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
       if (camPitchSmooth === null) camPitchSmooth = camPitchAng;
       camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-pitchRate * dt));
@@ -3699,11 +3714,9 @@ var Game = (function () {
       stepFrameExtra: stepFrameExtra,
       FRAME_SOFT_LIM: FRAME_SOFT_LIM
     },
-    // 鼠标引导时镜头俯仰的软膝
+    // 鼠标引导时镜头俯仰与瞄准俯仰的映射（天顶卡在画面上沿）
     __camPitch: {
-      softKnee: softKnee,
-      KNEE: CAM_SOFT_KNEE,
-      LIM: CAM_SOFT_LIM,
+      camPitchFor: camPitchFor,
       AIM_LIM: AIM_PITCH_LIM
     }
   };

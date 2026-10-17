@@ -1361,27 +1361,46 @@ if (Ent && M3 && me && world) {
     else ok('追尾镜头：地平线稳定、俯仰钳在 89°、全程不抽动');
   }
 
-  /* ---- 鼠标引导时镜头俯仰软膝 ----
-     以前 72°·tanh 实际只到 61°。现在 78° 以下镜头完全跟瞄准，
-     拉满 89° 时镜头约 85°，且永远低于 89° 的硬限位（正交基余量）。 */
+  /* ---- 鼠标引导时镜头俯仰：天顶刚好卡在画面上沿 ----
+     CMD 俯仰钳在 89°，永远过不了天顶。镜头俯仰停在 90° − 半视场，
+     拉满时天顶正好投影在画面上沿、CMD 贴在它下面 —— 看起来能一直朝正上方飞。
+     上限随 FOV 变；k 以下镜头 = 瞄准（准星在正中）；全程单调、衔接无折角。 */
   {
-    const CP = sandbox.Game.__camPitch;
-    const D = Math.PI / 180;
+    const CP = sandbox.Game.__camPitch, M3 = sandbox.M3;
+    const D = Math.PI / 180, W = 1280, H = 720;
     const bad = [];
-    const top = CP.softKnee(CP.AIM_LIM, CP.KNEE, CP.LIM) / D;
-    if (top < 84 || top > 87) bad.push('瞄准拉满时镜头俯仰 ' + top.toFixed(2) + '°（应在 84°–87°）');
-    if (CP.LIM >= 89 * D) bad.push('软膝上限 ' + (CP.LIM / D).toFixed(1) + '° 没留在 89° 硬限位之下');
-    for (let a = 0; a <= 78; a += 1) {
-      if (Math.abs(CP.softKnee(a * D, CP.KNEE, CP.LIM) - a * D) > 1e-12) { bad.push(a + '° 被压了（78° 以下应原样）'); break; }
-    }
-    let prev = -Infinity;
-    for (let a = -89; a <= 89; a += 0.25) {
-      const v = CP.softKnee(a * D, CP.KNEE, CP.LIM);
-      if (v < prev) { bad.push('软膝不单调（' + a + '°）'); break; }
-      prev = v;
+    const rows = [];
+    for (const fov of [38, 56, 80, 100]) {
+      const top = CP.camPitchFor(CP.AIM_LIM, fov);
+      const want = 90 * D - fov * D / 2;
+      if (Math.abs(top - want) > 1e-9) bad.push('FOV ' + fov + '：拉满时镜头 ' + (top / D).toFixed(2) + '°（应为 ' + (want / D).toFixed(2) + '°）');
+      // 真投影：天顶在画面上沿（y ≈ 0），CMD（89°）在画面里、贴着上沿
+      const fwd = M3.V(0, Math.sin(top), Math.cos(top));
+      const cam = M3.makeCamera(M3.V(0, 0, 0), fwd, M3.V(0, 1, 0), W, H, fov);
+      const zen = M3.projectUnclamped(cam, M3.V(0, 1e4, 0));
+      const cmd = M3.projectUnclamped(cam, M3.V(0, Math.sin(CP.AIM_LIM) * 1e4, Math.cos(CP.AIM_LIM) * 1e4));
+      if (Math.abs(zen.y) > 0.5) bad.push('FOV ' + fov + '：天顶在画面 y = ' + zen.y.toFixed(2) + '（应在上沿 0）');
+      if (!(cmd.y > 0 && cmd.y < H * 0.1)) bad.push('FOV ' + fov + '：CMD 拉满时在 y = ' + cmd.y.toFixed(1) + '（应在画面里、贴着上沿）');
+      // 天底对称
+      if (Math.abs(CP.camPitchFor(-CP.AIM_LIM, fov) + want) > 1e-9) bad.push('FOV ' + fov + '：天底不对称');
+      // 单调、无折角（相邻 0.1° 的斜率不跳）
+      let prev = -Infinity, prevSlope = null, maxKink = 0, k1 = null;
+      for (let a = -89; a <= 89; a += 0.1) {
+        const v = CP.camPitchFor(a * D, fov);
+        if (v < prev - 1e-12) { bad.push('FOV ' + fov + '：不单调（' + a.toFixed(1) + '°）'); break; }
+        if (prev > -Infinity) {
+          const s = (v - prev) / (0.1 * D);
+          if (prevSlope !== null) maxKink = Math.max(maxKink, Math.abs(s - prevSlope));
+          prevSlope = s;
+        }
+        if (k1 === null && a >= 0 && Math.abs(v - a * D) > 1e-9) k1 = a;
+        prev = v;
+      }
+      if (maxKink > 0.05) bad.push('FOV ' + fov + '：映射有折角（相邻斜率差 ' + maxKink.toFixed(3) + '）');
+      rows.push(fov + '°→' + (top / D).toFixed(0) + '°（' + (k1 === null ? 89 : k1.toFixed(0)) + '° 以下准星居中）');
     }
     if (bad.length) bad.forEach(fail);
-    else ok('镜头俯仰软膝：78° 以下原样，瞄准 89° 时镜头 ' + top.toFixed(1) + '°');
+    else ok('镜头俯仰：拉满时天顶卡在画面上沿 —— ' + rows.join('，'));
   }
 
   /* ---- 追尾镜头：出画处理（静态拉远 / 侧滑软钳 / 拉远带滞回） ----
@@ -2740,6 +2759,53 @@ if (Ent && M3 && me && world) {
     } else {
       ok('海天分界随海拔下沉（0.5/2/8 km → ' + probe.join(' / ') + '）');
     }
+  }
+
+  /* ---- 真实链路：CMD 顶在最上面左右拖，画面要跟着转 ----
+     曾经镜头偏航从瞄准方向的水平投影反算，投影太短（≈83° 以上）就冻结：
+     CMD 顶在 89° 时左右拖，罗盘和飞机在转、画面不转；一往下拖离开冻结区，
+     画面猛地转过去、CMD 从上沿跳下来。 */
+  {
+    const G = sandbox.Game, R = sandbox.Renderer, M3 = sandbox.M3;
+    const cvEl = sandbox.document.getElementById('cv');
+    const bad = [];
+    const D = 180 / Math.PI;
+    const yawOf = (v) => Math.atan2(v.x, v.z);
+
+    G.startMission(0);
+    for (let f = 0; f < 60; f++) pump(1);
+    const move = (mx, my) => {
+      cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2, movementX: mx, movementY: my });
+      pump(1);
+    };
+    // 推到顶：每帧 −40 px（≈5°），20 帧 ≈ 100°，早就钳在 89° 了
+    for (let f = 0; f < 20; f++) move(0, -40);
+    for (let f = 0; f < 30; f++) move(0, 0);
+
+    // 顶着左右拖 2 s（每帧 20 px ≈ 2.5°）：镜头偏航要跟着瞄准偏航
+    let maxLag = 0;
+    for (let f = 0; f < 120; f++) {
+      move(20, -5);
+      if (f > 15) {
+        const lag = Math.abs(M3.wrapPi(yawOf(R.getCam().fwd) - yawOf(G.__player().aimDir))) * D;
+        maxLag = Math.max(maxLag, lag);
+      }
+    }
+    if (maxLag > 15) bad.push('CMD 顶在最上左右拖时画面不跟（镜头与瞄准偏航差 ' + maxLag.toFixed(1) + '°）');
+
+    // 往下拖：画面每帧转动不超过鼠标本身带来的量，不能猛地追过去
+    let prev = R.getCam().fwd, maxJump = 0;
+    for (let f = 0; f < 30; f++) {
+      move(0, 10);
+      const c = R.getCam().fwd;
+      maxJump = Math.max(maxJump, Math.acos(M3.clamp(M3.dot(prev, c), -1, 1)) * D);
+      prev = c;
+    }
+    if (maxJump > 3) bad.push('顶着左右拖之后往下拖，画面一帧猛转 ' + maxJump.toFixed(1) + '°');
+
+    if (bad.length) bad.forEach(fail);
+    else ok('真实链路：CMD 顶在最上左右拖画面跟着转（偏航差 ≤ ' + maxLag.toFixed(1) +
+      '°），之后往下拖不跳（每帧 ≤ ' + maxJump.toFixed(2) + '°）');
   }
 
   /* ---- 真实链路：鼠标位移 → 瞄准方向 → 飞控 → 机头 ----

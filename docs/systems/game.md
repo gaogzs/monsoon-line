@@ -247,7 +247,7 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 1. 瞄准方向存在世界坐标里：`aimYaw / aimPitch`（俯仰限 ±89°）。`mousemove` 用 `movementX/Y × AIM_SENS × FOV/56` 转动它；点击画布时 `requestPointerLock()`，菜单 / 暂停时 `releasePointer()` 交还指针。
 2. `aimInit = false`（重生、`M` 切模式）时下一帧 `resetAim()` 从机头重新取。
 3. `AI.steerTo(player, aimDirNow(), player.ctrl, player, dt)` —— 传 `dt` 启用瞄准角速度前馈（见 [ai.md](ai.md)）；`player.aimDir` 供 HUD 画准星与机头连线。
-4. 追尾镜头（`S.camMode === 0`）在鼠标引导时跟 `aimDir` 而不跟机头，平滑系数 14；键盘直控时仍跟机头。这样准星固定在画面中心、机头标记去追它，机头才能真正收敛到准星上。跟 `aimDir` 时俯仰过一道软膝 `softKnee(·, 78°, 87°)`：78° 以下原样跟随，瞄准拉满 89° 时镜头约 85.6°，永远低于 89° 硬限位。（以前是 `72°·tanh(x/72°)`，实际只到 61°。）HUD 俯仰刻度在镜头水平分量 < 0.04（≈87.7°）时才隐藏，高于软膝上限。
+4. 追尾镜头（`S.camMode === 0`）在鼠标引导时跟 `aimDir` 而不跟机头，平滑系数 14；键盘直控时仍跟机头。这样准星固定在画面中心、机头标记去追它，机头才能真正收敛到准星上。跟 `aimDir` 时俯仰走 `camPitchFor(瞄准俯仰, S.fov)`：镜头上限是 `90° − FOV/2`，瞄准拉满 89° 时**天顶正好卡在画面上沿**（天底卡在下沿），CMD 贴着它 —— 看起来能一直朝正上方飞，只是光标推不过那条边。上限随 FOV 实时变（56° → 62°，38° → 71°，100° → 40°）。`k = max(0, 2·上限 − 89°)` 以下镜头 = 瞄准（FOV 56° 时 35° 以下准星在正中），之外 `k + (A − k)·r·(1 − (1 − t)^(1/r))` 平滑收到上限：衔接处斜率为 1、到 89° 时斜率为 0，全程单调。（以前是软膝 78° → 87°，拉满时画面几乎全是空天。）
 
 ### 键盘直控与油门轴
 `controlPlayer(dt)`：
@@ -288,8 +288,9 @@ var CAM_PITCH_LIM = 89 * Math.PI / 180;
 var SIN_LIM = Math.sin(CAM_PITCH_LIM);
 var hlen = hypot(p.fwd.x, p.fwd.z);
 
-// ① 偏航：最短角差平滑。水平投影塌缩时（hlen <= 0.12）沿用上一帧
-if (hlen > 0.12) {
+// ① 偏航：最短角差平滑。键盘直控时 tYaw 从机头水平投影反算，投影塌缩时（hlen <= 0.12）沿用上一帧；
+//    鼠标引导时 tYaw = aimYaw，任何仰角都跟（CMD 顶在 89° 时投影只有 0.017，反算会一直冻结）
+if (lookAim || hlen > 0.12) {
   dYaw = wrap(tYaw - camYawBase);                       // 归一到 ±π
   camYawBase += dYaw * (1 - Math.exp(-1.2 * dt));
   // 再把 camYawBase 归一到 ±π
