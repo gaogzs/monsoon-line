@@ -274,13 +274,13 @@ function spawnTarget(w, o) {
    玩家在哪一关都能爬到 18 km，爬上去就该看见单元。所以每一关的
    spawn 都调一次这里，单元的样子和数值只写这一份。
 
-   布局照设定：九个一组（3×3），组内间距 5 km；`o.xs` × `o.zs` 是
-   各编组中心（按 20 km 一格摆，组与组之间留 10 km 空当）。
+   布局照设定：九个一组（3×3），组内间距 10 km；`o.xs` × `o.zs` 是
+   各编组中心（按 30 km 一格摆，一组占 20×20 km，组与组之间留 10 km 空当）。
    高度：每组一个基准（18 500–21 000 m），组内再各自浮动 ±500 m。
 
    中立（team 2）+ friendlyAsset：谁都不能锁它，玩家打坏要扣分。
    不锁任何武器 —— 在它们附近开火全凭玩家自己掂量。 */
-var CELL_SPACING = 5000;
+var CELL_SPACING = 10000;
 
 function spawnCellField(w, o) {
   w.cells = w.cells || [];
@@ -397,7 +397,7 @@ MISSIONS.push({
   /* ---------------- 战场生成 ---------------- */
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [0], zs: [0, 20000] });
+    spawnCellField(w, { xs: [0], zs: [10000] });
     /* 战场尺度：起飞点与目标编队之间留出约 22 km。
        中距弹的锁定距离是 8–12 km，把编队摆在 8 km 外等于一进任务
        就直接进包线 —— 没有任何进入段可言。 */
@@ -613,7 +613,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [0], zs: [-20000, 0, 20000] });
+    spawnCellField(w, { xs: [0], zs: [-15000, 15000] });
     /* 这一关整条链条被拉长到约 30 km：进场点在东北端，
        中继网铺在中间，前进基地在你身后。进入段有了，
        而"来不及拦轰炸机"也才真的成立。 */
@@ -909,8 +909,8 @@ MISSIONS.push({
   map: [
     { x: 0, z: -6000, type: 'start', label: '进入点' },
     { x: 0, z: 15000, type: 'relay', label: '播撒机群' },
-    { x: 5000, z: 9000, type: 'relay', label: '单元' },
-    { x: -5000, z: 9000, type: 'relay', label: '单元' }
+    { x: 10000, z: 9000, type: 'relay', label: '单元' },
+    { x: -10000, z: 9000, type: 'relay', label: '单元' }
   ],
 
 
@@ -929,7 +929,7 @@ MISSIONS.push({
     w.wings[2].speed = 500;
     w.wings[3].speed = 500;
 
-    // 调节单元：一个编组（3×3，间距 5 km），压在进入点与播撒机群之间
+    // 调节单元：一个编组（3×3，间距 10 km），播撒机群就在它中间穿行
     var i, j;
     spawnCellField(w, { xs: [0], zs: [9000] });
 
@@ -1178,7 +1178,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [-20000, 0, 20000], zs: [0, 20000] });
+    spawnCellField(w, { xs: [-15000, 15000], zs: [10000] });
     p.pos = M3.V(0, 5200, -18000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 360;
@@ -1399,7 +1399,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    var cellGroups = spawnCellField(w, { xs: [-10000, 10000], zs: [0, 20000, 40000] });
+    var cellGroups = spawnCellField(w, { xs: [-15000, 15000], zs: [5000, 35000] });
     p.pos = M3.V(0, 9000, -16000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 400;
@@ -1648,7 +1648,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [5000], zs: [0, 20000, 40000] });
+    spawnCellField(w, { xs: [5000], zs: [0, 30000] });
     p.pos = M3.V(0, 18000, -14000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 500;
@@ -1791,7 +1791,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [-10000, 10000], zs: [0, 20000] });
+    spawnCellField(w, { xs: [0], zs: [-15000, 15000] });
     p.pos = M3.V(0, 2200, -14000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 330;
@@ -1948,7 +1948,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [0], zs: [0, 20000] });
+    spawnCellField(w, { xs: [0], zs: [0, 30000] });
     p.pos = M3.V(0, 6000, 4000);
     p.fwd = M3.V(0, 0, -1);        // 面朝北（本关 +z 真方位 170°），敌机从南面来
     p.speed = 380;
@@ -2180,7 +2180,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [0], zs: [0, 20000, 40000] });
+    spawnCellField(w, { xs: [0], zs: [0, 30000] });
     p.pos = M3.V(0, 4800, -16000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 340;
@@ -2375,7 +2375,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [-10000, 10000], zs: [0, 20000, 40000] });
+    spawnCellField(w, { xs: [-15000, 15000], zs: [0, 30000] });
     p.pos = M3.V(0, 17000, -18000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 480;
@@ -2551,7 +2551,7 @@ MISSIONS.push({
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [-10000, 10000], zs: [-10000, 10000] });
+    spawnCellField(w, { xs: [-15000, 15000], zs: [-15000, 15000] });
     p.pos = M3.V(0, 6000, -6000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 350;

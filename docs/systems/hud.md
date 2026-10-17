@@ -392,36 +392,38 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 
 位置同样来自 `hmiLayout()`，与 RWR 环共用一套坐标。
 
-### 威胁告警（屏幕中上方 `H * 0.14`）
+### 告警栈（屏幕中上方，`drawAlerts()`）
 
-RWR 环上那两个小字，在真正忙起来的时候根本看不见 ——
-而"有东西正朝你来"是这个游戏里最不能错过的一条信息。
+屏幕正中上方的告警**只有这一个栈**：先收集、按 `ALERT_ORDER` 排序、从上往下逐行画。
+起点 `max(H * 0.22, U(176))`（让开任务目标块），每行占固定高度，
+**闪烁的告警暗下去时照样占位**，下面的行不会一上一下地跳。
+以前导弹 / 雷达照射、失速等、"被对空雷达截获"（写在 `game.js`）各算各的 y，同时出现就叠在一起。
 
-所以单独放大一份放在屏幕中上方（30 px 字号）：
+优先级（上 → 下）：
 
-| 情况 | 显示 |
-|---|---|
-| 有导弹以本机为目标（或 3 km 内的敌弹） | `▲ 导弹逼近`，**红色闪烁**，下面一行是最近那枚的距离 |
-| 只有雷达在锁定本机 | `▲ 雷达照射`，琥珀色 |
+| 顺序 | id | 条件 | 文字 |
+|---|---|---|---|
+| 1 | `missile` | 有导弹以本机为目标（或 3 km 内的敌弹） | `▲ 导弹逼近`（红，快闪，30 px），下一行是最近那枚的距离 |
+| 2 | `lit` | 没有来袭导弹、但有敌机锁着本机 | `▲ 雷达照射`（琥珀，30 px） |
+| 3 | `detected` | `world.detected`（被对空雷达截获） | `▲ 被对空雷达截获`（红） |
+| 4 | `terrain` | `p.pos.y < 200 && p.fwd.y < 0` | `TERRAIN 低高度告警`（红） |
+| 5 | `stall` | `p.stall` | `STALL 失速`（红） |
+| 6 | `lowq` | `p.pos.y > 18000 && p.q < 12` | `LOW Q 动压不足`（琥珀） |
+| 7 | `jammed` | `suppressed > 0.05 \|\| ewPower > 0` | `JAMMED 雷达受扰`（琥珀） |
+| 8 | `winchester` | `gunAmmo <= 0 && spAmmo <= 0` | `WINCHESTER 弹药耗尽`（琥珀） |
+| 9 | `emcon` | `p.emcon` | `EMCON-Δ 电磁静默`（青，**不闪** —— 它是状态不是告警） |
 
-环上仍然保留方位点，两者互补：**一个告诉你"有威胁"，
-一个告诉你"威胁在哪个方向"。**
+雷达 / 导弹 > 失速 > 动压是定下来的顺序；低高度排在失速前面，因为它意味着下一秒就是海面。
+`threatState()` 只算导弹与照射的数据；RWR 环上仍然保留方位点，两者互补：
+**一个告诉你"有威胁"，一个告诉你"威胁在哪个方向"。**
 
-### 告警（中上部，让开威胁告警）
+`ewPower` 是自己正在开机干扰别人（**干扰是双向的**，自己的接收机也被压），
+`suppressed` 是被敌方干扰机的辐射场罩住。
 
-起点 `H * 0.14 + U(80)`，按优先级垂直排列，全部闪烁：
+任务横幅（`banner()`，默认 `H * 0.36`）读告警栈的下沿 `alertsBottom`：栈排得长时横幅往下让。
 
-| 条件 | 文字 |
-|---|---|
-| `p.stall` | `STALL 失速`（红） |
-| `p.pos.y < 200 && p.fwd.y < 0` | `TERRAIN 地形告警`（红） |
-| `p.pos.y > 18000 && p.q < 12` | `LOW Q 动压不足`（琥珀） |
-| `gunAmmo <= 0 && spAmmo <= 0` | `WINCHESTER 弹药耗尽`（琥珀） |
-| `suppressed > 0.05 \|\| ewPower > 0` | `JAMMED 雷达受扰`（琥珀） |
-| `p.emcon` | `EMCON-Δ 电磁静默`（青，**不闪** —— 它是状态不是告警） |
-
-前两条来自电子战：`ewPower` 是自己正在开机干扰别人（**干扰是双向的**，
-自己的接收机也被压），`suppressed` 是被敌方干扰机的辐射场罩住。
+**新增告警**：往 `ALERT_ORDER` 插一个 id、在 `drawAlerts()` 里 push 一条，别另起 y。
+`smoke.js` 会把全部告警同时打开，检查顺序与逐行不重叠。
 
 ### 任务目标（`U(92)` / `U(110)`）
 
@@ -455,7 +457,7 @@ drawCompass → drawPitchLadder → drawBoresight → drawTapes
 → drawRadar → drawThreatRing → drawTargets → drawLaserStatus
 → drawLeadReticle（在目标框之上，免得被挡住）
 → drawIncomingMissiles → drawStores → drawWeaponPanel
-→ drawTargetBearing → drawThreatAlert → drawWarnings → drawObjective
+→ drawTargetBearing → drawAlerts → drawObjective
 ```
 
 `draw()` 开头会 `ctx.save()`、设 `globalAlpha = hudOpacity / 100`（夹 0.15–1），
@@ -597,5 +599,5 @@ ctx.strokeText(t, x, y);
 | 屏外标记的安全矩形 | `offscreenRect()`（让开区）与 `edgePoint()`（落点） |
 | 调节单元上 HUD 的距离（10 km） | `CELL_HUD_RANGE2` / `farCell()` |
 | 俯仰刻度范围 | `drawPitchLadder()` 里的 `LIM = 40` |
-| 告警阈值 | `drawWarnings()` |
+| 告警阈值与优先级 | `drawAlerts()` / `ALERT_ORDER` |
 | 颜色 | `hud.js` 顶部 `GREEN / AMBER / CY / RED / DIM` |

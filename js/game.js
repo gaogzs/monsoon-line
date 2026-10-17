@@ -1634,26 +1634,70 @@ var Game = (function () {
        否则带对空弹时按 F 永远转不到海面目标 —— 而机炮打浮台、
        或者临时切弹打地面，本来都是正常用法。
        排前面的那类先循环，符合"我现在拿着什么弹"的直觉。 */
-    var cands = wantAir ? air.concat(surf) : surf.concat(air);
-    if (!cands.length) return;
+    if (!air.length && !surf.length) return;
 
-    var cur = player.target, at = -1;
-    for (i = 0; i < cands.length; i++) if (cands[i] === cur) at = i;
-    var next = cands[(at + 1) % cands.length];
-
-    // 没有当前目标时，选这一类里最近的
-    if (at < 0) {
-      var best = null, bd = 1e12;
-      for (i = 0; i < cands.length; i++) {
-        var d = M3.dist2(cands[i].pos, player.pos);
-        if (d < bd) { bd = d; best = cands[i]; }
+    /* 连按：1.5 s 内再按，沿上一次排好的顺序往下走（第二近、第三近……），
+       这样一堆目标挤在准星附近时也挑得出来。排序冻结在第一次按下的那一刻，
+       不然目标一动，"下一个"就会跳回刚才那个。 */
+    var cur = player.target, at;
+    if (tgtCycle.world === world && world.time - tgtCycle.t < TARGET_REPEAT_T) {
+      var live = tgtCycle.list.filter(function (t) { return t.alive; });
+      at = live.indexOf(cur);
+      if (live.length) {
+        player.target = live[(at + 1) % live.length];
+        tgtCycle.list = live;
+        tgtCycle.t = world.time;
+        player.lockProgress = 0;
+        SFX.lockTone(false);
+        return;
       }
-      next = best;
     }
+
+    var order = rankTargets(wantAir ? air : surf, wantAir ? surf : air);
+    // 最近的那个就是当前目标时，直接给第二个 —— 不然按 F 没有任何反应
+    var next = (order[0] === cur && order.length > 1) ? order[1] : order[0];
+    tgtCycle = { world: world, list: order, t: world.time };
 
     player.target = next;
     player.lockProgress = 0;
     SFX.lockTone(false);
+  }
+
+  /* F 键的排序：**屏幕内**的按离瞄准点的屏幕距离（鼠标引导 = CMD 瞄准环，
+     键盘直控 = 鼠标光标），**屏幕外**的按离本机的距离。
+     先屏幕内、后屏幕外；同一档里当前武器能打的那一类（prim）排前面。 */
+  var TARGET_REPEAT_T = 1.5;
+  var tgtCycle = { world: null, list: [], t: -99 };
+
+  function rankTargets(prim, sec) {
+    var cam = Renderer.getCam();
+    var ref = aimRef(cam);
+    function split(list) {
+      var on = [], off = [];
+      for (var i = 0; i < list.length; i++) {
+        var t = list[i];
+        var s = cam ? M3.project(cam, t.pos) : null;
+        if (s && s.x >= 0 && s.x <= Renderer.W && s.y >= 0 && s.y <= Renderer.H) {
+          on.push({ t: t, k: (s.x - ref.x) * (s.x - ref.x) + (s.y - ref.y) * (s.y - ref.y) });
+        } else {
+          off.push({ t: t, k: M3.dist2(t.pos, player.pos) });
+        }
+      }
+      var byK = function (a, b) { return a.k - b.k; };
+      return { on: on.sort(byK), off: off.sort(byK) };
+    }
+    var p = split(prim), s = split(sec);
+    return p.on.concat(s.on, p.off, s.off).map(function (e) { return e.t; });
+  }
+
+  /** 瞄准参考点（屏幕坐标） */
+  function aimRef(cam) {
+    if (aimMode && player.aimDir) {
+      var s = cam ? M3.project(cam, M3.add(player.pos, M3.mul(player.aimDir, 1400))) : null;
+      return { x: s ? s.x : Renderer.W / 2, y: s ? s.y : Renderer.H / 2 };
+    }
+    // 键盘直控：指针没锁，屏幕上有光标 —— 就用它
+    return { x: mouse.x, y: mouse.y };
   }
 
   function cycleSpecial() {
@@ -3004,17 +3048,7 @@ var Game = (function () {
     for (i = 0; i < hits.length; i++) {
       HUD.hitMark(ctx, Renderer.W, Renderer.H, hits[i].txt, hits[i].t / 1.1, hits[i].col);
     }
-    if (world.detected && player.alive) {
-      var bl = Math.sin(performance.now() * 0.01) > 0;
-      if (bl) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(255,77,77,0.9)';
-        ctx.font = 'bold 12px Consolas,monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('▲ 被对空雷达截获', Renderer.W / 2, 78);
-        ctx.restore();
-      }
-    }
+    // "被对空雷达截获"进了 HUD 的告警栈（hud.js drawAlerts），和失速、导弹逼近一起排
 
     // ---- 鼠标引导的瞄准环 ----
     if (aimMode && player.alive && S.camMode !== 2) {

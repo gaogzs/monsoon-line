@@ -3824,6 +3824,82 @@ if (Ent && M3 && me && world) {
     }
   }
 
+  /* ---- 屏幕中上方的告警：一个栈、按优先级排、永不重叠 ----
+
+     以前导弹逼近 / 雷达照射和失速 / 低高度各算各的 y，同时出现就叠在一起。 */
+  {
+    const H = sandbox.HUD, M3d = sandbox.M3;
+    const bad = [];
+    const p = {
+      pos: M3d.V(0, 19000, 0), fwd: M3d.V(0, -0.2, 1), team: 0,
+      stall: true, q: 5, suppressed: 1, gunAmmo: 0, spAmmo: 0, emcon: true
+    };
+    const world = {
+      missiles: [{ alive: true, target: p, team: 1, pos: M3d.V(0, 19000, 1500) }],
+      actors: [], detected: true
+    };
+    const list = H.drawAlerts(ctx2d(), 1280, 720, p, world);
+    const ids = list.map(a => a.id);
+    const want = H.ALERT_ORDER.filter(id => ids.indexOf(id) >= 0);
+    if (ids.join() !== want.join()) bad.push('告警顺序不对：' + ids.join(' > '));
+    if (ids[0] !== 'missile') bad.push('导弹逼近没有排在最上面');
+    if (!(ids.indexOf('stall') < ids.indexOf('lowq'))) bad.push('失速没有排在动压前面');
+    for (let i = 1; i < list.length; i++) {
+      const prev = list[i - 1];
+      const minGap = prev.h + (prev.sub ? prev.subH : 0) - 0.01;
+      if (list[i].y - prev.y < minGap) bad.push(prev.id + ' 与 ' + list[i].id + ' 重叠');
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('告警栈：' + ids.join(' > ') + '，逐行下排不重叠');
+  }
+
+  /* ---- F 键选目标：屏幕内按离瞄准环最近，屏幕外按距离，连按往下走 ----
+
+     以前 F 只是在生成顺序里一个个切，和准星在哪毫无关系。 */
+  {
+    const G = sandbox.G || sandbox.Game, M3d = sandbox.M3, R = sandbox.Renderer;
+    const bad = [];
+    G.startMission(0);
+    const w = G.__world(), pl = G.__player();
+    pump(5);
+    const kd = docListeners['keydown'] || [];
+    const pressF = () => kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} }));
+    const foes = w.actors.filter(a => a.alive && a.team === 1);
+    const dir = pl.aimDir || pl.fwd;
+    const right = M3d.norm(M3d.cross(M3d.V(0, 1, 0), dir));
+    // 在瞄准方向上偏一个角度、距离 d 的点
+    const at = (deg, d) => {
+      const r = deg * Math.PI / 180;
+      return M3d.add(pl.pos, M3d.mul(M3d.add(M3d.mul(dir, Math.cos(r)), M3d.mul(right, Math.sin(r))), d));
+    };
+    if (foes.length < 3 || !R.getCam()) bad.push('关卡 0 敌机不足或没有镜头，无法测试');
+    else {
+      const [near, far, other] = foes;
+      const place = (posMap) => {
+        foes.forEach(f => { f.pos = M3d.add(pl.pos, M3d.mul(dir, -6000)); });   // 其余全扔到身后
+        posMap.forEach(([a, p]) => { a.pos = p; });
+      };
+      // 屏幕内：near 偏 3°、far 偏 12°（都在 4 km 外，画面里）
+      pl.target = null;
+      place([[near, at(3, 4000)], [far, at(12, 4000)]]);
+      pressF();
+      if (pl.target !== near) bad.push('屏幕内有两个目标时没有锁离瞄准环近的那个');
+      // 连按：下一个是 far
+      place([[near, at(3, 4000)], [far, at(12, 4000)]]);
+      pressF();
+      if (pl.target !== far) bad.push('连按 F 没有换到第二近的目标');
+      // 屏幕外：other 偏 70°、6 km；far 偏 150°、2 km —— 近的是 far，哪怕夹角更大
+      w.time += 5;                     // 让连按窗口过期
+      pl.target = null;
+      place([[other, at(70, 6000)], [far, at(150, 2000)]]);
+      near.pos = at(179, 9000);
+      pressF();
+      if (pl.target !== far) bad.push('屏幕内没有目标时没有锁最近的屏幕外目标');
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('F 键选目标：屏幕内锁离瞄准环最近的、连按换第二近、屏幕内为空时锁最近的');
+  }
+
   /* ---- 调节单元：每一关头顶都有，不锁任何武器，误击只记一次 ----
 
      v1.9 之前单元只在第 3 关出现。现在阵列由 spawnCellField 统一生成；

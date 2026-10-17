@@ -169,7 +169,7 @@ pushModel 目标物（MODELS[t.model]；30 km 外的调节单元跳过）→ 飞
 drawTracers()                     ← game.js 自己的曳光，加色混合，画在模型之上
 Renderer.drawParticles(world.particles);  Renderer.end()
 HUD.draw(world, player, 0, S)     ← 在 end() 之后，所以不跟着抖；dt 传的是 0（渲染不推进 HUD 的计时）
-banner / hitMark / “被对空雷达截获”闪烁 / 鼠标引导的 CMD 瞄准环
+banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”已移进 HUD 告警栈）
 ```
 
 调节单元每关 9–54 个、大多在远处，`render()` 用 `CELL_DRAW_RANGE2`（30 km 的平方）把远的直接跳过 —— 雾里一个点，画了也看不见。HUD 那边另有一道 10 km 的 `farCell()`（见 [hud.md](hud.md)）。
@@ -357,7 +357,17 @@ Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);
 ---
 ## 目标、锁定与武器
 ### `cycleTarget()`（`F` / `Tab`）
-候选分成两组：`air`（`alive && team !== player.team` 的 `world.actors`）与 `surf`（`alive && team === 1` 的 `world.targets`）—— 中立的调节单元**不进锁定循环**。当前弹 `WEAPONS[player.special].target === 'air'` 时 `air.concat(surf)`，否则 `surf.concat(air)`：**两类都要能锁到，只是顺序不同**，否则带对空弹时按 `F` 永远转不到海面目标。没有当前目标时选这一类里 `M3.dist2` 最近的。切换后 `lockProgress = 0`、`SFX.lockTone(false)`。
+候选分成两组：`air`（`alive && team !== player.team` 的 `world.actors`）与 `surf`（`alive && team === 1` 的 `world.targets`）—— 中立的调节单元**不进锁定循环**。当前弹 `WEAPONS[player.special].target === 'air'` 时 air 是主类，否则 surf 是主类：**两类都要能锁到，只是顺序不同**。
+
+排序在 `rankTargets(prim, sec)`：
+
+- **屏幕内**（`M3.project` 落在画面里）按离瞄准点的屏幕距离排。瞄准点由 `aimRef()` 给：鼠标引导 = CMD 瞄准环的投影，键盘直控 = 鼠标光标 `mouse.x/y`。
+- **屏幕外**按离本机的距离排。
+- 总顺序：屏幕内主类 → 屏幕内另一类 → 屏幕外主类 → 屏幕外另一类。
+
+按 `F` 取第一个；第一个就是当前目标时取第二个（不然按了没反应）。
+**连按**：`TARGET_REPEAT_T`（1.5 s）内再按，沿上一次冻结的顺序（`tgtCycle`）往下走 —— 第二近、第三近……排序冻结是为了目标一动不会跳回刚才那个。
+切换后 `lockProgress = 0`、`SFX.lockTone(false)`。
 
 ### `updateLock(dt)`
 对空与对面是**两套判据**：

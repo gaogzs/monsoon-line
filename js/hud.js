@@ -99,8 +99,7 @@ var HUD = (function () {
     drawStores(ctx, W, H, p);
     drawWeaponPanel(ctx, W, H, p);
     drawTargetBearing(ctx, W, H, p, p.target);
-    drawThreatAlert(ctx, W, H, p, world);
-    drawWarnings(ctx, W, H, p, world);
+    drawAlerts(ctx, W, H, p, world);
     drawObjective(ctx, W, H, world);
 
     ctx.restore();
@@ -704,18 +703,15 @@ var HUD = (function () {
   }
 
   /* ============================================================
-     威胁告警（屏幕中上方）
+     威胁告警的数据（导弹逼近 / 雷达照射）
 
      RWR 环上那两个小字，在真正忙起来的时候根本看不见 ——
      而"有东西正朝你来"是这个游戏里最不能错过的一条信息。
-     所以单独放大一份放在屏幕中上方；环上仍然保留方位点，
+     所以单独放大一份进屏幕中上方的告警栈（drawAlerts）；环上仍然保留方位点，
      两者是互补的：一个告诉你"有威胁"，一个告诉你"威胁在哪个方向"。
      ============================================================ */
-  function drawThreatAlert(ctx, W, H, p, world) {
-    if (!world) return;
-
+  function threatState(p, world) {
     var inb = 0, minD = 1e9, lit = false;
-
     for (var i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
       if (!m.alive) continue;
@@ -730,22 +726,7 @@ var HUD = (function () {
       var e = world.actors[i];
       if (e.alive && e.team !== p.team && e.target === p) { lit = true; break; }
     }
-    if (!inb && !lit) return;
-
-    var bl = Math.sin(performance.now() * 0.018) > -0.35;
-    /* 让开顶部的任务目标块（目标行 U(92)、副行 U(110)、时限 U(128)）：
-       以前写死 H*0.14，正好压在那几行上。 */
-    var y = Math.max(H * 0.22, U(128) + U(48));
-    var big = 'bold ' + (30 * HUDK).toFixed(0) + 'px Consolas,monospace';
-
-    if (inb) {
-      // 导弹最优先：红色、闪烁、带距离
-      if (bl) text(ctx, '▲ 导弹逼近', W / 2, y, RED, big, 'center');
-      text(ctx, minD < 1000 ? Math.round(minD) + ' M' : (minD / 1000).toFixed(1) + ' KM',
-        W / 2, y + U(28), RED, FB, 'center');
-    } else {
-      text(ctx, '▲ 雷达照射', W / 2, y, AMBER, big, 'center');
-    }
+    return { inb: inb, minD: minD, lit: lit };
   }
 
   function drawThreatRing(ctx, W, H, p, world) {
@@ -1388,41 +1369,69 @@ var HUD = (function () {
   }
 
   /* ============================================================
-     告警
+     告警栈（屏幕中上方）
+
+     所有出现在屏幕正中上方的告警都在这里排队：先收集、再按优先级
+     从上往下排。以前导弹 / 雷达照射一套 y、失速等另一套 y、"被对空雷达
+     截获"又在 game.js 里写死一个 y —— 同时出现就叠在一起。
+     现在只有这一个起点，一行占一格，**永远不会重叠**。
+
+     闪烁的告警在暗下去的半拍里**照样占着位置**：不然下面几行会跟着
+     一上一下地跳。
+
+     新增告警：往 ALERT_ORDER 里插一个 id、在下面 push 一条，别另起 y。
      ============================================================ */
-  function drawWarnings(ctx, W, H, p, world) {
-    // 让开屏幕上方的威胁告警（那一条占据了 H*0.14 附近）
-    var y = H * 0.14 + U(80);
-    var bl = Math.sin(performance.now() * 0.014) > 0;
+  /* 优先级（上 → 下）：雷达 / 导弹 > 低高度 > 失速 > 动压 > 其它状态。
+     低高度排在失速前面：它意味着下一秒就是海面。 */
+  var ALERT_ORDER = ['missile', 'lit', 'detected', 'terrain', 'stall', 'lowq', 'jammed', 'winchester', 'emcon'];
+
+  var alertsBottom = 0;      // 告警栈最后一行的下沿 —— 任务横幅从它下面开始
+
+  function drawAlerts(ctx, W, H, p, world) {
+    var now = performance.now();
+    var bl = Math.sin(now * 0.014) > 0;
+    var blFast = Math.sin(now * 0.018) > -0.35;
+    var BIG = 'bold ' + (30 * HUDK).toFixed(0) + 'px Consolas,monospace';
     var F1 = 'bold ' + (24 * HUDK).toFixed(0) + 'px Consolas,monospace';
     var F2 = 'bold ' + (21 * HUDK).toFixed(0) + 'px Consolas,monospace';
+    var list = [];
 
-    if (p.stall && bl) {
-      text(ctx, 'STALL  失速', W / 2, y, RED, F1, 'center');
-      y += U(30);
+    var th = world ? threatState(p, world) : { inb: 0, lit: false };
+    if (th.inb) {
+      var dTxt = th.minD < 1000 ? Math.round(th.minD) + ' M' : (th.minD / 1000).toFixed(1) + ' KM';
+      list.push({ id: 'missile', txt: '▲ 导弹逼近', col: RED, font: BIG, on: blFast, h: U(34),
+        sub: dTxt, subH: U(26) });
+    } else if (th.lit) {
+      // 导弹已经在路上时不再单独报"被照射" —— 那是同一件事的前半段
+      list.push({ id: 'lit', txt: '▲ 雷达照射', col: AMBER, font: BIG, on: true, h: U(34) });
     }
-    if (p.pos.y < 200 && p.fwd.y < 0 && bl) {
-      text(ctx, 'TERRAIN  低高度告警', W / 2, y, RED, F1, 'center');
-      y += U(30);
-    }
-    if (p.pos.y > 18000 && p.q < 12 && bl) {
-      text(ctx, 'LOW Q  动压不足', W / 2, y, AMBER, F2, 'center');
-      y += U(30);
-    }
-    if (p.gunAmmo <= 0 && p.spAmmo <= 0 && bl) {
-      text(ctx, 'WINCHESTER  弹药耗尽', W / 2, y, AMBER, F2, 'center');
-      y += U(30);
-    }
+    if (p.pos.y < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: 'TERRAIN  低高度告警', col: RED, font: F1, on: bl, h: U(30) });
+    if (p.stall) list.push({ id: 'stall', txt: 'STALL  失速', col: RED, font: F1, on: bl, h: U(30) });
+    if (world && world.detected) list.push({ id: 'detected', txt: '▲ 被对空雷达截获', col: RED, font: F2, on: Math.sin(now * 0.01) > 0, h: U(28) });
+    if (p.pos.y > 18000 && p.q < 12) list.push({ id: 'lowq', txt: 'LOW Q  动压不足', col: AMBER, font: F2, on: bl, h: U(30) });
     /* 电子战的两个状态：受扰与静默。
        它们都是"你看不见别人 / 别人看不见你"的状态，必须一眼可辨 ——
        否则玩家只会觉得"雷达今天有点难用"。 */
-    if (((p.suppressed || 0) > 0.05 || (p.ewPower || 0) > 0) && bl) {
-      text(ctx, 'JAMMED  雷达受扰', W / 2, y, AMBER, F2, 'center');
-      y += U(30);
+    if ((p.suppressed || 0) > 0.05 || (p.ewPower || 0) > 0) list.push({ id: 'jammed', txt: 'JAMMED  雷达受扰', col: AMBER, font: F2, on: bl, h: U(30) });
+    if (p.gunAmmo <= 0 && p.spAmmo <= 0) list.push({ id: 'winchester', txt: 'WINCHESTER  弹药耗尽', col: AMBER, font: F2, on: bl, h: U(30) });
+    if (p.emcon) list.push({ id: 'emcon', txt: 'EMCON-Δ  电磁静默', col: CY, font: F2, on: true, h: U(30) });
+
+    list.sort(function (a, b) { return ALERT_ORDER.indexOf(a.id) - ALERT_ORDER.indexOf(b.id); });
+
+    /* 起点让开顶部的任务目标块（目标行 U(92)、副行 U(110)、时限 U(128)）。 */
+    var y = Math.max(H * 0.22, U(128) + U(48));
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      a.y = y;
+      if (a.on) text(ctx, a.txt, W / 2, y, a.col, a.font, 'center');
+      y += a.h;
+      if (a.sub) {
+        text(ctx, a.sub, W / 2, y - U(6), a.col, FB, 'center');
+        y += a.subH;
+      }
     }
-    if (p.emcon) {
-      text(ctx, 'EMCON-Δ  电磁静默', W / 2, y, CY, F2, 'center');
-    }
+    alertsBottom = list.length ? y : 0;
+    return list;
   }
 
   /* ============================================================
@@ -1702,16 +1711,18 @@ var HUD = (function () {
      击杀提示 / 任务横幅
      ============================================================ */
   function banner(ctx, W, H, title, sub, alpha, col) {
+    // 告警栈排得长时，横幅往下让，不压在告警上
+    var top = Math.max(H * 0.36, alertsBottom ? alertsBottom + U(4) : 0);
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = 'rgba(4,10,14,0.55)';
-    ctx.fillRect(0, H * 0.36, W, 88);
+    ctx.fillRect(0, top, W, 88);
     ctx.fillStyle = col || AMBER;
-    ctx.fillRect(0, H * 0.36, W, 2);
-    ctx.fillRect(0, H * 0.36 + 86, W, 2);
-    text(ctx, title, W / 2, H * 0.36 + 44, col || AMBER,
+    ctx.fillRect(0, top, W, 2);
+    ctx.fillRect(0, top + 86, W, 2);
+    text(ctx, title, W / 2, top + 44, col || AMBER,
       'bold 34px Consolas,monospace', 'center');
-    if (sub) text(ctx, sub, W / 2, H * 0.36 + 70, '#b9c8d4',
+    if (sub) text(ctx, sub, W / 2, top + 70, '#b9c8d4',
       '14px Consolas,monospace', 'center');
     ctx.restore();
   }
@@ -1727,7 +1738,7 @@ var HUD = (function () {
   return {
     draw: draw, banner: banner, hitMark: hitMark,
     computeNEZ: computeNEZ, computeEnvelope: computeEnvelope, radarXY: radarXY,
-    offscreenRect: offscreenRect,
+    offscreenRect: offscreenRect, drawAlerts: drawAlerts, ALERT_ORDER: ALERT_ORDER,
     GREEN: GREEN, AMBER: AMBER, CY: CY, RED: RED
   };
 })();
