@@ -810,10 +810,10 @@ var HUD = (function () {
     if (msIn) {
       var bl = Math.sin(performance.now() * 0.016) > 0;
       if (bl) {
-        text(ctx, '▲ 导弹逼近', cx, cy - R - 12, RED, 'bold 13px Consolas,monospace', 'center');
+        text(ctx, '▲ MISSILE 导弹逼近', cx, cy - R - 12, RED, 'bold 13px Consolas,monospace', 'center');
       }
     } else if (any) {
-      text(ctx, '▲ 被照射', cx, cy - R - 12, AMBER, FS, 'center');
+      text(ctx, '▲ SPIKE 被照射', cx, cy - R - 12, AMBER, FS, 'center');
     }
   }
 
@@ -1429,21 +1429,21 @@ var HUD = (function () {
     var th = world ? threatState(p, world) : { inb: 0, lit: false };
     if (th.inb) {
       var dTxt = th.minD < 1000 ? Math.round(th.minD) + ' M' : (th.minD / 1000).toFixed(1) + ' KM';
-      list.push({ id: 'missile', txt: '▲ 导弹逼近', col: RED, font: BIG, on: blFast, h: U(34),
+      list.push({ id: 'missile', txt: '▲ MISSILE  导弹逼近', col: RED, font: BIG, on: blFast, h: U(34),
         sub: dTxt, subH: U(26) });
     } else if (th.lit) {
       // 导弹已经在路上时不再单独报"被照射" —— 那是同一件事的前半段
-      list.push({ id: 'lit', txt: '▲ 雷达照射', col: AMBER, font: BIG, on: true, h: U(34) });
+      list.push({ id: 'lit', txt: '▲ SPIKE  雷达照射', col: AMBER, font: BIG, on: true, h: U(34) });
     }
     if (p.pos.y < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: 'TERRAIN  低高度告警', col: RED, font: F1, on: bl, h: U(30) });
     if (p.stall) list.push({ id: 'stall', txt: 'STALL  失速', col: RED, font: F1, on: bl, h: U(30) });
-    if (world && world.detected) list.push({ id: 'detected', txt: '▲ 被对空雷达截获', col: RED, font: F2, on: Math.sin(now * 0.01) > 0, h: U(28) });
+    if (world && world.detected) list.push({ id: 'detected', txt: '▲ DETECTED  被对空雷达截获', col: RED, font: F2, on: Math.sin(now * 0.01) > 0, h: U(28) });
     if (p.pos.y > 18000 && p.q < 12) list.push({ id: 'lowq', txt: 'LOW Q  动压不足', col: AMBER, font: F2, on: bl, h: U(30) });
     /* 电子战的两个状态：受扰与静默。
        它们都是"你看不见别人 / 别人看不见你"的状态，必须一眼可辨 ——
        否则玩家只会觉得"雷达今天有点难用"。 */
     /* 受扰是常态告警：不闪、颜色压暗 —— 一直挂着提醒你"现在看到的不全"，但不抢眼。 */
-    if ((p.suppressed || 0) > 0.05 || (p.ewPower || 0) > 0) list.push({ id: 'jammed', txt: 'JAMMED  雷达受扰', col: 'rgba(255,176,58,0.62)', font: F2, on: true, h: U(30) });
+    if ((p.suppressed || 0) > 0.05 || (p.ewPower || 0) > 0) list.push({ id: 'jammed', txt: 'JAMMED  电磁干扰', col: 'rgba(255,176,58,0.62)', font: F2, on: true, h: U(30) });
     /* 受损：最后一次掉血后挂 HudFx.FX.alertHold 秒，快闪 */
     if (typeof HudFx !== 'undefined' && HudFx.alertOn()) list.push({ id: 'damage', txt: 'DAMAGE  受损警告', col: RED, font: F1, on: blFast, h: U(30) });
     if (p.gunAmmo <= 0 && p.spAmmo <= 0) list.push({ id: 'winchester', txt: 'WINCHESTER  弹药耗尽', col: AMBER, font: F2, on: bl, h: U(30) });
