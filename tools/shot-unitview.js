@@ -77,8 +77,8 @@ ${tags}
 }
 
 const DEFAULTS = [
-  { kind: 'aircraft', id: 'c14' },      // 有俯视图的机型
-  { kind: 'aircraft', id: 'gal31' },    // 没有俯视图的机型
+  { kind: 'aircraft', id: 'sailfish' },      // 有俯视图的机型
+  { kind: 'aircraft', id: 'basalt' },    // 没有俯视图的机型
   { kind: 'ship', id: 'orca' },         // 舰船（无俯视图）
   { kind: 'ship', id: 'bluewhale' }         // 最重的一艘（386 面）
 ];

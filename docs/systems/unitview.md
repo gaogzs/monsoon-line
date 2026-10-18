@@ -156,14 +156,14 @@ for (i = 0; i < nv; i++) {
 | 标题 | `D-14 旗鱼` + 英文绰号小字 | 军舰 `虎鲸级`、其他船 `MV SOUTHERN CROSS 南十字`，+ 英文名小字 |
 | 副标题 | 阵营 · 定位 | 阵营 · 舰种 |
 | 3D 预览 | 全部 | 全部 |
-| 矢量俯视图 | **只有 7 型有数据**（6 架可驾驶 + `k8` 复用 `c14`） | 无 |
+| 矢量俯视图 | **只有 7 型有数据**（6 架可驾驶 + `tideline` 复用 `sailfish`） | 无 |
 | 设定 | `desc` | `desc` |
 | 参数表 | `phys` / `maxLoad` / `gun`（`gun: null` 的预警机、轰炸机显示「（无）」）/ `hardpointGroups` / `caps` / `ctrlFloor` … | `disp` / `dim` / `speed` / `crew` / `arms` / `vials` / `hp` / `radius` / `value` |
 
 ### 俯视图的分配规则
 
-`PLANFORM.planes` 里只有 6 个键（就是那 6 架可驾驶机型），但 `k8` 的
-`model` 是 `'c14'`，所以它也能取到数据 —— 共 7 型有俯视图。
+`PLANFORM.planes` 里只有 6 个键（就是那 6 架可驾驶机型），但 `tideline` 的
+`model` 是 `'sailfish'`，所以它也能取到数据 —— 共 7 型有俯视图。
 
 判断用 `u.rec.model`（不是 `id`）：
 
@@ -255,7 +255,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 | 模块 | 怎么用 |
 |---|---|
 | `game.js` | `buildCodex()` 生成并挂载（单位页调 `mount()`，带 `mount()` 的条目由条目自己挂）；`show()` 负责停；单位链接由 `bindCodexUnits()` 的事件委托接住；机库调 `mountModel()` + `composeLoadout()` |
-| `codex.js` | 三个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:c11">`（`ship:` / `weapon:` 同理）；`s4` 条目的 `mount()` 直接调 `mountModel()` |
+| `codex.js` | 三个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:frigatebird">`（`ship:` / `weapon:` 同理）；`s4` 条目的 `mount()` 直接调 `mountModel()` |
 | `css/style.css` | `.uv-*` 一族类 |
 | `tools/render-units.js` | 直接用 `renderModel()` 把 33 个单位各渲染一张 PNG |
 | `tools/shot-unitview.js` | 生成最小页面，交给无头 Chrome 截详情页的**布局** |
@@ -266,7 +266,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 `codex.js` 只输出标记，不绑定事件：
 
 ```html
-<span class="cx-unit" data-unit="aircraft:c11"> ... </span>
+<span class="cx-unit" data-unit="aircraft:frigatebird"> ... </span>
 ```
 
 `game.js` 在 `#codexBody` 上挂**一个** `onclick` 做事件委托，从 `ev.target`

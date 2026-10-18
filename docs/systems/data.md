@@ -76,9 +76,9 @@ var CALLSIGN = {
 
 ## AIRCRAFT 表
 
-数组，17 条。6 条可驾驶（`c11 c14 s6 c9 c21 c33`），11 条 NPC（带 `npcOnly: true`：`ucav m27 gal31 vac14 rok40 k8 spray a2 pelican quartz gal44`）。
+数组，17 条。6 条可驾驶（`frigatebird sailfish booby petrel skua albatross`），11 条 NPC（带 `npcOnly: true`：`folded_wing schist basalt sandstone boulder tideline spray datum pelican quartz lodestone`）。
 
-**`model` 不必等于 `id`**：NPC 机型借用现成几何——`k8` 用 `c14`，`a2` / `pelican` 用 `sower`，`quartz` / `gal44` 用 `rok40`。
+**`model` 不必等于 `id`**：NPC 机型借用现成几何——`tideline` 用 `sailfish`，`datum` / `pelican` 用 `sower`，`quartz` / `lodestone` 用 `boulder`。
 
 ### 字段清单
 
@@ -92,12 +92,12 @@ var CALLSIGN = {
 | `npcOnly` | bool | — | 缺省 = **可驾驶**，会出现在机库；`true` 则机库跳过、`preflight` 跳过其挂点检查 |
 | `caps` | string[] | — | `canCarry` 里回退成 `[]`，即"什么门槛都过不了" |
 | `ceiling` | number | — | `ai.js` 里回退成 `16000` 米 |
-| `ctrlFull` | number | — | `entities.js` `ctrlFactor` 回退成 `22000`（只有 `c9` 写 16500） |
-| `ctrlFloor` | number | — | 回退成 `0.13`（只有 `c14` 写 0.34） |
-| `variableSweep` | bool | — | 只有 `c11` 有；`entities.js` 据此做变后掠翼插值 |
+| `ctrlFull` | number | — | `entities.js` `ctrlFactor` 回退成 `22000`（只有 `petrel` 写 16500） |
+| `ctrlFloor` | number | — | 回退成 `0.13`（只有 `sailfish` 写 0.34） |
+| `variableSweep` | bool | — | 只有 `frigatebird` 有；`entities.js` 据此做变后掠翼插值 |
 | `stats` | 对象 | ✅ | 机库六维条；键见下，缺某个维度会算出 `NaN` 宽度 |
 | `phys` | 对象 | ✅ | **飞行模型的唯一来源**；`preflight` 只检查 `phys.vMax` |
-| `gun` | string \| `null` | ✅ | `WEAPONS` 的键，或 `null` 表示没有机炮（`rok40` `pelican` `quartz`）。`makeAircraft` 与 `ai.js` 开火段都已判空（v1.4.1 修过 `ai.js` 里 `WEAPONS[a.gun].range` 对 `null` 抛异常）；`preflight` 只在非空时检查键存在 |
+| `gun` | string \| `null` | ✅ | `WEAPONS` 的键，或 `null` 表示没有机炮（`boulder` `pelican` `quartz`）。`makeAircraft` 与 `ai.js` 开火段都已判空（v1.4.1 修过 `ai.js` 里 `WEAPONS[a.gun].range` 对 `null` 抛异常）；`preflight` 只在非空时检查键存在 |
 | `maxLoad` | number | ✅ | 挂载重量分母；`game.js` 里回退成 `5000` |
 | `hardpointGroups` | 数组 | ✅ | 缺了机库选装面板为空、`preflight` 报「没有定义挂载点组」 |
 | `defaultLoadout` | 对象 | ✅ | 缺了 `preflight` 不报，但 AI 取不到默认武器（见下） |
@@ -489,7 +489,7 @@ for (i = 0; i < AIRCRAFT.length; i++) if (AIRCRAFT[i].id === o.type) ac = AIRCRA
 if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 ```
 
-回退到 `AIRCRAFT[0]`（当前是 `c11` DB-11）意味着：**`type` 写错 = 敌机长得像、飞得像、名字也叫 DB-11**，不报错。ROK-27 曾经没有表条目，HUD 上一直把它标成"军舰鸟"，就是这么来的。加机型时务必确认 `type` 与 `id` 对得上。
+回退到 `AIRCRAFT[0]`（当前是 `frigatebird` DB-11）意味着：**`type` 写错 = 敌机长得像、飞得像、名字也叫 DB-11**，不报错。ROK-27 曾经没有表条目，HUD 上一直把它标成"军舰鸟"，就是这么来的。加机型时务必确认 `type` 与 `id` 对得上。
 
 其余默认值（都在 `makeAircraft` 里）：`o.x` / `o.z` = `0`，`o.y` = `3000`，`o.speed` = `300`，`o.throttle` = `0.72`，`o.team` = `0`，`o.flares` = `80`；`o.special` 未指定时取 `ac.defaultLoadout` 里**第一个真值**（对象键插入序，通常就是 `A`），该武器不存在则置 `null`。
 

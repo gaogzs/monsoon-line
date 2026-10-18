@@ -441,7 +441,7 @@ var WD_LIMIT = 1.5;
 1. **核心模块**：`M3 MODELS PLANFORM CODEX AIRCRAFT WEAPONS VOICES CALLSIGN SFX Renderer Ent AI HUD MISSIONS Radio` 逐个查 `typeof window[...]`，缺任何一个就**立即 `report()` 并返回**（后面没法查）。
 2. **每个机型**：`model` 在 `MODELS` 里、`gun` 在 `WEAPONS` 里、有 `hardpointGroups`、每组 `pts.length >= 2`（必须成对）、`phys.vMax` 存在；可驾驶机型还要 `PLANFORM.planes[model]` 存在，且每个挂载点组“在当前机体能力下至少有一种武器挂得上”。NPC 机型跳过最后一条 —— 下游弹的 `fits` 是空的。
 3. **默认配置**（`defaultLoadout`）：组存在、武器存在、`fits` 匹配该组 `kind`、`canCarry(ac, w)` 成立（后者会报出缺哪项机体能力）。
-4. **静态清单**：`needModels`（`c11 c14 s6 m27 ucav sower relay cell sam radar depot cmdpost station missile bomb`）与 `needWeapons`（`k3 k7 v11 v9 v17 v22 v25 v30 e4 l2 dl4 dl6 dl9`）逐项存在。
+4. **静态清单**：`needModels`（`frigatebird sailfish booby schist folded_wing sower relay cell sam radar depot cmdpost station missile bomb`）与 `needWeapons`（`k3 k7 v11 v9 v17 v22 v25 v30 e4 l2 dl4 dl6 dl9`）逐项存在。
 5. **每个任务**：`spawn / tick / win / lose` 是函数，且 `VOICES[m.id]` 存在。
 
 **失败时怎么报**：`report(problems)` 在 `document.body` 末尾插一个 `position:fixed; bottom:0; z-index:9999` 的暗红框（`max-height:36vh`、可滚动），标题是“开机自检发现 N 个问题（请把这一段发给开发者）：”，每条一行 `·`；同时 `console.error`。**不弹窗、不阻断游戏** —— 开发者工具没开的时候，这条红条就是唯一的报告渠道。见 [DESIGN.md §6.1](../DESIGN.md#61-为什么有开机自检)。

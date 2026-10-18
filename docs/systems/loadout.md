@@ -139,7 +139,7 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 | `vzu` SAV-6 | light, belly |
 | `dl9` BAD-9 | 不写 —— 地面发射，不上机 |
 
-适配表**不能不要**：`a2` / `pelican` / `quartz` / `gal44` 这些
+适配表**不能不要**：`datum` / `pelican` / `quartz` / `lodestone` 这些
 `npcOnly` 机型只有机腹挂点，而 `spawnEnemy` 的默认弹是空空弹，
 不查就会把格斗弹画到预警机的机腹上。两张表的取舍见
 [§ NPC 的挂载](#npc-的挂载)。
@@ -221,7 +221,7 @@ function canCarry(ac, w) {
 `getLoadout(ac)` 按需初始化，结构就是"组号 → 武器键"：
 
 ```js
-loadouts['c11'] = { A: 'srm', B: 'v11', C: 'oep' }
+loadouts['frigatebird'] = { A: 'srm', B: 'v11', C: 'oep' }
 ```
 
 默认值取自机型的 `defaultLoadout`，未指定的组是 `null`（空置）。

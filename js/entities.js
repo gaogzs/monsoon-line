@@ -93,7 +93,7 @@ var Ent = (function () {
      敌机机翼永远是干净的。所以 NPC 改读 npcFits；没写 npcFits 的
      武器（比如上游弹被任务直接塞给敌机）退回 fits。
 
-     注意适配表**不能不要**：`a2 / pelican / quartz / gal44` 这些
+     注意适配表**不能不要**：`datum / pelican / quartz / lodestone` 这些
      npcOnly 机型只有机腹挂点，而 spawnEnemy 的默认弹是空空弹，
      不查的话就会被画到机腹上去。 */
   function fitsKind(w, kind, playerStyle) {
@@ -1747,7 +1747,7 @@ var Ent = (function () {
   /* 模型上画了炮管的机型，按炮管口的机体坐标 [|x|, y, z] 出膛。
      G-6 的 CEL-7 两根炮管在机头下方 (±0.28, -0.78, 10.2)，
      以前统一用"机头前 6 m、左右 0.7 m"，火光和弹道都落在机身里面。 */
-  var GUN_MUZZLE = { s6: [0.28, -0.78, 10.2] };
+  var GUN_MUZZLE = { booby: [0.28, -0.78, 10.2] };
   function gunMuzzle(a, side) {
     var g = GUN_MUZZLE[a.model];
     if (g) {

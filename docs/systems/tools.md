@@ -547,16 +547,16 @@ node tools/render-mounts.js
 
 | 图 | 验证什么 |
 |---|---|
-| `mount-m27-dl6` | 制式弹按挂点逐点画出（4 件） |
-| `mount-m27-dl6-dry` | 弹药池清零后机翼真的变干净 |
-| `mount-gal31-dl4-vzu` | 任务写定的吊舱与制式弹共存（吊舱占外侧、导弹占重挂点） |
-| `mount-m27-dl6-vzu` | 同上，另一型 |
+| `mount-schist-dl6` | 制式弹按挂点逐点画出（4 件） |
+| `mount-schist-dl6-dry` | 弹药池清零后机翼真的变干净 |
+| `mount-basalt-dl4-vzu` | 任务写定的吊舱与制式弹共存（吊舱占外侧、导弹占重挂点） |
+| `mount-schist-dl6-vzu` | 同上，另一型 |
 | `mount-spray-vbn-vzu` | 吊舱进机腹、制式弹不被挤掉（正序占位会在这里翻车） |
-| `mount-vac14-vbn` | 储备 2 发 < 挂点 4 个时，多出来的挂点出厂就是空的 |
-| `mount-gal44-vsc` | 只有机腹挂点的干扰机把吊舱挂在机腹 |
+| `mount-sandstone-vbn` | 储备 2 发 < 挂点 4 个时，多出来的挂点出厂就是空的 |
+| `mount-lodestone-vsc` | 只有机腹挂点的干扰机把吊舱挂在机腹 |
 | `mount-pelican-dl6` | 适配表拦住"预警机挂格斗弹"（一件都不该有） |
-| `mount-ucav-v9` | 僚机 |
-| `mount-gal44-vsc-belly` · `mount-spray-vbn-vzu-belly` · `mount-m27-dl6-belly` | 同一批配置从**下**往上看（机腹挂载只有这个角度看得见） |
+| `mount-folded_wing-v9` | 僚机 |
+| `mount-lodestone-vsc-belly` · `mount-spray-vbn-vzu-belly` · `mount-schist-dl6-belly` | 同一批配置从**下**往上看（机腹挂载只有这个角度看得见） |
 
 ### 实现要点与限制
 

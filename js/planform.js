@@ -23,7 +23,7 @@ var PLANFORM = (function () {
   var P = {};
 
   /* ---------------- DB-11 军舰鸟 · 变后掠翼多用途 ---------------- */
-  P.c11 = {
+  P.frigatebird = {
     span: 17.6,
     len: 20.4,
     outline: [
@@ -74,7 +74,7 @@ var PLANFORM = (function () {
   };
 
   /* ---------------- D-14 旗鱼 · 平流层制空 ---------------- */
-  P.c14 = {
+  P.sailfish = {
     span: 13.8,
     len: 22.9,
     outline: [
@@ -117,7 +117,7 @@ var PLANFORM = (function () {
   };
 
   /* ---------------- G-6 鲣鸟 · 近距支援 ---------------- */
-  P.s6 = {
+  P.booby = {
     span: 17.2,
     len: 19.4,
     outline: [
@@ -162,7 +162,7 @@ var PLANFORM = (function () {
   };
 
   /* ---------------- F-9 海燕 · 高空高速截击机 ---------------- */
-  P.c9 = {
+  P.petrel = {
     span: 13.2,
     len: 22.9,
     outline: [
@@ -204,7 +204,7 @@ var PLANFORM = (function () {
   };
 
   /* ---------------- D-21 贼鸥 · 无尾菱形翼隐形机 ---------------- */
-  P.c21 = {
+  P.skua = {
     span: 13.8,
     len: 21.4,
     outline: [
@@ -248,7 +248,7 @@ var PLANFORM = (function () {
   };
 
   /* ---------------- D-33 信天翁 · 前掠翼高机动格斗机 ---------------- */
-  P.c33 = {
+  P.albatross = {
     span: 16.4,
     len: 19.6,
     outline: [

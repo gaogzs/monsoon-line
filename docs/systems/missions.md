@@ -34,7 +34,7 @@
 | 函数 | 签名 | 语义 |
 |---|---|---|
 | `spawnEnemy` | `spawnEnemy(w, o) → a` | 造一架敌机并推入 `w.actors`。`o` 字段见下表 |
-| `spawnWingman` | `spawnWingman(w, idx, slotX, slotY, slotZ) → a` | 造僚机（机型写死 `ucav`，队形相对长机），登记 `w.wings[idx]` |
+| `spawnWingman` | `spawnWingman(w, idx, slotX, slotY, slotZ) → a` | 造僚机（机型写死 `folded_wing`，队形相对长机），登记 `w.wings[idx]` |
 | `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets` |
 | `spawnCellField` | `spawnCellField(w, {xs, zs}) → [{x,y,z}]` | **调节单元阵列**：`xs × zs` 每个点一个 3×3 编组，推进 `w.targets` 与 `w.cells`，返回各组中心。见下文「调节单元阵列」 |
 | `spawnShip` | `spawnShip(w, o) → t` | **水面舰船**：按 `o.model` 查 `SHIPS` 表取 `hp/radius/value/label`（查不到回退 `SHIPS[0]`），直接调 `Ent.makeTarget` 并推入 `w.targets`；`team` 缺省 1、`fireCd` 缺省 `rnd(3,8)`；`o` 可覆盖 `hp/radius/value/label/team/drift/route/weapon/fireCd` |
@@ -55,7 +55,7 @@
 > （`spawnShip` 不替你换算，需要按表取值时自己 ×0.514）。现有关卡多用
 > `loop: true` 的两点往返巡航（8–20 m/s），m9 的登陆舰用 `loop: false` 一路往北开。实现见 [entities.md](entities.md#35-目标物-tkind-target)。
 
-`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'m27'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（**只在没写时**缺省 `'dl6'`；显式 `null` = 不带弹，预警机 / 轰炸机 / 运输用的 GAL-31 都这么传）/ **`loadout`**（逐组挂载，见下一节）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
+`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'schist'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（**只在没写时**缺省 `'dl6'`；显式 `null` = 不带弹，预警机 / 轰炸机 / 运输用的 GAL-31 都这么传）/ **`loadout`**（逐组挂载，见下一节）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
 
 `special` 与 `pods` 都**同时管机制和外观**：
 
@@ -71,7 +71,7 @@
 
 弹种能挂到哪类挂点由 `data.js` 的 `npcFits` 决定（**不是** `fits` —— 那是玩家机库的表）。
 所以给敌机指定弹种时，要确认目标机型有对应的挂点类型：
-`pelican` / `quartz` / `a2` / `gal44` 只有机腹挂点，写 `special: 'dl6'`（格斗弹）
+`pelican` / `quartz` / `datum` / `lodestone` 只有机腹挂点，写 `special: 'dl6'`（格斗弹）
 不会画出来（也不会报错 —— 它照旧能发射）。不想让它带弹就**显式写 `special: null`**
 （`spawnAewc` 就是这么传的）；省略不写会拿到缺省的 `'dl6'`。
 
@@ -99,7 +99,7 @@
 ```js
 // 一架用**上游武器**的 NPC 敌机（"上游 NPC"说的是它读哪张武器表，不是阵营）
 spawnEnemy(w, {
-  ac: 'c11', team: 1, x: 0, y: 8000, z: 6000,
+  ac: 'frigatebird', team: 1, x: 0, y: 8000, z: 6000,
   loadout: { A: 'srm', B: 'vgt' },   // A 翼尖 / B 重挂 —— 都是挂得上的组合
   special: 'srm',                    // 当前触发的那件的默认值
   skill: 0.7
@@ -155,7 +155,7 @@ spawnEnemy(w, {
 
 | 关卡 | 敌方飞机（team 1） | 其他 |
 |---|---|---|
-| m1 | ROK-27 测绘机 ×5（`dl6`）· VAC-14 护航 ×2（`vbn`）· ROK-27 ×2（`dl6` + `pods: ['vzu']`） | 我方鹈鹕预警机；群岛国 k8（team 2） |
+| m1 | ROK-27 测绘机 ×5（`dl6`）· VAC-14 护航 ×2（`vbn`）· ROK-27 ×2（`dl6` + `pods: ['vzu']`） | 我方鹈鹕预警机；群岛国 tideline（team 2） |
 | m2 | ROK-40 轰炸机 ×2（`special: null`，`onArrive` 结算）· 伏击 GAL-31 / ROK-27 · 石英预警机 | 防空浮台 `dl9`；巡逻舰；我方驱逐舰虎鲸带 `ss6` |
 | m3 | GAL-31 王牌**冬港**（`spawnWinterport`）· 护航 GAL-31 ×2（`dl4` + `vbn`）、ROK-27 ×2 · 运输 GAL-31（`null`）· GAL-44（`vsc`）· 石英 | 群岛国 DJACU 浪花（team 2，`otr`） |
 | m4 | ROK-27（`vsr` + `dl6`）×2 · VAC-14（`vgt` + `vbn`） | 我方护卫舰海豚带 `ss6`；三条民用船（team 2） |
@@ -165,7 +165,7 @@ spawnEnemy(w, {
 | m8 | VAC-14（`vgt` + `vbn`）×5 · ROK-27（`vsr` + `dl6`）· ROK-40（`vsr`）×2 · GAL-31 / VAC-14 掩护 · 石英 | 上游编队（team 0）：座头鲸 / 抹香鲸带 `ss6`，蓝鲸 `weapon: null` |
 | m9 | ROK-27（`dl6` + `vzu`）· ROK-27（`vsr` + `dl6`）· VAC-14（`vgt` + `vbn`） | 登陆舰 / 护航舰 `dl9` |
 | m10 | 冬港（`spawnWinterport`，同 m3）· 两层护航 GAL-31 / ROK-27（轻型带 `vzu`）· 石英 | 指挥舰 `dl9` |
-| sk1 | 机型池 `['m27','m27','gal31','vac14']`，按 `SK_FITS` 配弹 | 鹈鹕（team 0）；k8（team 2） |
+| sk1 | 机型池 `['schist','schist','basalt','sandstone']`，按 `SK_FITS` 配弹 | 鹈鹕（team 0）；tideline（team 2） |
 
 `spawnWinterport(w, {x, y, z, skill})` 是 m3 与 m10 共用的冬港生成器：GAL-31、`loadout: {A:'dl4', B:'vbn'}`、
 `phys` 覆盖（"人比飞机快"）、`isAce` / `bigTarget`、写入 `w.ace`。
@@ -181,9 +181,9 @@ v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，
 
 | 关卡 | 单位 |
 |---|---|
-| m1 | 群岛国 `k8` XAMSI「潮线」（`behavior: 'recon'`）+ 巡逻艇 `daplu`「屿」 |
+| m1 | 群岛国 `tideline` XAMSI「潮线」（`behavior: 'recon'`）+ 巡逻艇 `daplu`「屿」 |
 | m4 | 三条中立国民用船：`cross` 南十字、`icecore` 冰芯、`atoll` 环礁（沿航路巡航） |
-| m5 | 管理局勤务机 `a2` MERLI「水准」（沿单元编组巡视）+ 测量船 `diklo`「标杆」 |
+| m5 | 管理局勤务机 `datum` MERLI「水准」（沿单元编组巡视）+ 测量船 `diklo`「标杆」 |
 
 这是"不做中立识别机制"下唯一干净的安排：要么能打、要么不在交战语法里，
 没有"能锁但不该打"的中间态。MERLI 只有一个机腹挂载组、而机腹挂不了任何
@@ -218,7 +218,7 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
 **没有交战规则锁定。** 单元附近什么武器都能打，后果只有误伤扣分（`friendlyLoss`）；
 文字上只剩一句"谨慎使用重型武器"。
 
-`spawnWingman` 写死的部分：机型 `ucav`、阵营 0、`isDrone: true`、`special: 'v9'`、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
+`spawnWingman` 写死的部分：机型 `folded_wing`、阵营 0、`isDrone: true`、`special: 'v9'`、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
 
 ### 2.3 台词（`data.js`）
 
@@ -445,7 +445,7 @@ spawn()
 
 7. **飞完航线的单位会"自灭"。** `AI.updateRoute` 在最后一段飞完后直接 `a.alive = false`，而 `game.js` 的击落统计是 `team === 1 && !alive` 计数——以前逃生成功的轰炸机也会被算成"击落"；现在 `updateRoute` 离场时会标 `a.escaped`，`killCredit()` 不给它记功。`route.loiter`（预警机）与 `route.wps`（MERLI）两种航线永不退场。
 
-8. **`sower` 与 `ace` 只换了 `phys`，没换 `ac`。** 两者都由 `spawnEnemy` 以默认机型 `m27` 创建，之后覆写 `model` 与 `phys`；`a.ac` 仍然指向 ROK-27 条目，所以 `ctrlFloor` / `ctrlFull` 来自 ROK-27。改这两架的气动时记得 `ctrlFactor` 读的是 `a.ac`。
+8. **`sower` 与 `ace` 只换了 `phys`，没换 `ac`。** 两者都由 `spawnEnemy` 以默认机型 `schist` 创建，之后覆写 `model` 与 `phys`；`a.ac` 仍然指向 ROK-27 条目，所以 `ctrlFloor` / `ctrlFull` 来自 ROK-27。改这两架的气动时记得 `ctrlFactor` 读的是 `a.ac`。
 
 9. **`m2` 的中继平台 `t.vital = true` 没有任何人读。** 胜利条件按 `model === 'relay'` 计数，不靠 `vital`。同理 m1 的 `a.firingAllowed`、`w.baseHpFull` 都是"写了没人读"的字段。
    （`timeLimit` **不再是**这类字段 —— 它现在由主循环倒计时并统一判负，见 [game.md](game.md#newworld)。）

@@ -1589,15 +1589,15 @@ if (Ent && M3 && me && world) {
     function scenario() {
       const w = { actors: [], missiles: [], particles: [], targets: [], time: 0 };
       const lead = Ent.makeAircraft({
-        type: 'c11', team: 0, x: 0, y: 5000, z: 0,
+        type: 'frigatebird', team: 0, x: 0, y: 5000, z: 0,
         fwd: M3.V(0, 0, 1), speed: 300
       });
       const foe = Ent.makeAircraft({
-        type: 'm27', team: 1, x: 0, y: 5000, z: 3000,
+        type: 'schist', team: 1, x: 0, y: 5000, z: 3000,
         fwd: M3.V(0, 0, -1), speed: 300
       });
       const drone = Ent.makeAircraft({
-        type: 'ucav', team: 0, x: 140, y: 5025, z: -190,
+        type: 'folded_wing', team: 0, x: 140, y: 5025, z: -190,
         fwd: M3.V(0, 0, 1), speed: 300
       });
       w.player = lead;
@@ -1723,16 +1723,16 @@ if (Ent && M3 && me && world) {
     const bad2 = [];
     const w2 = { actors: [], missiles: [], particles: [], targets: [], time: 0 };
     const shooter = Ent.makeAircraft({
-      type: 'c11', team: 0, x: 0, y: 5000, z: 0, fwd: M3.V(0, 0, 1), speed: 300
+      type: 'frigatebird', team: 0, x: 0, y: 5000, z: 0, fwd: M3.V(0, 0, 1), speed: 300
     });
     // 近但冷：小机体、收着油门
     const coldNear = Ent.makeAircraft({
-      type: 'k8', team: 1, x: 0, y: 5000, z: 1200, fwd: M3.V(0, 0, -1), speed: 180
+      type: 'tideline', team: 1, x: 0, y: 5000, z: 1200, fwd: M3.V(0, 0, -1), speed: 180
     });
     coldNear.ab = false; coldNear.throttle = 0.3;
     // 远但亮：大机体、开加力
     const hotFar = Ent.makeAircraft({
-      type: 'rok40', team: 1, x: 0, y: 5000, z: 2600, fwd: M3.V(0, 0, -1), speed: 300
+      type: 'boulder', team: 1, x: 0, y: 5000, z: 2600, fwd: M3.V(0, 0, -1), speed: 300
     });
     hotFar.ab = true; hotFar.throttle = 1;
     w2.actors.push(shooter, coldNear, hotFar);
@@ -1769,7 +1769,7 @@ if (Ent && M3 && me && world) {
   {
     const bad3 = [];
     const mk = (o) => Ent.makeAircraft(Object.assign({
-      type: 'c11', team: 1, x: 0, y: 5000, z: 0, fwd: M3.V(0, 0, 1), speed: 300
+      type: 'frigatebird', team: 1, x: 0, y: 5000, z: 0, fwd: M3.V(0, 0, 1), speed: 300
     }, o));
 
     const aew = mk({ type: 'pelican' });  aew.aewc = true;       // 预警机：一直在辐射
@@ -2074,7 +2074,7 @@ if (Ent && M3 && me && world) {
 
     function make(slots, pool) {
       const a = Ent2.makeAircraft({
-        type: 'c11', team: 0, x: 0, y: 6000, z: 0,
+        type: 'frigatebird', team: 0, x: 0, y: 6000, z: 0,
         fwd: M3e.V(0, 0, 1), speed: 300
       });
       a.slotCd.srm = slots.slice();
@@ -2152,15 +2152,15 @@ if (Ent && M3 && me && world) {
     }
 
     // 1. 典型敌机：片岩（重挂点 2 + 通用挂点 2）挂下游格斗弹 → 4 枚
-    const m27 = npc('m27', 'dl6');
-    const n1 = countStoresOf(m27);
+    const schist = npc('schist', 'dl6');
+    const n1 = countStoresOf(schist);
     if (n1 !== 4) bad.push('ROK-27 挂 BIN-6 应当画出 4 枚，实际 ' + n1);
     // 打光之后机翼必须变干净（弹药池 = 0）
-    m27.ammoPool.dl6 = 0; m27.spAmmo = 0;
-    const n2 = countStoresOf(m27);
+    schist.ammoPool.dl6 = 0; schist.spAmmo = 0;
+    const n2 = countStoresOf(schist);
     if (n2 !== 0) bad.push('ROK-27 的弹打光后翼下仍然挂着 ' + n2 + ' 枚');
     // 装填中的挂架空着 —— 这条以前对 NPC 完全不存在
-    const m27b = npc('m27', 'dl6');
+    const m27b = npc('schist', 'dl6');
     if (!m27b.slotCd.dl6 || m27b.slotCd.dl6.length !== 4) {
       bad.push('ROK-27 没有按挂点数建起 4 个发射槽');
     } else {
@@ -2175,13 +2175,13 @@ if (Ent && M3 && me && world) {
     if (n4 !== 0) bad.push('只有机腹挂点的预警机被画上了 ' + n4 + ' 枚空空弹');
 
     // 3. 僚机 KA-7：翼下通用挂点 2 个，挂 GIR-9
-    const wing = npc('ucav', 'v9');
+    const wing = npc('folded_wing', 'v9');
     const n5 = countStoresOf(wing);
     if (n5 !== 2) bad.push('KA-7 应当画出 2 枚 GIR-9，实际 ' + n5);
 
     // 4. 任务写定的吊舱也要看得见：玄武岩挂 DAR-4 + SAV-6
     //    （吊舱先占通用挂点，制式弹占重挂点）
-    const gal = npc('gal31', 'dl4', ['vzu']);
+    const gal = npc('basalt', 'dl4', ['vzu']);
     const n6 = countStoresOf(gal);
     if (n6 !== 4) bad.push('GAL-31 挂 DAR-4 + SAV-6 应当画出 4 件，实际 ' + n6);
     if (!gal.ammoPool || gal.ammoPool.dl4 !== W3.dl4.ammo) {
@@ -2198,7 +2198,7 @@ if (Ent && M3 && me && world) {
     // 4b. 吊舱与制式弹**共存**：片岩（重 + 通用）挂 BIN-6 + SAV-6 ——
     //     吊舱占外侧通用挂点、导弹保住重挂点。可视挂架少了两个，
     //     但弹药池不能跟着改：AI 该打几发还是几发。
-    const mixed = npc('m27', 'dl6', ['vzu']);
+    const mixed = npc('schist', 'dl6', ['vzu']);
     const n9 = countStoresOf(mixed);
     if (n9 !== 4) bad.push('ROK-27 挂 BIN-6 + SAV-6 应当画出 4 件，实际 ' + n9);
     if (mixed.ammoPool.dl6 !== W3.dl6.ammo) {
@@ -2221,7 +2221,7 @@ if (Ent && M3 && me && world) {
     // 5. 玩家的"空置"组不该凭空长出当前选中的那枚弹
     //    （旧代码对空置组回退到 a.special，于是 8 个挂点全画上弹）
     const p0 = Ent3.makeAircraft({
-      type: 'c11', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
+      type: 'frigatebird', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
       fwd: M3n.V(0, 0, 1), speed: 300, special: 'srm'
     });
     p0.loadout = {};                       // 全部空置
@@ -2353,13 +2353,13 @@ if (Ent && M3 && me && world) {
         x: x, y: 0, z: z, hp: 100, radius: 10, ground: true, team: team });
     }
     const airT = Ent4.makeAircraft({
-      type: 'c11', team: 0, x: 0, y: 5000, z: -4000,
+      type: 'frigatebird', team: 0, x: 0, y: 5000, z: -4000,
       fwd: M3q.V(0, 0, -1), speed: 300
     });
 
     // 1. 一架上挂三种射程的空空弹：按距离挑"够得着里面最短的那件"
-    //    c11 的组：A 机身前侧（轻）/ B 翼套（重）/ C 机腹 —— srm 4.2 km / mrm 8.6 / v17 12.5
-    const mix = npcOf('c11', { A: 'srm', B: 'v17', C: 'mrm' });
+    //    frigatebird 的组：A 机身前侧（轻）/ B 翼套（重）/ C 机腹 —— srm 4.2 km / mrm 8.6 / v17 12.5
+    const mix = npcOf('frigatebird', { A: 'srm', B: 'v17', C: 'mrm' });
     /* 弹药池 = min(w.ammo, 挂点数 × perPoint)：预算不能超过机翼上实际挂得下的 */
     const capOf = wid => Math.min(W4[wid].ammo, (mix.slotCd[wid] || []).length * W4[wid].perPoint);
     if (!mix.ammoPool || mix.ammoPool.srm !== capOf('srm') ||
@@ -2385,7 +2385,7 @@ if (Ent && M3 && me && world) {
     }
 
     // 3. 对空 + 对地混挂：各打各的
-    const mixed = npcOf('c11', { A: 'srm', B: 'vgt' });
+    const mixed = npcOf('frigatebird', { A: 'srm', B: 'vgt' });
     if (at(mixed, airT, 3000) !== 'srm') bad.push('混挂时对空目标没挑到 srm');
     if (at(mixed, surf, 5000) !== 'vgt') {
       bad.push('混挂对面目标没挑到 vgt，实际 ' + at(mixed, surf, 5000));
@@ -2393,14 +2393,14 @@ if (Ent && M3 && me && world) {
 
     // 4. 任务写错的逐组挂载要被记下来，并且那一组空着
     Ent4.clearMountIssues();
-    const wrongKind = npcOf('c11', { A: 'v17' });          // 翼尖挂不了重型远距弹
+    const wrongKind = npcOf('frigatebird', { A: 'v17' });          // 翼尖挂不了重型远距弹
     if (Ent4.mountIssues.length !== 1) {
       bad.push('翼尖挂 v17 应当记 1 条挂载问题，实际 ' + Ent4.mountIssues.length);
     }
     if (wrongKind.ammoPool && wrongKind.ammoPool.v17) {
       bad.push('挂不上的武器不该进弹药池');
     }
-    const noCaps = npcOf('c14', { C: 'lcm' });             // 截击机没有 strike 火控
+    const noCaps = npcOf('sailfish', { C: 'lcm' });             // 截击机没有 strike 火控
     if (Ent4.mountIssues.length !== 2) {
       bad.push('机体能力不足时应当再记一条，实际 ' + Ent4.mountIssues.length);
     }
@@ -2416,7 +2416,7 @@ if (Ent && M3 && me && world) {
     function raid(loadout, targetKind, distM, seconds, altM) {
       const w = { actors: [], targets: [], bullets: [], missiles: [], particles: [],
         time: 0, player: null, killed: 0, friendlyLoss: 0 };
-      const atk = npcOf('c11', loadout);
+      const atk = npcOf('frigatebird', loadout);
       atk.pos = M3q.V(0, altM === undefined ? 5000 : altM, 0);
       atk.fwd = M3q.V(0, 0, 1);
       let tg;
@@ -2424,7 +2424,7 @@ if (Ent && M3 && me && world) {
         tg = surfaceOf(0, 0, distM);
         w.targets.push(tg);
       } else {
-        tg = Ent4.makeAircraft({ type: 'c11', team: 0, x: 0, y: 5000, z: distM,
+        tg = Ent4.makeAircraft({ type: 'frigatebird', team: 0, x: 0, y: 5000, z: distM,
           fwd: M3q.V(0, 0, -1), speed: 300 });
         w.actors.push(tg);
       }
@@ -2576,7 +2576,7 @@ if (Ent && M3 && me && world) {
       }
 
       // 制空 / 截击机必须挂得上
-      ['c14', 'c9', 'gal31'].forEach(id => {
+      ['sailfish', 'petrel', 'basalt'].forEach(id => {
         const ac = A3.find(a => a.id === id);
         if (!ac) return;
         const hasHeavy = (ac.hardpointGroups || []).some(g => arm.fits.indexOf(g.kind) >= 0);
@@ -2600,7 +2600,7 @@ if (Ent && M3 && me && world) {
      设定和数值脱节。所以把曲线的两端交给机型覆盖（ctrlFloor / ctrlFull）。 */
   {
     const E2 = sandbox.Ent, A2 = sandbox.AIRCRAFT;
-    const D14 = A2.find(a => a.id === 'c14'), F9 = A2.find(a => a.id === 'c9');
+    const D14 = A2.find(a => a.id === 'sailfish'), F9 = A2.find(a => a.id === 'petrel');
     const bad = [];
 
     if (!D14 || !F9) {
@@ -2626,7 +2626,7 @@ if (Ent && M3 && me && world) {
       }
 
       // 常规机型不受影响
-      const DB = A2.find(a => a.id === 'c11');
+      const DB = A2.find(a => a.id === 'frigatebird');
       if (Math.abs(E2.ctrlFactor(20000, 200, DB) - 0.13) > 1e-6) {
         bad.push('常规机型的低动压保底被动到了');
       }
@@ -3715,7 +3715,7 @@ if (Ent && M3 && me && world) {
        连它的基础射程 1600 也是假的。 */
     function shootAt(y) {
       const a = E12.makeAircraft({
-        type: 'c11', team: 0, isPlayer: true, x: 0, y: y, z: 0,
+        type: 'frigatebird', team: 0, isPlayer: true, x: 0, y: y, z: 0,
         fwd: M3m.V(0, 0, 1), speed: 300
       });
       a.gun = 'k3';
@@ -3765,7 +3765,7 @@ if (Ent && M3 && me && world) {
        传 0 会被顶成 300，所以只能直接改 vel。 */
     function patternAt(R, volleys) {
       const a = E14.makeAircraft({
-        type: 'c11', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
+        type: 'frigatebird', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
         fwd: M3b.V(0, 0, 1), speed: 0
       });
       a.vel = M3b.V(0, 0, 0);
@@ -3856,7 +3856,7 @@ if (Ent && M3 && me && world) {
     if (w.recharge === undefined) bad.push('GUS-2 没有 recharge（desc 说每 18 秒）');
 
     const a = E13.makeAircraft({
-      type: 'c11', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
+      type: 'frigatebird', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
       fwd: M3n.V(0, 0, 1), speed: 300
     });
     a.special = 'l2';
@@ -4246,12 +4246,12 @@ if (Ent && M3 && me && world) {
     if ((w.friendlyLoss || 0) - before !== 1) bad.push('玩家打掉一个单元，误击记了 ' + ((w.friendlyLoss || 0) - before) + ' 次');
 
     /* 管理局勤务机「水准」：沿编组巡视 —— 飞 150 s，看它守不守得住巡视高度、
-       有没有真的往下一个编组走。（a2 推力弱，高空守不住高度时这里会报。） */
+       有没有真的往下一个编组走。（datum 推力弱，高空守不住高度时这里会报。） */
     {
       const m5 = sandbox.MISSIONS.findIndex(m => m.id === 'm5');
       G.startMission(m5);
       const w5 = G.__world(), p5 = G.__player();
-      const datum = w5.actors.find(a => a.ac === 'a2' || (a.route && a.route.wps));
+      const datum = w5.actors.find(a => a.ac === 'datum' || (a.route && a.route.wps));
       if (!datum || !datum.route || !datum.route.wps) bad.push('m5 的勤务机没有巡视航线');
       else {
         /* 各编组高度不同，换航点时会爬 / 降一两千米 —— 所以不比"当前偏差"，
@@ -4690,14 +4690,14 @@ if (Ent && M3 && me && world) {
         } else {
           items[invIdx].fire('click');
           const listHTML = body.innerHTML || '';
-          if (listHTML.indexOf('data-unit="aircraft:c11"') < 0) {
+          if (listHTML.indexOf('data-unit="aircraft:frigatebird"') < 0) {
             fail('机型图鉴里没有可点的单位链接');
           }
           if (typeof body.onclick !== 'function') {
             fail('codexBody 上没有挂单位链接的事件委托');
           } else {
             body.onclick({
-              target: { getAttribute: k => (k === 'data-unit' ? 'aircraft:c11' : null), parentNode: null }
+              target: { getAttribute: k => (k === 'data-unit' ? 'aircraft:frigatebird' : null), parentNode: null }
             });
             const detailHTML = body.innerHTML || '';
             if (detailHTML.indexOf('uvCanvas') < 0 || detailHTML.indexOf('实时预览') < 0) {
@@ -4707,7 +4707,7 @@ if (Ent && M3 && me && world) {
                 target: { getAttribute: k => (k === 'data-unit-back' ? 'aircraft' : null), parentNode: null }
               });
               const backHTML = body.innerHTML || '';
-              if (backHTML.indexOf('data-unit="aircraft:c11"') < 0) {
+              if (backHTML.indexOf('data-unit="aircraft:frigatebird"') < 0) {
                 fail('详情页的返回按钮没有回到原图鉴');
               } else {
                 ok('点击链路通畅：机型图鉴 → 单位详情 → 返回图鉴');
@@ -5023,7 +5023,7 @@ try {
   const hb = S.spawnShip(W, { model: ship('humpback').model, x: 0, z: 0, team: 1 });
   if (hb.gunResist !== ship('humpback').gunResist) bad.push('spawnShip 没把 SHIPS[].gunResist 接上');
   if (Ent.makeTarget({ model: 'cell' }).gunResist !== S.GUN_RESIST_MODELS.cell) bad.push('调节单元没取到模型默认抗性');
-  const bomber = Ent.makeAircraft({ type: 'rok40', team: 1, pos: M3.V(0, 3000, 0) });
+  const bomber = Ent.makeAircraft({ type: 'boulder', team: 1, pos: M3.V(0, 3000, 0) });
   if (!(bomber.gunResist > 0)) bad.push('ROK-40 没有机炮抗性');
   for (const ac of AIRCRAFT) {
     if (ac.role && /战斗机|截击|攻击/.test(ac.role) && ac.gunResist) bad.push(ac.id + '（' + ac.role + '）不该有机炮抗性');

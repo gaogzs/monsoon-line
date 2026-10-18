@@ -80,7 +80,7 @@ function spawnEnemy(w, o) {
   /* 用 o.ac 指定机型（AIRCRAFT 表的 id），性能、外形、名称全部取自
      该条目。早先这里把 RO-27 的数值硬编码在函数里，于是换机型
      只是换个名字，飞起来还是同一架。 */
-  var acId = o.ac || 'm27';
+  var acId = o.ac || 'schist';
   var ac = null;
   for (var ai = 0; ai < AIRCRAFT.length; ai++) {
     if (AIRCRAFT[ai].id === acId) { ac = AIRCRAFT[ai]; break; }
@@ -181,9 +181,9 @@ function bombTheBase(bomber, w) {
 
 function spawnWingman(w, idx, slotX, slotY, slotZ) {
   // 僚机是「折翼」级无人僚机（KA-7），不是有人机 ——
-  // 这里原来写的是 c11，于是设定里的无人僚机在游戏里飞着有人机。
+  // 这里原来写的是 frigatebird，于是设定里的无人僚机在游戏里飞着有人机。
   var a = Ent.makeAircraft({
-    type: 'ucav',
+    type: 'folded_wing',
     team: 0,
     x: w.player.pos.x + slotX,
     y: w.player.pos.y + slotY,
@@ -247,7 +247,7 @@ function spawnAewc(w, o) {
    其中一架还是对面的。 */
 function spawnWinterport(w, o) {
   var ace = spawnEnemy(w, {
-    ac: 'gal31',
+    ac: 'basalt',
     x: o.x, y: o.y, z: o.z,
     fwd: M3.V(0, 0, -1), speed: 470,
     special: 'dl4', loadout: { A: 'dl4', B: 'vbn' },
@@ -439,7 +439,7 @@ MISSIONS.push({
     /* 两架 VAC-14 护航，拉到队形两翼各 3 km。 */
     for (i = 0; i < 2; i++) {
       spawnEnemy(w, {
-        ac: 'vac14',
+        ac: 'sandstone',
         x: (i - 0.5) * 5200, y: 8600, z: 20800,
         fwd: M3.V(0, 0, -1),
         speed: 300,
@@ -460,7 +460,7 @@ MISSIONS.push({
        从来不需要自己带保镖。 */
     for (i = 0; i < 2; i++) {
       spawnEnemy(w, {
-        ac: 'm27',
+        ac: 'schist',
         x: (i - 0.5) * 3000, y: 10200, z: 23500,
         fwd: M3.V(0, 0, -1), speed: 360,
         special: 'dl6', loadout: { A: 'dl6' },
@@ -478,7 +478,7 @@ MISSIONS.push({
        `behavior: 'recon'` 让它在满血时不主动接战，与"它不打架"一致
        （受创之后它才会自卫 —— 一支换了三次旗的空军也是这么反应的）。 */
     spawnEnemy(w, {
-      ac: 'k8', team: 2,
+      ac: 'tideline', team: 2,
       x: 9000, y: 4200, z: 12000,
       fwd: M3.V(-1, 0, 0), speed: 240,
       special: 'otr', skill: 0.30,
@@ -704,7 +704,7 @@ MISSIONS.push({
     for (i = 0; i < bombRun.length; i++) {
       var br = bombRun[i];
       var bmb = spawnEnemy(w, {
-        ac: 'rok40',
+        ac: 'boulder',
         x: br.x, y: 4300, z: -14000,
         fwd: M3.V(0, 0, 1), speed: 250,
         special: null, skill: 0.30,        // 弹舱里的东西由 onArrive 结算，不走导弹
@@ -818,7 +818,7 @@ MISSIONS.push({
         var isHeavy = (k < 3);
         var isHigh = (k === 5);
         var e = spawnEnemy(w, {
-          ac: (isHigh || isHeavy) ? 'gal31' : 'm27',
+          ac: (isHigh || isHeavy) ? 'basalt' : 'schist',
           x: -2200 + k * 900, y: isHigh ? 17500 : (isHeavy ? 7600 : 3200), z: 24000,
           fwd: M3.V(0, 0, -1), speed: isHigh ? 470 : (isHeavy ? 430 : 340),
           special: (isHigh || isHeavy) ? 'dl4' : 'dl6',
@@ -948,7 +948,7 @@ MISSIONS.push({
       var sx = (i % 4 - 1.5) * 4500;
       var sz = 15000 + Math.floor(i / 4) * 3000;
       var s = spawnEnemy(w, {
-        ac: 'gal31',
+        ac: 'basalt',
         x: sx, y: 18600, z: sz,
         fwd: M3.V(0, 0, -1), speed: 210,
         special: null, skill: 0.25,
@@ -985,7 +985,7 @@ MISSIONS.push({
        僚机会提示数据链中断、预警机会闭嘴。这就是下游教条里
        "先让对手瞎掉，再打"的那一步 —— 而它自己的位置也因此暴露。 */
     var jammer = spawnEnemy(w, {
-      ac: 'gal44',
+      ac: 'lodestone',
       x: -9000, y: 11000, z: 21000,
       fwd: M3.V(0, 0, -1), speed: 340,
       special: 'vsc', skill: 0.55,
@@ -1021,10 +1021,10 @@ MISSIONS.push({
        吊舱必须挂在**有 light 或 belly 组**的机型上：SAV-6 的
        npcFits 是 ['light','belly']，ROK-27 挂在 B 组外侧。 */
     var escorts = [
-      { ac: 'gal31', x: -6000, y: 18400, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.62 },
-      { ac: 'gal31', x: 6000, y: 18800, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.66 },
-      { ac: 'm27', x: -3000, y: 14600, sp: 'dl6', pod: ['vzu'], sk: 0.66 },
-      { ac: 'm27', x: 0, y: 14200, sp: 'dl6', loadout: { A: 'dl4', B: 'dl6' }, pod: null, sk: 0.70 },
+      { ac: 'basalt', x: -6000, y: 18400, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.62 },
+      { ac: 'basalt', x: 6000, y: 18800, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.66 },
+      { ac: 'schist', x: -3000, y: 14600, sp: 'dl6', pod: ['vzu'], sk: 0.66 },
+      { ac: 'schist', x: 0, y: 14200, sp: 'dl6', loadout: { A: 'dl4', B: 'dl6' }, pod: null, sk: 0.70 },
       { ac: 'spray', team: 2, x: -9000, y: 9200, sp: 'otr', loadout: { A: 'otr' }, pod: null, sk: 0.30 }
     ];
     for (i = 0; i < escorts.length; i++) {
@@ -1249,7 +1249,7 @@ MISSIONS.push({
        这一关里"海面上有什么"从此是双向的：你打他们的船，
        他们的飞机打你的船。 */
     spawnEnemy(w, {
-      ac: 'm27', team: 1,
+      ac: 'schist', team: 1,
       x: 8000, y: 6000, z: 22000,
       fwd: M3.V(0, 0, -1), speed: 380,
       special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
@@ -1257,7 +1257,7 @@ MISSIONS.push({
       callsign: downstreamCallsign(21)
     });
     spawnEnemy(w, {
-      ac: 'm27', team: 1,
+      ac: 'schist', team: 1,
       x: 11000, y: 5200, z: 24000,
       fwd: M3.V(0, 0, -1), speed: 380,
       special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
@@ -1265,7 +1265,7 @@ MISSIONS.push({
       callsign: downstreamCallsign(23)
     });
     spawnEnemy(w, {
-      ac: 'vac14',
+      ac: 'sandstone',
       x: -9000, y: 5500, z: 25000,
       fwd: M3.V(0, 0, -1), speed: 340,
       special: 'vgt', loadout: { A: 'vgt', B: 'vbn' },
@@ -1447,7 +1447,7 @@ MISSIONS.push({
     /* 下游随队干扰机 GAL-44「磁石」。
        沿航线飞进来、开机、掉头走 —— 与轰炸机是同一套 route 机制。 */
     var jammer = spawnEnemy(w, {
-      ac: 'gal44',
+      ac: 'lodestone',
       x: -14000, y: 11000, z: 24000,
       fwd: M3.V(0, 0, -1), speed: 340,
       special: 'vsc', skill: 0.55,
@@ -1473,7 +1473,7 @@ MISSIONS.push({
     for (i = 0; i < 3; i++) {
       var heavy = (i === 0);
       spawnEnemy(w, {
-        ac: heavy ? 'gal31' : 'm27',
+        ac: heavy ? 'basalt' : 'schist',
         x: -4000 + i * 4000, y: heavy ? 13000 : 7000, z: 26000,
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'dl6',
@@ -1490,7 +1490,7 @@ MISSIONS.push({
        赶在它离场前打掉，那两枚弹就不会落到补给船上。
        原来它挂的是上游的 GUT-30，且没有航线，于是被当成战斗机去缠斗。 */
     var cruise = spawnEnemy(w, {
-      ac: 'rok40',
+      ac: 'boulder',
       x: 12000, y: 12000, z: 34000,
       fwd: M3.V(-1, 0, 0), speed: 250,
       special: 'vsr', loadout: { B: 'vsr' },
@@ -1530,7 +1530,7 @@ MISSIONS.push({
     for (i = cellGroups.length - 1; i >= half; i--) patrol.push(cellGroups[i]);
     var wps = patrol.map(function (g) { return M3.V(g.x, g.y - 1500, g.z); });
     var datum = spawnEnemy(w, {
-      ac: 'a2', team: 2, special: null,   // 显式 null：不拿 spawnEnemy 缺省的 dl6
+      ac: 'datum', team: 2, special: null,   // 显式 null：不拿 spawnEnemy 缺省的 dl6
       x: wps[0].x, y: wps[0].y, z: wps[0].z - 8000,
       fwd: M3.V(0, 0, 1), speed: 240,
       skill: 0.30,
@@ -1671,7 +1671,7 @@ MISSIONS.push({
     var i;
     for (i = 0; i < 4; i++) {
       var vet = spawnEnemy(w, {
-        ac: 'gal31',
+        ac: 'basalt',
         x: -3000 + (i % 2) * 6000, y: 17800 + Math.floor(i / 2) * 900,
         z: 22000 + Math.floor(i / 2) * 4000,
         fwd: M3.V(0, 0, -1),
@@ -1687,7 +1687,7 @@ MISSIONS.push({
        两架带 SAV-6 —— 下游教条是"编队里永远有一架带干扰吊舱"。 */
     for (i = 0; i < 4; i++) {
       spawnEnemy(w, {
-        ac: 'm27',
+        ac: 'schist',
         x: 3000 + i * 3500, y: 14200 + (i % 2) * 500, z: 26000,
         fwd: M3.V(0, 0, -1),
         special: 'dl6',
@@ -1824,7 +1824,7 @@ MISSIONS.push({
 
     // 干扰机
     var jammer = spawnEnemy(w, {
-      ac: 'gal44',
+      ac: 'lodestone',
       x: -9000, y: 7000, z: 24000,
       fwd: M3.V(0, 0, -1), speed: 320,
       special: 'vsc', skill: 0.5,
@@ -1849,7 +1849,7 @@ MISSIONS.push({
 
     // 一架夜间巡逻的片岩
     spawnEnemy(w, {
-      ac: 'm27',
+      ac: 'schist',
       x: 14000, y: 5000, z: 20000,
       fwd: M3.V(0, 0, -1), speed: 320,
       special: 'dl6', skill: 0.5,
@@ -1991,7 +1991,7 @@ MISSIONS.push({
       var lane = Math.floor(i / 3);
       var isSledge = (i === 5);
       var st = spawnEnemy(w, {
-        ac: isSledge ? 'm27' : 'vac14',
+        ac: isSledge ? 'schist' : 'sandstone',
         x: (i % 3 - 1) * 3500 + (lane ? 1500 : -1500),
         y: lane ? 3000 : 2600,
         z: 22000 + lane * 3000,
@@ -2024,7 +2024,7 @@ MISSIONS.push({
     }
     for (i = 0; i < 2; i++) {
       var bmb = spawnEnemy(w, {
-        ac: 'rok40',
+        ac: 'boulder',
         x: (i - 0.5) * 5000, y: 5000, z: 26000,
         fwd: M3.V(0, 0, -1), speed: 250,
         special: 'vsr', loadout: { B: 'vsr' },
@@ -2044,7 +2044,7 @@ MISSIONS.push({
     for (i = 0; i < 4; i++) {
       var heavy = (i < 2);
       spawnEnemy(w, {
-        ac: heavy ? 'gal31' : 'vac14',
+        ac: heavy ? 'basalt' : 'sandstone',
         x: -9000 + i * 6000, y: heavy ? 9000 : 4000, z: 28000,
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'vbn',
@@ -2070,7 +2070,7 @@ MISSIONS.push({
       var a = w.actors[i];
       if (a.team !== 1 || !a.alive) continue;
       if (a.striker) attackers++;
-      else if (a.type === 'rok40') bombers++;
+      else if (a.type === 'boulder') bombers++;
     }
     var fl = 0;
     for (i = 0; i < w.targets.length; i++) {
@@ -2239,7 +2239,7 @@ MISSIONS.push({
        ['heavy']，挂在 ROK-27 的内侧 A 组。反舰弹归多用途机，
        不归 GAL-31 那种截击机（早先挂在 GAL-31 上）。 */
     spawnEnemy(w, {
-      ac: 'm27',
+      ac: 'schist',
       x: -2000, y: 8000, z: 20000,
       fwd: M3.V(0, 0, -1),
       special: 'dl6', loadout: { A: 'dl6' },
@@ -2247,7 +2247,7 @@ MISSIONS.push({
       skill: 0.7, callsign: downstreamCallsign(52)
     });
     spawnEnemy(w, {
-      ac: 'm27',
+      ac: 'schist',
       x: 3000, y: 8500, z: 22000,
       fwd: M3.V(0, 0, -1),
       special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
@@ -2258,7 +2258,7 @@ MISSIONS.push({
        A 组挂 TUM-7「碎石」对面弹，B 组挂 BIN-9 自卫。
        （早先是上游的 G-6 挂上游的 PEJ-30。） */
     spawnEnemy(w, {
-      ac: 'vac14',
+      ac: 'sandstone',
       x: 6000, y: 2800, z: 26000,
       fwd: M3.V(0, 0, -1),
       special: 'vgt', loadout: { A: 'vgt', B: 'vbn' },
@@ -2396,7 +2396,7 @@ MISSIONS.push({
       var inner = (i < 3);
       var heavy = (i % 2 === 0);
       spawnEnemy(w, {
-        ac: heavy ? 'gal31' : 'm27',
+        ac: heavy ? 'basalt' : 'schist',
         x: (inner ? -12000 : 12000) + (i % 3 - 1) * 3000,
         y: heavy ? 16500 : 14000,
         z: 14000 + (i % 3) * 2500,
@@ -2493,9 +2493,9 @@ MISSIONS.push({
    ============================================================ */
 /* 第四周的下游机型 → 制式挂载（全是下游弹） */
 var SK_FITS = {
-  m27:   { sp: 'dl6', lo: { A: 'dl4', B: 'dl6' } },
-  gal31: { sp: 'dl4', lo: { A: 'dl4', B: 'vbn' } },
-  vac14: { sp: 'vbn', lo: { A: 'vbn', B: 'vbn' } }
+  schist:   { sp: 'dl6', lo: { A: 'dl4', B: 'dl6' } },
+  basalt: { sp: 'dl4', lo: { A: 'dl4', B: 'vbn' } },
+  sandstone: { sp: 'vbn', lo: { A: 'vbn', B: 'vbn' } }
 };
 
 MISSIONS.push({
@@ -2562,7 +2562,7 @@ MISSIONS.push({
     /* 群岛国的一架「潮线」在海面附近游荡 —— 背景，team 2。
        早先它被放进敌方机型池（team 1），于是"不明回波"成了下游的僚机。 */
     spawnEnemy(w, {
-      ac: 'k8', team: 2,
+      ac: 'tideline', team: 2,
       x: -9000, y: 3800, z: 9000,
       fwd: M3.V(1, 0, 0), speed: 240,
       special: 'otr', skill: 0.30,
@@ -2576,7 +2576,7 @@ MISSIONS.push({
        ROK-27 写两次：它是下游的主力，出现得最多。
        每型配自己的制式弹（SK_FITS），不再一律 dl6。
        数量随批次递增（2→6），技能与高度也随机。 */
-    var pool = ['m27', 'm27', 'gal31', 'vac14'];
+    var pool = ['schist', 'schist', 'basalt', 'sandstone'];
     var queue = [];
     for (var b = 0; b < 6; b++) {
       var n = 2 + Math.floor(b * 0.8);            // 2,2,3,4,5,6

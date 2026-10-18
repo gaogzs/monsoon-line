@@ -108,27 +108,27 @@ function frameCamera(model, el) {
 /* ---------- 一个配置 = 一张图 ----------
    `pods` 与关卡文件里写的是同一种东西（missions.js 的 spawnEnemy）。 */
 const CASES = [
-  { tag: 'm27-dl6', type: 'm27', special: 'dl6', note: 'ROK-27 + BIN-6（重挂点 2 + 通用挂点 2）' },
-  { tag: 'm27-dl6-dry', type: 'm27', special: 'dl6', empty: true, note: '同上，但弹已打光（应当只剩裸机）' },
-  { tag: 'gal31-dl4-vzu', type: 'gal31', special: 'dl4', pods: ['vzu'], note: 'GAL-31 + DAR-4 + SAV-6 吊舱（吊舱占外侧，导弹保住重挂点）' },
-  { tag: 'm27-dl6-vzu', type: 'm27', special: 'dl6', pods: ['vzu'], note: 'ROK-27 + BIN-6 + SAV-6（一型导弹 + 吊舱，导弹的可见挂架变少但弹药池不变）' },
+  { tag: 'schist-dl6', type: 'schist', special: 'dl6', note: 'ROK-27 + BIN-6（重挂点 2 + 通用挂点 2）' },
+  { tag: 'schist-dl6-dry', type: 'schist', special: 'dl6', empty: true, note: '同上，但弹已打光（应当只剩裸机）' },
+  { tag: 'basalt-dl4-vzu', type: 'basalt', special: 'dl4', pods: ['vzu'], note: 'GAL-31 + DAR-4 + SAV-6 吊舱（吊舱占外侧，导弹保住重挂点）' },
+  { tag: 'schist-dl6-vzu', type: 'schist', special: 'dl6', pods: ['vzu'], note: 'ROK-27 + BIN-6 + SAV-6（一型导弹 + 吊舱，导弹的可见挂架变少但弹药池不变）' },
   { tag: 'spray-vbn-vzu', type: 'spray', special: 'vbn', pods: ['vzu'], note: 'DJACU Mk.1 浪花 + BIN-9 + SAV-6（吊舱进机腹，制式弹不被挤掉）' },
-  { tag: 'vac14-vbn', type: 'vac14', special: 'vbn', note: 'VAC-14 + BIN-9（储备 2 发 < 挂点 4 个，多出来的挂点出厂就是空的）' },
-  { tag: 'gal44-vsc', type: 'gal44', special: 'vsc', note: 'GAL-44 干扰机 + SAV-14 烧穿吊舱（机腹）' },
-  { tag: 'gal44-vsc-belly', type: 'gal44', special: 'vsc', el: -0.42, note: '同上，从**下**往上看机腹 —— 机腹挂载只有这个角度看得见' },
+  { tag: 'sandstone-vbn', type: 'sandstone', special: 'vbn', note: 'VAC-14 + BIN-9（储备 2 发 < 挂点 4 个，多出来的挂点出厂就是空的）' },
+  { tag: 'lodestone-vsc', type: 'lodestone', special: 'vsc', note: 'GAL-44 干扰机 + SAV-14 烧穿吊舱（机腹）' },
+  { tag: 'lodestone-vsc-belly', type: 'lodestone', special: 'vsc', el: -0.42, note: '同上，从**下**往上看机腹 —— 机腹挂载只有这个角度看得见' },
   { tag: 'spray-vbn-vzu-belly', type: 'spray', special: 'vbn', pods: ['vzu'], el: -0.42, note: '浪花，从下看机腹的吊舱' },
-  { tag: 'm27-dl6-belly', type: 'm27', special: 'dl6', el: -0.42, note: '片岩，从下看：翼下挂载的高度对不对' },
+  { tag: 'schist-dl6-belly', type: 'schist', special: 'dl6', el: -0.42, note: '片岩，从下看：翼下挂载的高度对不对' },
   { tag: 'pelican-dl6', type: 'pelican', special: 'dl6', note: 'J-2 鹈鹕预警机 + 空空弹：适配表拦住它（应当一件都没有）' },
-  { tag: 'ucav-v9', type: 'ucav', special: 'v9', note: 'KA-7 僚机 + GIR-9' },
-  { tag: 'c21-default', type: 'c21', note: 'D-21 贼鸥：机腹与翼下挂载要贴着扁平机身' },
-  { tag: 'c21-default-belly', type: 'c21', el: -0.42, note: '同上，从下看' },
-  { tag: 'c11-srm', type: 'c11', special: 'srm', note: '外观：TOR-2 双联格斗弹（应当短小）' },
-  { tag: 'c11-wasp', type: 'c11', special: 'wasp', note: '外观：SUT-7 三联挂梁' },
-  { tag: 'c11-qsr', type: 'c11', special: 'qsr', note: '外观：GIR-5 三管方巢' },
-  { tag: 'c11-swm', type: 'c11', special: 'swm', note: '外观：GIR-12 四格方巢' },
-  { tag: 'c11-rkt', type: 'c11', special: 'rkt', note: '外观：PEJ-6 七管火箭巢' },
-  { tag: 'c11-vlar', type: 'c11', special: 'vlar', note: '外观：CLA-12 超远程（应当最大）' },
-  { tag: 'c11-lcm', type: 'c11', special: 'lcm', note: '外观：GUT-30 巡航弹' }
+  { tag: 'folded_wing-v9', type: 'folded_wing', special: 'v9', note: 'KA-7 僚机 + GIR-9' },
+  { tag: 'skua-default', type: 'skua', note: 'D-21 贼鸥：机腹与翼下挂载要贴着扁平机身' },
+  { tag: 'skua-default-belly', type: 'skua', el: -0.42, note: '同上，从下看' },
+  { tag: 'frigatebird-srm', type: 'frigatebird', special: 'srm', note: '外观：TOR-2 双联格斗弹（应当短小）' },
+  { tag: 'frigatebird-wasp', type: 'frigatebird', special: 'wasp', note: '外观：SUT-7 三联挂梁' },
+  { tag: 'frigatebird-qsr', type: 'frigatebird', special: 'qsr', note: '外观：GIR-5 三管方巢' },
+  { tag: 'frigatebird-swm', type: 'frigatebird', special: 'swm', note: '外观：GIR-12 四格方巢' },
+  { tag: 'frigatebird-rkt', type: 'frigatebird', special: 'rkt', note: '外观：PEJ-6 七管火箭巢' },
+  { tag: 'frigatebird-vlar', type: 'frigatebird', special: 'vlar', note: '外观：CLA-12 超远程（应当最大）' },
+  { tag: 'frigatebird-lcm', type: 'frigatebird', special: 'lcm', note: '外观：GUT-30 巡航弹' }
 ];
 
 const BG = [0x0d, 0x16, 0x1c];

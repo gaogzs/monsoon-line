@@ -29,26 +29,26 @@
   f: [{ i: [顶点索引...], c: '#rrggbb' }, ...],  // 面（3 或 4 个索引 + 颜色）
   span, len,                            // 外形尺寸元数据（见下）
   air / ground / sea / radius,          // 目标类型元数据
-  morph: { map, spread, swept } }       // 仅 c11 有
+  morph: { map, spread, swept } }       // 仅 frigatebird 有
 ```
 
 现有 **38** 个键：飞机 13 · 浮空目标 2 · 海上/地面设施 5 · **水面舰船 16** · 弹药 2：
 
 | key | 名称 / 类别 | span | len | 元数据 | 备注 |
 |---|---|---|---|---|---|
-| `c11` | DB-11「军舰鸟」舰载多用途战斗机 | 15.2 | 20.5 | — | 唯一带 `morph` 的模型 |
-| `c14` | D-14「旗鱼」平流层制空战斗机 | 13.8 | 22.9 | — | 菱形翼 + V 尾 |
-| `c9` | F-9「海燕」高空高速截击机 | 13.2 | 22.9 | — | 带残留字段 `sweepAlt: null` |
-| `c21` | D-21「贼鸥」多用途隐形战斗机 | 13.8 | 21.4 | — | 无垂尾菱形翼 |
-| `c33` | D-33「信天翁」高机动格斗机 | 16.4 | 19.6 | — | 前掠翼 |
-| `s6` | G-6「鲣鸟」近距空中支援攻击机 | 17.2 | 19.4 | — | 双发翼根布局 |
-| `m27` | ROK-27「燧石」重型截击机（下游） | 14.8 | 22.0 | — | 翼身融合 |
-| `gal31` | GAL-31「玄武岩」重型截击机（下游） | 15.2 | 25.8 | — | 双三角翼 |
-| `vac14` | VAC-14「砂岩」轻型攻击机（下游） | 12.8 | 15.2 | — | 涡桨 |
-| `ucav` | 「折翼」级无人僚机 | 8.8 | 7.6 | — | 飞翼 |
+| `frigatebird` | DB-11「军舰鸟」舰载多用途战斗机 | 15.2 | 20.5 | — | 唯一带 `morph` 的模型 |
+| `sailfish` | D-14「旗鱼」平流层制空战斗机 | 13.8 | 22.9 | — | 菱形翼 + V 尾 |
+| `petrel` | F-9「海燕」高空高速截击机 | 13.2 | 22.9 | — | 带残留字段 `sweepAlt: null` |
+| `skua` | D-21「贼鸥」多用途隐形战斗机 | 13.8 | 21.4 | — | 无垂尾菱形翼 |
+| `albatross` | D-33「信天翁」高机动格斗机 | 16.4 | 19.6 | — | 前掠翼 |
+| `booby` | G-6「鲣鸟」近距空中支援攻击机 | 17.2 | 19.4 | — | 双发翼根布局 |
+| `schist` | ROK-27「燧石」重型截击机（下游） | 14.8 | 22.0 | — | 翼身融合 |
+| `basalt` | GAL-31「玄武岩」重型截击机（下游） | 15.2 | 25.8 | — | 双三角翼 |
+| `sandstone` | VAC-14「砂岩」轻型攻击机（下游） | 12.8 | 15.2 | — | 涡桨 |
+| `folded_wing` | 「折翼」级无人僚机 | 8.8 | 7.6 | — | 飞翼 |
 | `sower` | 「灰烬」级播撒机（下游） | 38.0 | 42.5 | — | 四发 |
 | `spray` | 「浪花」海上巡逻机 | 17.2 | 16.4 | — | 双发涡桨 |
-| `rok40` | ROK-40「巨砾」重型轰炸机（下游） | 48 | 44 | — | 四发、不参与空战 |
+| `boulder` | ROK-40「巨砾」重型轰炸机（下游） | 48 | 44 | — | 四发、不参与空战 |
 | `relay` | 「高原」级浮空中继平台 | 27 | 82 | `air` | `radius: 30` |
 | `cell` | DIL-4 型调节单元 | 60 | 118 | `air` | `radius: 34`，三个要害 |
 | `sam` | 中远程 SAM 发射车（4 联装） | 9 | 9 | `ground` `sea` | `radius: 5` |
@@ -80,8 +80,8 @@
 > `radius` 与 `ground` 也不会自动传到目标上——设施由 `spawnTarget` 手抄，舰船由 `spawnShip` 从 `SHIPS` 表取。详见"易踩的坑"。
 >
 > **机型与模型不是一一对应**：`AIRCRAFT` 17 条只用到 13 个飞机模型，
-> 5 个 NPC 机型借用现成几何——`k8` → `c14`，`a2` / `pelican` → `sower`，
-> `quartz` / `gal44` → `rok40`。所以本表没有 `k8` / `a2` / `pelican` / `quartz` / `gal44` 这几个键；
+> 5 个 NPC 机型借用现成几何——`tideline` → `sailfish`，`datum` / `pelican` → `sower`，
+> `quartz` / `lodestone` → `boulder`。所以本表没有 `tideline` / `datum` / `pelican` / `quartz` / `lodestone` 这几个键；
 > 要给它们独立外形，得新增 `M.xxx` 并改 `AIRCRAFT[].model`。
 >
 > 舰船的 `span` 是**船宽**、`len` 是**舰长**（沿用同一对字段，没有为船另起名字），
@@ -295,7 +295,7 @@ b.hull([
    但**增删机翼顶点**必须同步维护 `morphMap` / `morphSpread` / `morphSwept` 三者。
 2. **顶点是共享的。** 一个顶点被 4 个面引用是常态；`morph` 覆盖它等于同时动 4 个面。想只动一个面就得补一个独立顶点。
 3. **`span` / `len` 是没人读的元数据。** 没有代码消费 `MODELS[x].span`；
-   `planform.js` 用的是自己 `PLANFORM.planes` 里的尺寸。而且 `c11` 的 `span: 15.2`
+   `planform.js` 用的是自己 `PLANFORM.planes` 里的尺寸。而且 `frigatebird` 的 `span: 15.2`
    与公式算出的实际翼展 14.8（展开）/ 8.6（后掠）都不一致，
    `DESIGN.md` 变更记录又写成"15.6 → 10.1 m"——**三处数字互相对不上**，改之前先确认以哪个为准。
 4. **`air` / `ground` / `sea` / `radius` 不会自动传到目标对象上。**
@@ -309,7 +309,7 @@ b.hull([
    当前最大的是 `bluewhale`（520 顶点 / 386 面）与 `cross`（428 / 328），
    新增的重舰都在 300 顶点以内（`cameroceras` 312 / 240 面是最大的一条），
    都是集装箱和门架堆出来的；**往舰船上继续堆货箱之前先看一眼这个数**。
-6. **`c9` 的 `sweepAlt: null` 是残留字段**，没有任何消费者，别以为它有含义。
+6. **`petrel` 的 `sweepAlt: null` 是残留字段**，没有任何消费者，别以为它有含义。
 7. **零厚度翼面靠画家算法。** 绕序不重要（不剔除、光照取 `|dot|`），
    但共面片没有深度差，某些角度会闪；要消除只能给翼面一点厚度或错开坐标。
 8. **颜色是 hex 字符串**，`render.js` 会按亮度 / 雾浓度各 16 档做量化缓存
@@ -339,7 +339,7 @@ b.hull([
 | `game.js` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 **32** 个必需模型（另有 `AIRCRAFT[].model` 逐条单独检查） |
 | `entities.js` | 用 `ent.radius` 做受击判定与爆炸规模（`radius` 最终来自任务传入） |
 | `missions.js` | `spawnTarget({ model, radius, ground, ... })` 决定设施用哪个模型、多大；`spawnShip({ model, ... })` 按 `model` 查 `SHIPS` 放船 |
-| `data.js` | `AIRCRAFT[].model` 与 `SHIPS[].model` 里的字符串就是 `MODELS` 的键（如 `'c11'` / `'ammonite'`） |
+| `data.js` | `AIRCRAFT[].model` 与 `SHIPS[].model` 里的字符串就是 `MODELS` 的键（如 `'frigatebird'` / `'ammonite'`） |
 
 `MODELS.missile` 是**兜底模型**：`game.js` 的 `pushOneStore()`（挂载物，
 `game.js:2712`）与 `render()` 里的导弹段（`game.js:2816`）在按 model 名
@@ -353,11 +353,11 @@ b.hull([
 NPC 读 `npcFits`。见 [loadout.md](loadout.md#npc-的挂载)。
 
 `preflight()` 的必需清单是：
-`c11 c14 s6 m27 ucav sower relay cell sam radar depot cmdpost station missile bomb pod`
+`frigatebird sailfish booby schist folded_wing sower relay cell sam radar depot cmdpost station missile bomb pod`
 **+ 16 艘舰船** `orca bluewhale humpback spermwhale dolphin trilobite ammonite
 seascorpion cameroceras dunkleosteus daplu skori diklo cross icecore atoll`
 ——新增模型后记得往 `game.js` 的 `needModels` 数组里加，否则自检不会覆盖它。
 舰船是先进清单、后进关卡的（v1.4.0 起已由 `spawnShip` 用在各关里）：
 模型名写错要在自检里暴露，而不是等某个任务第一次引用它的时候才炸。
-机型借用的模型（`c9` `c21` `c33` `gal31` `vac14` `spray` `rok40` 等）不在这份清单里，
+机型借用的模型（`petrel` `skua` `albatross` `basalt` `sandstone` `spray` `boulder` 等）不在这份清单里，
 由 `preflight` 对每条 `AIRCRAFT[].model` 的单独检查覆盖。

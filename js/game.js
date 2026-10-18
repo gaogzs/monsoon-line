@@ -3515,7 +3515,7 @@ var Game = (function () {
       }
     }
 
-    var needModels = ['c11', 'c14', 's6', 'm27', 'ucav', 'sower', 'relay', 'cell',
+    var needModels = ['frigatebird', 'sailfish', 'booby', 'schist', 'folded_wing', 'sower', 'relay', 'cell',
       'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb', 'pod',
       /* 水面舰船（SHIPS 表）—— 接入关卡之前它们也要先被自检覆盖，
          否则模型名写错要到任务里才暴露。顺序按阵营：上游 → 下游 → 其余 */
