@@ -334,6 +334,7 @@ function spawnShip(w, o) {
     team: o.team === undefined ? 1 : o.team,
     x: o.x, y: o.y === undefined ? 0 : o.y, z: o.z,
     hp: o.hp || s.hp, radius: o.radius || s.radius,
+    gunResist: o.gunResist !== undefined ? o.gunResist : (s.gunResist || 0),
     ground: true, big: true,
     value: o.value === undefined ? s.value : o.value,
     drift: o.drift || 0,

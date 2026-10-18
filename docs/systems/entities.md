@@ -87,7 +87,7 @@
   alive, isPlayer, isDrone,
   pos, fwd, up, right,                 // 三个正交基，right = up × fwd
   speed, vel, throttle, ab,
-  hp, maxHp,
+  hp, maxHp, gunResist,                // gunResist：机炮抗性（AIRCRAFT[].gunResist，缺省 0）
   ctrl:{pitch,roll,yaw},               // -1..1 输入
   gun, gunAmmo, gunHeat, firingGun, gunTimer,
   special, spAmmo, spCd,
@@ -172,7 +172,7 @@
 ```js
 { kind:'target', team, ttype:'air'|'ground', label, model, alive, dead,
   pos, fwd, up, right, speed, vel,
-  hp, maxHp, radius, ground, big, drift, drifting,
+  hp, maxHp, radius, gunResist, ground, big, drift, drifting,   // gunResist：o.gunResist → GUN_RESIST_MODELS[model] → 0
   route, wpIdx, arrive, heading,
   fireCd, weapon, value }
 ```
@@ -275,8 +275,8 @@ keydown Enter / 鼠标右键
 无制导弹/子弹：resolveBullets → scanShot
     ├ 对飞机：raySphere(prev, dir, a.pos, 7.5)，命中半径**写死 7.5**
     └ 对目标：|Δy| > radius + 本帧弹道长 → 跳过；否则 raySphere(prev, dir, tg.pos, tg.radius || 8)
-       ├ 飞机 → Ent.damage(a, dmg, world, owner) → hp≤0 → Ent.kill()
-       └ 目标 → 子母弹：Ent.clusterBurst；否则 hitTarget(dmg × warheadK)（game.js）→ hp≤0 → Ent.killGround()
+       ├ 飞机 → Ent.damage(a, dmg × gunResistK, world, owner) → hp≤0 → Ent.kill()
+       └ 目标 → 子母弹：Ent.clusterBurst；否则 hitTarget(dmg × warheadK × gunResistK)（game.js）→ hp≤0 → Ent.killGround()
 ```
 
 - `Ent.kill()` 按结构完整度决定爆炸规模（`hp>150` 用 3.2 / 26 个粒子，否则 2.2 / 20），并给 `source.kills++`。
@@ -372,7 +372,7 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 1. **`a.rwr` 曾经是死字段，现在仍不完整。** 它声明为"正在锁定本机的导弹/敌机"，但至今**没有任何一处写入它** —— 导弹告警实际是 `game.js` `update()` 每帧扫描 `world.missiles` 算出来的。
    真正在用的"被照射感知"是 `rwrT` / `rwrSrc`（`ai.js` 每帧扫描 `world.actors` 写）：它决定 AI 会不会回头咬正在照它的人，也是被动吊舱（`silentLock`）与 EMCON-Δ 的价值所在。看到 `rwr` 别以为有现成的雷达告警系统 —— 它还是空的。
 
-2. **`damage()` 扣装甲，`hitTarget()` 不扣。** 给目标物加"减伤"要自己写，`ent.armor` 对它无效。
+2. **`damage()` 扣装甲，`hitTarget()` 不扣。** 给目标物加"减伤"要自己写，`ent.armor` 对它无效。唯一对飞机和目标物都生效的减伤是机炮抗性 `gunResist`，它在 `scanShot` 里乘，只对小口径子弹生效（见 [weapons.md](weapons.md#命中与近炸)）。
 
 3. **导引弹丢失目标后不会撞上任何东西。** 近炸判定在 `if (t && m.seekerOn)` 分支里；`t` 为 null 时弹只会直飞到期或坠海。这是"干扰弹真的有用"的实现方式，但也意味着导引弹没有"流弹误伤"。
 

@@ -2384,7 +2384,7 @@ var Game = (function () {
             world.hitsLanded++;
             if (b.kind === 'bullet') world.gunHits++;
           }
-          Ent.damage(a, b.dmg, world, b.owner);
+          Ent.damage(a, b.dmg * Ent.gunResistK(a, b), world, b.owner);
           Ent.spawnParticle(world.particles, b.pos, M3.V(0, 0, 0), 0.22, 1.4, '#ffdd88', { grow: true });
           SFX.hit();
           break;
@@ -2415,7 +2415,8 @@ var Game = (function () {
           }
           b.alive = false;
           // 加固目标对普通战斗部打折（Ent.warheadK；子弹的 b.w 是 undefined → 1）
-          hitTarget(tg, b.dmg * Ent.warheadK(b.w, tg), b.owner);
+          // 小口径航炮再乘机炮抗性（Ent.gunResistK；导弹 / 炸弹 → 1）
+          hitTarget(tg, b.dmg * Ent.warheadK(b.w, tg) * Ent.gunResistK(tg, b), b.owner);
           SFX.hit();
           break;
         }
@@ -3748,6 +3749,8 @@ var Game = (function () {
     __pushStores: pushStores,
     // 水面目标的对空射击：断言要能单独推一帧，确认我方舰艇不朝玩家打
     __updateTargets: updateTargets,
+    // 弹体命中结算：断言要能单独喂一发子弹进来，量它实际打掉多少血（机炮抗性）
+    __scanShot: scanShot,
     // 追尾镜头出画处理：断言要能脱离整局游戏单独推镜头
     __camFrame: {
       frameDeficit: frameDeficit,

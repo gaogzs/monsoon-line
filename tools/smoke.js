@@ -4992,6 +4992,70 @@ try {
 }
 
 /* ============================================================
+   机炮抗性（gunResist）
+   小口径航炮打大块头只剩 (1 − gunResist)。断言三件事：
+   系数本身只对小口径子弹生效；数据从表里一路接到实体上；
+   以及"30mm 全命中持续射击多久打沉" 这条手感底线。
+   ============================================================ */
+console.log('\n机炮抗性');
+try {
+  const bad = [];
+  const S = sandbox;
+  const ship = (m) => S.SHIPS.find(s => s.model === m || s.id === m);
+  const k30 = WEAPONS.k7, k20 = WEAPONS.k3;
+  const dps = (w) => w.dmg * w.rpm / 60;
+
+  // 1) 系数：小口径子弹吃抗性，导弹 / 大口径不吃
+  const tg = Ent.makeTarget({ hp: 1000, gunResist: 0.9 });
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  if (!near(Ent.gunResistK(tg, { kind: 'bullet', cal: 30 }), 0.1)) bad.push('30mm 子弹对 0.9 抗性应为 ×0.1');
+  if (!near(Ent.gunResistK(tg, { kind: 'bullet', cal: 75 }), 1)) bad.push('75mm 炮弹不该吃机炮抗性');
+  if (!near(Ent.gunResistK(tg, { kind: 'missile', cal: 0 }), 1)) bad.push('导弹不该吃机炮抗性');
+  if (!near(Ent.gunResistK(Ent.makeTarget({ gunResist: 5 }), { kind: 'bullet', cal: 20 }), 0.001)) bad.push('抗性应封顶 0.999');
+  for (const id of ['k1', 'k2', 'k3', 'k7', 'k11']) {
+    if (!(WEAPONS[id].cal > 0 && WEAPONS[id].cal <= Ent.SMALL_CAL)) bad.push(id + ' 缺 cal 或不是小口径');
+  }
+
+  // 2) 数据接到实体上：舰船走 spawnShip，设施 / 单元按模型默认，飞机读 AIRCRAFT
+  const W = S.Game.__world();
+  const saved = { targets: W.targets, actors: W.actors, bullets: W.bullets };
+  W.targets = []; W.actors = []; W.bullets = [];
+  const hb = S.spawnShip(W, { model: ship('humpback').model, x: 0, z: 0, team: 1 });
+  if (hb.gunResist !== ship('humpback').gunResist) bad.push('spawnShip 没把 SHIPS[].gunResist 接上');
+  if (Ent.makeTarget({ model: 'cell' }).gunResist !== S.GUN_RESIST_MODELS.cell) bad.push('调节单元没取到模型默认抗性');
+  const bomber = Ent.makeAircraft({ type: 'rok40', team: 1, pos: M3.V(0, 3000, 0) });
+  if (!(bomber.gunResist > 0)) bad.push('ROK-40 没有机炮抗性');
+  for (const ac of AIRCRAFT) {
+    if (ac.role && /战斗机|截击|攻击/.test(ac.role) && ac.gunResist) bad.push(ac.id + '（' + ac.role + '）不该有机炮抗性');
+  }
+
+  // 3) 一发 30mm 实打：对航母只剩 0.5%
+  const hp0 = hb.hp;
+  const b = { kind: 'bullet', team: 0, alive: true, pos: M3.V(0, 10, -60), vel: M3.V(0, 0, 1000),
+    dmg: k30.dmg, cal: k30.cal, life: 1, owner: null };
+  S.Game.__scanShot(b, 0.05);
+  const took = hp0 - hb.hp;
+  if (b.alive) bad.push('测试子弹没打中航母');
+  else if (!near(took, k30.dmg * (1 - ship('humpback').gunResist))) bad.push('30mm 打航母掉血 ' + took + '，应为 ' + k30.dmg * (1 - ship('humpback').gunResist));
+  W.targets = saved.targets; W.actors = saved.actors; W.bullets = saved.bullets;
+
+  // 4) 手感底线（全命中、持续射击）
+  const ttk = (hp, r, w) => hp / (dps(w) * (1 - (r || 0)));
+  const hbs = ship('humpback');
+  if (ttk(hbs.hp, hbs.gunResist, k30) < 300) bad.push('航母挨 30mm 不到 300 s 就沉（' + ttk(hbs.hp, hbs.gunResist, k30).toFixed(0) + ' s）');
+  const cellT = ttk(400, S.GUN_RESIST_MODELS.cell, k20);
+  if (cellT < 2 || cellT > 6) bad.push('调节单元挨 20mm 的 TTK ' + cellT.toFixed(1) + ' s 不在 2–6 s');
+  const orca = ship('orca');
+  if (ttk(orca.hp, orca.gunResist, k30) < 5) bad.push('驱逐舰挨 30mm 不到 5 s 就沉');
+
+  if (bad.length) bad.forEach(fail);
+  else ok('机炮抗性：只对小口径子弹生效；表→实体接通；航母 30mm TTK ' +
+    ttk(hbs.hp, hbs.gunResist, k30).toFixed(0) + ' s、调节单元 20mm ' + cellT.toFixed(1) + ' s');
+} catch (e) {
+  fail('机炮抗性测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
    结果
    ============================================================ */
 console.log('');

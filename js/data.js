@@ -457,6 +457,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     name: 'ROK-40', nick: 'Boulder', cn: '巨砾',
     // 实用升限（米）：AI 不会为了追人硬爬过这里，见 ai.js 的升限段
     ceiling: 16000,
+    // 机炮抗性（小口径航炮伤害减免比例），见 entities.js 的 gunResistK
+    gunResist: 0.15,
     role: '重型轰炸机',
     faction: '下游同盟',
     planformType: '平直翼',
@@ -595,6 +597,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     // 前缀 J- 取自 jundi（注意 / 警觉）—— 空中预警的活就是"一直看着"
     name: 'J-2', nick: 'Pelican', cn: '鹈鹕',
     ceiling: 12000,
+    // 机炮抗性（小口径航炮伤害减免比例），见 entities.js 的 gunResistK
+    gunResist: 0.05,
     role: '空中预警与指挥',
     faction: '上游公约',
     planformType: '高展弦比直翼',
@@ -625,6 +629,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     // 下游按制造商编号；石英是振荡器的材料，也是他们给这架飞机取的名字
     name: 'ROK-2', nick: 'Quartz', cn: '石英',
     ceiling: 11000,
+    // 机炮抗性（小口径航炮伤害减免比例），见 entities.js 的 gunResistK
+    gunResist: 0.05,
     role: '空中预警与指挥',
     faction: '下游同盟',
     planformType: '平直翼',
@@ -655,6 +661,8 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     // 下游的电子战机。高峰军工的重型机体 + 一台烧穿吊舱
     name: 'GAL-44', nick: 'Lodestone', cn: '磁石',
     ceiling: 14000,
+    // 机炮抗性（小口径航炮伤害减免比例），见 entities.js 的 gunResistK
+    gunResist: 0.05,
     role: '随队干扰机',
     faction: '下游同盟',
     planformType: '后掠翼',
@@ -718,6 +726,7 @@ var SHIPS = [
     speed: 31,
     crew: 210,
     hp: 900, radius: 44, value: 600,
+    gunResist: 0.9,
     label: '虎鲸',
     vials: ['四面相控阵', '前甲板垂发阵位', '动力舱'],
     arms: ['32 单元舰空弹垂发', '近防炮 ×2', '76 mm 舰炮 ×1', '反潜鱼雷 ×6'],
@@ -749,6 +758,7 @@ var SHIPS = [
     speed: 25,
     crew: 180,
     hp: 1200, radius: 62, value: 700,
+    gunResist: 0.95,
     label: '蓝鲸',
     vials: ['三座补给门架', '艉部上层建筑', '货舱与油舱'],
     arms: ['直升机 ×2', '近防炮 ×2'],
@@ -779,6 +789,7 @@ var SHIPS = [
     speed: 30,
     crew: 2400,
     hp: 2600, radius: 84, value: 1400,
+    gunResist: 0.995,
     label: '座头鲸',
     vials: ['飞行甲板与弹射器', '舰岛与航空管制', '机库与弹药升降机'],
     arms: ['舰载机 ×40（含 DB-11）', '舰空弹 ×16', '近防炮 ×4'],
@@ -807,6 +818,7 @@ var SHIPS = [
     speed: 32,
     crew: 380,
     hp: 1500, radius: 50, value: 900,
+    gunResist: 0.93,
     label: '抹香鲸',
     vials: ['四面大相控阵', '前后垂发阵位', '塔式综合桅杆'],
     arms: ['96 单元舰空弹垂发', '76 mm 舰炮 ×1', '近防炮 ×2', '反潜鱼雷 ×8'],
@@ -834,6 +846,7 @@ var SHIPS = [
     speed: 29,
     crew: 140,
     hp: 520, radius: 33, value: 340,
+    gunResist: 0.8,
     label: '海豚',
     vials: ['拖曳声呐与艉部绞车', '前主炮', '烟囱与动力段'],
     arms: ['反舰导弹 ×4', '舰空弹 ×8', '76 mm 舰炮 ×1', '反潜鱼雷 ×4'],
@@ -863,6 +876,7 @@ var SHIPS = [
     speed: 40,
     crew: 21,
     hp: 120, radius: 13, value: 120,
+    gunResist: 0.2,
     label: '三叶虫',
     vials: ['两座四联装发射箱', '驾驶室', '主机的进排气'],
     arms: ['反舰导弹 ×8', '30 mm 遥控炮 ×1'],
@@ -891,6 +905,7 @@ var SHIPS = [
     speed: 27,
     crew: 110,
     hp: 420, radius: 36, value: 320,
+    gunResist: 0.8,
     label: '菊石',
     vials: ['舰桥与前向搜索阵面', '前主炮', '烟囱与动力段'],
     arms: ['反舰导弹 ×8', '舰空导弹箱 ×6', '76 mm 舰炮 ×1', '近防炮 ×1'],
@@ -920,6 +935,7 @@ var SHIPS = [
     speed: 18,
     crew: 90,
     hp: 560, radius: 40, value: 260,
+    gunResist: 0.85,
     label: '海蝎',
     vials: ['艏门与跳板机构', '车辆甲板', '艉部上层建筑'],
     arms: ['30 mm 遥控炮 ×2'],
@@ -948,6 +964,7 @@ var SHIPS = [
     speed: 24,
     crew: 210,
     hp: 900, radius: 58, value: 1100,
+    gunResist: 0.92,
     label: '房角石',
     vials: ['三段发射模块', '前部火控与指挥舱', '动力舱'],
     arms: ['垂发单元 ×312', '近防炮 ×2'],
@@ -979,6 +996,7 @@ var SHIPS = [
     speed: 28,
     crew: 290,
     hp: 1050, radius: 46, value: 700,
+    gunResist: 0.93,
     label: '邓氏鱼',
     vials: ['前后反舰弹发射箱', '舰桥与前向阵面', '双烟囱'],
     arms: ['反舰导弹 ×32', '76 mm 舰炮 ×1', '舰空弹 ×8', '近防炮 ×1'],
@@ -1009,6 +1027,7 @@ var SHIPS = [
     speed: 26,
     crew: 12,
     hp: 90, radius: 10, value: 80,
+    gunResist: 0,
     label: '屿',
     vials: ['驾驶室', '桅杆与雷达'],
     arms: ['20 mm 遥控炮 ×1'],
@@ -1038,6 +1057,7 @@ var SHIPS = [
     speed: 15,
     crew: 54,
     hp: 300, radius: 32, value: 200,
+    gunResist: 0.6,
     label: '准绳',
     vials: ['艏楼主绞盘', '艉部布缆机', '作业门架'],
     arms: ['无'],
@@ -1066,6 +1086,7 @@ var SHIPS = [
     speed: 16,
     crew: 22,
     hp: 160, radius: 20, value: 120,
+    gunResist: 0.5,
     label: '标杆',
     vials: ['艏部上层建筑', '艉部 A 型吊架'],
     arms: ['无'],
@@ -1094,6 +1115,7 @@ var SHIPS = [
     speed: 19,
     crew: 28,
     hp: 800, radius: 54, value: 0,
+    gunResist: 0.9,
     neutral: true,
     label: '南十字',
     vials: ['艉部上层建筑', '货舱'],
@@ -1124,6 +1146,7 @@ var SHIPS = [
     speed: 14,
     crew: 46,
     hp: 320, radius: 30, value: 0,
+    gunResist: 0.6,
     neutral: true,
     label: '冰芯',
     vials: ['艉部 A 型吊架', '雷达罩'],
@@ -1153,6 +1176,7 @@ var SHIPS = [
     speed: 12,
     crew: 16,
     hp: 140, radius: 18, value: 0,
+    gunResist: 0.4,
     neutral: true,
     label: '环礁',
     vials: ['桅杆与天线', '艏部上层建筑'],
@@ -1193,7 +1217,7 @@ var WEAPONS = {
        那一片不是靠单发精度打中的，是靠射速填满的：
        完整算式与"射速兜底"的余量表见
        docs/systems/weapons.md「机炮散布」。 */
-    rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
+    cal: 20, rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
     range: 1600, highRange: 2600,
     /* "翻倍"不准确：range 1600 → highRange 2600，实际 1.63 倍。
        现在这句话和数值已经对上了 —— fireGun 会真的按射程算子弹寿命。 */
@@ -1203,7 +1227,7 @@ var WEAPONS = {
   k7: {
     name: 'CEL-7', cn: '30mm 四管转膛炮', kind: 'gun',
     /* 口径大、弹重 → 炮口跳动更大，散布比 CEL-3 再大一档。 */
-    rpm: 3900, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
+    cal: 30, rpm: 3900, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
     range: 2000, highRange: 3100,
     desc: 'G-6 专用。一发足以打穿巡逻艇的上层建筑。'
   },
@@ -1225,7 +1249,7 @@ var WEAPONS = {
 
   k1: {
     name: 'CEL-1', cn: '20mm 六管转膛炮 · 外销型', kind: 'gun',
-    rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
+    cal: 20, rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
     range: 1600, highRange: 2600,
     desc: '上游二十年前的外销型，和 CEL-3 是同一张图纸 ——' +
       '只是当年卖出去的那一批零件公差更松、炮管寿命更短。' +
@@ -1233,7 +1257,7 @@ var WEAPONS = {
   },
   k2: {
     name: 'CEL-2', cn: '20mm 六管转膛炮 · 库存批', kind: 'gun',
-    rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
+    cal: 20, rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
     range: 1600, highRange: 2600,
     desc: '调节场管理局不造武器。这门炮是从上游的退役库存里整批买来的，' +
       '机匣上还留着上一任使用方的序列号 —— 它唯一的作用是让勤务机' +
@@ -1242,7 +1266,7 @@ var WEAPONS = {
   k11: {
     name: 'CEL-11', cn: '30mm 四管转膛炮 · 下游型', kind: 'gun',
     /* 与 k7 同参数：口径、散布、射程都照抄，改的只是归属与来历。 */
-    rpm: 3900, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
+    cal: 30, rpm: 3900, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
     range: 2000, highRange: 3100,
     desc: '下游同盟的制式机炮 —— 他们只有这一门。和上游的 CEL-7 口径相同、' +
       '路数不同：下游不关心炮管寿命，只关心弹箱能塞多大，' +
@@ -2431,6 +2455,24 @@ var FLARE_RD = {
    目前只有测控 / 雷达站：混凝土基座、天线罩外有防护。
    ============================================================ */
 var HARD_MODELS = { radar: true };
+
+/* ============================================================
+   机炮抗性（gunResist）
+   小口径航炮（cal ≤ Ent.SMALL_CAL）打在它身上只剩 (1 − gunResist)。
+   机炮射速太高，命中就是一片 —— 对大块头、厚结构或"打个孔也无所谓"的
+   东西，这一片不该等于一枚对地弹。
+
+   飞机写在 AIRCRAFT[].gunResist，舰船写在 SHIPS[].gunResist；
+   这里是没有独立数据表的设施 / 调节单元，按模型取默认值
+   （spawnTarget 传了 gunResist 就以传入为准）。
+   ============================================================ */
+var GUN_RESIST_MODELS = {
+  cell: 0.75,      // 调节单元：打一个孔只是给它放气，低气压下也不会内爆
+  sam: 0.5,        // 发射车 + 掩体
+  radar: 0.6,      // 混凝土基座、天线罩外有防护（同时是 HARD_MODELS）
+  relay: 0.7,      // 高空中继平台：桁架结构，弹丸大多穿过
+  station: 0.9     // 海上站点：整座平台
+};
 
 
 /* ============================================================

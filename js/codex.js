@@ -1117,6 +1117,9 @@ function _seekerLabel(w) {
   return s;
 }
 
+/* 机炮抗性的显示：0 / 缺省 → —，其余按百分比（保留一位小数，航母是 99.5%） */
+function _gunResistTxt(r) { return r ? (Math.round(r * 1000) / 10) + '%' : '—'; }
+
 CODEX.push({
   cat: '图鉴 / INVENTORY',
   id: 'inv1',
@@ -1130,7 +1133,7 @@ CODEX.push({
       '矢量俯视识别图、设定全文与完整参数。</p>';
 
     h += '<table class="cx-table"><tr><th>型号</th><th>阵营</th><th>定位</th>' +
-      '<th>最大速度</th><th>俯仰率</th><th>结构</th><th>挂点</th><th>翼型</th></tr>';
+      '<th>最大速度</th><th>俯仰率</th><th>结构</th><th>机炮抗性</th><th>挂点</th><th>翼型</th></tr>';
     for (var i = 0; i < AIRCRAFT.length; i++) {
       var a = AIRCRAFT[i];
       var pts = 0, grps = a.hardpointGroups || [];
@@ -1149,6 +1152,7 @@ CODEX.push({
         '<td>' + a.phys.vMax + ' m/s</td>' +
         '<td>' + a.phys.pitch.toFixed(2) + ' rad/s</td>' +
         '<td>' + a.phys.hp + '</td>' +
+        '<td>' + _gunResistTxt(a.gunResist) + '</td>' +
         '<td>' + pts + ' 点 / ' + grps.length + ' 组</td>' +
         '<td>' + (a.planformType || '—') + '</td>' +
         '</tr>';
@@ -1313,13 +1317,14 @@ CODEX.push({
     h += '<h4>要害与舰载武备</h4><p class="cx-note">' +
       '要害仅作识别参考，游戏中没有分部位命中判定。</p>' +
       '<table class="cx-table"><tr><th>舰名</th><th>要害</th><th>舰载武备</th>' +
-      '<th>结构</th><th>受击半径</th></tr>';
+      '<th>结构</th><th>机炮抗性</th><th>受击半径</th></tr>';
     for (si = 0; si < SHIPS.length; si++) {
       s = SHIPS[si];
       h += '<tr><td><b>' + s.cn + '</b><br><span class="d">' + s.hull + '</span></td>' +
         '<td>' + s.vials.join(' · ') + '</td>' +
         '<td>' + s.arms.join(' · ') + '</td>' +
         '<td>' + s.hp + '</td>' +
+        '<td>' + _gunResistTxt(s.gunResist) + '</td>' +
         '<td>' + s.radius + ' m</td></tr>';
     }
     h += '</table>';

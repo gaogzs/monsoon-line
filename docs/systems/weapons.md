@@ -440,6 +440,13 @@ if (dist < reach) hitAny(t, m.dmg * warheadK(w, t) * (antiRadar && isRadiating(t
   或作为无制导弹撞上设施时调 `Ent.clusterBurst`：半径（+目标自身 `radius`）内**每个**敌方
   地面目标吃满额 `dmg × warheadK`，边缘不衰减；只打地面，不打飞机。
 
+- **机炮抗性（`gunResist`）**：小口径航炮子弹（`b.kind === 'bullet'` 且 `b.cal ≤ Ent.SMALL_CAL` = 40 mm）
+  打中带 `gunResist` 的单位，伤害 ×(1 − gunResist)（`Ent.gunResistK`，封顶 0.999）。导弹、炸弹、
+  大口径炮弹不受影响。飞机、设施、舰船都吃（`scanShot` 两个分支各乘一次）；与 JDA-3 的 `armor` 相乘叠加。
+  数值来源：`AIRCRAFT[].gunResist`（ROK-40 0.15、预警 / 干扰机 0.05，其余 0）、`SHIPS[].gunResist`
+  （小艇 0 → 航母 0.995）、`GUN_RESIST_MODELS`（调节单元 0.75、SAM 0.5、雷达 0.6、中继 0.7、站点 0.9）。
+  机炮武器的 `cal` 字段（mm）由 `fireGun` 写到子弹上。
+
 子弹与**无制导弹**都用 `M3.raySphere()` 做**线段**求交
 （`prev → pos`），见 [flight-model.md](flight-model.md#子弹)。
 

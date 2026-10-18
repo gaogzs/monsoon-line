@@ -498,6 +498,7 @@ var Ent = (function () {
 
       hp: ac.phys.hp,
       maxHp: ac.phys.hp,
+      gunResist: ac.gunResist || 0,
 
       ctrl: { pitch: 0, roll: 0, yaw: 0 },
 
@@ -1428,6 +1429,15 @@ var Ent = (function () {
     tg.hp -= dmg;
     if (tg.hp <= 0) killGround(tg, world);
   }
+  /* 机炮抗性系数：小口径航炮弹（bullet 且 cal ≤ SMALL_CAL）打在 ent 上的伤害倍率。
+     导弹、炸弹、大口径炮弹不受影响 —— 抗性模拟的是"弹丸太小、对方太大太结实"。
+     上限 0.999：再硬的东西也不该是完全无敌的。数值表见 data.js GUN_RESIST_MODELS。 */
+  var SMALL_CAL = 40;
+  function gunResistK(ent, shot) {
+    if (!shot || shot.kind !== 'bullet' || (shot.cal || 0) > SMALL_CAL) return 1;
+    return 1 - M3.clamp(ent.gunResist || 0, 0, 0.999);
+  }
+
   function hitAny(e, dmg, world, source) {
     if (e.kind === 'target') hitSurface(e, dmg, world, source);
     else damage(e, dmg, world, source);
@@ -1686,7 +1696,7 @@ var Ent = (function () {
         prev: M3.clone(muzzle),
         side: a.gunSide,            // 哪一侧炮口：曳光尾巴接回当前炮口，见 game.js drawTracers
         vel: M3.add(M3.mul(dir, w.speed), a.vel),
-        dmg: w.dmg, life: bulletLife, owner: a
+        dmg: w.dmg, cal: w.cal || 0, life: bulletLife, owner: a
       });
     }
 
@@ -1948,6 +1958,8 @@ var Ent = (function () {
       hp: o.hp || 100,
       maxHp: o.hp || 100,
       radius: o.radius || 10,
+      gunResist: o.gunResist !== undefined ? o.gunResist :
+        ((typeof GUN_RESIST_MODELS !== 'undefined' && GUN_RESIST_MODELS[o.model]) || 0),
       ground: !!o.ground,
       big: !!o.big,
       drift: o.drift || 0,
@@ -2051,6 +2063,7 @@ var Ent = (function () {
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
     clusterBurst: clusterBurst, isHard: isHard, warheadK: warheadK,
+    gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,
     setTargetHitHandler: setTargetHitHandler, hitSurface: hitSurface,
     makeTarget: makeTarget, stepTarget: stepTarget,
     randUnit: randUnit

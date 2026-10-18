@@ -332,6 +332,7 @@ var UnitView = (function () {
       ['加减速', '加速 ' + p.accel + ' · 减速 ' + p.decel + ' m/s²'],
       ['俯仰 / 滚转 / 偏航', p.pitch + ' / ' + p.roll + ' / ' + p.yaw + ' rad/s'],
       ['结构完整度', esc(p.hp)],
+      a.gunResist ? ['机炮抗性', gunResistTxt(a.gunResist) + '（小口径航炮伤害减免）'] : null,
       ['最大挂载', a.maxLoad + ' kg'],
       /* 预警机与重型轰炸机在数据里没有机炮（`gun: null`）。
          以前这里会显示 "undefined" —— 那是把内部空值漏给了读者。 */
@@ -358,6 +359,9 @@ var UnitView = (function () {
     return paraTable(rows);
   }
 
+  /* 与 codex.js 的 _gunResistTxt 同一写法；这里自带一份，单独加载本模块的预览工具也能用 */
+  function gunResistTxt(r) { return (Math.round(r * 1000) / 10) + '%'; }
+
   function shipParams(s) {
     var rows = [
       ['舰种', esc(s.cls || '—')],
@@ -373,6 +377,7 @@ var UnitView = (function () {
     ];
     if (!s.neutral) {
       rows.push(['结构 / 受击半径', s.hp + ' / ' + s.radius + ' m']);
+      if (s.gunResist) rows.push(['机炮抗性', gunResistTxt(s.gunResist) + '（小口径航炮伤害减免）']);
       rows.push(['任务价值分', s.value]);
     } else {
       rows.push(['交战国籍', '<span class="uv-neutral">未参战 · 攻击它没有战术收益</span>']);
