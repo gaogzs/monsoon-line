@@ -4939,6 +4939,9 @@ try {
   ship.weapon = 'dl9'; ship.fireCd = 0;
   const foe = Ent.makeAircraft({ type: AIRCRAFT[0].id, team: 1, pos: M3.V(3000, 3000, 6000) });
   foe.team = 1; foe.pos = M3.V(3000, 3000, 6000);
+  /* 真的静止：速度也清零。否则导弹按 vel 打提前量、目标却每帧被拽回原地，
+     弹永远飞向一个不存在的提前点 —— 旧的 prox+6（40 m）把这个误差盖住了。 */
+  foe.vel = M3.V(0, 0, 0); foe.speed = 0;
   W.targets = [ship]; W.actors = [pl, foe]; W.missiles = [];
 
   let shotsAtFriend = 0, shotsAtFoe = 0, killed = false;
@@ -5053,6 +5056,172 @@ try {
     ttk(hbs.hp, hbs.gunResist, k30).toFixed(0) + ' s、调节单元 20mm ' + cellT.toFixed(1) + ' s');
 } catch (e) {
   fail('机炮抗性测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   范围伤害与近炸引信（Combat，v1.13）
+   断言：衰减函数的边界与单调；同队不受伤、中立照样被炸；
+   撞地 / 寿命到期会起爆（不再是哑弹）；子母弹不伤飞机；
+   盲飞追诱饵会在诱饵上起爆；以及爆炸特效的尺寸与粒子预算。
+   ============================================================ */
+console.log('\n范围伤害与近炸');
+try {
+  const bad = [];
+  const C = sandbox.Combat;
+  if (!C) throw new Error('Combat 没有加载（index.html 漏了 js/combat.js？）');
+
+  // 1) 衰减：core 内为 1，R 外为 0，中间单调下降
+  if (C.falloffK(0, 4, 20) !== 1 || C.falloffK(4, 4, 20) !== 1) bad.push('falloffK 在满伤半径内不是 1');
+  if (C.falloffK(20, 4, 20) !== 0 || C.falloffK(35, 4, 20) !== 0) bad.push('falloffK 在爆炸半径外不是 0');
+  let prevK = 1;
+  for (let d = 4; d <= 20; d += 0.5) {
+    const k = C.falloffK(d, 4, 20);
+    if (k > prevK + 1e-12) { bad.push('falloffK 不单调（d=' + d + '）'); break; }
+    prevK = k;
+  }
+
+  const mkAir = (team, x) => {
+    const a = Ent.makeAircraft({ type: 'frigatebird', team: team, pos: M3.V(x, 3000, 0) });
+    a.team = team; a.pos = M3.V(x, 3000, 0); a.vel = M3.V(0, 0, 0);
+    a.hp = a.maxHp = 1e6; a.armor = 0;
+    return a;
+  };
+  const shotOf = (wid, team, pos) => ({
+    kind: 'missile', alive: true, team: team, owner: null, pos: M3.clone(pos),
+    vel: M3.V(0, 0, 0), w: WEAPONS[wid], dmg: WEAPONS[wid].dmg
+  });
+
+  // 2) 同队不受伤，中立（team 2）照样被炸，敌方按距离衰减
+  {
+    const sp = C.spec(WEAPONS.mrm);
+    const mate = mkAir(0, 5), foe = mkAir(1, -5), neu = mkAir(2, 0), far = mkAir(1, sp.blast + 40);
+    mate.pos = M3.V(5, 3000, 0); foe.pos = M3.V(-5, 3000, 0); far.pos = M3.V(sp.blast + 40, 3000, 0);
+    neu.pos = M3.V(0, 3000, 6);
+    const W = { actors: [mate, foe, neu, far], targets: [], particles: [], missiles: [] };
+    C.detonate(shotOf('mrm', 0, M3.V(0, 3000, 0)), W, null, null);
+    if (mate.hp !== mate.maxHp) bad.push('爆炸伤到了同队飞机');
+    if (!(foe.hp < foe.maxHp)) bad.push('爆炸半径内的敌机没掉血');
+    if (!(neu.hp < neu.maxHp)) bad.push('爆炸没有波及中立单位（应与子弹的 team !== 规则一致）');
+    if (far.hp !== far.maxHp) bad.push('爆炸半径外的敌机也掉了血');
+  }
+
+  // 3) 撞地会起爆：对地弹落在目标旁边的地上，目标要吃溅射
+  {
+    const tg = Ent.makeTarget({ hp: 1e6, x: 18, y: 0, z: 0, radius: 6, team: 1 });
+    const W = { actors: [], targets: [tg], particles: [], missiles: [], bullets: [] };
+    const m = Ent.makeMissile({ weapon: 'asl', team: 0, pos: M3.V(0, 3, 0), fwd: M3.V(0, -1, 0), speed: 200 });
+    W.missiles.push(m);
+    for (let f = 0; f < 60 && m.alive; f++) Ent.stepMissile(m, 1 / 60, W);
+    if (m.alive) bad.push('对地弹撞地之后没有结束');
+    else if (!(tg.hp < tg.maxHp)) bad.push('撞地没有起爆（爆炸半径内的目标没掉血）');
+  }
+
+  // 4) 寿命到期：在空中自爆，旁边的敌机吃溅射
+  {
+    const foe = mkAir(1, 6);
+    const W = { actors: [foe], targets: [], particles: [], missiles: [] };
+    const m = Ent.makeMissile({ weapon: 'srm', team: 0, pos: M3.V(0, 3000, 0), fwd: M3.V(0, 0, 1), speed: 1 });
+    m.age = m.life + 1;
+    Ent.stepMissile(m, 1 / 60, W);
+    if (m.alive || !(foe.hp < foe.maxHp)) bad.push('寿命到期的导弹没有在空中起爆');
+  }
+
+  // 5) 子母弹不伤飞机（blastAir:false），但照样炸地面
+  {
+    const foe = mkAir(1, 0); foe.pos = M3.V(0, 20, 0);
+    const tg = Ent.makeTarget({ hp: 1e6, x: 30, y: 0, z: 0, radius: 8, team: 1 });
+    const W = { actors: [foe], targets: [tg], particles: [], missiles: [] };
+    C.detonate(shotOf('clb', 0, M3.V(0, 0, 0)), W, null, null, { ground: true });
+    if (foe.hp !== foe.maxHp) bad.push('子母弹伤到了飞机');
+    if (!(tg.hp < tg.maxHp)) bad.push('子母弹没有炸到覆盖半径内的地面目标');
+  }
+
+  // 6) 近炸：正面迎头擦过（脱靶量落在 fuze 内），要在最近点起爆并造成部分伤害
+  {
+    const w = WEAPONS.mrm, sp = C.spec(w);
+    const miss = C.HIT_R_AIR + sp.fuze * 0.6;
+    const foe = mkAir(1, 0);
+    foe.pos = M3.V(miss, 3000, 400); foe.vel = M3.V(0, 0, 0);
+    const W = { actors: [foe], targets: [], particles: [], missiles: [] };
+    const m = Ent.makeMissile({ weapon: 'mrm', team: 0, pos: M3.V(0, 3000, 0), fwd: M3.V(0, 0, 1), speed: 700, target: foe });
+    m.turn = 0;                    // 不修正：就让它按这条线擦过去
+    W.missiles.push(m);
+    for (let f = 0; f < 120 && m.alive; f++) Ent.stepMissile(m, 1 / 60, W);
+    const took = foe.maxHp - foe.hp;
+    if (m.alive) bad.push('擦过 fuze 内的导弹没有起爆');
+    else if (!(took > 0 && took < w.dmg)) bad.push('近炸擦伤应为部分伤害，实际 ' + took + ' / ' + w.dmg);
+    else if (Math.abs(m.pos.z - 400) > 3) bad.push('近炸没有在最近点起爆（z=' + m.pos.z.toFixed(1) + '）');
+  }
+
+  // 7) 追诱饵：盲飞期内追着诱饵云飞，在云上起爆，伤到云旁边的飞机
+  {
+    const foe = mkAir(1, 0); foe.pos = M3.V(0, 3000, 600);
+    const W = { actors: [foe], targets: [], particles: [], missiles: [] };
+    const m = Ent.makeMissile({ weapon: 'srm', team: 0, pos: M3.V(0, 3000, 0), fwd: M3.V(0, 0, 1), speed: 600 });
+    m.reLockT = 1.4;
+    m.decoy = { p: M3.V(0, 3000, 600 - 6), v: M3.V(0, 0, 0), t0: 0, p2: 0, done: false };
+    W.missiles.push(m);
+    for (let f = 0; f < 120 && m.alive; f++) Ent.stepMissile(m, 1 / 60, W);
+    if (m.alive) bad.push('盲飞的导弹没有在诱饵上起爆');
+    else if (!(foe.hp < foe.maxHp)) bad.push('贴身投的诱饵上起爆没有溅到载机');
+  }
+
+  // 7b) 新挂载：TOR-8 动能弹擦过不伤人、撞上满伤；CLA-8 重战斗部在编队中间炸开能伤到多架
+  {
+    const pass = (wid, miss, extra) => {
+      const foe = mkAir(1, 0); foe.pos = M3.V(miss, 3000, 400);
+      const W = { actors: [foe].concat(extra || []), targets: [], particles: [], missiles: [] };
+      const m = Ent.makeMissile({ weapon: wid, team: 0, pos: M3.V(0, 3000, 0), fwd: M3.V(0, 0, 1), speed: 700, target: foe });
+      m.turn = 0;
+      for (let f = 0; f < 120 && m.alive; f++) Ent.stepMissile(m, 1 / 60, W);
+      return W.actors.map(a => a.maxHp - a.hp);
+    };
+    if (pass('kkv', C.HIT_R_AIR + 4)[0] !== 0) bad.push('TOR-8 动能弹擦过也造成了伤害');
+    if (pass('kkv', 0)[0] !== WEAPONS.kkv.dmg) bad.push('TOR-8 动能弹撞上没有打满 ' + WEAPONS.kkv.dmg);
+    const wing = mkAir(1, 0); wing.pos = M3.V(-30, 3000, 400);
+    const took = pass('hwm', 10, [wing]);
+    if (!(took[0] > 0 && took[1] > 0)) bad.push('CLA-8 在编队中间炸开没有同时伤到两架（' + took.join(' / ') + '）');
+  }
+
+  // 8) 特效尺寸：破片最远飞到 [0.8, 1.15] × blast，火球 ≤ 0.55 × blast
+  for (const wid of ['srm', 'mrm', 'arm']) {
+    const sp = C.spec(WEAPONS[wid]);
+    const W = { particles: [], player: null };
+    const o = M3.V(0, 3000, 0);
+    C.blastFx(W, o, WEAPONS[wid], {});
+    let frag = 0, ball = 0;
+    for (let f = 0; f < 600; f++) {
+      for (const p of W.particles) {
+        if (!p.alive) continue;
+        const d = M3.dist(p.pos, o);
+        if (p.streak) frag = Math.max(frag, d);
+        else if (p.color !== '#3a3632') ball = Math.max(ball, d);
+      }
+      Ent.stepParticles(W.particles, 1 / 60);
+    }
+    if (frag < 0.8 * sp.blast || frag > 1.15 * sp.blast) bad.push(wid + ' 破片最远 ' + frag.toFixed(1) + ' m，应在 [0.8, 1.15] × ' + sp.blast);
+    if (ball > 0.55 * sp.blast) bad.push(wid + ' 火球最远 ' + ball.toFixed(1) + ' m，超过 0.55 × ' + sp.blast);
+  }
+
+  // 9) 齐射预算：8 发同时起爆，粒子数不超上限，后起爆的被 LOD 削减
+  {
+    const W = { particles: [], player: null };
+    const counts = [];
+    // 场上本来就很忙（600 个粒子）：齐射要被 LOD 压住，不能把上限挤爆
+    for (let i = 0; i < 600; i++) Ent.spawnParticle(W.particles, M3.V(0, 0, 0), M3.V(0, 0, 0), 5, 1, '#888');
+    for (let i = 0; i < 8; i++) {
+      const n0 = W.particles.length;
+      C.blastFx(W, M3.V(i * 50, 3000, 0), WEAPONS.arm, {});
+      counts.push(W.particles.length - n0);
+    }
+    if (W.particles.length > 900) bad.push('8 发齐射粒子数 ' + W.particles.length + ' 超过 900');
+    if (!(counts[counts.length - 1] < counts[0])) bad.push('齐射时 LOD 没有生效（每发粒子数 ' + counts.join('/') + '）');
+  }
+
+  if (bad.length) bad.forEach(fail);
+  else ok('范围伤害：衰减边界 / 同队豁免 / 撞地与寿命到期起爆 / 子母弹不伤飞机 / 最近点近炸 / 诱饵起爆 / 特效尺寸与预算');
+} catch (e) {
+  fail('范围伤害测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
 /* ============================================================

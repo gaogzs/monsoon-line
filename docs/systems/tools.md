@@ -22,6 +22,7 @@
 |---|---|---|
 | `smoke.js` | 在无浏览器环境把整个游戏跑起来并断言 | **每次改完代码** |
 | `probe-missions.js` | **逐关验证"清空敌人之后到底能不能赢"**，并检查 NPC 挂载问题 | 加了新关卡、改了胜负条件之后 |
+| `probe-blast.js` | 每种空空弹按 straight / gentle / hard / jink / max / flare 六档机动各打 N 发，统计命中率、平均伤害（占 `dmg` 比例）、起爆距离，与 `probe-blast.baseline.json` 对比 | 改了近炸 / 爆炸半径 / 导引之后 |
 | `release.js` | 按命令里给的版本号追加 `CHANGELOG.md` 草稿，生成 `js/changelog.js` 与 `js/version.js` | **每次发一个版本**（`node tools/release.js vX.Y.Z`） |
 | `stamp-version.js` | 只把上一次提交写进 `js/version.js`（版本号从 `CHANGELOG.md` 顶部读） | **每次 `git commit` 之前** |
 | `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
@@ -74,6 +75,21 @@ OK  10 sk1  第四周    OK     win@34.5s lose@—  mount=0
 > 所以任何"跑一遍游戏"的工具都必须确认**主循环真的在转**
 > （`timeLeft` 在减少、或某一关的 `win` 花了非零帧数）。
 
+### `probe-blast.js` —— 近炸与溅射的分布
+
+靶机按脚本运动（不走 AI），新旧版本跑的是同一组交战。基线 `tools/probe-blast.baseline.json`
+是 v1.13 改动前存的，`dmg` 记为武器 `dmg` 的比例，便于跨弹比较。
+
+```
+node tools/probe-blast.js              跑一遍并和基线对比
+node tools/probe-blast.js --save       存为新基线
+node tools/probe-blast.js --n 80       每档发数（默认 120）
+node tools/probe-blast.js --only srm   只跑一种弹
+node tools/probe-blast.js --flare      投弹时机实验：srm 来袭，3000 / 1000 / 300 / 100 m 各投一组干扰弹
+```
+
+`--flare` 的期望：早投 ≈ 0 伤害、贴脸投 > 0、随距离单调（诱饵起爆的溅射）。
+
 ---
 
 ## tools/smoke.js
@@ -91,7 +107,7 @@ node tools/smoke.js
 
 ```text
 == 加载脚本 ==
-  OK    15 个脚本全部加载，无语法/求值异常
+  OK    16 个脚本全部加载，无语法/求值异常
 == 初始化 ==
 [季风线] 自检通过：模块与数据引用全部一致。
   OK    开机自检通过：模块与数据引用一致
@@ -234,7 +250,7 @@ function pump(frames) {
 
 | 分组 | 在防什么回归 |
 |---|---|
-| `== 加载脚本 ==` | 15 个脚本按 `index.html` 顺序求值，任何语法错/顶层求值异常 |
+| `== 加载脚本 ==` | 16 个脚本按 `index.html` 顺序求值，任何语法错/顶层求值异常 |
 | `== 初始化 ==` | `Game.init()` 抛异常；`preflight()` 的红条；初始屏幕必须是 `scr-title` |
 | `== 导航 ==` + `== 完整流程 ==` | 八个 `data-go` 在 `game.js` 里都要有 `go === '...'` 分支，且点击后 `.active` 真的换到目标 `scr-*`；再从 title 走一遍 brief → hangar（导航失效过一次：flex item 缺 `min-height` 把 footer 顶出视口） |
 | `== 更新记录 ==` | `js/changelog.js` 必须与 `CHANGELOG.md` **逐字段相等**（忘了跑 `release.js` 的拦网）；版本号格式 `vX.Y.Z`、日期格式、`<!-- commit: -->` 锚点、每版至少一条改动、版本号严格递减、`CHANGELOG.current` 与 `js/version.js` 的版本号一致；页面上画出的条目数 = 版本数，且每个版本号都出现在 HTML 里 |
@@ -259,6 +275,7 @@ function pump(frames) {
 | 资料库：动态生成的图鉴必须能跑 + 导弹急转应当掉速 | `CODEX` 里 `build()` 动态条目必须能生成且够长；导弹急转必须掉速（0.5 s 至少 15 m/s），否则躲导弹在物理上不可能 |
 | 调节单元：每一关头顶都有，不锁任何武器，误击只记一次 | 每关 `w.cells` 9–60 个（10 km 间距）、17.5–21.5 km、`team 2` + `friendlyAsset`、都在 `targets` 里；ROE 残余（判据函数、`world.roeBlocked`）不许回来；玩家打掉一个单元 `friendlyLoss` 只 +1；m5 的 MERLI 有 `route.wps`、守得住巡视高度、150 s 内到第一个编组；资料库 `s4` 有 `mount()` 且不抛异常 |
 | 告警栈：按优先级排、永不重叠 | 全部告警同时打开：顺序等于 `HUD.ALERT_ORDER`、导弹逼近在最上、失速在动压前、相邻两行的 y 差不小于上一行的行高 |
+| `范围伤害与近炸`（v1.13） | 衰减边界、同队豁免、撞地与寿命到期起爆、子母弹不伤飞机、最近点近炸、诱饵起爆、特效尺寸与粒子预算 |
 | F 键选目标 | 屏幕内锁离瞄准环最近的、1.5 s 内连按换第二近、屏幕内为空时锁最近的屏幕外目标 |
 
 ### 怎么写一条新断言
@@ -675,6 +692,7 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 | 更新记录页的样式 | `style.css` 的 `.cl-*`；数据在 `js/changelog.js`，条目文本由 `clInline()` 还原 `**粗**` / `` `代码` `` |
 | 版本号检查（格式 / 必须比当前大） | `release.js` 的 `normalizeVersion()` / `compareVersion()`；版本号本身由人在命令里给，见 [VERSIONING.md](../VERSIONING.md) 第 2 节 |
 | 改名影响哪些文件 / 旧→新对照表 | `rename-aircraft.js` 的 `FILES` / `PLANES` 数组 |
+| 近炸探针的发数 / 基线 | `probe-blast.js` 的 `--n`（默认 120）、`probe-blast.baseline.json` |
 | 命名体系校验的词根表 | `smoke.js` 的 `RAFSI` / `UP_PREFIX` / `DOWN_PREFIX` |
 
 ---

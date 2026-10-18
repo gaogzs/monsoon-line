@@ -56,8 +56,7 @@
 | `spawnParticle` | `spawnParticle(list, pos, vel, life, size, color, opt)` | 生成一个粒子。`opt = {grow, alpha, drag, grav}` |
 | `stepParticles` | `stepParticles(list, dt)` | 粒子每帧：寿命 → 位移 → 阻力 → 重力 |
 | `explode` | `explode(list, pos, scale, count)` | 爆炸：多色火球 + 黑烟 |
-| `detonate` | `detonate(m, t, world)` | 近炸命中判定：`cluster` 弹转 `clusterBurst`；地面目标判定距离再加 `radius`；伤害 × `warheadK`（反辐射弹对辐射源再 ×2）；经 `hitAny` 分流到 `damage` / 设施回调 |
-| `clusterBurst` | `clusterBurst(m, world)` | 子母弹面杀伤：半径 `w.cluster`（+目标 `radius`）内每个敌方地面目标吃满额 `dmg × warheadK`；`game.js` 的 `scanShot` 也直接调它 |
+| `detonate` | `detonate(m, t, world)` | 兼容包装，转 `Combat.detonate`（范围伤害见 [weapons.md](weapons.md#命中与近炸)）。`clusterBurst` 已删除 |
 | `isHard` | `isHard(t) → bool` | 加固目标：`t.hard` 或 `HARD_MODELS[t.model]` |
 | `warheadK` | `warheadK(w, t) → 系数` | 战斗部对目标的系数：非加固 1；加固时 `penetrator` 1、`cluster` 0.2、其余 0.6 |
 | `hitSurface` | `hitSurface(tg, dmg, world, source)` | 对设施 / 舰船结算一次伤害：有回调走 `hitTarget`，没有就 `hp -= dmg` + `killGround`。`hitAny` 的设施分支就是它；`smoke.js` 也直接调它测误伤计数 |
@@ -70,7 +69,7 @@
 | `stepTarget` | `stepTarget(t, dt, world)` | 目标物每帧：航路或漂移 + 受损下沉 |
 | `randUnit` | `randUnit() → 单位向量` | 球面均匀随机方向（爆炸、干扰弹用） |
 
-**不导出的内部函数**：`killMissile(m, world, hit)`；`irAcquire(m, world)`（红外重捕获 —— `w.target !== 'air'` 的弹只扫 `world.targets`）；`decoyRecheck(m)`（盲飞期结束时判诱饵云二次欺骗，`DECOY_LIFE = 2.6`）；`hitSurface` / `hitAny`（伤害分流）；`isRadiating`；`buildNpcMounts`。（`detonate` 虽然也导出了，但正常只在 `stepMissile` 内部调用。）外部模块要击落导弹请直接置 `m.alive = false`（`updateDEW` 就是这么做的）。
+**不导出的内部函数**：`killMissile(m, world, hit)`（撞地 / 寿命到期也起爆）；`fuzeCheck(m, t, world)`（近炸：相对运动线段最近点）；`decoyTarget(m)`（盲飞期的诱饵虚拟目标，`DECOY_R = 4`）；`irAcquire(m, world)`（红外重捕获 —— `w.target !== 'air'` 的弹只扫 `world.targets`）；`decoyRecheck(m)`（盲飞期结束时判诱饵云二次欺骗，`DECOY_LIFE = 2.6`）；`hitSurface` / `hitAny`（伤害分流）；`isRadiating`；`buildNpcMounts`。（`detonate` 虽然也导出了，但正常只在 `stepMissile` 内部调用。）外部模块要击落导弹请直接置 `m.alive = false`（`updateDEW` 就是这么做的）。
 
 ---
 
@@ -135,11 +134,12 @@
 ```js
 { kind:'missile', team, weapon, w, model, alive,
   pos, fwd, up, right, speed, vel,
-  target, age, life, dmg, turn, prox,
+  target, age, life, dmg, turn, fuze, fuzeRel, fuzeRef,
   owner, trailTimer, seekers, dewRolled, seekerOn, lostTime,
   decoyTries, reLockT }
 ```
 
+- `fuze` = `Combat.spec(w).fuze`；`fuzeRel` / `fuzeRef`：上一帧弹相对目标的位置及量的是谁（换目标即作废），供 `fuzeCheck` 求线段最近点。
 - `w` 是 `WEAPONS[weapon]` 的引用，所有弹道参数都从这读，弹体本身**不复制**它们。
 - `vel` 只在**无动力弹**（`w.ballistic`）里独立累积；有发动机的弹每帧 `vel = fwd × speed`。
 - `decoyTries` / `reLockT` 是诱饵的两个计数器：前者控制"越投越难骗"，
@@ -269,14 +269,16 @@ keydown Enter / 鼠标右键
 ### 4.4 一次命中的结算链路
 
 ```
-导引弹：stepMissile → dist < prox+6   → detonate
-    ├ w.cluster → clusterBurst（落地 pos.y<=0 时也触发）
-    └ 若 dist < prox+14(+radius) → hitAny：飞机 damage / 设施 hitTarget 回调，伤害 × warheadK
+导引弹：stepMissile → fuzeCheck（只看自己的目标 / 诱饵）
+    ├ gap < CONTACT(1.5) → 直接命中，Combat.detonate(direct = 目标)
+    └ gap < fuze 且最近点在本帧 → 在最近点 Combat.detonate
+撞地 / 寿命到期 → killMissile → Combat.detonate（不再是哑弹）
+Combat.blast：半径内 actors + targets（同队、发射者除外）× falloffK × warheadK → 飞机 damage / 设施 hitTarget
 无制导弹/子弹：resolveBullets → scanShot
-    ├ 对飞机：raySphere(prev, dir, a.pos, 7.5)，命中半径**写死 7.5**
+    ├ 对飞机：raySphere(prev, dir, a.pos, Combat.HIT_R_AIR = 7.5)
     └ 对目标：|Δy| > radius + 本帧弹道长 → 跳过；否则 raySphere(prev, dir, tg.pos, tg.radius || 8)
        ├ 飞机 → Ent.damage(a, dmg × gunResistK, world, owner) → hp≤0 → Ent.kill()
-       └ 目标 → 子母弹：Ent.clusterBurst；否则 hitTarget(dmg × warheadK × gunResistK)（game.js）→ hp≤0 → Ent.killGround()
+       └ 目标 → 无制导弹：Combat.detonate(direct)（撞飞机同理）；子弹：hitTarget(dmg × warheadK × gunResistK)（game.js）→ hp≤0 → Ent.killGround()
 ```
 
 - `Ent.kill()` 按结构完整度决定爆炸规模（`hp>150` 用 3.2 / 26 个粒子，否则 2.2 / 20），并给 `source.kills++`。
@@ -359,6 +361,7 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 |---|---|---|
 | `M3` | 被依赖 | 所有向量与旋转。`rotAxis` / `orthonormalize` / `raySphere` / `turnToward` / `angleBetween` |
 | `WEAPONS` `AIRCRAFT` | 被依赖 | 弹道参数与机型性能；`makeAircraft` 找不到机型会**静默回退到 `AIRCRAFT[0]`** |
+| `Combat` | 被依赖 | `spec` / `radiusOf` / `detonate`（`combat.js` 加载在 `entities.js` 之后，只在运行期调用） |
 | `SFX` | 被依赖 | `boom` / `flare` / `hit` / `laser` / `bigHit` |
 | `world` | 参数 | 由 `game.js` 建立，实体只读它做归属与音效（`world.particles`） |
 | `AI` | 依赖 `Ent` | `AI.update` 写 `a.ctrl`，调 `Ent.fireGun` / `Ent.breakLock` |
@@ -374,7 +377,7 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 
 2. **`damage()` 扣装甲，`hitTarget()` 不扣。** 给目标物加"减伤"要自己写，`ent.armor` 对它无效。唯一对飞机和目标物都生效的减伤是机炮抗性 `gunResist`，它在 `scanShot` 里乘，只对小口径子弹生效（见 [weapons.md](weapons.md#命中与近炸)）。
 
-3. **导引弹丢失目标后不会撞上任何东西。** 近炸判定在 `if (t && m.seekerOn)` 分支里；`t` 为 null 时弹只会直飞到期或坠海。这是"干扰弹真的有用"的实现方式，但也意味着导引弹没有"流弹误伤"。
+3. **导引弹只对自己的目标近炸。** `fuzeCheck` 只量 `m.target`（盲飞期量诱饵虚拟目标），路过别的飞机不触发。但撞地 / 寿命到期会起爆，半径内任何非同队单位都吃溅射 —— 所以现在**有**流弹误伤。
 
 4. **无制导弹必须给初速。** `makeMissile` 里 `vel` 对 `ballistic` 弹显式赋值；给 0 的话它就"从空中静止开始往下掉"，抛出的动能全丢。这是踩过的坑，注释里留着。
 

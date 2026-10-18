@@ -439,6 +439,8 @@ var UnitView = (function () {
       (!pod && w.speed) ? ['速度', w.speed + ' m/s' + (w.boost ? '（助推 +' + w.boost + '）' : '')] : null,
       (!pod && w.turn) ? ['转弯率', w.turn + ' rad/s'] : null,
       (!pod && w.dmg) ? ['战斗部', w.dmg] : null,
+      (!pod && w.dmg && typeof _fuzeTxt === 'function') ? ['引信', esc(_fuzeTxt(w))] : null,
+      (!pod && w.dmg && typeof _blastTxt === 'function') ? ['爆炸半径', esc(_blastTxt(w))] : null,
       (!pod && w.salvo > 1) ? ['齐射', '一按 ' + w.salvo + ' 发'] : null,
       (!pod && w.perPoint) ? ['单挂点', '×' + w.perPoint] : null,
       w.cd ? ['冷却', w.cd + ' s'] : null,

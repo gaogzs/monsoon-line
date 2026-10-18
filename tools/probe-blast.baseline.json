@@ -1,0 +1,610 @@
+{
+ "srm": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.1,
+   "detSd": 4.2
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.9,
+   "detSd": 3.2
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 13,
+   "detSd": 3.9
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.6,
+   "detSd": 3.4
+  },
+  "flare": {
+   "hit": 0.442,
+   "dmg": 0.442,
+   "detMean": 12.3,
+   "detSd": 3.4
+  }
+ },
+ "trm": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.3,
+   "detSd": 4.3
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 11.3,
+   "detSd": 4.3
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 11.5,
+   "detSd": 4.3
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.1,
+   "detSd": 4
+  },
+  "flare": {
+   "hit": 0.658,
+   "dmg": 0.658,
+   "detMean": 11.9,
+   "detSd": 4.6
+  }
+ },
+ "hos": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 11.5,
+   "detSd": 3.1
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 10.8,
+   "detSd": 3.6
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 11.1,
+   "detSd": 3.1
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 11.5,
+   "detSd": 3.1
+  },
+  "flare": {
+   "hit": 0.575,
+   "dmg": 0.575,
+   "detMean": 11.1,
+   "detSd": 3.2
+  }
+ },
+ "mrm": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 18.1,
+   "detSd": 4.3
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 16.6,
+   "detSd": 4.9
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 16.8,
+   "detSd": 5
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 17,
+   "detSd": 4.9
+  },
+  "flare": {
+   "hit": 0.442,
+   "dmg": 0.442,
+   "detMean": 16.6,
+   "detSd": 4.4
+  }
+ },
+ "arm": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 20,
+   "detSd": 4.7
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 20.1,
+   "detSd": 4.6
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 19.3,
+   "detSd": 4.7
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 18.8,
+   "detSd": 4.7
+  },
+  "flare": {
+   "hit": 0.442,
+   "dmg": 0.442,
+   "detMean": 19,
+   "detSd": 4.5
+  }
+ },
+ "vlar": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 24.9,
+   "detSd": 5.3
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 24.3,
+   "detSd": 5.6
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 23.4,
+   "detSd": 5.3
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 23.4,
+   "detSd": 5.7
+  },
+  "flare": {
+   "hit": 0.358,
+   "dmg": 0.358,
+   "detMean": 23.4,
+   "detSd": 5.6
+  }
+ },
+ "qsr": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 9,
+   "detSd": 3.3
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 9.5,
+   "detSd": 3.3
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 8.9,
+   "detSd": 3.4
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 9.4,
+   "detSd": 3.8
+  },
+  "flare": {
+   "hit": 0.483,
+   "dmg": 0.483,
+   "detMean": 8.7,
+   "detSd": 3.3
+  }
+ },
+ "wasp": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.6,
+   "detSd": 4.8
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 14,
+   "detSd": 4
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 13.8,
+   "detSd": 3.8
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 13.5,
+   "detSd": 4.5
+  },
+  "flare": {
+   "hit": 0.358,
+   "dmg": 0.358,
+   "detMean": 12.8,
+   "detSd": 4.5
+  }
+ },
+ "swm": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 7.4,
+   "detSd": 3.3
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 7.4,
+   "detSd": 3.4
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 7,
+   "detSd": 3.2
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 7.1,
+   "detSd": 3.2
+  },
+  "flare": {
+   "hit": 0.325,
+   "dmg": 0.325,
+   "detMean": 7.3,
+   "detSd": 3.7
+  }
+ },
+ "hva": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 23,
+   "detSd": 5
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 22.5,
+   "detSd": 5.1
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 22.6,
+   "detSd": 5.2
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 21.8,
+   "detSd": 5.3
+  },
+  "flare": {
+   "hit": 0.35,
+   "dmg": 0.35,
+   "detMean": 22.5,
+   "detSd": 5.3
+  }
+ },
+ "v11": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 17.3,
+   "detSd": 4.4
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 17.4,
+   "detSd": 3.9
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 18.1,
+   "detSd": 4
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 17.5,
+   "detSd": 4.7
+  },
+  "flare": {
+   "hit": 0.508,
+   "dmg": 0.508,
+   "detMean": 17.7,
+   "detSd": 4.2
+  }
+ },
+ "v9": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 14.4,
+   "detSd": 3.8
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 14.2,
+   "detSd": 3.9
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 14.3,
+   "detSd": 4
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 14,
+   "detSd": 4.1
+  },
+  "flare": {
+   "hit": 0.133,
+   "dmg": 0.133,
+   "detMean": 14.3,
+   "detSd": 2.8
+  }
+ },
+ "v17": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 18.4,
+   "detSd": 6
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 17.9,
+   "detSd": 6.4
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 17.9,
+   "detSd": 6.5
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 17.7,
+   "detSd": 6.2
+  },
+  "flare": {
+   "hit": 0.317,
+   "dmg": 0.317,
+   "detMean": 17.1,
+   "detSd": 5.7
+  }
+ },
+ "vbn": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.8,
+   "detSd": 3.4
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 11,
+   "detSd": 4.7
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.3,
+   "detSd": 4.3
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 12.8,
+   "detSd": 3.7
+  },
+  "flare": {
+   "hit": 0.575,
+   "dmg": 0.575,
+   "detMean": 12,
+   "detSd": 3.5
+  }
+ },
+ "otr": {
+  "straight": {
+   "hit": 0.908,
+   "dmg": 0.908,
+   "detMean": 13.2,
+   "detSd": 3.1
+  },
+  "gentle": {
+   "hit": 0.908,
+   "dmg": 0.908,
+   "detMean": 13.1,
+   "detSd": 3.1
+  },
+  "hard": {
+   "hit": 0.783,
+   "dmg": 0.783,
+   "detMean": 13.4,
+   "detSd": 3.3
+  },
+  "jink": {
+   "hit": 0.833,
+   "dmg": 0.833,
+   "detMean": 13.7,
+   "detSd": 2.8
+  },
+  "flare": {
+   "hit": 0.183,
+   "dmg": 0.183,
+   "detMean": 13.9,
+   "detSd": 3.1
+  }
+ },
+ "dl4": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 19.8,
+   "detSd": 4.8
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 18.9,
+   "detSd": 5.1
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 18.8,
+   "detSd": 4.7
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 18.2,
+   "detSd": 5.2
+  },
+  "flare": {
+   "hit": 0.475,
+   "dmg": 0.475,
+   "detMean": 20,
+   "detSd": 4.4
+  }
+ },
+ "dl6": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 16.1,
+   "detSd": 3.4
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 16.8,
+   "detSd": 4
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 15.9,
+   "detSd": 4.2
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 16.7,
+   "detSd": 3.7
+  },
+  "flare": {
+   "hit": 0.508,
+   "dmg": 0.508,
+   "detMean": 16.7,
+   "detSd": 3.9
+  }
+ },
+ "dl9": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 23.3,
+   "detSd": 5.6
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 24.3,
+   "detSd": 4.7
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 23.7,
+   "detSd": 5
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 24.3,
+   "detSd": 5.8
+  },
+  "flare": {
+   "hit": 0.342,
+   "dmg": 0.342,
+   "detMean": 24.3,
+   "detSd": 5.1
+  }
+ },
+ "ss6": {
+  "straight": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 22.7,
+   "detSd": 4.4
+  },
+  "gentle": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 24,
+   "detSd": 4.9
+  },
+  "hard": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 23.9,
+   "detSd": 5.5
+  },
+  "jink": {
+   "hit": 1,
+   "dmg": 1,
+   "detMean": 23.4,
+   "detSd": 5.1
+  },
+  "flare": {
+   "hit": 0.383,
+   "dmg": 0.383,
+   "detMean": 24,
+   "detSd": 5.3
+  }
+ }
+}

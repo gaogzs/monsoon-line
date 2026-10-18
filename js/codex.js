@@ -1076,6 +1076,21 @@ function _capLabel(c) {
 }
 
 /** 射程列的文字 */
+/* 战斗部的两列：引信（近炸触发半径）与爆炸半径（满伤半径 / 外缘）。
+   数从 Combat.spec 读 —— 与实际结算同一个口径。 */
+function _fuzeTxt(w) {
+  if (w.passive || !w.dmg) return '—';
+  var s = Combat.spec(w);
+  return s.fuze > 0 ? '近炸 ' + s.fuze + ' m' : '触发';
+}
+function _blastTxt(w) {
+  if (w.passive || !w.dmg) return '—';
+  var s = Combat.spec(w);
+  if (s.blast <= 0) return '仅直接命中';
+  if (s.core >= s.blast) return s.blast + ' m 平伤' + (s.air ? '' : '（仅地面）');
+  return s.core + ' / ' + s.blast + ' m' + (s.air ? '' : '（仅地面）');
+}
+
 function _rngTxt(w) {
   // 定向能吊舱不"飞过去"，它有一个拦截半径
   if (w.kind === 'dew' && w.interceptRange) {
@@ -1188,6 +1203,8 @@ CODEX.push({
       '机动能力断崖式下降，所以这个数比"总飞行距离"更贴近实战。' +
       '实际交战距离还受锁定距离与目标机动影响。' +
       '<br><b>单点</b>是一个挂载点能带的发数；' +
+      '<br><b>爆炸半径</b>写成"满伤 / 外缘"，按到目标表面的距离衰减，外缘处为零；' +
+      '<b>引信</b>的近炸半径是触发距离，弹在离目标最近的那一刻起爆。' +
       '同一种武器挂到多个组上，弹药与齐射数会一起累加。' +
       '<br>被动吊舱不占扳机，装上就一直起作用，' +
       '代价是少带一枚弹。' +
@@ -1226,6 +1243,8 @@ CODEX.push({
             ? '<br><span class="d">限 ' + w.needs.map(_capLabel).join(' / ') + '</span>'
             : '') + '</td>' +
           '<td>' + _seekerLabel(w) + '</td>' +
+          '<td>' + _fuzeTxt(w) + '</td>' +
+          '<td>' + _blastTxt(w) + '</td>' +
           '<td>' + (w.cd ? w.cd + 's' : '—') + '</td>' +
           '</tr>';
       }
@@ -1233,7 +1252,7 @@ CODEX.push({
       h += '<h4>' + cats[ci].t + '</h4>' +
         '<table class="cx-table"><tr><th>编号</th><th>代号</th><th>定位</th>' +
         '<th>射程</th><th>单点</th><th>kg</th><th>可挂</th><th>导引</th>' +
-        '<th>冷却</th></tr>' +
+        '<th>引信</th><th>爆炸半径</th><th>冷却</th></tr>' +
         rows + '</table>';
     }
 

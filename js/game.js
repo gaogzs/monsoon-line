@@ -2377,13 +2377,18 @@ var Game = (function () {
       for (j = 0; j < world.actors.length; j++) {
         var a = world.actors[j];
         if (!a.alive || a.team === b.team) continue;
-        var t = M3.raySphere(prev, dir, a.pos, 7.5);
+        var t = M3.raySphere(prev, dir, a.pos, Combat.HIT_R_AIR);
         if (t >= 0 && t <= segLen) {
-          b.alive = false;
           if (b.owner && b.owner.isPlayer) {
             world.hitsLanded++;
             if (b.kind === 'bullet') world.gunHits++;
           }
+          /* 无制导弹撞上飞机：就地起爆，直接命中的那架满伤，旁边的吃溅射 */
+          if (b.kind === 'missile') {
+            Combat.detonate(b, world, M3.add(prev, M3.mul(dir, t)), a);
+            break;
+          }
+          b.alive = false;
           Ent.damage(a, b.dmg * Ent.gunResistK(a, b), world, b.owner);
           Ent.spawnParticle(world.particles, b.pos, M3.V(0, 0, 0), 0.22, 1.4, '#ffdd88', { grow: true });
           SFX.hit();
@@ -2406,10 +2411,10 @@ var Game = (function () {
             world.hitsLanded++;
             if (b.kind === 'bullet') world.gunHits++;
           }
-          /* 子母弹撞上设施 = 就地抛撒，按覆盖半径结算一片（Ent.clusterBurst）。 */
-          if (b.w && b.w.cluster) {
-            b.pos = M3.add(prev, M3.mul(dir, t2));
-            Ent.clusterBurst(b, world);
+          /* 无制导弹（火箭 / 炸弹 / 子母弹）撞上设施 = 就地起爆（Combat.detonate）：
+             直接命中的满伤，爆炸半径内的其他目标按距离衰减。 */
+          if (b.kind === 'missile') {
+            Combat.detonate(b, world, M3.add(prev, M3.mul(dir, t2)), tg);
             SFX.hit();
             break;
           }
@@ -2421,10 +2426,11 @@ var Game = (function () {
           break;
         }
       }
-      if (b.pos.y <= 0) b.alive = false;
+      /* 子弹落地就没了；无制导弹落地的起爆在 stepMissile 里 */
+      if (b.pos.y <= 0 && b.kind !== 'missile') b.alive = false;
   }
 
-  /* 制导弹（detonate）与子母弹（clusterBurst）打设施也走这里 ——
+  /* 导弹 / 炸弹的起爆（Combat.blast）打设施也走这里 ——
      以前它们走的是 Ent.damage → kill()，击毁不进 groundKilled、
      误击调节单元也不记处罚。 */
   Ent.setTargetHitHandler(function (tg, dmg, source) { hitTarget(tg, dmg, source); });
@@ -3527,7 +3533,7 @@ var Game = (function () {
     }
 
     var needWeapons = ['k1', 'k2', 'k3', 'k7', 'k11', 'v11', 'v9', 'v17', 'v22', 'v25', 'v30',
-      'e4', 'l2', 'dl4', 'dl6', 'dl9'];
+      'e4', 'l2', 'dl4', 'dl6', 'dl9', 'hwm', 'kkv'];
     for (i = 0; i < needWeapons.length; i++) {
       if (!WEAPONS[needWeapons[i]]) problems.push('缺少武器 ' + needWeapons[i]);
     }

@@ -961,7 +961,10 @@ var Ent = (function () {
       life: w.vsLife,
       dmg: w.dmg,
       turn: w.turn,
-      prox: w.prox,
+      /* 近炸：上一帧弹相对目标的位置（fuzeRel），以及它是对谁量的（fuzeRef）。
+         换目标时要重新开始量，否则一帧之内会"瞬移"出一条假的最近点线段。 */
+      fuze: Combat.spec(w).fuze,
+      fuzeRel: null, fuzeRef: null,
       owner: o.owner || null,
       trailTimer: 0,
       /* 双导引头（BIN-9 `twinSeeker`）：一次诱饵只能骗掉其中一个，
@@ -1096,6 +1099,7 @@ var Ent = (function () {
        递减必须发生在导引段**之前**，否则捕获分支永远读不到 0。 */
     if (m.reLockT > 0) m.reLockT -= dt;
     if (m.decoy && !m.decoy.done && m.reLockT <= 0) decoyRecheck(m);
+    /* 寿命到期：在空中自爆（包括被电子干扰骗走、盲飞到期的弹）—— 以前是哑弹 */
     if (m.age > m.life) { killMissile(m, world, false); return; }
 
     // ---- 动力段 ----
@@ -1193,6 +1197,13 @@ var Ent = (function () {
       }
     }
 
+    /* 被诱饵骗走的盲飞期：把那团诱饵云当作虚拟目标继续追（见 decoyTarget），
+       而不是直飞 —— 追上了就在云里起爆，爆炸照样会波及旁边的人。 */
+    if (!t && world) {
+      var dcT = decoyTarget(m);
+      if (dcT) { t = dcT; m.seekerOn = true; }
+    }
+
     if (t && m.seekerOn) {
       var toT = M3.sub(t.pos, m.pos);
       var dist = M3.len(toT);
@@ -1272,11 +1283,6 @@ var Ent = (function () {
         if (!w.ballistic) m.speed = Math.max(170, m.speed - load * 62 * dt);
       }
 
-      // 近炸
-      if (dist < m.prox + 6) {
-        detonate(m, t, world);
-        return;
-      }
     } else if (!t) {
       /* 无目标时：直线飞一会儿，然后按各自的规则重新捕获。
 
@@ -1338,10 +1344,14 @@ var Ent = (function () {
       }
     }
 
+    /* 近炸 / 撞上：按本帧的相对运动做线段最近点（见 fuzeCheck）。
+       无制导弹不走这里 —— 它们的命中靠 game.js 的 scanShot。 */
+    if (t && m.seekerOn && !w.unguided && world && fuzeCheck(m, t, world)) return;
+
     if (m.pos.y <= 0) {
-      /* 子母 / 集束弹落地就是抛撒完成：按覆盖半径结算一片（见 clusterBurst）。 */
-      if (w.cluster && world) { m.pos.y = 0; clusterBurst(m, world); return; }
-      killMissile(m, world, false);
+      /* 撞地 / 落水：就地起爆。子母弹落地就是抛撒完成，按覆盖半径结算一片。 */
+      if (world) { m.pos.y = 0; Combat.detonate(m, world, null, null, { ground: true }); }
+      else m.alive = false;
       return;
     }
 
@@ -1443,44 +1453,64 @@ var Ent = (function () {
     else damage(e, dmg, world, source);
   }
 
-  /* 子母 / 集束弹的面杀伤（`w.cluster` = 覆盖半径，米）。
+  /* 近炸 / 撞上的判定：在**最近的那一刻**起爆。
 
-     只打**水面 / 地面目标** —— 子弹药是往下撒的，打不到天上的飞机。
-     半径内每个目标吃满额伤害（再乘加固系数），边缘不衰减：
-     子弹药是均匀铺开的，不是一个爆心。 */
-  function clusterBurst(m, world) {
-    m.alive = false;
-    var R = m.w.cluster;
-    explode(world.particles, m.pos, 1.4, 22);
-    SFX.boom(0.9);
-    var tl = world.targets || [];
-    for (var i = 0; i < tl.length; i++) {
-      var g = tl[i];
-      if (!g.alive || g.team === m.team || g.team > 1) continue;   // 中立（team 2）谁都不认
-      var dx = g.pos.x - m.pos.x, dz = g.pos.z - m.pos.z;
-      var reach = R + (g.radius || 8);
-      if (dx * dx + dz * dz > reach * reach) continue;
-      if (Math.abs(g.pos.y - m.pos.y) > reach + 60) continue;
-      hitSurface(g, m.dmg * warheadK(m.w, g), world, m.owner);
+     每帧量一次"弹相对目标"的位置，上一帧到这一帧连成一条线段，
+     求线段上离原点最近的那一点 —— 700 m/s 的弹一帧走 12 m，
+     只看端点会从目标身边穿过去而判不到。
+
+       最近点距目标表面 < CONTACT          直接撞上，当帧起爆，满伤
+       < fuze，且最近点落在本帧内           相对距离已由减转增：在最近点起爆
+       否则                                 记下这一帧，下一帧再看
+
+     起爆点放在"目标当前位置 + 最近点的相对位置"：这样 blast 量到的
+     弹目距离正好就是最近点距离。 */
+  function fuzeCheck(m, t, world) {
+    var rel1 = M3.sub(m.pos, t.pos);
+    var rel0 = (m.fuzeRef === t && m.fuzeRel) ? m.fuzeRel : null;
+    m.fuzeRel = rel1; m.fuzeRef = t;
+    if (!rel0) return false;
+    var d = M3.sub(rel1, rel0);
+    var dd = M3.dot(d, d);
+    var s = dd > 1e-9 ? M3.clamp(-M3.dot(rel0, d) / dd, 0, 1) : 1;
+    var cp = M3.add(rel0, M3.mul(d, s));
+    var r = t.kind === 'decoy' ? DECOY_R : Combat.radiusOf(t);
+    var gap = M3.len(cp) - r;
+    var isDecoy = t.kind === 'decoy';
+    if (gap < Combat.CONTACT) {
+      Combat.detonate(m, world, M3.add(t.pos, cp), isDecoy ? null : t);
+      return true;
     }
+    if (m.fuze > 0 && gap < m.fuze && s < 1) {
+      Combat.detonate(m, world, M3.add(t.pos, cp), null);
+      return true;
+    }
+    return false;
   }
 
+  /* 盲飞期内追的那团诱饵云：外推位置 p + v × (age − t0)。
+     云熄灭了、或者盲飞期已经结束（重新搜索 / 咬回真目标）就不再追。 */
+  var DECOY_R = 4;
+  function decoyTarget(m) {
+    var dc = m.decoy;
+    if (!dc || m.reLockT <= 0 || m.w.unguided) return null;
+    var tau = m.age - dc.t0;
+    if (tau < 0 || tau > DECOY_LIFE) return null;
+    if (!dc.ent) dc.ent = { kind: 'decoy', alive: true, pos: dc.p, vel: dc.v };
+    dc.ent.pos = M3.add(dc.p, M3.mul(dc.v, tau));
+    return dc.ent;
+  }
+
+  /* 兼容入口：t 是直接命中的单位（可为空）。所有起爆都走 Combat.detonate。 */
   function detonate(m, t, world) {
-    if (m.w && m.w.cluster) { clusterBurst(m, world); return; }
-    m.alive = false;
-    explode(world.particles, m.pos, 1.0, 14);
-    SFX.boom(0.75);
-    if (t && t.alive && M3.dist(t.pos, m.pos) < m.prox + 14 + (t.kind === 'target' ? (t.radius || 0) : 0)) {
-      var dmg = m.dmg * warheadK(m.w, t);
-      /* 反辐射弹对**正在辐射**的目标伤害翻倍 —— 它找的就是那部雷达。 */
-      if (m.w && m.w.antiRadar && isRadiating(t)) dmg *= 2;
-      hitAny(t, dmg, world, m.owner);
-    }
+    Combat.detonate(m, world, null, t || null);
   }
 
+  /* 弹体结束：hit = 撞上了东西。寿命到期也会起爆（Combat.blast） —— 以前是哑弹。 */
   function killMissile(m, world, hit) {
+    if (!m.alive) return;
+    if (world) { Combat.detonate(m, world, null, null); return; }
     m.alive = false;
-    if (hit) explode(world.particles, m.pos, 0.8, 12);
   }
 
   /** 干扰弹：尝试把追踪本机的红外弹骗走 */
@@ -1780,7 +1810,9 @@ var Ent = (function () {
       life: life, life0: life,
       size: size, color: color, alive: true,
       grow: !!opt.grow, alpha: opt.alpha === undefined ? 1 : opt.alpha,
-      drag: opt.drag || 0, grav: opt.grav || 0
+      drag: opt.drag || 0, grav: opt.grav || 0,
+      /* streak：按速度拉成短线（破片）；delay：先隐身这么多秒再开始（子母弹错开起爆） */
+      streak: !!opt.streak, delay: opt.delay || 0
     });
   }
 
@@ -1788,6 +1820,7 @@ var Ent = (function () {
     for (var i = 0; i < list.length; i++) {
       var p = list[i];
       if (!p.alive) continue;
+      if (p.delay > 0) { p.delay -= dt; continue; }
       p.life -= dt;
       if (p.life <= 0) { p.alive = false; continue; }
       p.pos = M3.add(p.pos, M3.mul(p.vel, dt));
@@ -2062,7 +2095,7 @@ var Ent = (function () {
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
-    clusterBurst: clusterBurst, isHard: isHard, warheadK: warheadK,
+    isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,
     setTargetHitHandler: setTargetHitHandler, hitSurface: hitSurface,
     makeTarget: makeTarget, stepTarget: stepTarget,

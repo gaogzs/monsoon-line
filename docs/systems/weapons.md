@@ -72,7 +72,9 @@ var ROOTS = {
   lockCone, lockDist,        // 锁定锥角（弧度）与最大锁定距离（米）
   dmg, ammo, cd, salvo,      // 伤害 / 备弹 / 冷却 / 一次按键打出的发数
   flare,                     // 被干扰弹骗到的概率 0..1，越高越好骗
-  prox,                      // 近炸半径（米）
+  fuze,                      // 近炸触发半径（米，量到目标表面）；0 / 缺省 = 只有触发引信
+  blast, blastCore,          // 爆炸半径 / 满伤半径（米，量到受害者表面）；blast 0 = 无溅射
+  blastAir,                  // 缺省 true；false = 只伤地面（子母弹）
   target,                    // air | ground | ship | none
   desc,                      // 卡片与图鉴的简介（HTML）
   stat: {dmg, spd, trn, rng, ecm}   // 0..1，仅用于界面条形图
@@ -113,14 +115,14 @@ rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
 | 标记 | 被谁读 | 含义 |
 |---|---|---|
 | `reAcquire` | `entities.js` `stepMissile` | **雷达弹**丢失后在 2.6 km 且锁定锥内重新捕获最近的敌机（盲飞期 `reLockT` 之后）。红外弹不靠它，走 `irAcquire()` 自主寻的 —— `target !== 'air'` 的红外弹（GUT-9、TUM-7）只在 `world.targets` 里找地面热源，不会转去追飞机 |
-| `antiRadar` | `entities.js` `detonate` | 对**正在辐射**的目标（预警机、开机的干扰机）伤害 ×2 |
+| `antiRadar` | `combat.js` `blast` | 对**正在辐射**的目标（预警机、开机的干扰机）伤害 ×2 |
 | `npcFits` | `entities.js` `fitsKind` / `mountPlan` | NPC 的挂点适配表（写在字面量里，不经 `STORE_ATTR`）；缺省退回 `fits` |
 | `nezer` | `ai.js`（最小发射距离 1400）、`game.js`（锁定 1.5 s） | 冲压弹：NEZ 大但近距无力 |
 | `scramjet` | `entities.js` `effectiveLife`、`hud.js` | 18 km 以上动力段骤减 |
 | `highAltImmune` | `entities.js` | 转弯下限抬到 0.78（仅 SPO-9）；代价是低空推力最多 −45%、滑翔掉速最多 ×1.6（按相对密度插值） |
 | `ballistic` | `entities.js` | 无动力，走自由落体弹道；有导引头的（GUT-9、PEJ-30）由导引转动**速度矢量**（保持速率） |
 | `hobs` | `entities.js` `stepMissile` | 出膛后的导引头视场取 max(77°, `lockCone`)，大离轴锁定的目标不会出膛即丢 |
-| `cluster` | `entities.js` `clusterBurst`、`game.js` `scanShot` | 数值 = 覆盖半径（米）；起爆 / 落地 / 撞设施时半径内所有地面目标吃满额伤害 |
+| `cluster` | `entities.js` `warheadK`、图鉴 `{{cluster}}` | 数值 = 覆盖半径（米）；面杀伤本身改由 `blast = cluster`、`blastCore = blast`、`blastAir: false` 表达（PEJ-9 60、PEJ-30 80） |
 | `penetrator` | `entities.js` `warheadK` | 对加固目标（`HARD_MODELS`）全额伤害；普通战斗部 ×0.6、集束 ×0.2 |
 | `loft` | `entities.js` `stepMissile` | `{alt, dive}`：水平距离 > dive 时瞄准点抬高 alt，末段俯冲（GUT-25、BOX-14） |
 | `decoyMemory` | `entities.js` `decoyRecheck` | 盲飞结束时不会被骗走它的那团诱饵云再骗一次（CLA-4） |
@@ -166,47 +168,53 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 
 ### 空空导弹
 
-| 键 | 名 | seeker | speed | boost | life/vsLife | turn | lockDist | dmg | flare | lead | cd | 单点 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `srm` | TOR-2 短矢 | ir | 760 | 180 | 4.5 / 12 | 1.75 | 4200 | 30 | 0.38 | 0.38 | 4.8 | 8 |
-| `trm` | TOR-4 短哨 | ir | 820 | 210 | 5.0 / 13 | 1.95 | 4800 | 32 | 0.24 | 0.48 | 5.6 | 6 |
-| `hos` | TOR-6 环刃 | ir | 700 | 240 | 4.0 / 11 | 2.60 | 3200 | 28 | 0.42 | 0.30 | 5.2 | 4 |
-| `qsr` | GIR-5 群刺 | ir | 740 | 190 | 4.2 / 11 | 1.70 | 4000 | 24 | 0.40 | 0.42 | 7.6 | 12 |
-| `wasp` | SUT-7 蜂刺 | ir | 860 | 260 | 4.8 / 12 | 2.15 | 5200 | 38 | 0.36 | 0.55 | 8.4 | 3 |
-| `swm` | GIR-12 鸦群 | ir | 720 | 300 | 3.5 / 9 | 2.55 | 3400 | 16 | 0.44 | 0.44 | 4.4 | 16 |
-| `v9` | GIR-9 蜂群 | ir | 830 | 200 | 4.0 / 9 | 1.90 | 3800 | 44 | 0.50 | 0.52 | 6 | 2 |
-| `v11` | SUT-11 锥刺 | ir | 790 | 280 | 5.0 / 11 | 2.45 | 4600 | 56 | 0.35 | 0.62 | 9.2 | 2 |
-| `mrm` | CLA-4 中继 | radar | 900 | 200 | 8.0 / 20 | 1.45 | 8600 | 40 | 0.30 | 0.78 | 15 | 4 |
-| `arm` | SPO-8 追云 | radar | 880 | 190 | 7.5 / 18 | 1.35 | 9500 | 52 | 0.35 | 0.72 | 18 | 2 |
-| `v17` | CLA-17 长杆 | radar | 1150 | 160 | 10.0 / 30 | 1.00 | 12500 | 62 | 0.72 | 0.86 | 22 | 1 |
-| `vlar` | CLA-12 极远 | radar | 980 | 150 | 12.0 / 30 | 0.78 | 16000 | 66 | 0.66 | 0.90 | 32 | 1 |
-| `hva` | SPO-9 落雷 | radar | 980 | 240 | 8.0 / 18 | 1.30 | 11000 | 62 | 0.70 | 0.80 | 26 | 1 |
-| `dl4` | DAR-4 砾石 | radar | 880 | 210 | 6.5 / 16 | 1.25 | 7200 | 30 | 0.45 | 0.74 | 6.8 | 0① |
-| `dl6` | BIN-6 燧火 | ir | 780 | 190 | 4.5 / 10 | 2.05 | 3600 | 26 | 0.35 | 0.48 | 4.4 | 0① |
-| `dl9` | BAD-9 高墙 | radar | 940 | 320 | 9.0 / 22 | 1.50 | 9000 | 48 | 0.60 | 0.80 | 14 | 0① |
-| `vbn` | BIN-9 双生 | ir | 780 | 300 | 4.0 / 10 | 2.10 | 4200 | 42 | 0.58 | 0.66 | 8 | 0① |
-| `otr` | TOR-1 旧锭 | ir | 620 | 200 | 3.0 / 7 | 1.35 | 3000 | 30 | 0.86 | 0.32 | 6 | 0① |
-| `ss6` | FAN-6 海墙 | radar | 960 | 330 | 9.5 / 22 | 1.45 | 9500 | 46 | 0.42② | 0.80 | 15 | 0① |
+| 键 | 名 | seeker | speed | boost | life/vsLife | turn | lockDist | dmg | flare | fuze | blast/core | lead | cd | 单点 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `srm` | TOR-2 短矢 | ir | 760 | 180 | 4.5 / 12 | 1.75 | 4200 | 30 | 0.38 | 12 | 18 / 2 | 0.38 | 4.8 | 8 |
+| `trm` | TOR-4 短哨 | ir | 820 | 210 | 5.0 / 13 | 1.95 | 4800 | 32 | 0.24 | 12 | 18 / 2 | 0.48 | 5.6 | 6 |
+| `hos` | TOR-6 环刃 | ir | 700 | 240 | 4.0 / 11 | 2.60 | 3200 | 28 | 0.42 | 11 | 17 / 2 | 0.30 | 5.2 | 4 |
+| `kkv` | TOR-8 透针 ⁿ | ir | 760 | 220 | 4.5 / 12 | 2.73 | 3800 | 48 | 0.40 | 0 | 0 / 0（仅直接命中） | 0.45 | 3.4 | 10 |
+| `qsr` | GIR-5 群刺 | ir | 740 | 190 | 4.2 / 11 | 1.70 | 4000 | 24 | 0.40 | 10 | 16 / 2 | 0.42 | 7.6 | 12 |
+| `wasp` | SUT-7 蜂刺 | ir | 860 | 260 | 4.8 / 12 | 2.15 | 5200 | 38 | 0.36 | 13 | 19 / 2 | 0.55 | 8.4 | 3 |
+| `swm` | GIR-12 鸦群 | ir | 720 | 300 | 3.5 / 9 | 2.55 | 3400 | 16 | 0.44 | 8 | 14 / 2 | 0.44 | 4.4 | 16 |
+| `v9` | GIR-9 蜂群 | ir | 830 | 200 | 4.0 / 9 | 1.90 | 3800 | 44 | 0.50 | 13 | 19 / 2 | 0.52 | 6 | 2 |
+| `v11` | SUT-11 锥刺 | ir | 790 | 280 | 5.0 / 11 | 2.45 | 4600 | 56 | 0.35 | 16 | 22 / 2 | 0.62 | 9.2 | 2 |
+| `mrm` | CLA-4 中继 | radar | 900 | 200 | 8.0 / 20 | 1.45 | 8600 | 40 | 0.30 | 18 | 30 / 4 | 0.78 | 15 | 4 |
+| `hwm` | CLA-8 雷鼓 ⁿ | radar | 810 | 180 | 8.0 / 20 | 1.16 | 8000 | 46 | 0.34 | 22 | 60 / 10 | 0.74 | 19.5 | 2 |
+| `arm` | SPO-8 追云 | radar | 880 | 190 | 7.5 / 18 | 1.35 | 9500 | 52 | 0.35 | 22 | 44 / 7 | 0.72 | 18 | 2 |
+| `v17` | CLA-17 长杆 | radar | 1150 | 160 | 10.0 / 30 | 1.00 | 12500 | 62 | 0.72 | 21 | 33 / 4 | 0.86 | 22 | 1 |
+| `vlar` | CLA-12 极远 | radar | 980 | 150 | 12.0 / 30 | 0.78 | 16000 | 66 | 0.66 | 27 | 49 / 7 | 0.90 | 32 | 1 |
+| `hva` | SPO-9 落雷 | radar | 980 | 240 | 8.0 / 18 | 1.30 | 11000 | 62 | 0.70 | 26 | 48 / 7 | 0.80 | 26 | 1 |
+| `dl4` | DAR-4 砾石 | radar | 880 | 210 | 6.5 / 16 | 1.25 | 7200 | 30 | 0.45 | 20 | 32 / 4 | 0.74 | 6.8 | 0① |
+| `dl6` | BIN-6 燧火 | ir | 780 | 190 | 4.5 / 10 | 2.05 | 3600 | 26 | 0.35 | 14 | 20 / 2 | 0.48 | 4.4 | 0① |
+| `dl9` | BAD-9 高墙 | radar | 940 | 320 | 9.0 / 22 | 1.50 | 9000 | 48 | 0.60 | 24 | 36 / 4 | 0.80 | 14 | 0① |
+| `vbn` | BIN-9 双生 | ir | 780 | 300 | 4.0 / 10 | 2.10 | 4200 | 42 | 0.58 | 12 | 18 / 2 | 0.66 | 8 | 0① |
+| `otr` | TOR-1 旧锭 | ir | 620 | 200 | 3.0 / 7 | 1.35 | 3000 | 30 | 0.86 | 18 | 28 / 8 | 0.32 | 6 | 0① |
+| `ss6` | FAN-6 海墙 | radar | 960 | 330 | 9.5 / 22 | 1.45 | 9500 | 46 | 0.42② | 24 | 36 / 4 | 0.80 | 15 | 0① |
 
 ① `fits: []` —— 下游专用弹（以及上游舰载的 FAN-6），玩家挂不上（见 [loadout.md](loadout.md)）。
+`fuze` / `blast/core` 的定数规则见 [命中与近炸](#命中与近炸)。
+ⁿ v1.13 新增（2.0 计划 2.5）：`kkv` 动能杀伤，`fuze 0 / blast 0`，最近点距表面不到 `Combat.CONTACT` 才命中；`hwm` 以 `mrm` 为母型的重战斗部，打编队。
 ② 雷达弹的 `flare` 由 `FLARE_RD` 覆盖。FAN-6 只装在**我方舰艇**上（`target.weapon = 'ss6'`），
 对空射击的选目标规则见 [ai.md](ai.md)「水面目标的对空射击」。
 
 ### 对地 / 反大型 / 炸弹
 
-| 键 | 名 | kind | seeker | speed | boost | life/vsLife | turn | lockDist | dmg | prox | cd | 单点 |
+| 键 | 名 | kind | seeker | speed | boost | life/vsLife | turn | lockDist | dmg | blast/core | cd | 单点 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `asl` | GUT-9 滑翔锤 | agm | ir | 320 | — | 14 / 26 | 0.55 | 6000 | 150 | 26 | 11 | 4 |
-| `asl2` | GUT-12 重锤-B | agm | radar | 480 | 140 | 10 / 22 | 0.90 | 9000 | 340 | 34 | 16 | 2 |
-| `v25` | GUT-25 重锤 | agm | radar | 730 | 120 | 14 / 50 | 0.62 | 8000 | 175 | 30 | 18 | 2 |
-| `lcm` | GUT-30 远帆 | agm | radar | 480 | 110 | 30 / 42 | 0.48 | 14000 | 300 | 36 | 36 | 1 |
-| `sat` | SPO-6 云裂 | asm | radar | 540 | 130 | 9 / 20 | 1.05 | 8200 | 260 | 30 | 19 | 2 |
-| `v22` | SPO-22 锚 | asm | radar | 920 | 130 | 12 / 45 | 0.55 | 8600 | 260 | 34 | 22 | 1 |
-| `rkt` | PEJ-6 撒星 | bomb | 无制导 | 620 | 520 | 3 / 3 | — | — | 22 | 14 | 4 | 28 |
-| `clb` | PEJ-9 碎玉 | bomb | 无制导 | 300 | — | 12 / 24 | — | — | 118 | 34 | 14 | 2 |
-| `v30` | PEJ-30 铁蒺藜 | bomb | eo | 280 | — | 12 / 24 | 0.20 | 2400 | 210 | 42 | 16 | 1 |
-| `vgt` | TUM-7 碎石 | agm | ir | 430 | 120 | 9 / 20 | 0.62 | 7000 | 190 | 30 | 11 | 0① |
-| `vsr` | BOX-14 坍方 | asm | radar | 560 | 150 | 11 / 24 | 0.55 | 9000 | 260 | 34 | 15.6 | 0① |
+| `asl` | GUT-9 滑翔锤 | agm | ir | 320 | — | 14 / 26 | 0.55 | 6000 | 150 | 30 / 8 | 11 | 4 |
+| `asl2` | GUT-12 重锤-B | agm | radar | 480 | 140 | 10 / 22 | 0.90 | 9000 | 340 | 45 / 10 | 16 | 2 |
+| `v25` | GUT-25 重锤 | agm | radar | 730 | 120 | 14 / 50 | 0.62 | 8000 | 175 | 30 / 8 | 18 | 2 |
+| `lcm` | GUT-30 远帆 | agm | radar | 480 | 110 | 30 / 42 | 0.48 | 14000 | 300 | 45 / 10 | 36 | 1 |
+| `sat` | SPO-6 云裂 | asm | radar | 540 | 130 | 9 / 20 | 1.05 | 8200 | 260 | 20 / 6 | 19 | 2 |
+| `v22` | SPO-22 锚 | asm | radar | 920 | 130 | 12 / 45 | 0.55 | 8600 | 260 | 20 / 6 | 22 | 1 |
+| `rkt` | PEJ-6 撒星 | bomb | 无制导 | 620 | 520 | 3 / 3 | — | — | 22 | 14 / 4 | 4 | 28 |
+| `clb` | PEJ-9 碎玉 | bomb | 无制导 | 300 | — | 12 / 24 | — | — | 118 | 60 / 60③ | 14 | 2 |
+| `v30` | PEJ-30 铁蒺藜 | bomb | eo | 280 | — | 12 / 24 | 0.20 | 2400 | 210 | 80 / 80③ | 16 | 1 |
+| `vgt` | TUM-7 碎石 | agm | ir | 430 | 120 | 9 / 20 | 0.62 | 7000 | 190 | 30 / 8 | 11 | 0① |
+| `vsr` | BOX-14 坍方 | asm | radar | 560 | 150 | 11 / 24 | 0.55 | 9000 | 260 | 20 / 6 | 15.6 | 0① |
+
+③ `blastAir: false`：只伤地面，满半径满伤（子母弹）。对地弹都**没有 `fuze`**，只靠触发 / 撞地 / 寿命到期起爆。
 
 `asl` 与 `v30` 是**无动力但有制导**（`ballistic: true`）：扔出去之后
 只剩动能与弹翼 / 末端修正；`rkt` 与 `clb` 是无制导（`unguided`），
@@ -420,25 +428,48 @@ hp = actor.pos + actor.fwd*4 + actor.right * side * (2.4 + rank*1.9)
 
 ## 命中与近炸
 
+v1.13 起起爆与范围伤害集中在 `js/combat.js`（`Combat`，`index.html` 里排在 `entities.js` 之后）。
+旧字段 `prox` 已全部删除；`Combat.spec(w)` 在新字段缺省时从 `prox` / `cluster` 推出兼容值。
+
+| 入口 | 何时 | 结果 |
+|---|---|---|
+| `fuzeCheck`（`entities.js` `stepMissile`） | 制导弹每帧，**只看自己的目标**（或诱饵虚拟目标） | 相对运动线段求最近点：`gap < Combat.CONTACT`（1.5）= 直接命中满伤；`gap < fuze` 且最近点落在本帧内 → 在最近点起爆 |
+| `scanShot`（`game.js`） | 无制导弹撞飞机 / 设施（不走 `fuzeCheck`） | `Combat.detonate`，被撞单位作 `direct`；子弹不变 |
+| 撞地 / 撞海（`pos.y <= 0`） | 所有弹 | 起爆（`{ground: true}`），以前是哑弹 |
+| 寿命到期 | 所有弹 | 起爆，以前是哑弹 |
+
 ```js
-if (dist < m.prox + 6) detonate(m, t, world);
-// detonate:
-if (w.cluster) return clusterBurst(m, world);                    // 子母弹：面杀伤
-reach = m.prox + 14 + (t.kind === 'target' ? t.radius : 0);       // 设施 / 舰船加上自身半径
-if (dist < reach) hitAny(t, m.dmg * warheadK(w, t) * (antiRadar && isRadiating(t) ? 2 : 1));
+Combat.detonate(shot, world, pos, direct, {ground})   // = blast + blastFx + SFX.boom
+// blast：半径内所有 actors + targets（同队与发射者除外，中立 team 2 照打）
+d = max(0, dist - 受害者半径);       // 飞机 Combat.HIT_R_AIR = 7.5，设施 / 舰船 tg.radius
+k = d <= core ? 1 : d < R ? (1 - x)² : 0;   // x = (d - core) / (R - core)
+dmg × k × warheadK × (antiRadar && 正在辐射 ? 2 : 1);   // direct 单位 k = 1
 ```
 
-近炸不会直接秒杀，而是造成 `dmg` 伤害；只有目标仍在 `prox + 14`（地面目标再加 `radius`）内
-才真正扣血。这避免了"擦过就算命中"。
+- `Ent.detonate(m, t, world)` 保留为兼容包装；`Ent.clusterBurst` 已删除。
+- 玩家在爆炸半径内 → `Renderer.addShake`；在 R..2.5R 的擦边 → 小幅震动。
+- **诱饵起爆**：`breakLock` 骗中后的盲飞期（`reLockT > 0`）里，弹追 `decoyTarget(m)` ——
+  `decoy.p + decoy.v × (age − t0)` 处半径 `DECOY_R = 4` 的虚拟目标，直到 `DECOY_LIFE`（2.6 s）
+  或盲飞期结束；在它身上起爆，溅射能伤到刚投弹的飞机（贴脸投弹仍会受伤）。ECM（`openEcm`）不变：盲飞、寿命末自毁。
 
+| 档 | 弹 | fuze | blast | core |
+|---|---|---|---|---|
+| 格斗弹 | srm trm hos qsr swm wasp v11 v9 dl6 vbn | round(旧 prox × 0.6) | fuze + 6 | 2 |
+| 中程 | mrm dl4 v17 dl9 ss6 | × 0.7 | + 12 | 4 |
+| 重型 | arm vlar hva | × 0.8 | + 22 | 7 |
+| 例外 | otr | 18 | 28 | 8（dmg 30→32：老弹跟踪差，补偿） |
+| 对地 | rkt 14/4；clb 60/60、v30 80/80（只伤地面）；asl v25 vgt 30/8；asl2 lcm 45/10；sat v22 vsr 20/6 | — | 见左 | 见左 |
+
+- **特效 `Combat.blastFx`**：火球半径 clamp(0.35×blast, core, 0.5×blast) 且 ≥ 4；Fibonacci 球面破片壳（drag 3.5，飞到 ≈ blast）+
+  拖尾粒子，继承 30% 弹速；落地 = 半球 + 0.6×blast 水柱；子母弹 = 6–10 团错时小爆（粒子 `delay`）；blast 0 只在直接命中时白闪。
+  按粒子数（650 / 800）与距离（6 / 12 km）降级。`Ent.spawnParticle` 新增 `streak` / `delay`，`render.js` 画拖尾。
+- 图鉴 `inv2` 有「引信 / 爆炸半径」列（`codex.js` `_fuzeTxt` / `_blastTxt`），详情页 `weaponParams` 有同名两行。
+- 调参后看分布：`node tools/probe-blast.js`（见 [tools.md](tools.md)）。
 - **设施 / 舰船走 `hitTarget`**：`game.js` 启动时 `Ent.setTargetHitHandler()` 注册自己的
-  `hitTarget`，制导弹与子母弹打地面目标都经它结算（击毁进 `groundKilled`、误击调节单元记处罚）。
+  `hitTarget`，范围伤害打地面目标都经它结算（击毁进 `groundKilled`、误击调节单元记处罚）。
   没注册时（工具脚本）退回 `hp -= dmg` + `killGround`。
 - **加固目标（`Ent.isHard`）**：`t.hard` 或 `HARD_MODELS[t.model]`（目前只有 `radar`）。
   `warheadK`：`penetrator`（GUT-12）×1、`cluster` ×0.2、其余战斗部 ×0.6；机炮子弹无 `b.w`，不打折。
-- **子母弹（`cluster` = 半径 m，PEJ-9 60、PEJ-30 80）**：起爆、落地（`pos.y <= 0`）、
-  或作为无制导弹撞上设施时调 `Ent.clusterBurst`：半径（+目标自身 `radius`）内**每个**敌方
-  地面目标吃满额 `dmg × warheadK`，边缘不衰减；只打地面，不打飞机。
 
 - **机炮抗性（`gunResist`）**：小口径航炮子弹（`b.kind === 'bullet'` 且 `b.cal ≤ Ent.SMALL_CAL` = 40 mm）
   打中带 `gunResist` 的单位，伤害 ×(1 − gunResist)（`Ent.gunResistK`，封顶 0.999）。导弹、炸弹、
@@ -610,5 +641,8 @@ if (!(Math.random() < chance)) continue;
 | 高空锁定锥收窄（×0.78） | `game.js` `updateLock()` |
 | 锁定速率分档 | 同上，`rate` 那一行 |
 | 一次按键打出的发数 | 武器自己的 `salvo` |
+| 近炸 / 爆炸半径 | `data.js` 的 `fuze` `blast` `blastCore` `blastAir` |
+| 衰减曲线 / 飞机受害半径 / 直接命中距离 | `combat.js` `falloffK` / `HIT_R_AIR` / `CONTACT` |
+| 爆炸特效与预算 | `combat.js` `blastFx` / `BLAST_FX` |
 | 干扰弹冷却与粒子数 | `entities.js` `breakLock()` |
 | 定向能拦截窗口折算（1.2 s） | `game.js` `updateDEW()` |

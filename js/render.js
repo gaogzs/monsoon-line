@@ -488,7 +488,7 @@ var Renderer = (function () {
     ctx.globalCompositeOperation = 'lighter';
     for (var i = 0; i < list.length; i++) {
       var p = list[i];
-      if (!p.alive) continue;
+      if (!p.alive || p.delay > 0) continue;
       var s = M3.project(cam, p.pos);
       if (!s) continue;
       var lifeK = p.life / p.life0;
@@ -496,6 +496,16 @@ var Renderer = (function () {
       if (r < 0.4 || s.x < -r * 3 || s.x > W + r * 3 || s.y < -r * 3 || s.y > H + r * 3) continue;
       ctx.globalAlpha = Math.max(0, Math.min(1, lifeK)) * (p.alpha === undefined ? 1 : p.alpha);
       ctx.fillStyle = p.color;
+      if (p.streak) {
+        /* 破片：从当前位置往回拉一段（≈ 30 ms 的航迹），看起来是飞散的碎片而不是光点 */
+        var s0 = M3.project(cam, M3.sub(p.pos, M3.mul(p.vel, 0.03)));
+        if (s0) {
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = Math.max(1, r * 0.9);
+          ctx.beginPath(); ctx.moveTo(s0.x, s0.y); ctx.lineTo(s.x, s.y); ctx.stroke();
+          continue;
+        }
+      }
       if (r < 1.4) {
         ctx.fillRect(s.x - r, s.y - r, r * 2, r * 2);
       } else {
