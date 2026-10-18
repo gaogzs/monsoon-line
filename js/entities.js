@@ -825,8 +825,9 @@ var Ent = (function () {
       a.ewT += dt;
       var ewRamp = Math.min(1, a.ewT / 0.22);
       var ewBurn = a.ewBurnT > 0 ? a.ewBurnT : 6;
-      var ewSlide = a.ewT < ewBurn ? 1
-        : Math.max(0, 1 - (a.ewT - ewBurn) / 1.1);
+      var ewSlide = a.ewWave
+        ? 1 - (1 - a.ewWave.to) * Math.min(1, a.ewT / a.ewWave.dur)
+        : (a.ewT < ewBurn ? 1 : Math.max(0, 1 - (a.ewT - ewBurn) / 1.1));
       a.ewPower = ewRamp * ewSlide;
       a.spActive -= dt;
       if (a.spActive <= 0) {
@@ -2036,11 +2037,15 @@ var Ent = (function () {
      这就是设定里那句"当你开启干扰吊舱时，对方雷达不会立刻致盲，
      而是会在 3 到 8 秒内完成对抗并重新建立跟踪"。
      ============================================================ */
-  function openEcm(actor, wid, threatSkill) {
+  /* opt.wave（随队干扰机用，见 ai.js 的 jamAuto）：{ dur, to }
+       —— 持续 dur 秒，强度从 1 线性降到 to，不走"被对抗掉"那条归零曲线。
+       对手在适应，但压不干净；下一波重新开机又回到满强度。 */
+  function openEcm(actor, wid, threatSkill, opt) {
     var w = WEAPONS[wid];
     if (!w || w.kind !== 'ecm' || w.passive) return false;
     var sk = M3.clamp(threatSkill === undefined ? 0.5 : threatSkill, 0, 1);
-    actor.spActive = w.duration || 6;
+    actor.ewWave = (opt && opt.wave) || null;
+    actor.spActive = actor.ewWave ? actor.ewWave.dur : (w.duration || 6);
     actor.ewT = 0;
     actor.ewBurnT = 3 + (1 - sk) * 5;
     actor.ewPower = 0;

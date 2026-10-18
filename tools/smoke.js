@@ -5401,6 +5401,13 @@ try {
     a.spCd = 0;
     for (let i = 0; i < 30; i++) AI.update(a, 1 / 60, W);
     if (!(a.spActive > 0) || !(cd > 0)) bad.push('冷却结束后干扰机没有再次开机');
+    // 一波：30 s 内强度从 1 衰减到 0.6，不归零
+    let minP = 1, maxP = 0;
+    for (let i = 0; i < 60 * 29; i++) {
+      Ent.stepAircraft ? Ent.stepAircraft(a, 1 / 60, W) : null;
+      if (i > 30) { minP = Math.min(minP, a.ewPower); maxP = Math.max(maxP, a.ewPower); }
+    }
+    if (!(minP > 0.55 && maxP > 0.95)) bad.push('随队干扰机一波之内强度不是 1 → 0.6（实测 ' + minP.toFixed(2) + ' – ' + maxP.toFixed(2) + '）');
   }
   if (bad.length) bad.forEach(fail);
   else ok('航线按水平距离到点；随队干扰机按玩家一方任何单位开机、冷却后重开');

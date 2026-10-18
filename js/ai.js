@@ -429,14 +429,17 @@ var AI = (function () {
      ============================================================ */
   /* 航线型干扰机的自动开机（missions.js 的 jammerRoute）：
      玩家一方任何单位（飞机或水面 / 地面目标）进入干扰半径 × trigK、
-     吊舱没在开、冷却也好了 —— 开机。每 0.25 s 查一次就够。 */
+     吊舱没在开、冷却也好了 —— 开机。每 0.25 s 查一次就够。
+     每一波持续 J.dur 秒，强度从 1 衰减到 J.fadeTo（openEcm 的 wave 选项）；
+     一波结束后隔 J.rekey 秒重开，回到满强度 —— 玩家感觉到的是"刚缓过来又被压满"。
+     不用吊舱自己的 cd（40 s）：随队干扰机的活就是持续压着。无线电只在第一次开机时报。 */
   function jamAuto(a, J, world, dt) {
     if (a.spActive > 0 || a.spCd > 0) return;
     J.t = (J.t || 0) - dt;
     if (J.t > 0) return;
     J.t = 0.25;
     var w = WEAPONS[J.wid];
-    var R = (w.jamRadius || 9000) * (J.trigK || 1.2), R2 = R * R;
+    var R = (w.jamRadius || 9000) * (J.trigK || 1), R2 = R * R;
     var hit = false, i;
     for (i = 0; i < world.actors.length && !hit; i++) {
       var e = world.actors[i];
@@ -447,10 +450,10 @@ var AI = (function () {
       if (tl[i].alive && Ent.hostile(tl[i], a) && M3.dist2(tl[i].pos, a.pos) < R2) hit = true;
     }
     if (!hit) return;
-    Ent.openEcm(a, J.wid, J.skill);
-    a.spCd = w.cd;
-    if (world.radio) {
-      world.radio.raw({ who: a.label || a.name, cls: 'enemy', tx: J.n ? J.again : J.msg, gap: 0.9 });
+    Ent.openEcm(a, J.wid, J.skill, { wave: { dur: J.dur, to: J.fadeTo } });
+    a.spCd = J.dur + J.rekey;
+    if (!J.n && J.msg && world.radio) {
+      world.radio.raw({ who: a.label || a.name, cls: 'enemy', tx: J.msg, gap: 0.9 });
     }
     J.n = (J.n || 0) + 1;
   }
