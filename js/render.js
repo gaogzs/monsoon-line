@@ -15,10 +15,23 @@ var Renderer = (function () {
 
   var cam = null;
 
-  /* ---------- 光照 ---------- */
-  var LIGHT = M3.norm(M3.V(-0.42, 0.80, 0.43));
-  var FOG_R = 150, FOG_G = 176, FOG_B = 196;
-  var FOG_NEAR = 900, FOG_FAR = 9000, FOG_MAX = 0.82;
+  /* ---------- 光照 / 雾：数值全部来自 shading.js（与 WebGL 共用一份） ---------- */
+  var LIGHT = Shading.LIGHT;
+  var FOG_R = Shading.FOG_RGB[0], FOG_G = Shading.FOG_RGB[1], FOG_B = Shading.FOG_RGB[2];
+  var FOG_NEAR = Shading.FOG_NEAR, FOG_FAR = Shading.FOG_FAR, FOG_MAX = Shading.FOG_MAX;
+
+  /* ---------- 模型用哪条管线 ----------
+     'auto'  有 WebGL2 就用（render-gl.js，深度缓冲，遮挡正确），没有就退回下面的画家算法
+     'gl'    同 auto（拿不到 WebGL2 时仍然退回）
+     '2d'    强制画家算法（设置里的"兼容"，或 URL 带 ?render=2d）
+     天空、云、海面、粒子、HUD 无论哪种都画在 2D 画布上。 */
+  var mode = 'auto', glOn = false, urlForce = false;
+  try {
+    if (typeof location !== 'undefined' && /[?&]render=2d(&|$)/.test(location.search || '')) { mode = '2d'; urlForce = true; }
+  } catch (e) { /* 工具脚本里没有 location */ }
+  // URL 里的 ?render=2d 优先于设置（排查问题时用）
+  function setMode(m) { if (!urlForce) mode = (m === '2d' || m === 'gl') ? m : 'auto'; }
+  function usingGL() { return glOn; }
 
   /* ---------- 颜色缓存（量化亮度/雾浓度，避免每帧拼字符串） ---------- */
   var colorCache = {};
@@ -306,6 +319,7 @@ var Renderer = (function () {
      ============================================================ */
   function pushModel(model, P, fwd, up, opts) {
     opts = opts || {};
+    if (glOn) { RenderGL.push(model, P, fwd, up, opts); return; }
     var verts = model.v;
     var nv = verts.length;
     if (nv > MAXV) return;
@@ -369,11 +383,11 @@ var Renderer = (function () {
       if (face.cl && nl > 1e-9 &&
           nx * (wX[a0] - cam.pos.x) + ny * (wY[a0] - cam.pos.y) + nz * (wZ[a0] - cam.pos.z) > 0) continue;
 
-      var bright = 0.62;
+      var bright = Shading.DEGENERATE;
       if (nl > 1e-9) {
         nx /= nl; ny /= nl; nz /= nl;
         var dl = Math.abs(nx * LIGHT.x + ny * LIGHT.y + nz * LIGHT.z);
-        bright = 0.44 + 0.56 * dl;
+        bright = Shading.AMBIENT + Shading.DIFFUSE * dl;
       }
       bright += tint;
 
@@ -454,6 +468,11 @@ var Renderer = (function () {
 
   /* ---------- 排序 + 绘制全部面 ---------- */
   function flush() {
+    if (glOn) {
+      var glc = RenderGL.render(cam);
+      if (glc) ctx.drawImage(glc, 0, 0, W, H);   // 当前变换已含 DPR 与镜头抖动
+      return;
+    }
     var arr = [];
     for (var i = 0; i < faceN; i++) arr.push(faceList[i]);
     arr.sort(function (a, b) { return b.d - a.d; });
@@ -536,6 +555,8 @@ var Renderer = (function () {
       shake *= 0.86;
     } else { shakeX = shakeY = 0; shake = 0; }
 
+    glOn = mode !== '2d' && typeof RenderGL !== 'undefined' && RenderGL.begin(W, H, DPR);
+
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.clearRect(0, 0, W, H);
     var hy = drawSky();
@@ -573,6 +594,7 @@ var Renderer = (function () {
 
   return {
     init: init, resize: resize, setCamera: setCamera, getCam: getCam,
+    setMode: setMode, usingGL: usingGL,
     begin: begin, end: end, pushModel: pushModel, flush: flush,
     drawParticles: drawParticles, addShake: addShake,
     line: line, rect: rect, circle: circle, ring: ring, text: text,

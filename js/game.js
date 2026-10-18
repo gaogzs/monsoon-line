@@ -226,7 +226,9 @@ var Game = (function () {
     // 0 = 追尾，1 = 座舱，2 = 目标。只能在这里改，没有热切换键。
     camMode: 0,
     // 追尾镜头飞机快出画时怎么办：0 = 静态拉远，1 = 侧滑软钳，2 = 拉远带滞回
-    camFrame: 0
+    camFrame: 0,
+    // 模型渲染：0 = 自动（有 WebGL2 就用），1 = 兼容（2D 画家算法）。见 render.js 的 setMode
+    renderMode: 0
   };
 
   var S = {};
@@ -266,7 +268,12 @@ var Game = (function () {
         { k: 'hudOpacity', label: 'HUD 透明度', type: 'range', min: 25, max: 100, unit: '%' },
         { k: 'compass', label: '顶部指南针', type: 'toggle' },
         { k: 'pitchLadder', label: '俯仰刻度', type: 'toggle' },
-        { k: 'targetMarkers', label: '目标方位标记', type: 'toggle' }
+        { k: 'targetMarkers', label: '目标方位标记', type: 'toggle' },
+        /* 兼容模式给拿不到 WebGL2 的老显卡 / 远程桌面用：遮挡会按"每个面的平均深度"排，
+           翼下挂弹偶尔会透到机翼上面。 */
+        { k: 'renderMode', label: '渲染', type: 'select', options: [
+          { v: 0, t: '自动（WebGL）' }, { v: 1, t: '兼容（2D）' }
+        ] }
       ]
     }
   ];
@@ -306,7 +313,12 @@ var Game = (function () {
     if (key === 'volMaster' || key === 'volEngine' || key === 'volSfx' || key === 'muted') {
       applyAudioSettings();
     }
+    if (key === 'renderMode') applyRenderMode();
     // 视角与显示类不需要额外动作：渲染每帧直接读 S
+  }
+
+  function applyRenderMode() {
+    if (Renderer.setMode) Renderer.setMode(S.renderMode === 1 ? '2d' : 'auto');
   }
 
   function makeSetRow(item) {
@@ -3681,6 +3693,7 @@ var Game = (function () {
 
     cv = document.getElementById('cv');
     Renderer.init(cv);
+    applyRenderMode();
     bindInput();
 
     // 导航按钮。注意这里不再用兜底 else ——
@@ -3784,6 +3797,8 @@ var Game = (function () {
     __pushStores: pushStores,
     // 水面目标的对空射击：断言要能单独推一帧，确认我方舰艇不朝玩家打
     __updateTargets: updateTargets,
+    // 后台模拟（tools/lib/sim.js）：只推进游戏逻辑，不渲染
+    __update: function (dt) { if (state === 'playing' && world && player) update(dt); },
     __updateLock: updateLock, __cycleTarget: cycleTarget,
     // 弹体命中结算：断言要能单独喂一发子弹进来，量它实际打掉多少血（机炮抗性）
     __scanShot: scanShot,

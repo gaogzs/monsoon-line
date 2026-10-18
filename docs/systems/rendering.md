@@ -1,13 +1,48 @@
 # 渲染管线
 
-代码：`js/render.js`（565 行） · 相机与投影数学在 `js/math3d.js`
+代码：`js/render.js`（2D 层 + 画家算法兜底） · `js/render-gl.js`（模型的 WebGL2 渲染，v2.0.0 起） · `js/shading.js`（着色规则，唯一一份） · 相机与投影数学在 `js/math3d.js`
+
+> **v2.0.0 起模型改走 WebGL2**（docs/2-0IMPL.md 阶段 2.5）。天空、云、海面网格、粒子、曳光、HUD 仍是 Canvas 2D。
+> 下文的画家算法 / 补接缝 / 近平面裁剪描述的是 **2D 兜底路径**，仍然存在、仍然正确。
 
 渲染器是一个 IIFE，只导出一个 `Renderer` 单例。它不认识实体、任务、HUD，
 只接受"一个模型 + 一个位姿"，把它变成屏幕上的多边形。所有世界坐标单位是米。
 
 ---
 
-## 为什么不用 WebGL
+## WebGL2 模型层（v2.0.0）
+
+| 项 | 事实 |
+|---|---|
+| 画布 | `RenderGL` 自己的离屏 canvas；`Renderer.flush()` 把它 `drawImage` 到主 2D 画布，夹在环境层（天空/云/海面）与粒子/曳光/HUD 之间 |
+| 遮挡 | 深度缓冲，取代面质心排序 —— 翼下挂弹、机身与尾翼穿插不再排错 |
+| 深度 | 对数深度，写 `gl_FragDepth`。近平面 0.6 m、视距几十公里，普通透视深度远处只有米级精度会闪 |
+| 着色 | 仍是"每面一色"：每个顶点带所在面的法线与面中心，顶点着色器里按 `Shading` 算亮度/雾并量化 16 档，`flat` 传给片元 |
+| 背面 | 只对 `face.cl`（封闭部件）丢弃背面；其余双面，同 2D |
+| 半透明 | 单独一趟，远→近排序，不写深度 |
+| 抖动 | 仍由 2D 变换施加（`drawImage` 在 `save()/translate` 之内） |
+| 多实例 | `RenderGL.create()` 另开实例；单位详情页 / 机库预览各用自己的，雾关闭 |
+
+**模式选择**（`Renderer.setMode` / `usingGL`）：
+
+| 来源 | 值 | 效果 |
+|---|---|---|
+| 设置 显示→渲染 | `renderMode` 0 = 自动（WebGL） / 1 = 兼容（2D） | `game.js` 的 `applyRenderMode()` → `setMode('auto' \| '2d')` |
+| URL `?render=2d` | — | 强制 2D，**覆盖设置**（排查用） |
+| 拿不到 WebGL2 | — | `begin()` 里 `RenderGL.begin()` 失败 → 本帧走画家算法（工具脚本、老显卡） |
+
+`usingGL()` 返回本帧实际走的路径。`pushModel()` 在 GL 路径下直接转给 `RenderGL.push()`。
+
+**`shading.js` 是着色唯一来源**：光照方向 `LIGHT`、雾（900–9000 m，封顶 0.82，雾色 `[150,176,196]`）、
+`AMBIENT 0.44 / DIFFUSE 0.56 / DEGENERATE 0.62`、自发光封顶 1.5、16 档量化。
+`render.js` 与 `render-gl.js` 都读它 —— 改一处两边一起变。两条路径的画面差异由 `tools/probe-render.js` 盯着。
+
+---
+
+## 为什么当初不用 WebGL（v1.x 的理由，已被 v2.0.0 推翻）
+
+> 以下是 v1.x 的决策记录。v2.0.0 换成 WebGL2 的直接原因是画家算法的遮挡错误（挂弹、穿插），
+> 2D 实现保留为兜底。
 
 "低多边形 + 画家算法"在 Canvas 2D 上跑得动，而且白捡了三个好处：
 
@@ -144,7 +179,9 @@ color = mix(baseColor, (150,176,196), fog)
 | `begin` | `begin()` | 每帧开始。见"每帧顺序" |
 | `end` | `end()` | 仅 `ctx.restore()`，收掉 `begin` 里为了抖动做的 `save()` |
 | `pushModel` | `pushModel(model, P, fwd, up, opts)` | **只收集不绘制**。把一个模型按位姿 `(P, fwd, up)` 变换到世界、逐面投影、着色，塞进面池。`opts` 见下 |
-| `flush` | `flush()` | 对面池排序并一次性画出所有面 |
+| `flush` | `flush()` | 2D 路径：对面池排序并一次性画出所有面。GL 路径：`RenderGL.render(cam)`，把离屏画布 `drawImage` 上来 |
+| `setMode` | `setMode('auto'\|'gl'\|'2d')` | 选渲染路径；URL `?render=2d` 时无效（URL 优先） |
+| `usingGL` | `usingGL()` | 本帧是否走 WebGL（`begin()` 时决定） |
 | `drawParticles` | `drawParticles(list)` | 用 `globalCompositeOperation = 'lighter'` 画数组里的活粒子 |
 | `addShake` | `addShake(v)` | `shake = min(shake + v, 26)`，给后续 `begin()` 消费。**目前 `js/` 里没有任何调用点**，是为受击/爆炸预留的接口 |
 | `line` / `rect` / `circle` / `ring` / `text` | 见左列签名 | 屏幕空间绘制辅助，HUD 用：线段 `(x1,y1,x2,y2,col,w=1)`、`fillRect` 简写 `(x,y,w,h,col)`、实心圆 `(x,y,r,col)`、描边圆 `(x,y,r,col,w=1)`、文本 `(t,x,y,col,font='12px Consolas, monospace',align='left')`（画完复位 `textAlign`） |
@@ -192,8 +229,10 @@ Renderer.begin()
   ├─ drawGround(hy)   → 渐变海面 + 两遍网格线
   └─ ctx.save() + translate(shakeX, shakeY)
 
-pushModel() × N        ← 只收集，不绘制
-Renderer.flush()       ← 排序 + 绘制全部面
+  （begin() 里同时决定 glOn = mode≠'2d' && RenderGL.begin(W,H,DPR)）
+
+pushModel() × N        ← 只收集，不绘制（GL 路径转给 RenderGL.push）
+Renderer.flush()       ← 2D：排序 + 绘制全部面；GL：渲染离屏画布并 drawImage
 
 drawTracers()          ← game.js 自己的曳光弹，画在模型之上
 Renderer.drawParticles(world.particles)   ← globalCompositeOperation = 'lighter'

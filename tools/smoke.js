@@ -5416,6 +5416,30 @@ try {
 }
 
 /* ============================================================
+   后台模拟框架（tools/lib/sim.js）：同一种子两次跑出逐帧相同的世界，
+   换种子则不同。所有 probe 都建在它上面 —— 它要是不确定，探针的数字就没法比。
+   ============================================================ */
+console.log('\n后台模拟框架');
+try {
+  const SimL = require('./lib/sim');
+  const sig = (seed) => {
+    const S = SimL.load({ seed: seed });
+    S.start(0).godMode();
+    S.run(6);
+    let h = 0;
+    for (const a of S.world.actors) h += a.pos.x * 1.3 + a.pos.y * 0.7 + a.pos.z + (a.alive ? 1 : 0);
+    for (const m of S.world.missiles) h += m.pos.x + m.pos.z;
+    return h.toFixed(4);
+  };
+  const a1 = sig(11), a2 = sig(11), b = sig(12);
+  if (a1 !== a2) fail('同一种子两次模拟结果不同（' + a1 + ' / ' + a2 + '）');
+  else if (a1 === b) fail('换了种子，模拟结果却完全一样 —— 随机数没接上');
+  else ok('后台模拟：同种子可复现，换种子会变');
+} catch (e) {
+  fail('后台模拟框架测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
    结果
    ============================================================ */
 console.log('');

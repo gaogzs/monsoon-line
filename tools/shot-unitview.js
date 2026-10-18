@@ -43,7 +43,7 @@ function findChrome() {
 /* 加载哪几个模块：只要详情页跑得起来就行。
    刻意**不加载 game.js** —— 它在 load 时会启动整个游戏，
    而这个页面只是想看一个详情页而已。 */
-const SCRIPTS = ['version', 'math3d', 'models', 'planform', 'codex', 'data', 'unitview'];
+const SCRIPTS = ['version', 'math3d', 'models', 'planform', 'codex', 'data', 'shading', 'render-gl', 'unitview'];
 
 function page(kind, id) {
   const tags = SCRIPTS.map(n => '<script src="../../js/' + n + '.js"></script>').join('\n');
@@ -106,7 +106,7 @@ function main() {
     fs.writeFileSync(htmlPath, page(j.kind, j.id));
 
     const res = spawnSync(chrome, [
-      '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-sandbox',
+      '--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars', '--no-sandbox',
       '--window-size=1400,1050',
       /* virtual-time-budget 让页面先跑几秒：3D 预览要靠 rAF 出第一帧，
          不等的话截到的是空画布 */

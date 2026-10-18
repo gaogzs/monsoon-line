@@ -146,6 +146,11 @@ var UnitView = (function () {
     var k = (Math.min(W, H) * 0.52) / Math.max(1e-6, bd.r * cam.focal / dist);
     var ox = W / 2, oy = H / 2;
 
+    /* 有 WebGL2 就走和游戏画面同一套渲染（render-gl.js + shading.js）：
+       同一份着色器、同一套亮度量化 —— 预览里看到的就是实机里的样子。
+       只是不加雾（模型就在眼前）。拿不到时退回下面的 CPU 光栅化。 */
+    if (renderGL(g, W, H, model, cam, k)) return;
+
     /* 相机空间 → 屏幕偏移：**每个顶点只做一次**。
        顶点是共享的（一个顶点常被 4 个面引用），放进面循环里做就会
        被反复改写 —— 第二遍拿到的已经是屏幕坐标，模型会扭成一团。 */
@@ -231,6 +236,21 @@ var UnitView = (function () {
       g.lineWidth = 0.8;
       g.stroke();
     }
+  }
+
+  var glView = null;
+  var ORIGIN = M3.V(0, 0, 0), FWD = M3.V(0, 0, 1), UP = M3.V(0, 1, 0);
+  function renderGL(g, W, H, model, cam, k) {
+    if (typeof RenderGL === 'undefined' || !g.drawImage) return false;
+    if (!glView) glView = RenderGL.create();
+    if (!glView.begin(W, H, 1)) return false;
+    glView.push(model, ORIGIN, FWD, UP, {});
+    /* 预览的缩放（k）折进焦距：屏幕坐标 = 中心 + 相机坐标 × focal·k / z */
+    var c2 = { pos: cam.pos, right: cam.right, up: cam.up, fwd: cam.fwd,
+      focal: cam.focal * k, cx: W / 2, cy: H / 2, near: cam.near };
+    var out = glView.render(c2, { fog: false });
+    if (out) g.drawImage(out, 0, 0, W, H);
+    return true;
   }
 
   var zbuf = null, zbufN = 0;

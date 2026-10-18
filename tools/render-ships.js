@@ -48,7 +48,7 @@ sandbox.devicePixelRatio = 1;
 sandbox.document = { getElementById: () => null, createElement: () => ({ getContext: () => null }) };
 const ctxVm = vm.createContext(sandbox);
 
-for (const name of ['math3d', 'models', 'data', 'render']) {
+for (const name of ['math3d', 'models', 'data', 'shading', 'render']) {
   if (!scripts.includes(name)) continue;
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', name + '.js'), 'utf8'), ctxVm,
     { filename: name + '.js' });

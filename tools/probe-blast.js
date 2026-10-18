@@ -24,7 +24,6 @@
                                             统计目标的平均受伤（期望早投≈0、贴脸投 > 0、单调） */
 'use strict';
 const fs = require('fs');
-const vm = require('vm');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const BASELINE = path.join(__dirname, 'probe-blast.baseline.json');
@@ -35,42 +34,14 @@ const N = +(args[args.indexOf('--n') + 1]) || 120;
 const FLARE = args.includes('--flare');
 const ONLY = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
 
-/* ---- 最小沙箱：只需要数据、数学和实体层，不跑游戏主循环 ---- */
-const noop = () => {};
-let seed = 0x1b2c3d;
-const rnd = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-const sandbox = {
-  console, Date, JSON, Object, Array, String, Number, Boolean, isFinite, parseFloat, parseInt,
-  RegExp, Error, Map, Set, setTimeout: () => 0, clearTimeout: noop, setInterval: () => 0, clearInterval: noop
-};
-sandbox.Math = Object.create(Math);
-sandbox.Math.random = rnd;
-sandbox.window = sandbox;
-sandbox.performance = { now: () => Date.now() };
-const ctx2d = new Proxy({}, { get: (t, k) => (k === 'measureText' ? () => ({ width: 10 }) : noop), set: () => true });
-const fakeEl = () => ({
-  style: {}, classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
-  appendChild: noop, addEventListener: noop, setAttribute: noop, getAttribute: () => null,
-  getContext: () => ctx2d, querySelectorAll: () => [], querySelector: () => null
-});
-sandbox.document = {
-  getElementById: fakeEl, createElement: fakeEl, querySelectorAll: () => [], querySelector: () => null,
-  body: fakeEl(), documentElement: fakeEl(), addEventListener: noop, createTextNode: fakeEl
-};
-sandbox.addEventListener = noop;
-sandbox.requestAnimationFrame = () => 1;
-sandbox.localStorage = { getItem: () => null, setItem: noop, removeItem: noop };
-sandbox.AudioContext = function () { return ctx2d; };
-
-const order = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')
-  .match(/<script src="([^"]+)"><\/script>/g).map(s => s.match(/src="([^"]+)"/)[1]);
-const ctx = vm.createContext(sandbox);
-for (const src of order) {
-  if (/game\.js$/.test(src)) continue;          // 不需要主循环
-  vm.runInContext(fs.readFileSync(path.join(ROOT, src), 'utf8'), ctx, { filename: src });
-}
+/* ---- 后台模拟沙箱（tools/lib/sim.js）：只要数据、数学和实体层，不跑主循环 ---- */
+const Sim = require('./lib/sim');
+const S = Sim.load({ seed: 0x1b2c3d, init: false });
+const sandbox = S.sandbox;
 const { Ent, M3, WEAPONS } = sandbox;
-if (sandbox.SFX) for (const k in sandbox.SFX) if (typeof sandbox.SFX[k] === 'function') sandbox.SFX[k] = noop;
+const rnd = () => sandbox.Math.random();
+const reseed = (n) => S.seed(n);
+if (sandbox.SFX) for (const k in sandbox.SFX) if (typeof sandbox.SFX[k] === 'function') sandbox.SFX[k] = () => {};
 
 /* 靶机的"表面"半径，与命中判定一致 */
 const HIT_R = (sandbox.Combat && sandbox.Combat.HIT_R_AIR) || 7.5;
@@ -175,7 +146,7 @@ function stats(xs) {
 if (FLARE) {
   console.log('\n== 投弹时机（srm 来袭、目标平飞、必定骗中，每档 ' + N + ' 发） ==');
   for (const at of [3000, 1000, 300, 100]) {
-    seed = 0x5eed + at;
+    reseed(0x5eed + at);
     const rs = [];
     for (let i = 0; i < N; i++) rs.push(trial('srm', 'straight', at));
     const hurt = rs.filter(r => r.dmg > 0).length;
@@ -194,7 +165,7 @@ for (const id of ids) {
   out[id] = {};
   for (const mode of MODES) {
     if (mode === 'flare' && WEAPONS[id].seeker === 'eo') continue;
-    seed = 0x1b2c3d + id.length * 7919 + MODES.indexOf(mode) * 104729;
+    reseed(0x1b2c3d + id.length * 7919 + MODES.indexOf(mode) * 104729);
     const rs = [];
     for (let i = 0; i < N; i++) rs.push(trial(id, mode));
     const hits = rs.filter(r => r.dmg > 0);

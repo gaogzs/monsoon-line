@@ -8,6 +8,8 @@
 
 > 上游是 [codex.md](codex.md)（图鉴条目）与 [planform.md](planform.md)（俯视识别图）。
 > 3D 预览为什么不复用主渲染管线是本文件最需要注意的部分，见下文。
+> **v2.0.0 起**预览优先走 WebGL2：`renderGL()` 用自己的 `RenderGL.create()` 实例（`glView`，雾关闭），
+> 着色与游戏同一套量化规则（`shading.js`）；拿不到 WebGL2 时退回下文的 CPU 实现。
 
 ---
 
@@ -82,9 +84,20 @@ else { if (player && world) render(); else { Renderer.begin(); Renderer.end(); }
 而这里需要的东西其实很少：一个模型、一个绕着它转的相机、平面着色。
 所以 `renderModel()` 是**约 120 行的独立实现**。
 
-**代价写在明处**：`LIGHT` 与亮度公式 `0.44 + 0.56*|dot|` 是从 `render.js`
-抄过来的。改 `render.js` 的 `LIGHT` 或改那个公式时，**这里要跟着改**，
-否则预览里的明暗会与实机不一致。这一条是本文件最容易踩的坑。
+~~**代价写在明处**：`LIGHT` 与亮度公式是从 `render.js` 抄过来的，改那边这里要跟着改。~~
+**v2.0.0 起已不成立**：着色统一由 `js/shading.js` 提供，预览与游戏读同一份。
+
+### v2.0.0：WebGL 预览（`renderGL`）
+
+`Renderer` 仍是单例、仍不复用；但 `RenderGL` 支持多实例，所以预览另开一个：
+
+| 项 | 事实 |
+|---|---|
+| 实例 | 模块级 `glView = RenderGL.create()`，首次用时创建；机库 `mountModel()` 同路径 |
+| 调用 | `glView.begin(W,H,1)` → `push(model, 原点, +z, +y, {})` → `render(cam, { fog: false })` → `drawImage` 到预览 canvas |
+| 缩放 | 预览的缩放 `k` 折进焦距（`focal·k`） |
+| 着色 | 与游戏相同的量化亮度（以前预览是不量化的平滑明暗） |
+| 兜底 | `RenderGL` 不存在、`drawImage` 不可用或 `begin()` 失败时返回 `false`，走下文的 CPU z-raster / 画家实现 |
 
 ---
 
@@ -258,7 +271,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 | `codex.js` | 三个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:frigatebird">`（`ship:` / `weapon:` 同理）；`s4` 条目的 `mount()` 直接调 `mountModel()` |
 | `css/style.css` | `.uv-*` 一族类 |
 | `tools/render-units.js` | 直接用 `renderModel()` 把 33 个单位各渲染一张 PNG |
-| `tools/shot-unitview.js` | 生成最小页面，交给无头 Chrome 截详情页的**布局** |
+| `tools/shot-unitview.js` | 生成最小页面（含 `shading.js` / `render-gl.js`，swiftshader），交给无头 Chrome 截详情页的**布局**与 WebGL 预览 |
 | `tools/smoke.js` | 4 条断言：详情页可生成 / 俯视图分配 / 渲染器不抛异常 / 点击链路 |
 
 ### 链接是怎么接上的
@@ -282,8 +295,8 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 
 ## 易踩的坑
 
-1. **改 `render.js` 的 `LIGHT` 或亮度公式，这里要跟着改。**
-   两份实现是刻意的（理由见上），但一致性靠人守。
+1. ~~改 `render.js` 的 `LIGHT` 或亮度公式，这里要跟着改。~~ v2.0.0 起改 `js/shading.js`，游戏与预览一起变。
+   但注意 **`render-units.js` 走的是 CPU 兜底路径**（node 里没有 WebGL），它的 PNG 不代表浏览器里的 GL 画面。
 2. **顶点缓冲被就地复用。** `cX` / `cY` 在第一趟后就不再是相机空间坐标。
    想在第二趟里重新用原始值，得另开一组数组。
 3. **`proj` 必须在面循环之外统一做一次**（共享顶点）。

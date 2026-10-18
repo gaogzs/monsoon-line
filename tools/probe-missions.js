@@ -1,102 +1,17 @@
-/* 临时探针：逐关检查"把敌人清空之后到底能不能赢"。
+/* 探针：逐关检查"把敌人清空之后到底能不能赢"。
    冒烟测试只保证 30 秒不崩、无 NaN，抓不到"胜利条件不可达"这类设计 bug。
-   做法：加载真实游戏沙箱 → startMission(i) → 每帧无条件清零所有敌机与敌方设施
+   做法：后台模拟（tools/lib/sim.js）→ startMission(i) → 每 0.5 s 无条件清零所有敌机与敌方设施
    → 看 mission.win(world) 是否在合理时间内变成 true。
-   用法：node tools/probe-missions.js */
+   固定种子：同一份代码每次跑出同样的结果。
+   用法：node tools/probe-missions.js [--seed N] */
 'use strict';
-const fs = require('fs');
-const vm = require('vm');
-const path = require('path');
-const ROOT = path.resolve(__dirname, '..');
-
-/* ---- 最小桩：与 tools/smoke.js 同样的思路，但只保留能跑起来的部分 ---- */
-const sandbox = { console, Math, Date, JSON, Object, Array, String, Number,
-  Boolean, isFinite, parseFloat, parseInt, RegExp, Error, Map, Set,
-  /* 音频层会 setTimeout 做节流；这里给一个"立刻到期"的替身，
-     免得它的定时器在探针跑完之后才开火。 */
-  setTimeout: (fn) => { try { fn(); } catch (e) { /* 音频失败不影响判定 */ } return 0; },
-  clearTimeout: noop2, setInterval: () => 0, clearInterval: noop2 };
-function noop2() {}
-sandbox.window = sandbox;
-sandbox.performance = { now: () => Date.now() };
-
-const noop = () => {};function fakeEl() {
-  const el = {
-    style: {}, className: '', innerHTML: '', textContent: '', value: '',
-    children: [], width: 1200, height: 700,
-    classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
-    appendChild: noop, removeChild: noop, addEventListener: noop,
-    removeEventListener: noop, setAttribute: noop, getAttribute: () => null,
-    getContext: () => ctx2d, focus: noop, blur: noop, click: noop,
-    querySelectorAll: () => [], querySelector: () => null,
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: 1200, height: 700 })
-  };
-  return el;
-}
-const ctx2d = new Proxy({}, {
-  get: (t, k) => {
-    if (k === 'canvas') return { width: 1200, height: 700 };
-    if (k === 'measureText') return () => ({ width: 10 });
-    if (k === 'createLinearGradient' || k === 'createRadialGradient') {
-      return () => ({ addColorStop: noop });
-    }
-    if (k === 'getImageData') return () => ({ data: new Uint8ClampedArray(4) });
-    return noop;
-  },
-  set: () => true
-});
-sandbox.document = {
-  getElementById: () => fakeEl(), createElement: () => fakeEl(),
-  querySelectorAll: () => [], querySelector: () => null,
-  body: fakeEl(), documentElement: fakeEl(), addEventListener: noop,
-  removeEventListener: noop, createTextNode: () => fakeEl()
-};
-sandbox.requestAnimationFrame = () => 1;
-sandbox.cancelAnimationFrame = noop;
-/* window 上的事件监听要收着：Game.init() 挂在 window 的 'load' 上，
-   不触发它主循环根本不会启动（这一点踩过一次 —— 探针当时推进了 0 帧，
-   却把 m2 / sk1 报成"胜利条件不可达"）。 */
-const winListeners = {};
-sandbox.addEventListener = function (ev, fn) {
-  (winListeners[ev] = winListeners[ev] || []).push(fn);
-};
-sandbox.localStorage = { getItem: () => null, setItem: noop, removeItem: noop };
-function FakeAudioCtx() { return ctx2d; }
-sandbox.AudioContext = FakeAudioCtx;
-sandbox.webkitAudioContext = FakeAudioCtx;
-
-const order = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')
-  .match(/<script src="([^"]+)"><\/script>/g)
-  .map(s => s.match(/src="([^"]+)"/)[1]);
-
-const ctx = vm.createContext(sandbox);
-for (const src of order) {
-  vm.runInContext(fs.readFileSync(path.join(ROOT, src.replace(/^\.\//, '')), 'utf8'),
-    ctx, { filename: src });
-}
-
-const G = sandbox.Game, M3v = sandbox.M3;
-const MISSIONS = sandbox.MISSIONS;
-const EntP = sandbox.Ent;
-
-/* 用一个假的 rAF 队列推进主循环 —— 与 smoke.js 的 pump 同源 */
-let rafQ = [];
-sandbox.requestAnimationFrame = fn => { rafQ.push(fn); return rafQ.length; };
-
-/* 触发 load：Game.init() 在这里面，它会启动主循环 */
-for (const fn of (winListeners.load || [])) {
-  try { fn({}); } catch (e) { console.log('init 失败：' + e.message); }
-}
-
-let clock = Date.now();
-function pump(n) {
-  for (let i = 0; i < n; i++) {
-    const q = rafQ; rafQ = [];
-    if (!q.length) break;
-    clock += 16;
-    q.forEach(fn => fn(clock));
-  }
-}
+const Sim = require('./lib/sim');
+const args = process.argv.slice(2);
+const SEED = args.includes('--seed') ? +args[args.indexOf('--seed') + 1] : 1;
+const S = Sim.load({ seed: SEED });
+const G = S.sandbox.Game;
+const MISSIONS = S.sandbox.MISSIONS;
+const EntP = S.sandbox.Ent;
 
 console.log('== 可完成性探针：清空敌人后能否取胜 ==\n');
 const rows = [];
@@ -126,7 +41,7 @@ for (let mi = 0; mi < MISSIONS.length; mi++) {
         pl.hp = pl.maxHp;
         pl.alive = true;
       }
-      pump(1);
+      S.step(1 / 60);
       if (wonAt < 0 && m.win(w)) { won = true; wonAt = f / FPS; }
       if (lostAt < 0 && m.lose(w)) lostAt = f / FPS;
       if (wonAt >= 0) break;

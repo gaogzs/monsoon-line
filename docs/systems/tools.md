@@ -7,6 +7,7 @@
 · `tools/lib/raster.js`（几个预览器共用的光栅器 / Canvas 桩 / PNG 编码）
 · `tools/probe-missions.js`（逐关验证胜利条件可达）· `tools/render-mounts.js`（离线 NPC 挂载预览）
 · `tools/rename-aircraft.js`（一次性批量改名）
+· `tools/lib/sim.js`（后台模拟框架，v2.0.0）· `tools/probe-render.js`（WebGL / 2D 画面对比）· `tools/probe-balance.js`（难度回归）
 
 ---
 
@@ -21,6 +22,9 @@
 | 工具 | 一句话职责 | 什么时候跑 |
 |---|---|---|
 | `smoke.js` | 在无浏览器环境把整个游戏跑起来并断言 | **每次改完代码** |
+| `lib/sim.js` | 后台模拟框架：vm 沙箱 + 固定种子 + 空渲染，probe-* 都建在它上面 | —（被 require） |
+| `probe-render.js` | 无头 Chrome（swiftshader）把同一组场景用 WebGL 与 2D 各画一张并逐像素比 | 改了 `render-gl.js` / `render.js` / `shading.js` 之后 |
+| `probe-balance.js` | 玩家无敌且不作为，按关（m2/m5/m8）多种子统计敌方压力 | 改了敌方航线 / 轰炸 / 反舰弹之后 |
 | `probe-missions.js` | **逐关验证"清空敌人之后到底能不能赢"**，并检查 NPC 挂载问题 | 加了新关卡、改了胜负条件之后 |
 | `probe-blast.js` | 每种空空弹按 straight / gentle / hard / jink / max / flare 六档机动各打 N 发，统计命中率、平均伤害（占 `dmg` 比例）、起爆距离，与 `probe-blast.baseline.json` 对比 | 改了近炸 / 爆炸半径 / 导引之后 |
 | `release.js` | 按命令里给的版本号追加 `CHANGELOG.md` 草稿，生成 `js/changelog.js` 与 `js/version.js` | **每次发一个版本**（`node tools/release.js vX.Y.Z`） |
@@ -29,7 +33,7 @@
 | `render-ships.js` | 用真正的 `models.js` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
 | `render-mounts.js` | 用真正的 `Ent.makeAircraft()` + `Game.__pushStores()` 把 NPC 的实体挂载渲染成 PNG | 改了挂载分配 / 挂点坐标之后 |
 | `render-units.js` | 用单位详情页自己的 `renderModel()` 把 25 个单位渲染成 PNG | 改了 `unitview.js` 的渲染代码之后 |
-| `shot-unitview.js` | 无头 Chrome 截详情页的**布局**（需要本机有 Chrome） | 改了详情页的 HTML 结构或 CSS 之后 |
+| `shot-unitview.js` | 无头 Chrome 截详情页的**布局**与 WebGL 预览（需要本机有 Chrome） | 改了详情页的 HTML 结构或 CSS 之后 |
 | `lib/raster.js` | 供上面几个预览器共用的光栅器与 PNG 编码 | —（被 require） |
 | `rename-aircraft.js` | 按表把旧机型编号全库替换成新编号 | 只在改命名规范时，一次性的 |
 
@@ -37,6 +41,47 @@
 舰船预览器需要同一套东西。**没有去动那个已经被验证过、能跑的旧工具** ——
 新代码走 `require('./lib/raster')`，旧文件保持原样。两份实现的差异只有一处：
 `lib/raster.js` 多了一个 `Raster.clear()`（预览器要铺底色，俯视图不需要）。
+
+### `lib/sim.js` —— 后台模拟框架（v2.0.0）
+
+以前每个 probe 各抄一份沙箱；现在统一建在它上面（`probe-missions.js` / `probe-blast.js` 已迁移）。
+
+```js
+const Sim = require('./lib/sim');
+const S = Sim.load({ seed: 42, init, quiet });  // 每次 load 一个全新沙箱
+S.start(2);                 // 开 MISSIONS[2]
+S.step(dt);                 // 调 game.js 导出的 Game.__update(dt)，不走 rAF、不画 HUD
+S.run(30, (t, w, pl) => {}); // 推进 30 s 游戏时间，每帧回调
+S.seed(7); S.godMode();
+Sim.batch(seeds, scenario); Sim.stats(...);
+```
+
+| 项 | 事实 |
+|---|---|
+| 随机数 | `Math.random` 换成 mulberry32，同种子 = 同一场战斗 |
+| 渲染 | 假 2D 上下文（Proxy，全空操作）；拿不到 WebGL，`Renderer` 自动落到 2D |
+| 钩子 | `game.js` 导出 `__update` 专供它用 |
+
+### `probe-render.js` —— WebGL 与 2D 画面对比
+
+无头 Chrome（`--use-angle=swiftshader` 软件 GL）把固定场景（`wing-top` / `wing-low` / `fleet-fog` / `ship` / `aircraft-*`）
+用两条路径各画一张，左右并排，输出 `tools/preview/probe-render.png`。
+差异 = 任一通道差 > 24 的像素占比；**限 3%**，遮挡场景（`wing-top`）除外 —— 那正是迁移要修的，只报告不判失败。
+当前：非遮挡场景 ≤ 1.3%。
+
+### `probe-balance.js` —— 难度回归
+
+```bash
+node tools/probe-balance.js [--seeds 5] [--t 240] [--only m2]
+```
+
+玩家无敌、不开火、不机动，量敌方行动本身的压力：`loseAt`、我方单位损失、剩余血量、航线到点次数（`onArrive`）。
+
+| 关 | 3 种子 × 240 s | 备注 |
+|---|---|---|
+| m2 | 基地血量 62%，到点 2 次 | v1.13.2 修航线前是 100% / 0 次 |
+| m5 | 到点 1 次 | |
+| m8 | 到点 2 次，血量 100% | **已知问题**：BOX-14 反舰弹寿命 24 s，在舰前约 1.9 km 处失效 |
 
 ### `probe-missions.js` —— 冒烟测试抓不到的那一半
 
@@ -277,6 +322,9 @@ function pump(frames) {
 | 告警栈：按优先级排、永不重叠 | 全部告警同时打开：顺序等于 `HUD.ALERT_ORDER`、导弹逼近在最上、失速在动压前、相邻两行的 y 差不小于上一行的行高 |
 | `范围伤害与近炸`（v1.13） | 衰减边界、同队豁免、撞地与寿命到期起爆、子母弹不伤飞机、最近点近炸、诱饵起爆、特效尺寸与粒子预算 |
 | F 键选目标 | 屏幕内锁离瞄准环最近的、1.5 s 内连按换第二近、屏幕内为空时锁最近的屏幕外目标 |
+
+> **v2.0.0：** smoke **仍用自己的沙箱**（它要校验 `index.html` 里的元素 id，`lib/sim.js` 不带这层 DOM），
+> 但新增"后台模拟框架"一组：`require('./lib/sim')`，同种子两次逐帧相同、换种子会变。
 
 ### 怎么写一条新断言
 
@@ -625,7 +673,10 @@ node tools/shot-unitview.js              # 默认四个：有/无俯视图的飞
 node tools/shot-unitview.js ship:bluewhale   # 指定单位（ship: 前缀表示舰船）
 ```
 
-它生成一个**最小页面**：只加载详情页需要的 7 个模块，刻意**不加载 `game.js`**
+v2.0.0 起最小页面额外加载 `shading.js` 与 `render-gl.js`，并给 Chromium 加 swiftshader 软件 GL 参数 ——
+截到的 3D 预览就是真机走的 WebGL 路径。
+
+它生成一个**最小页面**：只加载详情页需要的模块，刻意**不加载 `game.js`**
 （那个文件在 `load` 时会启动整个游戏），再把 `UnitView.html()` 的结果插进去。
 
 Chromium 的参数里有两个是必须的：
