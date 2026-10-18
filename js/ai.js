@@ -427,13 +427,48 @@ var AI = (function () {
      这比"给它们写一套 AI"简单得多，也更贴合它们在战场上的角色：
      它们不是战斗单位，是**事件**。
      ============================================================ */
+  /* 航线型干扰机的自动开机（missions.js 的 jammerRoute）：
+     玩家一方任何单位（飞机或水面 / 地面目标）进入干扰半径 × trigK、
+     吊舱没在开、冷却也好了 —— 开机。每 0.25 s 查一次就够。 */
+  function jamAuto(a, J, world, dt) {
+    if (a.spActive > 0 || a.spCd > 0) return;
+    J.t = (J.t || 0) - dt;
+    if (J.t > 0) return;
+    J.t = 0.25;
+    var w = WEAPONS[J.wid];
+    var R = (w.jamRadius || 9000) * (J.trigK || 1.2), R2 = R * R;
+    var hit = false, i;
+    for (i = 0; i < world.actors.length && !hit; i++) {
+      var e = world.actors[i];
+      if (e.alive && Ent.hostile(e, a) && M3.dist2(e.pos, a.pos) < R2) hit = true;
+    }
+    var tl = world.targets || [];
+    for (i = 0; i < tl.length && !hit; i++) {
+      if (tl[i].alive && Ent.hostile(tl[i], a) && M3.dist2(tl[i].pos, a.pos) < R2) hit = true;
+    }
+    if (!hit) return;
+    Ent.openEcm(a, J.wid, J.skill);
+    a.spCd = w.cd;
+    if (world.radio) {
+      world.radio.raw({ who: a.label || a.name, cls: 'enemy', tx: J.n ? J.again : J.msg, gap: 0.9 });
+    }
+    J.n = (J.n || 0) + 1;
+  }
+
   function updateRoute(a, dt, world) {
     var r = a.route;
     var ctrl = a.ctrl;
 
-    var to = M3.sub(r.wp, a.pos);
+    /* 航点只管水平位置，高度另有 r.alt 管 —— 所以到点和转向都按**水平**算。
+
+       以前这里用的是三维距离，而大多数航点写的是海平面（y: 0）：
+       巡航在 11 km 的干扰机从航点正上方飞过，三维距离仍有 9.8 km，
+       永远够不到 arrive（3 km）—— onArrive 从不执行，干扰机从不开机、
+       轰炸机从不投弹、预警机从不换边，全在航点上空打转。
+       转向也一样：三维方向在接近航点时几乎垂直朝下，会把飞机往海里拽。 */
+    var to = M3.V(r.wp.x - a.pos.x, 0, r.wp.z - a.pos.z);
     var dist = M3.len(to);
-    var desired = dist > 1 ? M3.mul(to, 1 / dist) : a.fwd;
+    var desired = dist > 1 ? M3.mul(to, 1 / dist) : M3.norm(M3.V(a.fwd.x, 0, a.fwd.z));
 
     // 巡航高度保持 —— 航线给了高度，它只负责回到那上面
     if (a.pos.y < r.alt - 150 && desired.y < 0.10) {
@@ -441,6 +476,8 @@ var AI = (function () {
     } else if (a.pos.y > r.alt + 150 && desired.y > -0.10) {
       desired = M3.norm(M3.V(desired.x, -0.28, desired.z));
     }
+
+    if (r.jam) jamAuto(a, r.jam, world, dt);
 
     steerTo(a, desired, ctrl, a);
     a.throttle = 0.95;

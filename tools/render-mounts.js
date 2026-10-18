@@ -114,7 +114,7 @@ const CASES = [
   { tag: 'schist-dl6-vzu', type: 'schist', special: 'dl6', pods: ['vzu'], note: 'ROK-27 + BIN-6 + SAV-6（一型导弹 + 吊舱，导弹的可见挂架变少但弹药池不变）' },
   { tag: 'spray-vbn-vzu', type: 'spray', special: 'vbn', pods: ['vzu'], note: 'DJACU Mk.1 浪花 + BIN-9 + SAV-6（吊舱进机腹，制式弹不被挤掉）' },
   { tag: 'sandstone-vbn', type: 'sandstone', special: 'vbn', note: 'VAC-14 + BIN-9（储备 2 发 < 挂点 4 个，多出来的挂点出厂就是空的）' },
-  { tag: 'lodestone-vsc', type: 'lodestone', special: 'vsc', note: 'GAL-44 干扰机 + SAV-14 烧穿吊舱（机腹）' },
+  { tag: 'lodestone-vsc', type: 'lodestone', special: 'vsc', note: 'ROK-44 干扰机 + SAV-14 烧穿吊舱（机腹）' },
   { tag: 'lodestone-vsc-belly', type: 'lodestone', special: 'vsc', el: -0.42, note: '同上，从**下**往上看机腹 —— 机腹挂载只有这个角度看得见' },
   { tag: 'spray-vbn-vzu-belly', type: 'spray', special: 'vbn', pods: ['vzu'], el: -0.42, note: '浪花，从下看机腹的吊舱' },
   { tag: 'schist-dl6-belly', type: 'schist', special: 'dl6', el: -0.42, note: '片岩，从下看：翼下挂载的高度对不对' },

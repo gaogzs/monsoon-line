@@ -103,6 +103,8 @@ var HUD = (function () {
     drawObjective(ctx, W, H, world);
 
     ctx.restore();
+    /* 全屏滤镜（干扰 / 受伤闪红）在 hudOpacity 之外画 —— 见 hudfx.js */
+    if (typeof HudFx !== 'undefined') HudFx.draw(ctx, W, H, p);
   }
 
   /* ============================================================
@@ -1411,7 +1413,7 @@ var HUD = (function () {
      ============================================================ */
   /* 优先级（上 → 下）：雷达 / 导弹 > 低高度 > 失速 > 动压 > 其它状态。
      低高度排在失速前面：它意味着下一秒就是海面。 */
-  var ALERT_ORDER = ['missile', 'lit', 'detected', 'terrain', 'stall', 'lowq', 'jammed', 'winchester', 'emcon'];
+  var ALERT_ORDER = ['missile', 'lit', 'damage', 'detected', 'terrain', 'stall', 'lowq', 'jammed', 'winchester', 'emcon'];
 
   var alertsBottom = 0;      // 告警栈最后一行的下沿 —— 任务横幅从它下面开始
 
@@ -1440,7 +1442,10 @@ var HUD = (function () {
     /* 电子战的两个状态：受扰与静默。
        它们都是"你看不见别人 / 别人看不见你"的状态，必须一眼可辨 ——
        否则玩家只会觉得"雷达今天有点难用"。 */
-    if ((p.suppressed || 0) > 0.05 || (p.ewPower || 0) > 0) list.push({ id: 'jammed', txt: 'JAMMED  雷达受扰', col: AMBER, font: F2, on: bl, h: U(30) });
+    /* 受扰是常态告警：不闪、颜色压暗 —— 一直挂着提醒你"现在看到的不全"，但不抢眼。 */
+    if ((p.suppressed || 0) > 0.05 || (p.ewPower || 0) > 0) list.push({ id: 'jammed', txt: 'JAMMED  雷达受扰', col: 'rgba(255,176,58,0.62)', font: F2, on: true, h: U(30) });
+    /* 受损：最后一次掉血后挂 HudFx.FX.alertHold 秒，快闪 */
+    if (typeof HudFx !== 'undefined' && HudFx.alertOn()) list.push({ id: 'damage', txt: 'DAMAGE  受损警告', col: RED, font: F1, on: blFast, h: U(30) });
     if (p.gunAmmo <= 0 && p.spAmmo <= 0) list.push({ id: 'winchester', txt: 'WINCHESTER  弹药耗尽', col: AMBER, font: F2, on: bl, h: U(30) });
     if (p.emcon) list.push({ id: 'emcon', txt: 'EMCON-Δ  电磁静默', col: CY, font: F2, on: true, h: U(30) });
 

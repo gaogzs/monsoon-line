@@ -632,3 +632,19 @@ ctx.strokeText(t, x, y);
 | 俯仰刻度范围 | `drawPitchLadder()` 里的 `LIM = 40` |
 | 告警阈值与优先级 | `drawAlerts()` / `ALERT_ORDER` |
 | 颜色 | `hud.js` 顶部 `GREEN / AMBER / CY / RED / DIM` |
+
+## 全屏滤镜（`js/hudfx.js`，v1.13.2）
+
+`HUD.draw` 最后调 `HudFx.draw(ctx, W, H, p)`，画在 `hudOpacity` 的 save/restore 之外，滤镜不跟着 HUD 变淡。
+参数全在 `HudFx.FX`。
+
+| 效果 | 触发 | 强度 | 上限（保证 UI 可读） |
+|---|---|---|---|
+| 干扰滤镜：下行扫描线带 + 细扫描线 + 静电噪点（预渲染 128² 图随机平移铺满）+ 偶发撕裂线 | `max(suppressed, ewPower × 0.8)` > 0.04 | 线性跟随强度 | 扫描线带 0.10、噪点 0.13、撕裂线 0.22（只有一两条 1–3 px 的线） |
+| 受伤闪红：径向渐变，边缘重、中央轻 | 每帧比较玩家 hp，掉血即触发（不改 `Ent.damage`） | `0.18 + 单次伤害 / maxHp × 3.2`，夹到 1；多次命中取较大值，不累加 | 边缘 0.42、中央 0.06；每秒退 2.2，满强度约 0.45 s 退完 |
+
+告警栏：
+- `DAMAGE 受损警告`：红色快闪，最后一次掉血后挂 1.4 s（`FX.alertHold`），优先级排在雷达照射之后。
+- `JAMMED 雷达受扰`：受扰期间常驻，不闪，颜色压暗（`rgba(255,176,58,0.62)`）。
+
+`HUD.draw` 收到的 dt 恒为 0，所以 `HudFx` 自己用 `performance.now()` 算帧间隔。换了玩家对象（新一局）会自动清零。

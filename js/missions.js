@@ -217,6 +217,19 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
 
    它**做什么**写在 game.js 的 updateAewc() 里 —— 因为那要用到
    bearing() / setWingCmd() / Radio，那些都在 game.js 的闭包里。 */
+/* 随队干扰机的航线：飞到站位点之后在 wp ↔ hold 之间来回盘旋，不退场。
+
+   开机不看时间、不看玩家：**玩家一方任何单位**（我方飞机、僚机、我方舰船 /
+   设施）进入 SAV-14 干扰半径的 trigK 倍，冷却也好了，就开机（ai.js 的
+   updateRoute → jamAuto）。打掉它是唯一让它闭嘴的办法。
+   msg 是第一次开机的无线电，之后每次开机播短句。 */
+function jammerRoute(o) {
+  return {
+    loiter: true, wp: o.wp, exit: o.hold, alt: o.alt, arrive: 2600,
+    jam: { wid: 'vsc', skill: 0.5, trigK: 1.2, msg: o.msg, again: o.again || '<i>干扰机再次开机。</i>' }
+  };
+}
+
 function spawnAewc(w, o) {
   var a = spawnEnemy(w, {
     ac: o.ac,
@@ -900,7 +913,7 @@ MISSIONS.push({
     'GAL-31「玄武岩」×2（高层）/ ROK-27「片岩」×2（15 km 以下）护航编队',
     'ROK-2「石英」预警机（给整片空域的敌机分配目标）',
     'WINTERPORT「冬港」—— 下游航空军战役指挥官',
-    'GAL-44「磁石」随队干扰机（九公里内雷达被压哑）'
+    'ROK-44「磁石」随队干扰机（九公里内雷达被压哑）'
   ],
   intel: `高度 <b>19 500 m</b> · 密度 0.095 kg/m³ · 温度 −57 ℃<br>
     在此高度你<b>无法加速</b>，只能靠进入战斗前攒下的能量<br>
@@ -976,7 +989,7 @@ MISSIONS.push({
       a: M3.V(6000, 0, 21000), b: M3.V(-6000, 0, 24000)
     });
 
-    /* 下游随队干扰机 GAL-44「磁石」。
+    /* 下游随队干扰机 ROK-44「磁石」。
 
        它不空战：沿固定航线飞进来、开机、掉头走 —— 与轰炸机是同一套
        航线机制（`route`），只是到点之后干的事不同。
@@ -986,27 +999,18 @@ MISSIONS.push({
        "先让对手瞎掉，再打"的那一步 —— 而它自己的位置也因此暴露。 */
     var jammer = spawnEnemy(w, {
       ac: 'lodestone',
-      x: -9000, y: 11000, z: 21000,
+      /* 磁石的升限是 16 000 m（巨砾的机体）—— 贴着升限飞，在 18–19 km 主战场下方约 3 km。
+         以前在 11 000 m，与主战场差 8 km，九公里的干扰半径连边都够不到。 */
+      x: -9000, y: 15800, z: 21000,
       fwd: M3.V(0, 0, -1), speed: 340,
       special: 'vsc', skill: 0.55,
       // 呼号是村名（设定 8.7）。原来写的「焦炬 TORCH」是它挂的那台吊舱的名字
       callsign: '苦井 BITTERWELL'
     });
-    jammer.route = {
-      phase: 'ingress',
-      wp: M3.V(-6000, 0, 11000), alt: 11000, arrive: 3000,
-      exit: M3.V(-12000, 0, 22000), exitAlt: 11000,
-      onArrive: function (a, w2) {
-        Ent.openEcm(a, 'vsc', 0.5);
-        a.spCd = WEAPONS.vsc.cd;
-        if (w2 && w2.radio) {
-          w2.radio.raw({
-            who: a.label || a.name, cls: 'enemy',
-            tx: '<i>下游干扰机开机 —— 九公里内全部被压倒。</i>', gap: 0.9
-          });
-        }
-      }
-    };
+    jammer.route = jammerRoute({
+      wp: M3.V(-6000, 0, 11000), hold: M3.V(-10000, 0, 15000), alt: 15800,
+      msg: '<i>下游干扰机开机 —— 九公里内全部被压倒。</i>'
+    });
 
     /* 四架护航，下游的标准搭配：便宜的负责数量，贵的负责质量。
 
@@ -1375,14 +1379,14 @@ MISSIONS.push({
   objectives: [
     '摧毁 3 座对空雷达站',
     '摧毁 2 套远程防空阵地（BAD-9）',
-    '击落 GAL-44 随队干扰机',
+    '击落 ROK-44 随队干扰机',
     '清除空域内全部敌机（含截击编队与 ROK-40）',
     '保护调节场管理局布缆船「准绳」（误击将失去上游信用）'
   ],
   threats: [
     '对空雷达站 ×3',
     'BAD-9「高墙」远程防空阵地 ×2',
-    'GAL-44「磁石」随队干扰机（SAV-14 压制场）',
+    'ROK-44「磁石」随队干扰机（SAV-14 压制场）',
     'ROK-27 / GAL-31 截击编队',
     'ROK-40「巨砾」×1（防线后方过境，BOX-14 反舰弹）'
   ],
@@ -1444,7 +1448,7 @@ MISSIONS.push({
     });
     skori.friendlyAsset = true;
 
-    /* 下游随队干扰机 GAL-44「磁石」。
+    /* 下游随队干扰机 ROK-44「磁石」。
        沿航线飞进来、开机、掉头走 —— 与轰炸机是同一套 route 机制。 */
     var jammer = spawnEnemy(w, {
       ac: 'lodestone',
@@ -1453,21 +1457,10 @@ MISSIONS.push({
       special: 'vsc', skill: 0.55,
       callsign: '旱湾 DRYBAY'
     });
-    jammer.route = {
-      phase: 'ingress',
-      wp: M3.V(-6000, 0, 11000), alt: 11000, arrive: 3000,
-      exit: M3.V(-14000, 0, 26000), exitAlt: 11000,
-      onArrive: function (a, w2) {
-        Ent.openEcm(a, 'vsc', 0.5);
-        a.spCd = WEAPONS.vsc.cd;
-        if (w2 && w2.radio) {
-          w2.radio.raw({
-            who: a.label || a.name, cls: 'enemy',
-            tx: '<i>下游干扰机开机 —— 九公里内全部被压倒。</i>', gap: 0.9
-          });
-        }
-      }
-    };
+    jammer.route = jammerRoute({
+      wp: M3.V(-6000, 0, 11000), hold: M3.V(-11000, 0, 16000), alt: 11000,
+      msg: '<i>下游干扰机开机 —— 九公里内全部被压倒。</i>'
+    });
 
     // 截击编队
     for (i = 0; i < 3; i++) {
@@ -1562,7 +1555,8 @@ MISSIONS.push({
     }
     for (i = 0; i < w.actors.length; i++) {
       var a = w.actors[i];
-      if (a.team === 1 && a.alive && a.ewPower > 0 && a.ecmOn) jammers++;
+      // 以前还要求 a.ecmOn —— 那个字段全项目没人写，状态栏永远显示"沉默"
+      if (a.team === 1 && a.alive && a.ewPower > 0) jammers++;
     }
     w.objectiveSub = '雷达 ' + radars + ' · 防空 ' + sams +
       (jammers ? ' · 干扰中' : ' · 干扰机沉默');
@@ -1771,14 +1765,14 @@ MISSIONS.push({
 
   objectives: [
     '摧毁 2 艘 海蝎级登陆舰',
-    '击落 GAL-44 干扰机，清除空域内全部敌机',
+    '击落 ROK-44 干扰机，清除空域内全部敌机',
     '（可选）摧毁 邓氏鱼级巡洋舰（防空圈核心）',
     '尽量保持在 1500 m 以下 —— 雷达暴露意味着被锁定'
   ],
   threats: [
     '邓氏鱼级巡洋舰（舰空弹 ×8，编队旗舰）',
     '海蝎级登陆舰 ×2（武装薄弱、结构脆弱）',
-    'GAL-44「磁石」干扰机（SAV-14 压制场）',
+    'ROK-44「磁石」干扰机（SAV-14 压制场）',
     'BAD-9 舰空弹（低空进入可缩短反应时间）'
   ],
   intel: `云底 <b>900 m</b> · 云顶 3400 m · 能见度 6 km<br>
@@ -1831,21 +1825,10 @@ MISSIONS.push({
       // 「灰烬」是第 3 关播撒机的级名，不能再拿来当呼号
       callsign: '碱滩 SALTFLAT'
     });
-    jammer.route = {
-      phase: 'ingress',
-      wp: M3.V(-6000, 0, 14000), alt: 7000, arrive: 3000,
-      exit: M3.V(-12000, 0, 26000), exitAlt: 7000,
-      onArrive: function (a, w2) {
-        Ent.openEcm(a, 'vsc', 0.5);
-        a.spCd = WEAPONS.vsc.cd;
-        if (w2 && w2.radio) {
-          w2.radio.raw({
-            who: a.label || a.name, cls: 'enemy',
-            tx: '<i>干扰机开机 —— 云里的光点全糊了。</i>', gap: 0.9
-          });
-        }
-      }
-    };
+    jammer.route = jammerRoute({
+      wp: M3.V(-6000, 0, 14000), hold: M3.V(-10000, 0, 19000), alt: 7000,
+      msg: '<i>干扰机开机 —— 云里的光点全糊了。</i>'
+    });
 
     // 一架夜间巡逻的片岩
     spawnEnemy(w, {

@@ -419,6 +419,9 @@ var SFX = (function () {
       if (!ready) return;
       var t = T();
       engG.gain.setTargetAtTime(0, t, 0.05);
+      /* 附近飞机的引擎声是另一条音链，不经过 engG。漏了它的话，战斗中途退出时
+         它停在最后一帧的音量上，回到任何页面都一直在响。 */
+      if (nearG) nearG.gain.setTargetAtTime(0, t, 0.05);
       gunG.gain.setTargetAtTime(0, t, 0.05);
       warnG.gain.setTargetAtTime(0, t, 0.05);
       // LFO 深度也要归零，不然噪声门还开着

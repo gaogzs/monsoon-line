@@ -2274,7 +2274,7 @@ if (Ent && M3 && me && world) {
        挂载中心必须比它低至少一个挂载物半径（0.30）——
        低了才叫"挂在外面"，否则那一件在画面上根本看不见。
 
-       抓过一次：GAL-44 干扰机与石英的机腹在 -2.60 m，而按机型类型给的
+       抓过一次：ROK-44 干扰机与石英的机腹在 -2.60 m，而按机型类型给的
        默认吊舱高度是 -1.95（对战斗机合适），于是机腹吊舱整件埋进机身 ——
        而吊舱是那两架飞机唯一的外挂特征。 */
     function surfaceUnderModel(m2, px, pz) {
@@ -5314,6 +5314,98 @@ try {
   else ok('压制下：门槛随压制变近、越远亮得越短、烧穿距离保底；不可锁定、不进候选、已有锁定被取消');
 } catch (e) {
   fail('压制可见性测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   HUD 全屏滤镜（HudFx）：受伤闪红随单次伤害变重、很快退掉；
+   受损告警跟着亮；干扰强度取 max(suppressed, ewPower × 0.8)；
+   最强也不超过"看得清 UI"的不透明度上限。
+   ============================================================ */
+console.log('\nHUD 滤镜');
+try {
+  const bad = [];
+  const F = sandbox.HudFx;
+  if (!F) throw new Error('HudFx 没有加载（index.html 漏了 js/hudfx.js？）');
+  const p = { alive: true, hp: 100, maxHp: 100, suppressed: 0, ewPower: 0 };
+  F.reset();
+  F.step(p, 1000);
+  p.hp = 95; F.step(p, 1016);
+  const small = F.hurtLevel();
+  if (!(small > 0)) bad.push('掉血之后没有红色滤镜');
+  if (!F.alertOn()) bad.push('掉血之后没有受损告警');
+  F.reset(); F.step(p, 2000);
+  p.hp = 55; F.step(p, 2016);
+  const big = F.hurtLevel();
+  if (!(big > small)) bad.push('单次伤害更大，红色反而没更重（' + small.toFixed(2) + ' / ' + big.toFixed(2) + '）');
+  let t = 2016;
+  for (let i = 0; i < 60; i++) { t += 16; F.step(p, t); }
+  if (F.hurtLevel() > 0.01) bad.push('红色滤镜 1 秒内没有退掉');
+  for (let i = 0; i < 60; i++) { t += 16; F.step(p, t); }
+  if (F.alertOn()) bad.push('受损告警 2 秒后还在');
+  // 不透明度上限：最强时也只是蒙一层
+  const X = F.FX;
+  if (X.hurtEdgeA > 0.5 || X.hurtCenterA > 0.1) bad.push('受伤滤镜最大不透明度过高，会挡住 UI');
+  if (X.jamScanA + X.jamNoiseA > 0.3) bad.push('干扰滤镜最大不透明度过高，会挡住 UI');
+  p.suppressed = 0.3; p.ewPower = 0.5;
+  if (Math.abs(F.jamLevel(p) - 0.4) > 1e-9) bad.push('干扰强度没有取 max(suppressed, ewPower × 0.8)');
+  // 在假画布上画一遍不出错
+  p.suppressed = 1; p.hp = 10; F.draw(sandbox.Renderer.ctx || {}, 800, 600, p);
+  F.reset();
+  if (bad.length) bad.forEach(fail);
+  else ok('HUD 滤镜：受伤闪红随单次伤害加重、约半秒退掉；受损告警；干扰强度与不透明度上限');
+} catch (e) {
+  fail('HUD 滤镜测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   航线型单位：到点按水平距离判（航点写在海平面，飞机在高空），
+   随队干扰机在玩家一方任何单位进入范围时开机、冷却后再开。
+   ============================================================ */
+console.log('\n航线与随队干扰机');
+try {
+  const bad = [];
+  const AI = sandbox.AI;
+  const mkR = (y) => {
+    const a = Ent.makeAircraft({ type: 'lodestone', team: 1, pos: M3.V(0, y, 0) });
+    a.team = 1; a.pos = M3.V(0, y, 0); a.fwd = M3.V(0, 0, 1); a.alive = true;
+    AI.attach && AI.attach(a, {});
+    a.ai = a.ai || {};
+    return a;
+  };
+  // 1) 高空飞过海平面航点正上方，要算"到了"
+  {
+    const a = mkR(11000);
+    let arrived = false;
+    a.route = { phase: 'ingress', wp: M3.V(0, 0, 1000), alt: 11000, arrive: 3000,
+      exit: M3.V(0, 0, 30000), onArrive: () => { arrived = true; } };
+    const W = { actors: [a], targets: [], missiles: [], particles: [] };
+    AI.update(a, 1 / 60, W);
+    if (!arrived) bad.push('11 km 高度飞到海平面航点正上方，航线没有判定到达（三维距离的老 bug）');
+  }
+  // 2) 随队干扰机：附近有我方舰船就开机；冷却中不重开；冷却后再开
+  {
+    const a = mkR(4000);
+    a.route = sandbox.jammerRoute({ wp: M3.V(0, 0, 50000), hold: M3.V(0, 0, 60000), alt: 4000, msg: 'x' });
+    const ship = Ent.makeTarget({ team: 0, ttype: 'ship', x: 0, z: 5000, hp: 900, radius: 40 });
+    const far = Ent.makeTarget({ team: 0, ttype: 'ship', x: 0, z: 40000, hp: 900, radius: 40 });
+    const W = { actors: [a], targets: [far], missiles: [], particles: [] };
+    for (let i = 0; i < 30; i++) AI.update(a, 1 / 60, W);
+    if (a.spActive > 0) bad.push('范围内没有玩家一方单位，干扰机却开机了');
+    W.targets = [far, ship];
+    for (let i = 0; i < 30; i++) AI.update(a, 1 / 60, W);
+    if (!(a.spActive > 0)) bad.push('我方舰船在范围内，干扰机没有开机（不该只看玩家）');
+    const cd = a.spCd;
+    a.spActive = 0;
+    for (let i = 0; i < 30; i++) AI.update(a, 1 / 60, W);
+    if (a.spActive > 0) bad.push('冷却中的干扰机又开机了');
+    a.spCd = 0;
+    for (let i = 0; i < 30; i++) AI.update(a, 1 / 60, W);
+    if (!(a.spActive > 0) || !(cd > 0)) bad.push('冷却结束后干扰机没有再次开机');
+  }
+  if (bad.length) bad.forEach(fail);
+  else ok('航线按水平距离到点；随队干扰机按玩家一方任何单位开机、冷却后重开');
+} catch (e) {
+  fail('航线 / 干扰机测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
 /* ============================================================

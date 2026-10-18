@@ -144,8 +144,10 @@ spawnEnemy(w, {
 
 - **m1** 放了一架上游 `J-2 鹈鹕`（team 0，`label: 'SEXTANT'`）—— 无线电里
   报了整场战役方位的那个人从此有了实体
-- **m3** 放了一架下游 `ROK-2 石英`（team 1），以及一架 `GAL-44 磁石` 干扰机：
-  后者用 `route.onArrive` 调 `Ent.openEcm(a, 'vsc')` 开机，然后掉头走
+- **m3** 放了一架下游 `ROK-2 石英`（team 1），以及一架 `ROK-44 磁石` 干扰机：
+  后者走 `jammerRoute`（m5、m7 同）：飞到站位点后在两点间盘旋、不退场；玩家一方任何单位
+  （飞机或舰船 / 设施）进入干扰半径 × 1.2 且冷却结束就开机（`ai.js` 的 `jamAuto`），约每 40 s 一次。
+  m3 的磁石贴着 16 000 m 升限飞（15 800 m），在 18–19 km 主战场下方约 3 km
 - **m10** 再放一架鹈鹕（team 0，`SEXTANT`），敌方预警机的 `aewDown` 是该关的阶段事件
 
 ### 各关兵力：敌方一律是下游
@@ -157,11 +159,11 @@ spawnEnemy(w, {
 |---|---|---|
 | m1 | ROK-27 测绘机 ×5（`dl6`）· VAC-14 护航 ×2（`vbn`）· ROK-27 ×2（`dl6` + `pods: ['vzu']`） | 我方鹈鹕预警机；群岛国 tideline（team 2） |
 | m2 | ROK-40 轰炸机 ×2（`special: null`，`onArrive` 结算）· 伏击 GAL-31 / ROK-27 · 石英预警机 | 防空浮台 `dl9`；巡逻舰；我方驱逐舰虎鲸带 `ss6` |
-| m3 | GAL-31 王牌**冬港**（`spawnWinterport`）· 护航 GAL-31 ×2（`dl4` + `vbn`）、ROK-27 ×2 · 运输 GAL-31（`null`）· GAL-44（`vsc`）· 石英 | 群岛国 DJACU 浪花（team 2，`otr`） |
+| m3 | GAL-31 王牌**冬港**（`spawnWinterport`）· 护航 GAL-31 ×2（`dl4` + `vbn`）、ROK-27 ×2 · 运输 GAL-31（`null`）· ROK-44（`vsc`）· 石英 | 群岛国 DJACU 浪花（team 2，`otr`） |
 | m4 | ROK-27（`vsr` + `dl6`）×2 · VAC-14（`vgt` + `vbn`） | 我方护卫舰海豚带 `ss6`；三条民用船（team 2） |
-| m5 | 截击编队 GAL-31 / ROK-27 · ROK-40（`vsr`）· GAL-44（`vsc`） | **准绳 SKORI**（`team: 2` + `friendlyAsset`，误伤扣分）；MERLI / 标杆（team 2） |
+| m5 | 截击编队 GAL-31 / ROK-27 · ROK-40（`vsr`）· ROK-44（`vsc`） | **准绳 SKORI**（`team: 2` + `friendlyAsset`，误伤扣分）；MERLI / 标杆（team 2） |
 | m6 | GAL-31（`dl4`）×4 · ROK-27（`dl6`，隔一架带 `vzu`）×4 · 石英 | — |
-| m7 | ROK-27（`dl6`）· GAL-44（`vsc`） | 舰船 `dl9` |
+| m7 | ROK-27（`dl6`）· ROK-44（`vsc`） | 舰船 `dl9` |
 | m8 | VAC-14（`vgt` + `vbn`）×5 · ROK-27（`vsr` + `dl6`）· ROK-40（`vsr`）×2 · GAL-31 / VAC-14 掩护 · 石英 | 上游编队（team 0）：座头鲸 / 抹香鲸带 `ss6`，蓝鲸 `weapon: null` |
 | m9 | ROK-27（`dl6` + `vzu`）· ROK-27（`vsr` + `dl6`）· VAC-14（`vgt` + `vbn`） | 登陆舰 / 护航舰 `dl9` |
 | m10 | 冬港（`spawnWinterport`，同 m3）· 两层护航 GAL-31 / ROK-27（轻型带 `vzu`）· 石英 | 指挥舰 `dl9` |
