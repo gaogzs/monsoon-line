@@ -5225,6 +5225,98 @@ try {
 }
 
 /* ============================================================
+   被压制时的目标可见性与锁定（Ent.jamState）
+   压制 ≥ 0.5：烧穿距离外的敌方目标框闪烁，≥ 0.8 消失；
+   这两种状态下都不能锁定、不进 F 键候选，已有锁定被强制取消。
+   ============================================================ */
+console.log('\n压制下的目标与锁定');
+try {
+  const bad = [];
+  const G = sandbox.Game, W = G.__world(), pl = G.__player();
+  if (!W || !pl || !G.__updateLock || !G.__cycleTarget) throw new Error('拿不到 world / player / __updateLock / __cycleTarget');
+  const saved = { actors: W.actors, targets: W.targets, special: pl.special, sup: pl.suppressed };
+  const R = Ent.JAM_BURN_R;
+  pl.alive = true; pl.pos = M3.V(0, 3000, 0); pl.fwd = M3.V(0, 0, 1);
+  pl.special = Object.keys(WEAPONS).find(k => WEAPONS[k].kind === 'aam' && WEAPONS[k].fits && WEAPONS[k].fits.length);
+  const mk = (z) => { const a = Ent.makeAircraft({ type: 'frigatebird', team: 1, pos: M3.V(0, 3000, z) }); a.team = 1; a.pos = M3.V(0, 3000, z); return a; };
+  const near = mk(R * 0.5), far = mk(R + 1500);   // far 的位置下面按压制重新放
+  W.actors = [pl, near, far]; W.targets = [];
+
+  const st = (s, e) => { pl.suppressed = s; return Ent.jamState(pl, e); };
+  if (st(0, far) !== 'clear') bad.push('没压制时远处目标不清楚');
+  if (st(1, near) !== 'clear') bad.push('烧穿距离内的目标被压制影响了');
+  // 门槛随压制变近：同一个距离，轻压制正常、中压制闪烁、重压制消失
+  const at = (s) => { const r = Ent.jamRanges(s); return r; };
+  if (!(at(0.8).clear < at(0.3).clear && at(0.8).hide < at(0.3).hide)) bad.push('压制越重，看得清的距离没有变近');
+  const probe = mk(0); 
+  const place = (d) => { probe.pos = M3.V(0, 3000, d); return probe; };
+  const r6 = at(0.6);
+  if (st(0.6, place(r6.clear - 100)) !== 'clear') bad.push('clearR 以内应为 clear');
+  if (st(0.6, place((r6.clear + r6.hide) / 2)) !== 'flicker') bad.push('闪烁带里应为 flicker');
+  if (st(0.6, place(r6.hide + 100)) !== 'hidden') bad.push('hideR 以外应为 hidden');
+  // 同压制下越远亮得越短
+  pl.suppressed = 0.6;
+  const duty = (d) => Ent.jamDuty(pl, place(d));
+  const d1 = duty(r6.clear + (r6.hide - r6.clear) * 0.25), d2 = duty(r6.clear + (r6.hide - r6.clear) * 0.75);
+  if (!(d1 > d2 && d2 > 0)) bad.push('同一压制下远的目标没有亮得更短（' + d1.toFixed(2) + ' / ' + d2.toFixed(2) + '）');
+  // 闪烁：有亮有灭
+  place((r6.clear + r6.hide) / 2);
+  let on = 0;
+  for (let i = 0; i < 120; i++) if (Ent.jamShown(pl, probe, i / 60)) on++;
+  if (!(on > 0 && on < 120)) bad.push('flicker 状态目标框没有闪烁（120 帧里亮 ' + on + ' 帧）');
+  // 友军标记：本机被压或友机在压制场里，远处的友机框都要受影响；AI 被压制时锁不了 clearR 外的目标
+  {
+    const mate = mk(0); mate.team = pl.team; mate.pos = M3.V(0, 3000, 30000);
+    pl.suppressed = 0; mate.suppressed = 0.6;
+    if (Ent.jamState(pl, mate) === 'clear') bad.push('友机在压制场里，远处的友机框没受影响');
+    mate.suppressed = 0; pl.suppressed = 0.6;
+    if (Ent.jamState(pl, mate) === 'clear') bad.push('本机被压制时远处的友机框没受影响');
+    mate.pos = M3.V(0, 3000, 500);
+    if (Ent.jamState(pl, mate) !== 'clear') bad.push('烧穿距离内的友机框被隐藏了');
+    const wing = mk(0); wing.team = 0; wing.pos = M3.V(0, 3000, 0); wing.suppressed = 0.6;
+    const rr = Ent.jamRanges(0.6);
+    if (Ent.jamLockOK(wing, place(rr.clear + 500))) bad.push('被压制的友机还能锁 clearR 外的敌机');
+    if (!Ent.jamLockOK(wing, place(rr.clear - 500))) bad.push('被压制的友机锁不了 clearR 内的敌机');
+    wing.suppressed = 0;
+    if (!Ent.jamLockOK(wing, place(40000))) bad.push('没被压制的友机也被限制了');
+    if (!(Ent.jamLockK({ suppressed: 0.6 }) < 1)) bad.push('压制没有缩短锁定距离');
+  }
+  // 舰船：玩家看舰船压制打折、烧穿距离更远；被压制的舰船锁不了远处的飞机
+  {
+    const shp = Ent.makeTarget({ team: 1, ttype: 'ship', x: 0, z: 0, hp: 900, radius: 40 });
+    pl.suppressed = 0.9;
+    shp.pos = M3.V(0, 0, 4000);
+    if (Ent.jamState(pl, shp) !== 'clear') bad.push('舰船烧穿距离（' + Ent.JAM_BURN_SURF + ' m）内被隐藏了');
+    probe.pos = M3.V(0, 3000, 4000);
+    if (Ent.jamState(pl, probe) === 'clear') bad.push('同距离的飞机反而没受压制（对照组失效）');
+    shp.pos = M3.V(0, 0, 0); shp.suppressed = 0.4;
+    if (Ent.jamLockOK(shp, place(Ent.jamRanges(0.4, true).clear + 500))) bad.push('被压制的舰船还能锁 clearR 外的飞机');
+    if (!Ent.jamLockOK(shp, place(Ent.JAM_BURN_SURF - 200))) bad.push('被压制的舰船锁不了烧穿距离内的飞机');
+  }
+  // 下面的候选 / 取消锁定：far 放进 0.6 压制的闪烁带
+  far.pos = M3.V(0, 3000, (r6.clear + r6.hide) / 2);
+
+  // F 键候选：只剩近的
+  pl.suppressed = 0.6; pl.target = null;
+  const seen = new Set();
+  for (let i = 0; i < 4; i++) { G.__cycleTarget(); if (pl.target) seen.add(pl.target); }
+  if (seen.has(far)) bad.push('flicker 状态的目标进了 F 键候选');
+  if (!seen.has(near)) bad.push('烧穿距离内的目标没进 F 键候选');
+
+  // 已有锁定被强制取消
+  pl.suppressed = 0; pl.target = far; pl.lockProgress = 1; pl.locked = true;
+  pl.suppressed = 0.6;
+  G.__updateLock(1 / 60);
+  if (pl.target || pl.locked || pl.lockProgress) bad.push('目标进入 hidden 后锁定没有被取消');
+
+  W.actors = saved.actors; W.targets = saved.targets; pl.special = saved.special; pl.suppressed = saved.sup; pl.target = null;
+  if (bad.length) bad.forEach(fail);
+  else ok('压制下：门槛随压制变近、越远亮得越短、烧穿距离保底；不可锁定、不进候选、已有锁定被取消');
+} catch (e) {
+  fail('压制可见性测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
    结果
    ============================================================ */
 console.log('');

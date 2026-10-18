@@ -592,8 +592,9 @@ var HUD = (function () {
 
     /* 电子战压制：雷达屏幕上出雪花（设定 7.3）。
 
-       丢的是**信息**，不是飞机 —— 所以只动雷达光点，
-       目标框（drawTargets）照旧画。两个来源合并成一个"脏度"：
+       丢的是**信息**，不是飞机。雷达光点在这里出雪花；
+       目标框另有一套（drawTargets 读 Ent.jamState：只看 suppressed，
+       压得重时远处的框闪烁 / 消失）。这里两个来源合并成一个"脏度"：
 
          suppressed  被敌方干扰机压制（下游的烧穿吊舱）
          ewPower     自己正在开机干扰别人 —— 干扰是双向的 */
@@ -612,11 +613,12 @@ var HUD = (function () {
       var e = world.actors[i];
       if (!e.alive || e === p) continue;
       var friendly = (e.team === p.team);
-      /* 只对敌方光点下手：友军的敌我识别来自数据链，不受雷达干扰影响。 */
-      if (!friendly && jam > 0.02 && Math.random() < jam * 0.55) continue;
+      /* 友军也会丢：它自己在压制场里时，数据链报来的位置一样不可靠（Ent.jamPress）。 */
+      var jamE = friendly ? Ent.jamPress(p, e) : jam;
+      if (jamE > 0.02 && Math.random() < jamE * 0.55) continue;
       s = radarXY(p, e.pos, cx, cy, R, range);
-      if (!friendly && jam > 0.02) {
-        var jr = jam * 9;
+      if (jamE > 0.02) {
+        var jr = jamE * 9;
         s.x += (Math.random() - 0.5) * jr;
         s.y += (Math.random() - 0.5) * jr;
       }
@@ -887,6 +889,9 @@ var HUD = (function () {
 
     for (i = 0; i < list.length; i++) {
       var t = list[i];
+      /* 被压制：远处的敌方目标框闪烁（flicker）或消失（hidden），屏外标记同样处理。
+         判据在 Ent.jamState —— 与锁定、F 键候选同一个口径。 */
+      if (!Ent.jamShown(p, t, world.time || 0)) continue;
       var s = M3.projectUnclamped(cam, t.pos);
       var dist = M3.dist(p.pos, t.pos);
       var isAlly = (t.team === p.team);

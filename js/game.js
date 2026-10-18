@@ -1654,12 +1654,13 @@ var Game = (function () {
     var air = [], surf = [];
     for (var i = 0; i < world.actors.length; i++) {
       var a = world.actors[i];
-      if (a.alive && Ent.hostile(a, player)) air.push(a);   // 中立飞机不进锁定循环
+      // 中立飞机不进锁定循环；被压制得看不清的（jamState 非 clear）也不进
+      if (a.alive && Ent.hostile(a, player) && Ent.jamState(player, a) === 'clear') air.push(a);
     }
     for (i = 0; i < world.targets.length; i++) {
       // 只把真正的敌方目标纳入锁定循环；中立的调节单元不可被选为目标
       var tg = world.targets[i];
-      if (tg.alive && tg.team === 1) surf.push(tg);
+      if (tg.alive && tg.team === 1 && Ent.jamState(player, tg) === 'clear') surf.push(tg);
     }
 
     /* 当前武器能打的那一类**排在前面**，另一类接在后面。
@@ -1675,7 +1676,9 @@ var Game = (function () {
        不然目标一动，"下一个"就会跳回刚才那个。 */
     var cur = player.target, at;
     if (tgtCycle.world === world && world.time - tgtCycle.t < TARGET_REPEAT_T) {
-      var live = tgtCycle.list.filter(function (t) { return t.alive; });
+      var live = tgtCycle.list.filter(function (t) {
+        return t.alive && Ent.jamState(player, t) === 'clear';
+      });
       at = live.indexOf(cur);
       if (live.length) {
         player.target = live[(at + 1) % live.length];
@@ -2152,6 +2155,8 @@ var Game = (function () {
     /* 每帧重算：压制是"此刻被照着"，不是一种累积状态 ——
        离开那片空域，下一帧就恢复。 */
     for (i = 0; i < world.actors.length; i++) world.actors[i].suppressed = 0;
+    var tl = world.targets || [];
+    for (i = 0; i < tl.length; i++) tl[i].suppressed = 0;
     for (i = 0; i < world.actors.length; i++) {
       var a = world.actors[i];
       if (!a.alive || a.ewPower <= 0) continue;
@@ -2165,6 +2170,16 @@ var Game = (function () {
         // 越靠中心越强；乘 ewPower 是为了让"关机"自动归零
         var k = a.ewFieldK * (1 - d / r) * a.ewPower;
         e.suppressed = Math.max(e.suppressed, Math.min(1, k));
+      }
+      /* 舰船 / 地面设施也会被压，但只吃一半（Ent.JAM_SURF_K）：
+         大功率雷达 + 多套传感器，比战斗机难压得多。 */
+      for (j = 0; j < tl.length; j++) {
+        var g = tl[j];
+        if (!g.alive || !Ent.hostile(g, a)) continue;
+        var dg = M3.dist(g.pos, a.pos);
+        if (dg > r) continue;
+        var kg = a.ewFieldK * (1 - dg / r) * a.ewPower * Ent.JAM_SURF_K;
+        g.suppressed = Math.max(g.suppressed, Math.min(1, kg));
       }
     }
   }
@@ -2261,6 +2276,14 @@ var Game = (function () {
       player.lockProgress = 0;
       return;
     }
+    /* 被压制到看不清这个目标（flicker / hidden）：锁定强制取消，目标清空。
+       要等飞进烧穿距离、或者离开压制场，再按 F 重新选。 */
+    if (Ent.jamState(player, t) !== 'clear') {
+      player.target = null;
+      player.lockProgress = 0;
+      player.locked = false;
+      return;
+    }
     var w = WEAPONS[player.special];
     if (!w || w.kind === 'ecm' || w.kind === 'dew') { player.lockProgress = 1; return; }
 
@@ -2294,6 +2317,9 @@ var Game = (function () {
     /* EMCON-Δ：雷达关机，只剩被动手段 —— 锁定距离直接砍半。
        这是"更难被发现"那一头的代价，与被动吊舱的 +45% 正好互为反面。 */
     if (player.emcon) lockDist *= 0.5;
+
+    /* 被敌方干扰机压制（suppressed）：锁定距离最多砍一半，锁定也更慢（见下面的 rate）。 */
+    lockDist *= Ent.jamLockK(player);
 
     /* 目标自己的被动抗锁（SAV-6 / ZUN-8 这类吊舱汇总出来的 lockResist）。
        AI 锁玩家时一直在读它（ai.js），玩家锁 AI 时以前却不读 ——
@@ -2332,6 +2358,7 @@ var Game = (function () {
       : (w.seeker === 'ir' ? 0.55
         : (w.seeker === 'eo' ? 0.60      // 光电与红外同属被动成像，都快
           : (w.seeker === 'laser' ? 1.6 : 1.1))));
+    rate *= Ent.jamLockK(player);
     if (ok) {
       if (player.lockProgress < 1 && player.lockProgress + rate * dt >= 1) {
         SFX.lock();
@@ -2477,7 +2504,8 @@ var Game = (function () {
       if (player.alive) {
         var d = M3.dist(t.pos, player.pos);
         // 玩家的被动吊舱会压缩敌方对他的锁定距离
-        if (d <= w.lockDist * (1 - (player.lockResist || 0))) {
+        /* 自己被压制：锁定距离打折、只锁"看得清"的距离以内（与 AI 同一套，Ent.jamLockOK） */
+        if (d <= w.lockDist * (1 - (player.lockResist || 0)) * Ent.jamLockK(t) && Ent.jamLockOK(t, player)) {
           // 低空突防可以躲开对空雷达；但贴得太近仍会被目视发现
           var lowExposed = t.ground && player.pos.y < (world.dangerAltitude || 1500) && d < 5200;
           if (world.detected || lowExposed) return player;
@@ -2488,10 +2516,11 @@ var Game = (function () {
     } else if (t.team !== 0) {
       return null;
     }
-    var best = null, bd = w.lockDist;
+    var best = null, bd = w.lockDist * Ent.jamLockK(t);
     for (var j = 0; j < world.actors.length; j++) {
       var e = world.actors[j];
       if (!e.alive || e === player || e.team === t.team || e.team === 2) continue;
+      if (!Ent.jamLockOK(t, e)) continue;
       var de = M3.dist(t.pos, e.pos);
       if (de < bd) { bd = de; best = e; }
     }
@@ -3755,6 +3784,7 @@ var Game = (function () {
     __pushStores: pushStores,
     // 水面目标的对空射击：断言要能单独推一帧，确认我方舰艇不朝玩家打
     __updateTargets: updateTargets,
+    __updateLock: updateLock, __cycleTarget: cycleTarget,
     // 弹体命中结算：断言要能单独喂一发子弹进来，量它实际打掉多少血（机炮抗性）
     __scanShot: scanShot,
     // 追尾镜头出画处理：断言要能脱离整局游戏单独推镜头

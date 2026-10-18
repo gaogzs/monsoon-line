@@ -901,12 +901,16 @@ var AI = (function () {
         if (t && t.ewPower > 0 && spW.seeker === 'radar') {
           resist *= (1 - t.ewPower * (t.ewLockReduce || 0) * (1 - (s.ewResist || 0)));
         }
-        var okDist = dist < spW.lockDist * lockK * resist;
+        /* 自己被干扰机压制（suppressed，友军敌军都一样）：只能锁"看得清"的距离以内的目标
+           （Ent.jamLockOK，与玩家同一套门槛），锁定距离最多减半。 */
+        var jamK = Ent.jamLockK(a);
+        var okDist = dist < spW.lockDist * lockK * resist * jamK && Ent.jamLockOK(a, t);
         var okAng = off < cone * 0.85;
         /* 最小发射距离。对面目标给得比空中小目标保守一点：
            贴得太近，滑翔弹/炸弹的引信来不及开。 */
         var minR = spW.nezer ? 1400 : (t.kind === 'target' ? 1200 : 700);
-        if (okDist && okAng && dist > minR && Math.random() < 0.35 + s.skill * 0.45) {
+        /* 锁定本身也更难：玩家那边是锁定速度变慢，AI 没有锁定进度条，折成开火意愿 */
+        if (okDist && okAng && dist > minR && Math.random() < (0.35 + s.skill * 0.45) * jamK) {
           if (world.fireMissile) world.fireMissile(a, t);
           s.shootT = M3.rnd(2.6, 5.2) * (1.6 - s.skill * 0.6);
         }

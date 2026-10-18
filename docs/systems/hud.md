@@ -228,8 +228,27 @@ ry = dz * fz + dx * fx;     // 前
 `ewPower`（自己正在开机干扰，**干扰是双向的**）不为零时，敌方光点会
 按强度随机丢失、剩下的也会偏一点 —— 这就是设定 7.3 里那句
 "雷达屏幕上一片雪花，但目视却能看见敌机"。
-友军光点**不受影响**：敌我识别来自数据链，不是雷达。
-丢的是信息，不是飞机 —— 所以目标框（`drawTargets`）照旧画。
+友军光点和目标框**同样受影响**，压制取 max(本机, 友机)（`Ent.jamPress`）：友机自己在压制场里，数据链报来的位置一样不可靠。
+目标框另有一套，只看 `suppressed`（自己开吊舱不影响；友军取 `Ent.jamPress` = max(本机, 友机)），判据是 `Ent.jamState(p, e)`。
+压制强度决定两条门槛距离，距离决定闪成什么样：
+
+| 距离 d | 状态 | 目标框 |
+|---|---|---|
+| ≤ `clearR = max(1800, 16000 × (1 − s))` | `clear` | 正常 |
+| `clearR` – `hideR` | `flicker` | 闪烁；亮的时间占比从 1 线性掉到 0（`Ent.jamDuty`），越远越短 |
+| ≥ `hideR = clearR + max(1500, 10000 × (1 − s))` | `hidden` | 不画 |
+
+1800 m 是烧穿距离（`JAM_BURN_R`），`suppressed < 0.05` 当作没被压制。
+
+**舰船 / 地面设施**（`kind === 'target'`）两头都打折：雷达功率大、回波强、传感器多，比战斗机难压。
+- 玩家看它们、锁它们：压制 × `JAM_SURF_K`（0.5），烧穿距离换成 `JAM_BURN_SURF`（4500 m）。
+- 它们自己受的压制：`game.js` 的 `updateJamming` 同样乘 0.5。被压时，舰空弹的锁定距离 × `jamLockK`，
+  只能打 `clearR` 以内的飞机（`pickTargetFor` 读 `Ent.jamLockOK`）。
+烧穿距离内的目标始终 `clear`。非 `clear` 的目标**不能锁定、不进 F 键候选**，
+已有的锁定会被强制取消（`game.js` 的 `updateLock` / `cycleTarget`）。
+另外 `suppressed` 本身会让锁定距离和锁定速度最多减半（`Ent.jamLockK`）。
+AI（友军、敌军一样）用同一套门槛：被压制时只能对 `clearR` 以内的目标开火（`Ent.jamLockOK`），
+锁定距离 × `jamLockK`，开火概率也 × `jamLockK`（`ai.js` 的 `fireAtTarget`）。
 
 **注意**：油门条原来就压在这个圆心上，是本次搬走的（见上）。
 改左下角任何元素前，先确认它不会与雷达圆心重叠。
