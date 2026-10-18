@@ -1549,14 +1549,15 @@ if (Ent && M3 && me && world) {
       const w = m2();
       const bmb = w.actors.find(a => a.route && a.route.tailGun && a.alive);
       const hp0 = w.baseTarget.hp;
-      // 直接挪到投弹点附近，省掉八十多秒的航程
-      bmb.pos = M3.add(bmb.route.wp, M3.V(0, 700, 2200));
+      // 直接挪到投弹点附近，省掉八十多秒的航程（分段航线：第一段 goto 的 wp 就是投弹点）
+      bmb.pos = M3.add(bmb.route.legs[0].wp, M3.V(0, 700, 2200));
       for (let i = 0; i < 30; i++) AI.update(bmb, 1 / 60, w);
       if (w.baseTarget.hp >= hp0) {
         bad.push('轰炸机抵达投弹点后基地未受损（hp ' + hp0 + ' → ' + w.baseTarget.hp + '）');
       }
-      if (bmb.route.phase !== 'egress') {
-        bad.push('投弹后没有转入脱离，phase=' + bmb.route.phase);
+      const leg = bmb.route.legs[bmb.route.leg];
+      if (!leg || leg.do !== 'egress') {
+        bad.push('投弹后没有转入脱离，当前段=' + (leg ? leg.do : '—'));
       }
     }
 
@@ -3660,7 +3661,7 @@ if (Ent && M3 && me && world) {
     const out = [];
     // 连按 F 走一圈，看锁定结果落在谁身上
     for (let n = 0; n < 14; n++) {
-      kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} }));
+      (kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} })), (docListeners['keyup'] || []).forEach(fn => fn({ code: 'KeyF', preventDefault() {} })))  /* F 在松开时切换（长按是取消选择） */;
       pump(1);
       const t = pl.target;
       out.push(t ? (t.kind === 'air' ? '空中' : '地面:' + (t.model || '?')) : '无');
@@ -4123,7 +4124,7 @@ if (Ent && M3 && me && world) {
       // 玩家的锁定循环：把所有能选的目标轮一遍，不该出现中立机
       const kd = docListeners['keydown'] || [];
       for (let i = 0; i < 20; i++) {
-        kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} }));
+        (kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} })), (docListeners['keyup'] || []).forEach(fn => fn({ code: 'KeyF', preventDefault() {} })))  /* F 在松开时切换（长按是取消选择） */;
         if (pl.target === neutral) { bad.push('玩家锁定循环里出现了中立机'); break; }
       }
       if (bad.length) fail('中立飞机被当成了目标：' + bad[0]);
@@ -4170,7 +4171,7 @@ if (Ent && M3 && me && world) {
     const w = G.__world(), pl = G.__player();
     pump(5);
     const kd = docListeners['keydown'] || [];
-    const pressF = () => kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} }));
+    const pressF = () => (kd.forEach(fn => fn({ code: 'KeyF', preventDefault() {} })), (docListeners['keyup'] || []).forEach(fn => fn({ code: 'KeyF', preventDefault() {} })))  /* F 在松开时切换（长按是取消选择） */;
     const foes = w.actors.filter(a => a.alive && a.team === 1);
     const dir = pl.aimDir || pl.fwd;
     const right = M3d.norm(M3d.cross(M3d.V(0, 1, 0), dir));
@@ -5437,6 +5438,148 @@ try {
   else ok('后台模拟：同种子可复现，换种子会变');
 } catch (e) {
   fail('后台模拟框架测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   分段航线（route.js）的 strike 段与 AI 射程上限（Ent.aiReach）
+   ============================================================ */
+console.log('\n分段航线与有效射程');
+try {
+  const bad = [];
+  const AI = sandbox.AI, R = sandbox.Route, W8 = WEAPONS.vsr;
+  // 1) 有效射程：BOX-14 实际飞不到锁定距离；AI 射程取较小者
+  const eff = Ent.effRange(W8, 4500);
+  if (!(eff > 5000 && eff < W8.lockDist)) bad.push('BOX-14 的有效射程应在 5 km 与锁定距离之间，实测 ' + eff);
+  if (!(Ent.aiReach(W8, 4500) <= eff)) bad.push('AI 射程没有被有效射程封顶');
+  if (!(Ent.effRange(W8, 4500) === eff)) bad.push('有效射程没有缓存');
+
+  const mkB = () => {
+    const a = Ent.makeAircraft({ type: 'boulder', team: 1, pos: M3.V(0, 4500, 0), special: 'vsr', loadout: { B: 'vsr' } });
+    a.team = 1; a.pos = M3.V(0, 4500, 0); a.fwd = M3.V(0, 0, 1);
+    a.ammoPool = { vsr: 2, dl6: 4 };                 // 再挂一件自卫弹：strike 不能拿它打
+    a.slotCd = { vsr: [0, 0], dl6: [0, 0] };
+    if (!a.ai && AI.attach) AI.attach(a, {});
+    a.ai = a.ai || {};
+    return a;
+  };
+  const ship = (z) => Ent.makeTarget({ team: 0, ttype: 'ship', x: 0, z: z, hp: 1e6, radius: 40 });
+  const run = (a, W, n) => { for (let i = 0; i < n; i++) AI.update(a, 1 / 60, W); };
+
+  // 2) 射程外不放；进入有效射程 × rangeK 才放，而且只用指定武器
+  {
+    const a = mkB(), tg = ship(30000), shots = [];
+    const W = { actors: [a], targets: [tg], missiles: [], particles: [],
+      fireMissile: (s, t) => { shots.push({ w: s.special, d: Math.hypot(t.pos.x - s.pos.x, t.pos.z - s.pos.z) }); s.ammoPool[s.special]--; return {}; } };
+    a.route = R.plan([{ do: 'strike', weapon: 'vsr', rangeK: 0.8, alt: 4500, shots: 1, timeout: 999 },
+      { do: 'egress', wp: M3.V(0, 0, -40000), alt: 6000 }]);
+    run(a, W, 60);
+    if (shots.length) bad.push('目标在 30 km 外就发射了');
+    tg.pos = M3.V(0, 0, Ent.aiReach(W8, 4500, 0.8) - 300);
+    run(a, W, 60);
+    if (shots.length !== 1) bad.push('进入有效射程 × 0.8 后没有发射（' + shots.length + ' 发）');
+    else if (shots[0].w !== 'vsr') bad.push('strike 用了别的武器：' + shots[0].w);
+    const leg = a.route.legs[a.route.leg];
+    if (!leg || leg.do !== 'egress') bad.push('发满之后没有进入下一段');
+  }
+  // 3) 目标沉了换目标；一个都没有就跳过
+  {
+    const a = mkB(), t1 = ship(6000), t2 = ship(7000);
+    const W = { actors: [a], targets: [t1, t2], missiles: [], particles: [], fireMissile: () => null };
+    a.route = R.plan([{ do: 'strike', weapon: 'vsr', timeout: 999 }, { do: 'egress', wp: M3.V(0, 0, -40000) }]);
+    run(a, W, 2);
+    const first = a.route.st && a.route.st.tgt;
+    if (first !== t1) bad.push('没有先选最近的目标');
+    t1.alive = false;
+    run(a, W, 2);
+    if (a.route.st.tgt !== t2) bad.push('目标沉了没有换下一个');
+    t2.alive = false;
+    run(a, W, 2);
+    if (a.route.legs[a.route.leg].do !== 'egress') bad.push('没有目标时 strike 没有跳过');
+  }
+  // 4) 超时放弃
+  {
+    const a = mkB(), tg = ship(60000);
+    const W = { actors: [a], targets: [tg], missiles: [], particles: [], fireMissile: () => null };
+    a.route = R.plan([{ do: 'strike', weapon: 'vsr', timeout: 1 }, { do: 'egress', wp: M3.V(0, 0, -40000) }]);
+    run(a, W, 90);
+    if (a.route.legs[a.route.leg].do !== 'egress') bad.push('strike 超时没有进入下一段');
+  }
+  // 5) 对面弹的离轴角只量水平方位：目标在机头正下方 60° 也算对准；偏到侧面才不算
+  {
+    const a = mkB();
+    const below = { pos: M3.V(0, 0, 4500 / Math.tan(Math.PI / 3)) };
+    if (Ent.lockOff(a, below, W8) > 0.01) bad.push('对面弹：机头正前下方 60° 的目标被算成偏离');
+    if (!(Ent.lockOff(a, below, WEAPONS.srm) > 1)) bad.push('对空弹的离轴角不该忽略垂直方向');
+    const side = { pos: M3.V(8000, 0, 2000) };
+    if (!(Ent.lockOff(a, side, W8) > W8.lockCone)) bad.push('对面弹：偏到侧面的目标仍算在锁定锥内');
+  }
+  if (bad.length) bad.forEach(fail);
+  else ok('分段航线：射程外不放、进入有效射程 × rangeK 才放、只用指定武器、换目标 / 跳过 / 超时；AI 射程被有效射程封顶');
+} catch (e) {
+  fail('分段航线测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   锁定的分量：锁满才把目标交给导弹；玩家锁满才让对方收到照射告警；
+   长按 F 取消选择目标
+   ============================================================ */
+console.log('\n锁定与目标选择');
+try {
+  const bad = [];
+  const G = sandbox.Game, Ent = sandbox.Ent, M3 = sandbox.M3, AI = sandbox.AI;
+  G.startMission(0);
+  pump(3);
+  const w = G.__world(), pl = G.__player();
+  pl.hp = pl.maxHp = 1e9;
+  const foe = Ent.makeAircraft({ type: 'frigatebird', team: 1, pos: M3.add(pl.pos, M3.mul(pl.fwd, 3000)) });
+  foe.team = 1; foe.pos = M3.add(pl.pos, M3.mul(pl.fwd, 3000)); foe.hp = foe.maxHp = 1e9;
+  if (AI.attach && !foe.ai) AI.attach(foe, {});
+  w.actors.push(foe);
+  const kd = docListeners['keydown'] || [], ku = docListeners['keyup'] || [];
+  const key = (L, code) => L.forEach(fn => fn({ code: code, preventDefault() {} }));
+  const wid = Object.keys(sandbox.WEAPONS).find(k => sandbox.WEAPONS[k].kind === 'aam' && sandbox.WEAPONS[k].seeker === 'radar' && sandbox.WEAPONS[k].fits && sandbox.WEAPONS[k].fits.length);
+  const fire = (locked) => {
+    pl.special = wid; pl.spAmmo = 9; pl.spCd = 0; pl.target = foe;
+    pl.locked = locked; pl.lockProgress = locked ? 1 : 0.3;
+    const n0 = w.missiles.length;
+    key(kd, 'Enter');
+    return w.missiles.slice(n0).filter(m => m.owner === pl);
+  };
+  const m1 = fire(false);
+  if (!m1.length) bad.push('没锁满时制导弹发射不出去（应当能发射，只是不带目标）');
+  else if (m1.some(m => m.target)) bad.push('没锁满的导弹仍然带着选中目标出膛');
+  const m2 = fire(true);
+  if (!m2.length || !m2.every(m => m.target === foe)) bad.push('锁满后发射的导弹没有带上选中目标');
+
+  // 照射告警：只是选中、没锁满时对方收不到（先关掉默认挂载里被动吊舱的静默锁定）
+  const sl0 = pl.silentLock; pl.silentLock = false;
+  pl.special = wid; pl.target = foe; pl.locked = false;
+  AI.update(foe, 1 / 60, w);
+  if (foe.rwrT > 0) bad.push('玩家没锁满，对方就收到了照射告警');
+  pl.locked = true;
+  AI.update(foe, 1 / 60, w);
+  if (!(foe.rwrT > 0)) bad.push('玩家锁满后对方没有收到照射告警');
+  pl.silentLock = sl0;
+
+  // 长按 F：取消选择；短按：切换
+  pl.target = foe; pl.locked = true;
+  const realNow = sandbox.performance.now;
+  let fake = 1e6;
+  sandbox.performance.now = () => fake;
+  key(kd, 'KeyF');
+  fake += 600;
+  pump(1);
+  key(ku, 'KeyF');
+  sandbox.performance.now = realNow;
+  if (pl.target) bad.push('长按 F 没有取消选择目标');
+  key(kd, 'KeyF'); key(ku, 'KeyF');
+  if (!pl.target) bad.push('短按 F 没有选中目标');
+
+  w.actors.splice(w.actors.indexOf(foe), 1);
+  if (bad.length) bad.forEach(fail);
+  else ok('锁定：没锁满的弹不带目标、锁满才带；锁满才触发对方告警；长按 F 取消选择、短按切换');
+} catch (e) {
+  fail('锁定与目标选择测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
 /* ============================================================

@@ -14,6 +14,12 @@
      单次伤害占满血的比例越大，红色越重；很快退掉（HURT_DECAY）。
      告警栏的"受损警告"由 alertOn() 提供，退得比红色稍慢。
 
+   画在**单独一层全屏画布**上（z-index 300）：盖住游戏画布上的 HUD，
+   也盖住无线电记录、系统提示这些 HTML 面板（200 / 210）——
+   干扰时整个界面都该"花"。暂停菜单（800）在它上面，不受影响。
+   干扰还给这一层加一点 backdrop-filter 模糊，强度跟着压制走，最重 1.2 px。
+   这一层每帧开始时清空（Renderer.begin → beginFrame），离开战斗自动消失。
+
    HUD.draw 拿到的 dt 恒为 0（game.js 里画的是"当前状态"），
    所以这里自己用 performance.now() 算帧间隔。
    ============================================================ */
@@ -30,8 +36,40 @@ var HudFx = (function () {
     hurtEdgeA: 0.42,       // 强度 1 时屏幕边缘的红色不透明度
     hurtCenterA: 0.06,     // 强度 1 时屏幕中央的红色不透明度 —— 准星附近几乎不挡
     hurtDecay: 2.2,        // 每秒退多少强度：满强度约 0.45 s 退完
-    alertHold: 1.4         // "受损警告"在最后一次掉血后保留多久（s）
+    alertHold: 1.4,        // "受损警告"在最后一次掉血后保留多久（s）
+    jamBlur: 1.2,          // 干扰最强时整层界面的模糊半径（px）
+    layerZ: 300            // 叠加层的 z-index：无线电面板之上、暂停菜单之下
   };
+
+  /* ---------- 叠加层 ---------- */
+  var layer = null, lctx = null, layerDirty = false, curBlur = 0;
+  function getLayer() {
+    if (layer) return lctx;
+    if (typeof document === 'undefined' || !document.body || !document.createElement) return null;
+    layer = document.createElement('canvas');
+    if (!layer || !layer.getContext) { layer = null; return null; }
+    var st = layer.style || {};
+    st.position = 'fixed'; st.left = '0'; st.top = '0'; st.width = '100%'; st.height = '100%';
+    st.pointerEvents = 'none'; st.zIndex = String(FX.layerZ);
+    if (document.body.appendChild) document.body.appendChild(layer);
+    lctx = layer.getContext('2d');
+    return lctx;
+  }
+  function setBlur(px) {
+    if (!layer || Math.abs(px - curBlur) < 0.05) return;
+    curBlur = px;
+    var v = px > 0.05 ? 'blur(' + px.toFixed(2) + 'px)' : 'none';
+    layer.style.backdropFilter = v;
+    layer.style.webkitBackdropFilter = v;
+  }
+  /* 每帧开始（不管在不在战斗里）：清掉上一帧 */
+  function beginFrame() {
+    if (!layer || !layerDirty) return;
+    lctx.setTransform(1, 0, 0, 1, 0, 0);
+    lctx.clearRect(0, 0, layer.width, layer.height);
+    setBlur(0);
+    layerDirty = false;
+  }
 
   var lastT = 0;
   var hurtK = 0;           // 当前红色强度 0..1
@@ -123,18 +161,31 @@ var HudFx = (function () {
     ctx.restore();
   }
 
-  /* HUD.draw 的最后调一次（在 hudOpacity 的 save/restore 之外，滤镜不跟着 HUD 变淡）。 */
+  /* HUD.draw 的最后调一次。画到叠加层上；拿不到叠加层（工具脚本）就画在传进来的 ctx 上。 */
   function draw(ctx, W, H, p) {
     if (!p) return;
     var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     step(p, now);
     var j = jamLevel(p);
-    if (j > FX.jamMin) drawJam(ctx, W, H, Math.min(1, j), now);
-    if (hurtK > 0.01) drawHurt(ctx, W, H, hurtK);
+    var on = j > FX.jamMin || hurtK > 0.01;
+    var g = on ? getLayer() : null;
+    if (g) {
+      var dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 2);
+      var pw = Math.floor(W * dpr), ph = Math.floor(H * dpr);
+      if (layer.width !== pw || layer.height !== ph) { layer.width = pw; layer.height = ph; }
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.clearRect(0, 0, W, H);
+      layerDirty = true;
+    } else {
+      g = ctx;
+    }
+    if (j > FX.jamMin) drawJam(g, W, H, Math.min(1, j), now);
+    if (hurtK > 0.01) drawHurt(g, W, H, hurtK);
+    if (g !== ctx) setBlur(j > FX.jamMin ? FX.jamBlur * Math.min(1, j) : 0);
   }
 
   return {
-    FX: FX, draw: draw, step: step, noteDamage: noteDamage, jamLevel: jamLevel,
+    FX: FX, draw: draw, step: step, noteDamage: noteDamage, jamLevel: jamLevel, beginFrame: beginFrame,
     hurtLevel: function () { return hurtK; },
     alertOn: function () { return alertT > 0; },
     reset: function () { hurtK = 0; alertT = 0; lastHp = null; lastP = null; lastT = 0; }

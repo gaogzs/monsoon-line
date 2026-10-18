@@ -226,10 +226,10 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
    打掉它是唯一让它闭嘴的办法。
    msg 是第一次开机的无线电，之后每次开机播短句。 */
 function jammerRoute(o) {
-  return {
-    loiter: true, wp: o.wp, exit: o.hold, alt: o.alt, arrive: 2600,
-    jam: { wid: 'vsc', skill: 0.5, trigK: 1.0, dur: 30, fadeTo: 0.6, rekey: 3, msg: o.msg }
-  };
+  return Route.plan([
+    { do: 'goto', wp: o.wp, alt: o.alt },
+    { do: 'loiter', a: o.wp, b: o.hold, alt: o.alt }
+  ], { jam: { wid: 'vsc', skill: 0.5, trigK: 1.0, dur: 30, fadeTo: 0.6, rekey: 3, msg: o.msg } });
 }
 
 function spawnAewc(w, o) {
@@ -725,17 +725,17 @@ MISSIONS.push({
         special: null, skill: 0.30,        // 弹舱里的东西由 onArrive 结算，不走导弹
         callsign: downstreamCallsign(17 + i)
       });
-      bmb.route = {
-        phase: 'ingress',
-        wp: M3.V(br.x, 0, br.z), alt: 4300, arrive: 3000,
-        exit: M3.V(br.ox, 0, br.oz), exitAlt: 6500,
-        /* tailGun 目前是**无效配置**：ROK-40 已经没有机炮
-           （gun: null），updateRoute 的尾炮段第一句就返回。
-           留着它是因为将来若要恢复自卫火力，改的就是这一处。
-           原因见 docs/systems/ai.md「已知问题」。 */
-        tailGun: 1700,
-        onArrive: bombTheBase
-      };
+      // 弹舱里的东西不是武器，投弹由 bombTheBase 直接结算 —— 所以这里是 goto + call，不是 strike
+      bmb.route = Route.plan([
+        { do: 'goto', wp: M3.V(br.x, 0, br.z), alt: 4300, arrive: 3000 },
+        { do: 'call', fn: bombTheBase },
+        { do: 'egress', wp: M3.V(br.ox, 0, br.oz), alt: 6500 }
+      ]);
+      /* tailGun 目前是**无效配置**：ROK-40 已经没有机炮
+         （gun: null），updateRoute 的尾炮段第一句就返回。
+         留着它是因为将来若要恢复自卫火力，改的就是这一处。
+         原因见 docs/systems/ai.md「已知问题」。 */
+      bmb.route.tailGun = 1700;
       bmb.bigTarget = true;
     }
 
@@ -1492,19 +1492,18 @@ MISSIONS.push({
       skill: 0.4, callsign: downstreamCallsign(24)
     });
     cruise.bigTarget = true;
-    cruise.route = {
-      phase: 'ingress',
-      wp: M3.V(-14000, 0, 18000), alt: 12000, arrive: 2500,
-      exit: M3.V(-20000, 0, 40000), exitAlt: 12000,
-      onArrive: function (a, w2) {
+    cruise.route = Route.plan([
+      { do: 'goto', wp: M3.V(-14000, 0, 18000), alt: 12000, arrive: 2500 },
+      { do: 'call', fn: function (a, w2) {
         if (w2 && w2.radio) {
           w2.radio.raw({
             who: 'SEXTANT', cls: 'cmd',
             tx: '<i>巨砾到了投放点，正在掉头 —— 两枚反舰弹往北边的补给线去了。</i>', gap: 0.9
           });
         }
-      }
-    };
+      } },
+      { do: 'egress', wp: M3.V(-20000, 0, 40000), alt: 12000 }
+    ]);
 
     /* 调节场管理局自己的高空勤务机 MERLI「水准」。
 
@@ -1995,18 +1994,6 @@ MISSIONS.push({
        然后掉头。投放由 onArrive 直接调 fireMissile —— 航线单位不走
        空战 AI 的开火段。原来它们没有航线、挂的是上游的 GUT-30，
        于是两架四发轰炸机在跟战斗机缠斗。 */
-    function bomberRelease(a, w2) {
-      var best = null, bd = 1e12;
-      for (var bi = 0; bi < w2.targets.length; bi++) {
-        var bt = w2.targets[bi];
-        if (!bt.alive || bt.team !== 0) continue;
-        var d2 = M3.dist2(bt.pos, a.pos);
-        if (d2 < bd) { bd = d2; best = bt; }
-      }
-      if (!best || !w2.fireMissile) return;
-      Ent.setWeapon(a, 'vsr');
-      if (a.spAmmo > 0) w2.fireMissile(a, best);
-    }
     for (i = 0; i < 2; i++) {
       var bmb = spawnEnemy(w, {
         ac: 'boulder',
@@ -2017,12 +2004,13 @@ MISSIONS.push({
         callsign: downstreamCallsign(46 + i)
       });
       bmb.bigTarget = true;
-      bmb.route = {
-        phase: 'ingress',
-        wp: M3.V((i - 0.5) * 6000, 0, 4500), alt: 4500, arrive: 1500,
-        exit: M3.V((i - 0.5) * 16000, 0, 34000), exitAlt: 6000,
-        onArrive: bomberRelease
-      };
+      /* 以前：飞到固定点（离舰队约 9 km）就放 —— BOX-14 实际只飞得到 8.2 km，
+         两枚弹都在舰队前方 1.9 km 的空中自爆。现在按射程放（route.js 的 strike）：
+         朝最近的我方舰船飞，进入有效射程 × 0.8 才发射，打完掉头离场。 */
+      bmb.route = Route.plan([
+        { do: 'strike', weapon: 'vsr', pick: 'nearest', rangeK: 0.8, alt: 4500, shots: 1, timeout: 150 },
+        { do: 'egress', wp: M3.V((i - 0.5) * 16000, 0, 34000), alt: 6000 }
+      ]);
     }
 
     // 四架护航

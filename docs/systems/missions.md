@@ -145,7 +145,7 @@ spawnEnemy(w, {
 - **m1** 放了一架上游 `J-2 鹈鹕`（team 0，`label: 'SEXTANT'`）—— 无线电里
   报了整场战役方位的那个人从此有了实体
 - **m3** 放了一架下游 `ROK-2 石英`（team 1），以及一架 `ROK-44 磁石` 干扰机：
-  后者走 `jammerRoute`（m5、m7 同）：飞到站位点后在两点间盘旋、不退场；玩家一方任何单位
+  后者走 `jammerRoute`（m5、m7 同；现为 `Route.plan([goto, loiter], {jam})`，整条航线随队干扰）：飞到站位点后在两点间盘旋、不退场；玩家一方任何单位
   （飞机或舰船 / 设施）进入干扰半径（12 km）就开机（`ai.js` 的 `jamAuto`）。
   一波 30 s，强度从 1 线性降到 0.6（`openEcm` 的 `wave` 选项，不走"被对抗掉"曲线），隔 3 s 重开回满。
   m3 的磁石贴着 16 000 m 升限飞（15 800 m），在 18–19 km 主战场下方约 3 km
@@ -411,7 +411,7 @@ spawn()
  ├ 2 座地面测控平台（model radar, ground）
  ├ 4 座防空浮台（model sam, weapon dl9, fireCd rnd(3,8)）
  ├ 前进基地（team 0, hp900）→ w.baseTarget
- └ 2 架 ROK-40 轰炸机，各带 route（ingress→投弹→egress）
+ └ 2 架 ROK-40 轰炸机，各带 Route.plan（goto → call bombTheBase → egress）
 
 每帧 tick()
  ├ 统计存活 relay / radar / sam，拼 objectiveSub
@@ -465,7 +465,7 @@ spawn()
 
 15. **舰船的 `ttype` 用 `'ground'`，不要新造 `'ship'`。** 渲染按 `MODELS[t.model]` 查表，`ttype` 只影响 HUD 文案（`'air'` → 浮空平台，其余 → 地面设施）与受损下沉分支。舰船不下沉，所以不能写 `'air'`。
 
-16. **对地攻击要安排在低一些的高度。** 从 5 km 平飞打 6 km 外的海面目标，`vgt` 会在离目标还有几百米的地方到期（动力段撑不住）。3 km 上下进入才打得中 —— m8 的鲣鸟攻击机就压在 2.6–3 km。详见 [loadout.md](loadout.md#npc-的挂载)。
+16. **对地攻击要安排在低一些的高度。** 从 5 km 平飞打 6 km 外的海面目标，`vgt` 会在离目标还有几百米的地方到期（动力段撑不住）。3 km 上下进入才打得中 —— m8 的鲣鸟攻击机就压在 2.6–3 km。m8 的 ROK-40 用 `strike` 段（`rangeK 0.8`、alt 4500），进 `Ent.aiReach` 才放 BOX-14；旧的 `bomberRelease`（舰前约 9 km 定点放弹，够不着）已删除。详见 [loadout.md](loadout.md#npc-的挂载)。
 
 17. **随机波次不要在 `tick()` 里掷骰。** `sk1` 的六个批次在 `spawn()` 里一次性生成（`M3.pick` + `M3.rnd`），`tick()` 只读 `w.skQueue`。逐帧掷骰会让目标数抖动，也会让冒烟测试失去可复现性。
 
@@ -529,6 +529,7 @@ spawn()
 |---|---|
 | `Ent` | `makeAircraft` / `makeTarget` / `spawnParticle` / `damage` / `killGround` |
 | `AI` | `AI.attach` 挂控制状态；`a.route` 让单位走航线而非空战 |
+| `Route` | `Route.plan(legs, {jam})` 造分段航线（goto / strike / call / loiter / egress），见 [ai.md](ai.md#航线型单位轰炸机) |
 | `M3` | 向量运算（`V` / `rnd` / `dist` / `clone`） |
 | `CALLSIGN` | 玩家与僚机的固定呼号 |
 | `VOICES` / `Radio` | 台词表与播放（`w.radio.play` / `w.radio.raw`） |

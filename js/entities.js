@@ -152,7 +152,7 @@ var Ent = (function () {
       if (!w || w.kind === 'gun' || w.kind === 'ecm' || w.kind === 'dew') continue;
       if (!w.seeker || w.seeker === 'none') continue;      // 无制导：AI 不会瞄
       if (!weaponMatchesTarget(w, t)) continue;
-      var reach = w.lockDist || 0;
+      var reach = aiReach(w, a.pos.y);      // min(锁定距离, 有效射程)
       if (reach <= 0) continue;
       var score = (reach >= dist) ? reach : 1e6 + (dist - reach);
       var sl = a.slotCd ? a.slotCd[wid] : null;
@@ -1000,7 +1000,7 @@ var Ent = (function () {
      找一个热源咬上去。
 
      这也解释了为什么大离轴格斗弹值钱：TOR-6「环刃」的视场是 ±88°，
-     机头都不用转过去；而基础弹只有 45°，得先把机头带过去。
+     机头都不用转过去；而基础弹只有 28°，得先把机头带过去。
 
      "更热"怎么算 —— 这里没有热力学模型，用三个现有量凑：
        ab         加力尾焰是最大的热源（3 倍权重）
@@ -1380,6 +1380,93 @@ var Ent = (function () {
         M3.rnd(0.7, 1.5), whitish ? '#e8e2d0' : '#b9b4a6',
         { grow: true, drag: 1.4 });
     }
+  }
+
+  /* ============================================================
+     有效射程：这件弹从 alt 高度平飞发射，**真的能飞到多远**
+
+     lockDist 只是导引头能锁多远。弹飞不飞得到，看的是速度、动力段、
+     滑翔掉速、高抛弹道 —— BOX-14 锁得到 9 km，实际只飞得到 8.2 km。
+     以前 AI 一律拿 lockDist 当射程，于是在"锁得上但打不到"的距离上开火。
+
+     算法：用 stepMissile 本身对一个远在 60 km 外、正前方的假目标飞一次，
+     记下弹体结束（寿命到、撞地）时离发射点的距离（对面弹取水平距离）。
+     和实战用同一份弹道代码 —— 改了速度、寿命、loft，射程自动跟着变。
+     结果按 2 km 高度分档缓存在武器上，第一次用到时才算（一次 < 2400 步）。
+     ============================================================ */
+  var EFF_BAND = 2000, EFF_LAUNCH_V = 250;
+  function effRange(w, alt) {
+    if (!w || !w.vsLife) return w ? (w.lockDist || 0) : 0;
+    var band = Math.max(0, Math.round((alt || 0) / EFF_BAND));
+    var c = w.__eff || (w.__eff = {});
+    if (c[band] !== undefined) return c[band];
+    var y0 = Math.max(200, band * EFF_BAND);
+    var surf = w.target === 'ground' || w.target === 'ship';
+    var far = 60000;
+    var dummy = surf
+      ? { kind: 'target', alive: true, team: 99, radius: 10, pos: M3.V(0, 0, far), vel: M3.V(0, 0, 0) }
+      : { kind: 'dummy', alive: true, team: 99, pos: M3.V(0, y0, far), vel: M3.V(0, 0, 0) };
+    // silent：结束时的起爆不出声（Combat.detonate 认这个标记）
+    var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
+    var m = makeMissile({ weapon: w.id, team: 98, pos: M3.V(0, y0, 0),
+      fwd: M3.norm(M3.sub(dummy.pos, M3.V(0, y0, 0))), speed: EFF_LAUNCH_V, target: dummy });
+    m.owner = null;
+    var last = M3.clone(m.pos);
+    for (var f = 0; f < 60 * 60 && m.alive; f++) {
+      last = M3.clone(m.pos);
+      stepMissile(m, 1 / 60, world);
+      world.particles.length = 0;
+    }
+    var r = surf ? Math.sqrt(last.x * last.x + last.z * last.z) : M3.len(M3.sub(last, M3.V(0, y0, 0)));
+    /* 高抛弹（loft）：远处假目标让它一路高飞、到不了俯冲段，平飞估计偏大 15% 左右。
+       在 [0.6 r, r] 里对真目标二分几次，取"真的打得到"的最远距离。 */
+    if (w.loft && surf) r = loftReach(w, y0, r);
+    return (c[band] = Math.round(r));
+  }
+
+  function hitsAt(w, y0, D) {
+    // 与弹同队：起爆照常判，但不结算伤害（不会碰到 game.js 的 hitTarget）
+    var tg = { kind: 'target', alive: true, team: 98, radius: 10, pos: M3.V(0, 0, D), vel: M3.V(0, 0, 0) };
+    var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
+    var m = makeMissile({ weapon: w.id, team: 98, pos: M3.V(0, y0, 0),
+      fwd: M3.norm(M3.sub(tg.pos, M3.V(0, y0, 0))), speed: EFF_LAUNCH_V, target: tg });
+    for (var f = 0; f < 60 * 60 && m.alive; f++) { stepMissile(m, 1 / 60, world); world.particles.length = 0; }
+    return M3.dist(m.pos, tg.pos) < tg.radius + 15;
+  }
+  function loftReach(w, y0, r0) {
+    var lo = r0 * 0.6, hi = r0;
+    if (hitsAt(w, y0, hi)) return hi;
+    for (var i = 0; i < 7; i++) {
+      var mid = (lo + hi) / 2;
+      if (hitsAt(w, y0, mid)) lo = mid; else hi = mid;
+    }
+    return lo;
+  }
+
+  /* 发射时的离轴角（玩家锁定、AI 开火、航线 strike 共用）。
+
+     对空弹：机头与视线的三维夹角 —— 导引头在机头上。
+     对面弹：只量**水平方位**，世界坐标的垂直方向不算。飞机保持高度飞，
+     地面 / 海面目标在机头下方几十度是常态；俯冲是弹自己的事。 */
+  function lockOff(a, t, w) {
+    var to = M3.sub(t.pos, a.pos);
+    if (w && (w.target === 'ground' || w.target === 'ship')) {
+      var hx = to.x, hz = to.z, fx = a.fwd.x, fz = a.fwd.z;
+      var hl = Math.sqrt(hx * hx + hz * hz), fl = Math.sqrt(fx * fx + fz * fz);
+      if (hl < 1 || fl < 1e-3) return 0;          // 正上方 / 机头垂直：方位无从谈起，不拦
+      return Math.acos(M3.clamp((hx * fx + hz * fz) / (hl * fl), -1, 1));
+    }
+    var d = M3.len(to);
+    return d > 1 ? M3.angleBetween(a.fwd, M3.mul(to, 1 / d)) : 0;
+  }
+
+  /* AI 用的射程：min(锁定距离, 有效射程)。rangeK 留余量（目标在动、不一定正对着飞）。 */
+  var AI_RANGE_K = 0.9;
+  function aiReach(w, alt, k) {
+    if (!w) return 0;
+    var L = w.lockDist || Infinity;      // 无制导弹没有 lockDist：只看飞得到多远
+    if (!w.vsLife) return w.lockDist || 0;
+    return Math.min(L, effRange(w, alt) * (k === undefined ? AI_RANGE_K : k));
   }
 
   /** 动力段时长（考虑冲压弹在高空的降级） */
@@ -2182,6 +2269,7 @@ var Ent = (function () {
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
+    effRange: effRange, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
     isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     jamState: jamState, jamShown: jamShown, jamDuty: jamDuty, jamRanges: jamRanges, jamPress: jamPress, jamLockOK: jamLockOK, jamLockK: jamLockK, JAM_BURN_R: JAM_BURN_R, JAM_SURF_K: JAM_SURF_K, JAM_BURN_SURF: JAM_BURN_SURF,
     gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,

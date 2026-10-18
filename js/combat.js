@@ -76,7 +76,7 @@ var Combat = (function () {
     blastFx(world, shot.pos, shot.w, {
       ground: !!(opt && opt.ground), vel: shot.vel, direct: direct || null
     });
-    if (typeof SFX !== 'undefined' && SFX.boom) SFX.boom(0.75);
+    if (!world.silent && typeof SFX !== 'undefined' && SFX.boom) SFX.boom(0.75);
   }
 
   /* 面杀伤。半径内每个非同队单位按衰减吃伤害；返回被打到的单位数。 */

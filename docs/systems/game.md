@@ -389,22 +389,30 @@ Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);
 **连按**：`TARGET_REPEAT_T`（1.5 s）内再按，沿上一次冻结的顺序（`tgtCycle`）往下走 —— 第二近、第三近……排序冻结是为了目标一动不会跳回刚才那个。
 切换后 `lockProgress = 0`、`SFX.lockTone(false)`。
 
+**短按 / 长按**（`tgtKey` / `TGT_HOLD` / `updateTargetKey`）：`F`/`Tab` 的 `keydown` 只记按下时刻，**松开**时才切目标（以前 `keydown` 就切）；按住 ≥ `TGT_HOLD`（0.45 s）则清空目标（SysNote `已取消选择目标`），松开不再切。帮助文字写作 `F / Tab`。
+
 ### `updateLock(dt)`
 对空与对面是**两套判据**：
 
 ```js
 cone     = w.lockCone * (player.pos.y > 18000 ? 0.78 : 1);      // 高空收窄
 lockDist = w.lockDist * (player.lockRangeK || 1) * (spActive > 0 ? 1 - w.lockReduce : 1);
-if (w.target === 'air') ok = dist < lockDist && off < cone;              // 距离 + 离轴角
-else                    ok = dist < lockDist * 1.35 && -dir.y > -0.10;   // 距离 + 俯角
+lockDist *= Ent.jamLockK(player);                                       // 被压制：最多减半
+if (w.target === 'air') ok = dist < lockDist && off < cone;              // 距离 + 三维离轴角
+else ok = dist < lockDist * 1.35 && -dir.y > -0.10
+          && Ent.lockOff(player, t, w) < cone;                           // 距离 + 俯角 + 水平方位
+player.lockInCone = (对空 ? off : Ent.lockOff(...)) < cone;              // HUD 的视场提示读它
 ```
 
-对面弹走的是**火控投放包线**（水平距离够近且目标在机头下方），不是导引头锥角 —— 以前两个分支代码一模一样，玩家得把机头死死指着浮台，稍微偏一点就丢锁。锁定速率按导引方式分档：`nezer → 1.5`、`ir → 0.55`、`eo → 0.60`、`laser → 1.6`、其余 `1.1`（单位 1/s）；丢锁按 `-2.2/s` 衰减。`w.kind === 'ecm' || 'dew'` 直接 `lockProgress = 1`。
+对面弹走的是**火控投放包线**：水平距离够近、目标在机头下方，并且**水平方位**在锁定锥内（`Ent.lockOff`，世界垂直方向不算，与 AI、航线 strike 同一条规则）。以前只看俯角，正后方的目标也锁得上；更早的时候两个分支代码一模一样，玩家得把机头死死指着浮台。锁定速率按导引方式分档：`nezer → 1.5`、`ir → 0.55`、`eo → 0.60`、`laser → 1.6`、其余 `1.1`（单位 1/s）；丢锁按 `-2.2/s` 衰减。
+
+另写三个标志给 HUD / 发射用：`lockOk`（本帧在锥角与距离内）、`lockInCone`（只看锥角，`drawConeCue` 读）、`lockCone`（本帧实际锥角）。`lockProgress` 满 → `player.locked = true`，不满或换目标/丢目标即复位为 `false`。`w.kind === 'ecm' || 'dew'` 直接 `lockProgress = 1`。
 
 ### `fireSpecial()`（右键 / `Enter`）
 1. `state !== 'playing' || !player.alive` → 返回。
 2. `ecm` → 转 `launch()`；`dew` → 播“GUS-2 是自动拦截系统”并返回；`spAmmo <= 0` 或 `spCd > 0` → `SFX.loseLock()` 返回。
-3. **只保留一条目标检查**：`targetMismatch(w, t)` —— 武器对空/对面与目标类别矛盾时说清楚（“按 R 换成对地挂载”）。**不再要求“必须先锁定”**：无制导武器本来就不需要目标，俯冲扫射也不该被拦；`lockProgress` 只驱动 HUD 的锁定环，不是开火许可。
+3. **只保留一条目标检查**：`targetMismatch(w, t)` —— 武器对空/对面与目标类别矛盾时说清楚（“按 R 换成对地挂载”）。不拦开火，但**锁定决定导弹拿不拿得到目标**：制导武器（`guided`）只有 `player.locked` 时才把选中目标交给 `launch()`，否则传 `null` —— 红外弹靠 `irAcquire` 在导引头视场里自己找、雷达 / 对面弹直飞（只有 `reAcquire` 类会再捕获），并出 SysNote `未锁定：…`。无制导武器不受影响。
+   > 以前：发射总是带上选中目标，`lockProgress` 只驱动 HUD 锁定环和锁定音，不是开火条件。
 4. `launch()` 成功后按武器类型播无线电：无制导 / `bomb/agm/asm` → **投放**；`seeker === 'radar'` → **Fox 3**；`laser` → **照射**；其余 → **Fox 2**。
 
 ### `launch(actor, target, w)` —— 玩家与 AI 的双路径

@@ -1284,7 +1284,7 @@ var WEAPONS = {
     id: 'srm', name: 'TOR-2', cn: '短矢 · BOLT', kind: 'aam',
     model: 'missile',
     speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
-    turn: 1.75, seeker: 'ir', lockCone: 45 * Math.PI / 180, lockDist: 4200,
+    turn: 1.75, seeker: 'ir', lockCone: 28 * Math.PI / 180, lockDist: 4200,
     dmg: 30, ammo: 8, cd: 0.11, salvo: 1, flare: 0.38, fuze: 12, blast: 18, blastCore: 2,
     target: 'air',    desc: `基础短程红外弹。转弯率 {{turn}} rad/s，抗干扰一般，锁定锥 {{coneDeg}}°。
       一个挂点带 {{perPoint}} 发、装填只要 {{cd}} 秒 —— 它就是用来"多带几发"的。`,
@@ -1300,7 +1300,7 @@ var WEAPONS = {
     id: 'trm', name: 'TOR-4', cn: '短哨 · WHISTLE', kind: 'aam',
     model: 'missile',
     speed: 820, boost: 210, life: 5.0, vsLife: 13.0,
-    turn: 1.95, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4800,
+    turn: 1.95, seeker: 'ir', lockCone: 30 * Math.PI / 180, lockDist: 4800,
     dmg: 32, ammo: 6, cd: 0.14, salvo: 1, flare: 0.24, fuze: 12, blast: 18, blastCore: 2,
     target: 'air',    desc: '短哨是基础弹的抗干扰改型：换了双色导引头，flare 从 0.38 降到 {{flare}}，' +
       '代价是单价上去了、单挂点只能带 {{perPoint}} 发。',
@@ -1327,7 +1327,7 @@ var WEAPONS = {
     id: 'kkv', name: 'TOR-8', cn: '透针 · NEEDLE', kind: 'aam',
     model: 'missile',
     speed: 760, boost: 220, life: 4.5, vsLife: 12.0,
-    turn: 2.73, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 3800,
+    turn: 2.73, seeker: 'ir', lockCone: 34 * Math.PI / 180, lockDist: 3800,
     dmg: 48, ammo: 10, cd: 0.1, salvo: 1, flare: 0.40, fuze: 0, blast: 0, blastCore: 0,
     target: 'air',
     desc: '动能杀伤格斗弹。没有破片战斗部，靠直接碰撞杀伤 —— <b>擦肩而过等于没打中</b>，' +
@@ -1342,7 +1342,7 @@ var WEAPONS = {
     id: 'hwm', name: 'CLA-8', cn: '雷鼓 · WARDRUM', kind: 'aam',
     model: 'missile',
     speed: 810, boost: 180, life: 8.0, vsLife: 20.0,
-    turn: 1.16, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 8000,
+    turn: 1.16, seeker: 'radar', lockCone: 36 * Math.PI / 180, lockDist: 8000,
     dmg: 46, ammo: 2, cd: 0.84, salvo: 1, flare: 0.34, fuze: 22, blast: 60, blastCore: 10,
     target: 'air',
     desc: '重战斗部中距弹。近炸引信 {{fuze}} 米、爆炸半径 {{blast}} 米 —— 不需要打准，' +
@@ -1355,7 +1355,7 @@ var WEAPONS = {
     id: 'mrm', name: 'CLA-4', cn: '中继 · RELAY', kind: 'aam',
     model: 'missile',
     speed: 900, boost: 200, life: 8.0, vsLife: 20.0,
-    turn: 1.45, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 8600,
+    turn: 1.45, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 8600,
     dmg: 40, ammo: 4, cd: 0.64, salvo: 1, flare: 0.30, fuze: 18, blast: 30, blastCore: 4,
     target: 'air', reAcquire: true, decoyMemory: true,
     /* 原句是"不吃干扰弹"。那是假的 —— 干扰弹是热焰弹与箔丝一起投放的，
@@ -1446,7 +1446,7 @@ var WEAPONS = {
     id: 'qsr', name: 'GIR-5', cn: '群刺 · QUILLS', kind: 'aam',
     model: 'missile',
     speed: 740, boost: 190, life: 4.2, vsLife: 11.0,
-    turn: 1.70, seeker: 'ir', lockCone: 52 * Math.PI / 180, lockDist: 4000,
+    turn: 1.70, seeker: 'ir', lockCone: 30 * Math.PI / 180, lockDist: 4000,
     dmg: 24, ammo: 12, cd: 0.28, salvo: 3, flare: 0.40, fuze: 10, blast: 16, blastCore: 2,
     target: 'air',
     desc: '三联装发射巢：按一下出 {{salvo}} 枚，一个挂点装 {{perPoint}} 枚（{{volleys}} 次齐射）。单发威力最小，' +
@@ -1458,7 +1458,7 @@ var WEAPONS = {
     id: 'wasp', name: 'SUT-7', cn: '蜂刺 · WASP', kind: 'aam',
     model: 'missile',
     speed: 860, boost: 260, life: 4.8, vsLife: 12.0,
-    turn: 2.15, seeker: 'ir', lockCone: 58 * Math.PI / 180, lockDist: 5200,
+    turn: 2.15, seeker: 'ir', lockCone: 36 * Math.PI / 180, lockDist: 5200,
     dmg: 38, ammo: 3, cd: 0.38, salvo: 1, flare: 0.36, fuze: 13, blast: 19, blastCore: 2,
     target: 'air', reAcquire: true,
     /* 原文"推力更猛、加速更快"与数据相反（boost 260 < 锥刺的 280）。
@@ -1651,7 +1651,7 @@ var WEAPONS = {
     id: 'swm', name: 'GIR-12', cn: '鸦群 · MURMUR', kind: 'aam',
     model: 'missile',
     speed: 720, boost: 300, life: 3.5, vsLife: 9.0,
-    turn: 2.55, seeker: 'ir', lockCone: 55 * Math.PI / 180, lockDist: 3400,
+    turn: 2.55, seeker: 'ir', lockCone: 32 * Math.PI / 180, lockDist: 3400,
     dmg: 16, ammo: 8, cd: 0.17, salvo: 4, flare: 0.44, fuze: 8, blast: 14, blastCore: 2,
     target: 'air',    desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下十六发，
       一次齐射四枚，用来把蜂群从天上扫下来。
@@ -1691,7 +1691,7 @@ var WEAPONS = {
     id: 'v11', name: 'SUT-11', cn: '锥刺 · STING', kind: 'aam',
     model: 'missile',
     speed: 790, boost: 280, life: 5.0, vsLife: 11.0,
-    turn: 2.45, seeker: 'ir', lockCone: 50 * Math.PI / 180, lockDist: 4600,
+    turn: 2.45, seeker: 'ir', lockCone: 35 * Math.PI / 180, lockDist: 4600,
     dmg: 56, ammo: 16, cd: 0.23, salvo: 1, flare: 0.35, fuze: 16, blast: 22, blastCore: 2,
     target: 'air', reAcquire: true,
     desc: `高机动缠斗弹。转弯率 <b>{{turn}} rad/s</b>，全场最高之一；
@@ -1936,7 +1936,7 @@ var WEAPONS = {
     id: 'vbn', name: 'BIN-9', cn: '双生 · TWINBORN', kind: 'aam',
     model: 'missile',
     speed: 780, boost: 300, life: 4.0, vsLife: 10.0,
-    turn: 2.10, seeker: 'ir', lockCone: 62 * Math.PI / 180, lockDist: 4200,
+    turn: 2.10, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 4200,
     dmg: 42, ammo: 2, cd: 8, salvo: 1, flare: 0.58, fuze: 12, blast: 18, blastCore: 2,
     target: 'air',
     /* 双导引头：第一次骗中只打掉一个（entities.js 的 breakLock / m.seekers） */
@@ -1954,7 +1954,7 @@ var WEAPONS = {
     id: 'otr', name: 'TOR-1', cn: '旧锭 · OLDBAR', kind: 'aam',
     model: 'missile',
     speed: 620, boost: 200, life: 3.0, vsLife: 7.0,
-    turn: 1.35, seeker: 'ir', lockCone: 38 * Math.PI / 180, lockDist: 3000,
+    turn: 1.35, seeker: 'ir', lockCone: 24 * Math.PI / 180, lockDist: 3000,
     dmg: 32, ammo: 2, cd: 6, salvo: 1, flare: 0.86, fuze: 18, blast: 28, blastCore: 8,
     target: 'air',
     fits: [], perPoint: 0, mass: 0,
@@ -1968,7 +1968,7 @@ var WEAPONS = {
   dl4: {
     id: 'dl4', name: 'DAR-4', cn: '砾石 · GRAVEL', kind: 'aam', model: 'missile',
     speed: 880, boost: 210, life: 6.5, vsLife: 16.0,
-    turn: 1.25, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 7200,
+    turn: 1.25, seeker: 'radar', lockCone: 36 * Math.PI / 180, lockDist: 7200,
     dmg: 30, ammo: 8, cd: 0.68, salvo: 1, flare: 0.45, fuze: 20, blast: 32, blastCore: 4,
     target: 'air',    // 下游专用弹：fits 为空表示玩家挂不上它
     fits: [], perPoint: 0, mass: 0,
@@ -1978,7 +1978,7 @@ var WEAPONS = {
   dl6: {
     id: 'dl6', name: 'BIN-6', cn: '燧火 · FLINTFIRE', kind: 'aam', model: 'missile',
     speed: 780, boost: 190, life: 4.5, vsLife: 10.0,
-    turn: 2.05, seeker: 'ir', lockCone: 60 * Math.PI / 180, lockDist: 3600,
+    turn: 2.05, seeker: 'ir', lockCone: 36 * Math.PI / 180, lockDist: 3600,
     dmg: 26, ammo: 6, cd: 0.44, salvo: 1, flare: 0.35, fuze: 14, blast: 20, blastCore: 2,
     target: 'air',
     fits: [], perPoint: 0, mass: 0,

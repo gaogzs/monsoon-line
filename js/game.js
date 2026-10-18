@@ -433,7 +433,7 @@ var Game = (function () {
     ['↑ ↓ ← →', '自由视角（松开自动回中）'],
     ['鼠标左键 / Space', '机炮'],
     ['鼠标右键 / Enter', '发射特殊武器'],
-    ['F / Tab', '切换目标'],
+    ['F / Tab', '切换目标（长按取消选择）'],
     ['R', '切换挂载'],
     ['V', '投放干扰弹 —— 热焰弹与箔丝同时撒出，按住连续投放'],
     ['1 / 2 / 3', '僚机指令：散开 / 集火 / 掩护'],
@@ -1554,7 +1554,11 @@ var Game = (function () {
       if (state === 'playing') {
         if (e.code === 'KeyH') togglePause();
         if (e.code === 'KeyM') toggleAimMode();
-        if (e.code === 'KeyF' || e.code === 'Tab') cycleTarget();
+        /* F / Tab：松开时切换目标；按住超过 TGT_HOLD 秒则取消选择（见 updateTargetKey）。
+           切换放在松开时，长按才不会先切一次再取消。 */
+        if ((e.code === 'KeyF' || e.code === 'Tab') && !e.repeat) {
+          tgtKey.down = performance.now(); tgtKey.cleared = false;
+        }
         if (e.code === 'KeyR') cycleSpecial();
         // V 改成按住连发，见 controlPlayer()
         if (e.code === 'Enter') fireSpecial();
@@ -1568,7 +1572,13 @@ var Game = (function () {
         else if (['hangar', 'codex', 'help', 'brief', 'campaign', 'changelog'].indexOf(state) >= 0) show('title');
       }
     });
-    document.addEventListener('keyup', function (e) { keys[e.code] = false; });
+    document.addEventListener('keyup', function (e) {
+      keys[e.code] = false;
+      if ((e.code === 'KeyF' || e.code === 'Tab') && tgtKey.down) {
+        if (state === 'playing' && !tgtKey.cleared) cycleTarget();
+        tgtKey.down = 0;
+      }
+    });
 
     window.addEventListener('blur', function () {
       keys = {};
@@ -1650,6 +1660,22 @@ var Game = (function () {
     world.wingCmd = cmd;
     Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: '僚机指令：<b>' + names[cmd] + '</b>', gap: 0.5 });
     SFX.confirm();
+  }
+
+  /* 长按 F / Tab 取消选择目标：想贴近了再锁（不让对方太早收到照射告警）就先把目标放掉。 */
+  var TGT_HOLD = 0.45;
+  var tgtKey = { down: 0, cleared: false };
+  function updateTargetKey() {
+    if (!tgtKey.down || tgtKey.cleared || !player) return;
+    if ((performance.now() - tgtKey.down) / 1000 < TGT_HOLD) return;
+    tgtKey.cleared = true;
+    if (player.target) {
+      player.target = null;
+      player.lockProgress = 0;
+      player.locked = false;
+      SysNote.show('已取消选择目标');
+      SFX.lockTone && SFX.lockTone(false);
+    }
   }
 
   function cycleTarget() {
@@ -1836,9 +1862,20 @@ var Game = (function () {
       }
     }
 
-    /* lockProgress 不再拦发射。它仍然驱动 HUD 上的锁定环 ——
-       那是给玩家看的"火控解算进度"，不是开火许可。 */
-    if (launch(player, t, world)) launchCall(w);
+    /* 锁定不拦发射，但**决定导弹认不认这个目标**：
+
+         锁满（player.locked）   导弹带着选中的目标出膛
+         没锁满                 不带目标 —— 红外弹自己在视场里找热源，
+                                雷达 / 对地弹直飞，只有带 reAcquire 的会自己重新捕获
+         无制导弹               本来就不认目标，不受影响
+
+       以前出膛一律把选中目标交给导弹，锁定环走不走满对结果没有任何影响。 */
+    var guided = w.seeker && w.seeker !== 'none' && !w.unguided;
+    var lt = (t && (!guided || player.locked)) ? t : null;
+    if (t && guided && !player.locked) {
+      SysNote.show('未锁定：' + (w.seeker === 'ir' ? '红外弹出膛后自行寻找热源' : '导弹没有目标，直线飞出'), { warn: true });
+    }
+    if (launch(player, lt, world)) launchCall(w);
   }
 
   /* 发射呼叫。
@@ -2018,6 +2055,7 @@ var Game = (function () {
   }
 
   function controlPlayer(dt) {
+    updateTargetKey();
     if (!player.alive) return;
     var c = player.ctrl;
 
@@ -2283,9 +2321,12 @@ var Game = (function () {
 
   function updateLock(dt) {
     var t = player.target;
+    player.lockInCone = false;            // HUD 用：目标在不在这件弹的锁定锥里（drawConeCue）
+    player.lockInRange = false;           // HUD 用：目标在不在锁定距离内
     if (!t || !t.alive) {
       if (t && !t.alive) player.target = null;
       player.lockProgress = 0;
+      player.locked = false;
       return;
     }
     /* 被压制到看不清这个目标（flicker / hidden）：锁定强制取消，目标清空。
@@ -2351,14 +2392,21 @@ var Game = (function () {
        等于拿导引头的逻辑去锁海面：玩家得把机头死死指着浮台，
        稍微偏一点就"丢锁" —— 而对地武器本来就不是那么用的。 */
     var ok = false;
+    player.lockCone = cone;
     if (w.target === 'air') {
+      player.lockInCone = off < cone;
+      player.lockInRange = dist < lockDist;
       ok = dist < lockDist && off < cone;
     } else {
       /* 投放包线：水平距离够近，并且目标在机头下方。
          dir 是指向目标的世界方向，dir.y 直接就是它的高低 ——
          dir.y 为正表示目标在机头上方，那是仰投，不该给解。 */
+      /* 方位限制：只量水平方位（Ent.lockOff），世界垂直方向不算 ——
+         与 AI、航线 strike 同一条规则。以前这里只看俯角，正后方的目标也锁得上。 */
       var dep = -dir.y;                       // 目标低于机头的程度（sin）
-      ok = dist < lockDist * 1.35 && dep > -0.10;
+      player.lockInCone = Ent.lockOff(player, t, w) < cone;
+      player.lockInRange = dist < lockDist * 1.35;
+      ok = dist < lockDist * 1.35 && dep > -0.10 && player.lockInCone;
     }
 
     /* 锁定速率按导引方式分档。
@@ -2378,7 +2426,9 @@ var Game = (function () {
       }
       player.lockProgress = Math.min(1, player.lockProgress + rate * dt);
       player.locked = player.lockProgress >= 1;
+      player.lockOk = true;
     } else {
+      player.lockOk = false;
       player.lockProgress = Math.max(0, player.lockProgress - dt * 2.2);
       player.locked = false;
     }
@@ -2517,7 +2567,7 @@ var Game = (function () {
         var d = M3.dist(t.pos, player.pos);
         // 玩家的被动吊舱会压缩敌方对他的锁定距离
         /* 自己被压制：锁定距离打折、只锁"看得清"的距离以内（与 AI 同一套，Ent.jamLockOK） */
-        if (d <= w.lockDist * (1 - (player.lockResist || 0)) * Ent.jamLockK(t) && Ent.jamLockOK(t, player)) {
+        if (d <= Ent.aiReach(w, t.pos.y) * (1 - (player.lockResist || 0)) * Ent.jamLockK(t) && Ent.jamLockOK(t, player)) {
           // 低空突防可以躲开对空雷达；但贴得太近仍会被目视发现
           var lowExposed = t.ground && player.pos.y < (world.dangerAltitude || 1500) && d < 5200;
           if (world.detected || lowExposed) return player;
@@ -2528,7 +2578,8 @@ var Game = (function () {
     } else if (t.team !== 0) {
       return null;
     }
-    var best = null, bd = w.lockDist * Ent.jamLockK(t);
+    // 射程：min(锁定距离, 有效射程)（Ent.aiReach），不在打不到的距离上放弹
+    var best = null, bd = Ent.aiReach(w, t.pos.y) * Ent.jamLockK(t);
     for (var j = 0; j < world.actors.length; j++) {
       var e = world.actors[j];
       if (!e.alive || e === player || e.team === t.team || e.team === 2) continue;

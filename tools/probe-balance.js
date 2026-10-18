@@ -7,7 +7,7 @@
      loseAt     mission.lose 第一次为真的时刻（— = 时限内没输）
      ourLost    我方水面 / 地面单位被打掉的数量 / 开局总数
      ourHp      我方水面 / 地面单位剩余血量占比（合计）
-     raids      敌方航线单位执行 onArrive 的次数（投弹 / 放弹 / 开机）
+     raids      敌方航线单位的动作次数（旧写法的 onArrive；分段航线的 call 段与 strike 每一发）
 
    v1.13.2 修了"航线永远到不了点"之后，第 2、5、8 关的轰炸机才第一次真的投弹 ——
    这个探针就是用来看那之后难度跳了多少。
@@ -34,12 +34,19 @@ function scenario(id) {
     const ours0 = ours().length;
     const hp0 = ours().reduce((a, t) => a + (t.maxHp || t.hp || 0), 0);
     let raids = 0;
-    // 数航线单位的 onArrive：包一层计数
+    // 数航线单位的"动作"：旧写法的 onArrive，分段航线（route.js）的 call 段与 strike 的每一发
     const wrap = (a) => {
-      if (!a.route || !a.route.onArrive || a.route.__wrapped) return;
-      const f = a.route.onArrive;
-      a.route.onArrive = function () { raids++; return f.apply(this, arguments); };
-      a.route.__wrapped = true;
+      const r = a.route;
+      if (!r || r.__wrapped) return;
+      r.__wrapped = true;
+      if (r.onArrive) {
+        const f = r.onArrive;
+        r.onArrive = function () { raids++; return f.apply(this, arguments); };
+      }
+      for (const L of (r.legs || [])) {
+        if (L.do === 'call') { const g = L.fn; L.fn = function () { raids++; return g.apply(this, arguments); }; }
+        if (L.do === 'strike') { const h = L.onFire; L.onFire = function () { raids++; if (h) return h.apply(this, arguments); }; }
+      }
     };
     let loseAt = -1;
     S.run(T, (t) => {
@@ -70,6 +77,6 @@ for (const id of IDS) {
     (la ? '（平均 ' + la.mean.toFixed(0) + ' s，最快 ' + la.min.toFixed(0) + ' s）' : '            ') +
     '  我方单位损失 ' + lost.mean.toFixed(1) + '/' + rs[0].ours0 +
     '  剩余血量 ' + (hp.mean * 100).toFixed(0) + '%' +
-    '  航线到点 ' + rd.mean.toFixed(1) + ' 次');
+    '  航线动作 ' + rd.mean.toFixed(1) + ' 次');
 }
 console.log('');

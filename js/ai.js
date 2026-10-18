@@ -67,7 +67,9 @@ var AI = (function () {
       var w = WEAPONS[wid];
       if (!w || !w.seeker || w.seeker === 'none') continue;
       if (w.target !== 'ground' && w.target !== 'ship') continue;
-      if ((w.lockDist || 0) > reach) reach = w.lockDist;
+      // 够不够得着按"有效射程"（Ent.aiReach），不按导引头的锁定距离
+      var rw = Ent.aiReach(w, a.pos.y);
+      if (rw > reach) reach = rw;
     }
     if (reach <= 0) return null;
     return nearestSurfaceTarget(a, world, reach * 1.15);
@@ -461,6 +463,10 @@ var AI = (function () {
   function updateRoute(a, dt, world) {
     var r = a.route;
     var ctrl = a.ctrl;
+    /* 分段航线（route.js）：执行器先决定这一帧往哪飞、多高、要不要开火，
+       写进 r.wp / r.alt —— 下面的转向和高度保持照旧。 */
+    if (r.legs && Route.step(a, r, dt, world) === 'gone') return;
+    if (!r.wp) return;
 
     /* 航点只管水平位置，高度另有 r.alt 管 —— 所以到点和转向都按**水平**算。
 
@@ -493,7 +499,7 @@ var AI = (function () {
 
     /* 到点：执行该点的动作，然后转到下一段。
        最后一段飞完就自行消失 —— 轰炸机不会掉头回来再打一遍。 */
-    if (dist < r.arrive) {
+    if (!r.legs && dist < r.arrive) {
       if (r.wps) {
         /* 巡视型（管理局勤务机）：一串航点挨个飞、飞完从头再来，
            每个航点自带高度 —— 永不退场，和预警机一样。 */
@@ -619,6 +625,9 @@ var AI = (function () {
       var rg = world.actors[ri];
       if (!rg.alive || !Ent.hostile(rg, a) || rg === a) continue;
       if (rg.target !== a) continue;
+      /* 玩家：锁满才算照射。只是选中、锁定环还在走，对方收不到告警 ——
+         贴近了再锁，就是为了不让对方太早警觉。AI 之间仍按"选中即照射"。 */
+      if (rg.isPlayer && !rg.locked) continue;
       if (rg.silentLock) continue;                 // 被动测距，不告警
       if (rg.emcon) continue;                      // 完全电磁静默，更不告警
       var rw = WEAPONS[rg.special];
@@ -944,8 +953,11 @@ var AI = (function () {
         /* 自己被干扰机压制（suppressed，友军敌军都一样）：只能锁"看得清"的距离以内的目标
            （Ent.jamLockOK，与玩家同一套门槛），锁定距离最多减半。 */
         var jamK = Ent.jamLockK(a);
-        var okDist = dist < spW.lockDist * lockK * resist * jamK && Ent.jamLockOK(a, t);
-        var okAng = off < cone * 0.85;
+        /* 射程取 min(锁定距离, 有效射程 × 0.9)（Ent.aiReach）：以前只看 lockDist，
+           BOX-14、SPO-6 这类弹会在"锁得上但飞不到"的距离上开火。 */
+        var okDist = dist < Ent.aiReach(spW, a.pos.y) * lockK * resist * jamK && Ent.jamLockOK(a, t);
+        /* 离轴角按武器分：对空弹三维夹角，对面弹只看水平方位（Ent.lockOff）—— 世界垂直方向不算 */
+        var okAng = Ent.lockOff(a, t, spW) < cone * 0.85;
         /* 最小发射距离。对面目标给得比空中小目标保守一点：
            贴得太近，滑翔弹/炸弹的引信来不及开。 */
         var minR = spW.nezer ? 1400 : (t.kind === 'target' ? 1200 : 700);

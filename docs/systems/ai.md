@@ -153,6 +153,9 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | `wingman` + `cover` | 同 `drone + cover`（共用 `leadThreat()`） |
 | 其余（含 `enemy`） | 被主动雷达照射时优先咬照射者（12 km 内）；否则 `nearestEnemy(a, world, role === 'wingman' ? 11000 : 15000)`；**空中一个都没有时**，带得动对面弹的飞机转去挑面目标（`surfaceTargetFor`） |
 
+**照射判定（RWR，`a.rwrT / a.rwrSrc`）**：敌对、`target === a`、挂主动雷达弹（`seeker === 'radar'`）才算照射；`silentLock` / `emcon` 不告警。
+**玩家要锁满（`player.locked`）才算** —— 只是选中、锁定环还在走，对方收不到告警，可以贴近了再锁。以前选中即照射。AI 之间仍是"选中即照射"。
+
 > **面目标（海上平台 / 地面设施）是后加的。** 在这之前 `nearestEnemy` 只扫
 > `world.actors`，`world.targets` 对 AI 完全不存在 —— 所以"敌机来炸你的
 > 前进基地"这件事在代码里根本没有落点，下游的随队攻击机只能是摆设。
@@ -286,8 +289,8 @@ a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
    无制导弹（炸弹 / 火箭巢）不参与 —— AI 没有投弹瞄准逻辑。
    挑中谁就 `Ent.setWeapon(a, pick)`，也就是"AI 换武器"的全部：
    **没有独立的选弹状态**，只有每次开火前的一次挑选
-2. **锁定锥**：`off < cone * 0.85`，`y > 18000` 时 `cone *= 0.8`（收窄 20%）
-3. **锁定距离**：`dist < lockDist * lockK * resist`，其中
+2. **锁定锥**：`off < cone * 0.85`，`off = Ent.lockOff(a, t, w)`（对面弹只量水平方位），`y > 18000` 时 `cone *= 0.8`（收窄 20%）
+3. **锁定距离**：`dist < Ent.aiReach(w, y) * lockK * resist`（`aiReach = min(lockDist, effRange × 0.9)`，见 [entities.md](entities.md)；以前直接用 `lockDist`，BOX-14 这类标称比飞得远的弹会在射程外放），其中
    `lockK = 1 - min(0.25, max(0, (y - 15000) / 40000))`（越高越难锁），
    `resist = t.lockResist ? 1 - t.lockResist : 1`（目标的被动吊舱打折）；
    目标正在主动干扰（`t.ewPower > 0`）**且本弹是雷达制导**时再乘
@@ -346,6 +349,20 @@ a.route = {
   onArrive: bombTheBase        // 到点要做的事
 };
 ```
+
+**分段型**（`route.legs`，`js/route.js` 的 `Route.plan(legs, {jam})`，在 `combat.js` 之后加载）：
+`updateRoute` 先调 `Route.step`，它只决定"往哪飞、多高、要不要开火"，结果写回 `route.wp / route.alt`；转向与高度保持仍走下面那套。
+无 `legs` 的旧单段写法不变。
+
+| 段 | 字段 | 行为 |
+|---|---|---|
+| `goto` | `wp, alt, arrive`（缺省 2000） | 水平距离 < arrive 即下一段 |
+| `strike` | `weapon, pick, rangeK`（缺省 0.8）`, alt, shots, timeout` | 挑一个该武器能打的敌方目标（`pick`：`nearest` 缺省 / `biggest` / `function(t,a)→分数`），保持 alt 飞去；`dist < Ent.aiReach(w, alt, rangeK)` + `Ent.lockOff` 在锁定锥内 + 武器就绪才发射，**只发 `weapon` 这一件**；发满 shots 下一段；目标死了换一个，一个都没有就跳过；超 timeout 放弃 |
+| `call` | `fn(a, world)` | 执行一次，立刻下一段 |
+| `loiter` | `a, b, alt, time, until, jam` | a↔b 来回飞，time 到或 until 为真下一段，都不给就永远盘旋 |
+| `egress` | `wp, alt` | 到点离场消失（escaped） |
+
+`plan` 级 `jam` 整条航线生效（飞往站位途中也开机），`loiter` 段的 `jam` 可覆盖。已改用分段的：m2 轰炸机（goto → call bombTheBase → egress，`tailGun` 仍挂在 route 上）、m5 巡航（goto → call 播无线电 → egress）、m8 轰炸机（strike vsr，rangeK 0.8、alt 4500、timeout 150 → egress）、`jammerRoute`（goto → loiter，plan 级 jam）。
 
 **盘旋型**（`route.loiter: true`，预警机，`missions.js` 的 `spawnAewc()`）：
 到点后 `wp` 与 `exit` 互换，在两点之间来回飞、永不退场 —— 击落是唯一让它
@@ -501,7 +518,8 @@ M3 播撒机 0.25、护航 0.58–0.72、
 | 规避触发距离（4.2 km） | `findIncoming()` 里的 `4200` |
 | 脱离血量阈值 | `update()` 里 `a.hp < a.maxHp * 0.25` |
 | 威胁警戒半径 | `nearestEnemy()` 调用处的 `15000` / `11000` / `9000` |
-| 面目标搜索半径 | `surfaceTargetFor()` 里取"自己最远那件对面弹的 `lockDist × 1.15`" |
+| 面目标搜索半径 | `surfaceTargetFor()` 里取"自己最远那件对面弹的 `aiReach × 1.15`"（旧：`lockDist`） |
+| 分段航线 | `js/route.js`（`ARRIVE`、段缺省值） |
 | 挑弹规则（类别 + 射程） | `entities.js` `chooseWeapon()` |
 | 对地目标的接近角 | `approachSurface()` 里的 `-0.06`（远）/ `-0.02`（近） |
 | 升限钳制 | `clampCeiling()` 里的 `1200` / `-0.22` / `0.08` |

@@ -39,7 +39,10 @@
 | `mountPlan` | `mountPlan(a) → [弹种或 null]` | 逐组挂载分配（逐组配置 → 吊舱 → 制式弹），下标对齐 `ac.hardpointGroups` |
 | `storePos` | `storePos(a, g, pt) → 世界坐标` | 一个挂点的挂载物该画在哪。`pt` 只有 (横向, 前后)，高度取 `g.hy` 或按类型给的默认值（`STORE_HY`） |
 | `STORE_HY` | `{ tip, light, heavy, belly }` | 默认吊挂高度表（米，机体系）。机型可用挂点组的 `hy` 覆盖 |
-| `chooseWeapon` | `chooseWeapon(a, t, dist) → 武器id\|null` | AI 开火前挑一件：按目标类别（对空 / 对面）+ 射程（够得着的取最短）。判据见 §7 坑 14 |
+| `chooseWeapon` | `chooseWeapon(a, t, dist) → 武器id\|null` | AI 开火前挑一件：按目标类别（对空 / 对面）+ 射程（`aiReach`，够得着的取最短）。判据见 §7 坑 14 |
+| `effRange` | `effRange(w, alt) → m` | 有效动力射程：用 `stepMissile` 朝远处假目标直飞一次量出，按 2 km 高度档缓存在 `w.__eff`；带 loft 的对面弹再用 `loftReach/hitsAt` 对真目标二分修正。模拟世界带 `silent`，`Combat.detonate` 不出声。例：BOX-14 `lockDist` 9000 → 4 km 高约 8.4 km；SPO-6 8200 → 约 7.6 km |
+| `aiReach` | `aiReach(w, alt, k=0.9) → m` | `min(lockDist, effRange × k)`。`ai.js` 的 `fireAtTarget` / `surfaceTargetFor`、`chooseWeapon`、`game.js` `pickTargetFor`（舰载防空）、`route.js` strike 都用它 |
+| `lockOff` | `lockOff(a, t, w) → rad` | 发射离轴角：对面弹（target 是 ground/ship）只量水平方位、忽略垂直；对空弹量三维夹角。玩家对面锁定、AI `okAng`、route strike 共用 |
 | `setWeapon` | `setWeapon(a, wid)` | 把它设成"当前触发的那件"（`special` / `spAmmo` / `spCd`）。玩家换弹与 AI 选弹共用 |
 | `weaponMatchesTarget` | `weaponMatchesTarget(w, t) → bool` | 武器能不能打这个目标（与 `game.js` 的 `targetMismatch` 同源） |
 | `mountIssues` | `[string]` | 关卡里写错的 NPC 挂载（挂不上 / 能力不足）。`smoke.js` 断言它是空的 |

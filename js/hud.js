@@ -95,6 +95,7 @@ var HUD = (function () {
     drawTargets(ctx, W, H, cam, p, world);
     drawLaserStatus(ctx, W, H, p, world);
     drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
+    drawConeCue(ctx, W, H, cam, p);
     drawIncomingMissiles(ctx, W, H, cam, p, world);
     drawStores(ctx, W, H, p);
     drawWeaponPanel(ctx, W, H, p);
@@ -537,6 +538,15 @@ var HUD = (function () {
     var cx = R + U(28), cy = H - R - U(32);
     var range = 12000;
 
+    /* 雷达"上方"跟着**镜头**的水平朝向走，不跟机头 —— 不真实，但玩家看的是镜头画面，
+       雷达和画面对得上才好用（拉杆转弯时机头和镜头并不一致）。镜头近乎垂直时退回机头。 */
+    var cam = Renderer.getCam();
+    var hx = cam ? cam.fwd.x : p.fwd.x, hz = cam ? cam.fwd.z : p.fwd.z;
+    var hl = Math.sqrt(hx * hx + hz * hz);
+    if (hl < 0.05) { hx = p.fwd.x; hz = p.fwd.z; hl = Math.sqrt(hx * hx + hz * hz); }
+    radarH.x = hl > 0.05 ? hx / hl : 0;
+    radarH.z = hl > 0.05 ? hz / hl : 1;
+
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
     ctx.fillStyle = 'rgba(6,18,24,0.72)';
@@ -547,9 +557,18 @@ var HUD = (function () {
     for (var k = 1; k <= 3; k++) {
       ctx.beginPath(); ctx.arc(cx, cy, R * k / 3, 0, Math.PI * 2); ctx.stroke();
     }
+    /* 方位十字：南北、东西两根轴按**真方位**画，随雷达一起转。
+       世界 +z 的真方位是 world.axis（与顶部罗盘同一个口径）。 */
+    var axis = ((world && world.axis) || 0) * Math.PI / 180;
+    var card = [['N', 0], ['E', 90], ['S', 180], ['W', 270]], pts = [];
+    for (var ci = 0; ci < 4; ci++) {
+      var b = card[ci][1] * Math.PI / 180 - axis;
+      var u = radarDir(Math.sin(b), Math.cos(b));
+      pts.push(u);
+    }
     ctx.beginPath();
-    ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
-    ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
+    ctx.moveTo(cx + pts[0].x * R, cy + pts[0].y * R); ctx.lineTo(cx + pts[2].x * R, cy + pts[2].y * R);
+    ctx.moveTo(cx + pts[1].x * R, cy + pts[1].y * R); ctx.lineTo(cx + pts[3].x * R, cy + pts[3].y * R);
     ctx.stroke();
 
     // 扫描线
@@ -563,12 +582,40 @@ var HUD = (function () {
 
     // 目标
     drawBlips(ctx, cx, cy, R, range, p, world);
+
+    /* 本机：中心一个小箭头，指向机头的水平方位。雷达跟镜头转以后，
+       机头不一定朝上 —— 这个箭头告诉你飞机实际往哪飞。 */
+    var nd = radarDir(p.fwd.x, p.fwd.z), nl = Math.sqrt(nd.x * nd.x + nd.y * nd.y);
+    if (nl > 0.05) {
+      var ux = nd.x / nl, uy = nd.y / nl, L0 = U(7);
+      ctx.fillStyle = CY;
+      ctx.beginPath();
+      ctx.moveTo(cx + ux * L0, cy + uy * L0);
+      ctx.lineTo(cx - ux * L0 * 0.6 - uy * L0 * 0.55, cy - uy * L0 * 0.6 + ux * L0 * 0.55);
+      ctx.lineTo(cx - ux * L0 * 0.25, cy - uy * L0 * 0.25);
+      ctx.lineTo(cx - ux * L0 * 0.6 + uy * L0 * 0.55, cy - uy * L0 * 0.6 - ux * L0 * 0.55);
+      ctx.closePath(); ctx.fill();
+    }
     ctx.restore();
 
     ctx.strokeStyle = DIM; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-    text(ctx, 'RDR 12KM', cx, cy + R + 14, DIM, FS, 'center');
-    text(ctx, 'N', cx, cy - R - 6, DIM, FS, 'center');
+    /* 量程标签挪到更下面：方位字母在圆外转一圈，转到正下方时不能和它叠在一起 */
+    text(ctx, 'RDR 12KM', cx, cy + R + U(26), DIM, FS, 'center');
+    /* 方位字母放在圆外，跟着轴转到各自的位置，但字本身保持正向（只移位置、不旋转） */
+    for (ci = 0; ci < 4; ci++) {
+      var lr = R + U(10);
+      text(ctx, card[ci][0], cx + pts[ci].x * lr, cy + pts[ci].y * lr + U(4),
+        ci === 0 ? AMBER : DIM, FS, 'center');
+    }
+  }
+
+  /* 雷达的"上方"（镜头水平朝向，drawRadar 每帧更新）与世界方向 → 雷达单位向量（y 向下） */
+  var radarH = { x: 0, z: 1 };
+  function radarDir(dx, dz) {
+    var rx = dx * radarH.z - dz * radarH.x;
+    var ry = dz * radarH.z + dx * radarH.x;
+    return { x: rx, y: -ry };
   }
 
   /* 调节单元每关头顶几十个：远处的不上 HUD（罗盘、雷达、目标框都一样），
@@ -580,8 +627,7 @@ var HUD = (function () {
 
   function radarXY(p, wp, cx, cy, R, range) {
     var dx = wp.x - p.pos.x, dz = wp.z - p.pos.z;
-    var hl = Math.sqrt(p.fwd.x * p.fwd.x + p.fwd.z * p.fwd.z);
-    var fx = hl > 0.05 ? p.fwd.x / hl : 0, fz = hl > 0.05 ? p.fwd.z / hl : 1;
+    var fx = radarH.x, fz = radarH.z;              // 镜头朝向（见 drawRadar）
     var rx = dx * fz - dz * fx;
     var ry = dz * fz + dx * fx;
     var d = Math.sqrt(dx * dx + dz * dz);
@@ -900,7 +946,7 @@ var HUD = (function () {
       var isLock = (p.target === t);
 
       if (s.behind || s.x < 0 || s.x > W || s.y < 0 || s.y > H) {
-        drawOffscreen(ctx, W, H, cam, t, isLock, dist, isAlly, offRect);
+        drawOffscreen(ctx, W, H, cam, t, isLock, dist, isAlly, offRect, isLock && p.locked);
         continue;
       }
 
@@ -1055,9 +1101,11 @@ var HUD = (function () {
       return;
     }
 
-    // 空中目标：第一行呼号（认人），第二行机型（认机），最后一行距离
-    var line1 = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.name || ''));
-    var line2 = t.label && t.ac ? (t.ac.name + ' ' + t.ac.cn) : null;
+    /* 空中目标：第一行机型（认机 —— 对火控来说这才是要紧的），
+       第二行呼号（风味信息，压暗），最后一行距离。以前呼号在前。 */
+    var acTxt = t.ac ? (t.ac.name + ' ' + t.ac.cn) : null;
+    var line1 = acTxt || t.label || t.name || '';
+    var line2 = acTxt && t.label ? t.label : null;
 
     var tx = s.x + sz + 7, ty = s.y - sz + 8;
     text(ctx, line1, tx, ty, col, FS, 'left');
@@ -1099,6 +1147,21 @@ var HUD = (function () {
     ctx.moveTo(x0 + c, y1); ctx.lineTo(x0, y1); ctx.lineTo(x0, y1 - c);
     ctx.stroke();
 
+    /* 已锁定：四角括号变成双层（内侧再加一圈短角），锁定环消失。
+       不换颜色 —— 框的颜色已经在表达发射包线了。 */
+    if (p.locked) {
+      var g2 = 5, c2 = 6;
+      var u0 = x0 + g2, v0 = y0 + g2, u1 = x1 - g2, v1 = y1 - g2;
+      ctx.beginPath();
+      ctx.moveTo(u0, v0 + c2); ctx.lineTo(u0, v0); ctx.lineTo(u0 + c2, v0);
+      ctx.moveTo(u1 - c2, v0); ctx.lineTo(u1, v0); ctx.lineTo(u1, v0 + c2);
+      ctx.moveTo(u1, v1 - c2); ctx.lineTo(u1, v1); ctx.lineTo(u1 - c2, v1);
+      ctx.moveTo(u0 + c2, v1); ctx.lineTo(u0, v1); ctx.lineTo(u0, v1 - c2);
+      ctx.stroke();
+      // 框正上方写 LOCK，与框下方的 IN RNG / NEZ 上下对应
+      text(ctx, 'LOCK', s.x, y0 - 6, ctx.strokeStyle, 'bold 12px Consolas,monospace', 'center');
+    }
+
     // 目标速度矢量线
     if (t.kind === 'air' && t.fwd) {
       ctx.strokeStyle = 'rgba(79,224,138,0.7)'; ctx.lineWidth = 1.4;
@@ -1114,13 +1177,16 @@ var HUD = (function () {
     // 数据块的颜色跟着框走，保持一致
     var col = inNez ? RED : (outMax ? FAR : AMBER);
 
-    text(ctx, label, tx, ty + 10, col, 'bold 12px Consolas,monospace', 'left');
-    var ly = ty + 24;
-
-    // 机型代号 —— 效仿皇牌空战，红框旁边直接写清那是什么飞机。
-    // 用 cn（中文名）而不是 nick（英文绰号）。
+    /* 第一行机型代号（粗体，框色）—— 效仿皇牌空战，红框旁边直接写清那是什么飞机，
+       用 cn（中文名）而不是 nick（英文绰号）。对火控来说认机型才是要紧的；
+       呼号是风味信息，放第二行、用普通字重。以前呼号在前。 */
+    var ly = ty + 10;
     if (t.ac) {
-      text(ctx, t.ac.name + ' ' + t.ac.cn, tx, ly, col, FS, 'left');
+      text(ctx, t.ac.name + ' ' + t.ac.cn, tx, ly, col, 'bold 12px Consolas,monospace', 'left');
+      ly += 14;
+      if (t.label) { text(ctx, t.label, tx, ly, col, FS, 'left'); ly += 14; }
+    } else {
+      text(ctx, label, tx, ly, col, 'bold 12px Consolas,monospace', 'left');
       ly += 14;
     }
 
@@ -1151,14 +1217,66 @@ var HUD = (function () {
       text(ctx, 'IN RNG', s.x, envY, AMBER, 'bold 12px Consolas,monospace', 'center');
     }
 
-    // 锁定进度环
-    if (p.lockProgress < 1) {
-      ctx.strokeStyle = AMBER; ctx.lineWidth = 3;
+    /* 锁定进度环：
+         锁定中（在锥内、射程内）   琥珀实线，往前走
+         锁不了（锥外或射程外）     暗色虚线，进度往回掉 —— 一眼看出"现在不在锁"
+         已锁定                     不画（改由上面的双层角框表示） */
+    if (!p.locked) {
+      var rr = Math.max(w, h) + 10;
+      ctx.save();
+      if (p.lockOk) { ctx.strokeStyle = AMBER; ctx.lineWidth = 3; }
+      else { ctx.strokeStyle = 'rgba(255,176,58,0.38)'; ctx.lineWidth = 2; if (ctx.setLineDash) ctx.setLineDash([4, 4]); }
       ctx.beginPath();
-      ctx.arc(s.x, s.y, Math.max(w, h) + 10, -Math.PI / 2,
-        -Math.PI / 2 + Math.PI * 2 * p.lockProgress);
+      if (p.lockOk || p.lockProgress > 0.01) {
+        ctx.arc(s.x, s.y, rr, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(p.lockOk ? 0 : 1, p.lockProgress));
+      }
       ctx.stroke();
+      ctx.restore();
     }
+  }
+
+  /* ============================================================
+     导弹视场提示（常驻）
+
+     拿着制导武器就一直画，没有出现 / 消失的条件 —— 只换样式：
+       没有目标                       暗色虚线
+       有目标，但在锥外或锁定距离外   淡橙虚线
+       目标在锥内且在锁定距离内       红色实线（能锁）
+     对空弹：机头周围的圆，半径 = 锁定锥；圆比屏幕还大就不画（大离轴弹）。
+     对面弹：锥只量水平方位，在地平线附近画两道短竖线标出左右边界。
+     锥宽的弹，圆多数时候整个在画面外，不会增加画面负担。
+     ============================================================ */
+  function drawConeCue(ctx, W, H, cam, p) {
+    var w = WEAPONS[p.special];
+    if (!w || !w.seeker || w.seeker === 'none' || w.unguided || !w.lockCone) return;
+    var cone = p.lockCone || w.lockCone;
+    var t = p.target && p.target.alive ? p.target : null;
+    var hot = !!(t && p.lockInCone && p.lockInRange);
+    ctx.save();
+    ctx.strokeStyle = hot ? RED : (t ? 'rgba(255,176,58,0.42)' : 'rgba(150,170,180,0.22)');
+    ctx.lineWidth = hot ? 1.6 : 1.4;
+    if (!hot && ctx.setLineDash) ctx.setLineDash([6, 6]);
+    if (w.target === 'air') {
+      var bs = M3.project(cam, M3.add(p.pos, M3.mul(p.fwd, 2000)));
+      var r = cam.focal * Math.tan(Math.min(1.45, cone));
+      if (bs && r < Math.max(W, H)) {
+        ctx.beginPath(); ctx.arc(bs.x, bs.y, r, 0, Math.PI * 2); ctx.stroke();
+      }
+    } else {
+      var hx = p.fwd.x, hz = p.fwd.z, hl = Math.sqrt(hx * hx + hz * hz);
+      if (hl > 0.05) {
+        hx /= hl; hz /= hl;
+        for (var sgn = -1; sgn <= 1; sgn += 2) {
+          var a = sgn * cone, ca = Math.cos(a), sa = Math.sin(a);
+          // 绕世界竖轴转 a：方位边界的方向，取远处海平面附近的一点
+          var dx = hx * ca + hz * sa, dz = -hx * sa + hz * ca;
+          var q = M3.project(cam, M3.V(p.pos.x + dx * 20000, Math.max(0, p.pos.y - 3000), p.pos.z + dz * 20000));
+          if (!q) continue;
+          ctx.beginPath(); ctx.moveTo(q.x, q.y - U(22)); ctx.lineTo(q.x, q.y + U(22)); ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
   }
 
   /** 发射包线：{ rmax, nez }，非对空弹给 null。
@@ -1253,7 +1371,8 @@ var HUD = (function () {
     return { x: cx + dx * k, y: cy + dy * k };
   }
 
-  function drawOffscreen(ctx, W, H, cam, t, isLock, dist, isAlly, rect) {
+  /* isLock = 当前选中的目标；locked = 而且锁定环已经走满 */
+  function drawOffscreen(ctx, W, H, cam, t, isLock, dist, isAlly, rect, locked) {
     var cx = W / 2, cy = H / 2;
 
     /* 方向取相机空间的横向分量 (x, -y)。它和投影点在屏幕上的偏移方向
@@ -1314,6 +1433,17 @@ var HUD = (function () {
       ctx.beginPath();
       ctx.arc(0, 0, 1.6, 0, Math.PI * 2);
       ctx.fill();
+      /* 锁满：在外环外切处加一个红色四角框（边长 = 外环脉动的最大直径，不跟着脉动） */
+      if (locked) {
+        var q = sz0 + 3.0 + 2.4 + 1.5, qc = 5;
+        ctx.strokeStyle = RED; ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-q, -q + qc); ctx.lineTo(-q, -q); ctx.lineTo(-q + qc, -q);
+        ctx.moveTo(q - qc, -q); ctx.lineTo(q, -q); ctx.lineTo(q, -q + qc);
+        ctx.moveTo(q, q - qc); ctx.lineTo(q, q); ctx.lineTo(q - qc, q);
+        ctx.moveTo(-q + qc, q); ctx.lineTo(-q, q); ctx.lineTo(-q, q - qc);
+        ctx.stroke();
+      }
     }
 
     ctx.rotate(ang);
@@ -1325,8 +1455,9 @@ var HUD = (function () {
 
     /* 读数写在**朝屏幕中心**的一侧：贴边的标记若把读数写在更外一侧，
        就又压回刚让开的仪表上了。 */
-    text(ctx, (isLock ? 'LOCK ' : '') + (dist / 1000).toFixed(1),
-      pt.x - dx * 20, pt.y - dy * 20 + 4, col,
+    /* 只写距离。锁定状态由箭头外的红色四角框表示（见上），不再写 LOCK / TGT 前缀 */
+    text(ctx, (dist / 1000).toFixed(1),
+      pt.x - dx * (isLock ? 32 : 20), pt.y - dy * (isLock ? 32 : 20) + 4, col,   // 选中目标让开外环和四角框
       isLock ? 'bold ' + FS : FS, 'center');
   }
 
@@ -1668,6 +1799,24 @@ var HUD = (function () {
     ctx.moveTo(mx - 7, my + 6);
     ctx.lineTo(mx + 7, my + 6);
     ctx.stroke();
+
+    /* 已锁定：标记外面套一圈双层四角框（与目标框锁定时同一个画法），上方写 LOCK。
+       目标在画面外时，这里是唯一能看出"我已经锁住它了"的地方。
+       用四角框而不是告警色块：四角框在这套 HUD 里只代表"我选中的目标"，
+       不会和 SPIKE / MISSILE 那类"别人锁我"的告警混淆。 */
+    if (p.locked && p.target === t) {
+      ctx.strokeStyle = col; ctx.lineWidth = 1.4;
+      [[12, 5], [8, 4]].forEach(function (b) {
+        var a0 = mx - b[0], a1 = mx + b[0], b0 = my - b[0] - 2, b1 = my + b[0] + 2, c = b[1];
+        ctx.beginPath();
+        ctx.moveTo(a0, b0 + c); ctx.lineTo(a0, b0); ctx.lineTo(a0 + c, b0);
+        ctx.moveTo(a1 - c, b0); ctx.lineTo(a1, b0); ctx.lineTo(a1, b0 + c);
+        ctx.moveTo(a1, b1 - c); ctx.lineTo(a1, b1); ctx.lineTo(a1 - c, b1);
+        ctx.moveTo(a0 + c, b1); ctx.lineTo(a0, b1); ctx.lineTo(a0, b1 - c);
+        ctx.stroke();
+      });
+      text(ctx, 'LOCK', mx, my - 18, col, 'bold 11px Consolas,monospace', 'center');
+    }
 
     // 距离 / 方位读数
     text(ctx, (dist / 1000).toFixed(1) + ' KM', cx - halfW - 12, cy + 4,

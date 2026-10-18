@@ -543,6 +543,8 @@ var Renderer = (function () {
   function begin() {
     poolN = 0;
     faceN = 0;
+    // 全屏滤镜层（hudfx.js）每帧先清空：离开战斗（菜单、结算）时自动消失
+    if (typeof HudFx !== 'undefined' && HudFx.beginFrame) HudFx.beginFrame();
 
     // 相机未设置时给一个安全默认值（标题界面会走到这里）
     if (!cam) {
