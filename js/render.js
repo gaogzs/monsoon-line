@@ -24,7 +24,8 @@ var Renderer = (function () {
      'auto'  有 WebGL2 就用（render-gl.js，深度缓冲，遮挡正确），没有就退回下面的画家算法
      'gl'    同 auto（拿不到 WebGL2 时仍然退回）
      '2d'    强制画家算法（设置里的"兼容"，或 URL 带 ?render=2d）
-     天空、云、海面、粒子、HUD 无论哪种都画在 2D 画布上。 */
+     用 WebGL 时，天空、海面、云、粒子也由 render-env.js 画（与模型共用深度缓冲）；
+     2D 模式下仍是本文件里原来的画法。曳光和 HUD 无论哪种都画在 2D 画布上。 */
   var mode = 'auto', glOn = false, urlForce = false;
   try {
     if (typeof location !== 'undefined' && /[?&]render=2d(&|$)/.test(location.search || '')) { mode = '2d'; urlForce = true; }
@@ -32,6 +33,16 @@ var Renderer = (function () {
   // URL 里的 ?render=2d 优先于设置（排查问题时用）
   function setMode(m) { if (!urlForce) mode = (m === '2d' || m === 'gl') ? m : 'auto'; }
   function usingGL() { return glOn; }
+
+  /* ---------- WebGL 环境层的开关（2.5.9） ----------
+     quality：0 = 标准（关软粒子，给集成显卡），1 = 高。
+     高空云片两档都画：10 km 以上的云团已经去掉了，高层只剩它。
+     其余几项单独开关，用来和旧画面并排对比（控制台 Renderer.setGfx({ clouds: false })）；
+     env 关掉 = 天空 / 云 / 海面整层退回 2D（画面对比测试就这么用）。 */
+  var gfx = { env: true, clouds: true, sheets: true, particles: true, soft: true }, quality = 1;
+  var envGL = false, flushed = false;
+  function setGfx(o) { for (var k in o) if (Object.prototype.hasOwnProperty.call(gfx, k)) gfx[k] = !!o[k]; }
+  function setQuality(q) { quality = q ? 1 : 0; }
 
   /* ---------- 颜色缓存（量化亮度/雾浓度，避免每帧拼字符串） ---------- */
   var colorCache = {};
@@ -117,11 +128,11 @@ var Renderer = (function () {
      1500 m 的积云俯角超过 40°，落在 58° 视场之外。
      所以每一段飞行高度附近都必须有云，它们才是可靠的姿态参照。 */
   var CLOUD_LAYERS = [
-    { y0: 500, y1: 2600, s0: 500, s1: 1500, a0: 0.30, a1: 0.52, n: 22 },    // 低层积云
-    { y0: 3200, y1: 6200, s0: 600, s1: 1900, a0: 0.24, a1: 0.44, n: 20 },   // 中层
-    { y0: 6800, y1: 10200, s0: 700, s1: 2300, a0: 0.20, a1: 0.38, n: 18 },  // 中高层
-    { y0: 10800, y1: 15200, s0: 800, s1: 2600, a0: 0.15, a1: 0.30, n: 16 }, // 高层
-    { y0: 15800, y1: 21400, s0: 900, s1: 3000, a0: 0.11, a1: 0.24, n: 14 }  // 平流层薄云
+    { y0: 1400, y1: 2800, s0: 500, s1: 1500, a0: 0.30, a1: 0.52, n: 13 },   // 低层积云（云底 1400 m，低空飞行不贴着云）
+    { y0: 3400, y1: 6200, s0: 600, s1: 1900, a0: 0.24, a1: 0.44, n: 12 },   // 中层
+    { y0: 6800, y1: 10200, s0: 700, s1: 2300, a0: 0.20, a1: 0.38, n: 11 },  // 中高层
+    { y0: 10800, y1: 15200, s0: 800, s1: 2600, a0: 0.15, a1: 0.30, n: 9 },  // 高层
+    { y0: 15800, y1: 21400, s0: 900, s1: 3000, a0: 0.11, a1: 0.24, n: 8 }   // 平流层薄云
   ];
   var cloudSeeds = [];
   (function () {
@@ -139,6 +150,9 @@ var Renderer = (function () {
     }
   })();
   var CLOUD_CELL = 6400;
+  var CLOUD_FAR = 16000;
+  // WebGL 的云用同一组种子（每朵拆成几个柔边贴片）
+  if (typeof RenderGL !== 'undefined' && RenderGL.setClouds) RenderGL.setClouds(cloudSeeds, CLOUD_CELL, CLOUD_FAR);
 
   function horizonY() {
     var d = M3.V(cam.fwd.x, 0, cam.fwd.z);
@@ -207,8 +221,6 @@ var Renderer = (function () {
     }
     return hy;
   }
-
-  var CLOUD_FAR = 16000;
 
   function drawClouds() {
     var bx = Math.round(cam.pos.x / CLOUD_CELL) * CLOUD_CELL;
@@ -469,8 +481,28 @@ var Renderer = (function () {
   /* ---------- 排序 + 绘制全部面 ---------- */
   function flush() {
     if (glOn) {
-      var glc = RenderGL.render(cam);
-      if (glc) ctx.drawImage(glc, 0, 0, W, H);   // 当前变换已含 DPR 与镜头抖动
+      flushed = true;
+      if (!envGL) {
+        var glc = RenderGL.render(cam);
+        if (glc) ctx.drawImage(glc, 0, 0, W, H);   // 当前变换已含 DPR 与镜头抖动
+        return;
+      }
+      /* 环境也在 GL 里：整张图铺满屏幕，镜头抖动改成移动投影中心（不然边上会露出空白） */
+      var c2 = cam;
+      if (shakeX || shakeY) {
+        c2 = {}; for (var k in cam) c2[k] = cam[k];
+        c2.cx = cam.cx + shakeX; c2.cy = cam.cy + shakeY;
+      }
+      var glc2 = RenderGL.render(c2, { env: {
+        sky: true, clouds: gfx.clouds, particles: gfx.particles,
+        sheets: gfx.sheets, soft: gfx.soft && quality > 0
+      } });
+      if (glc2) {
+        ctx.save();
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        ctx.drawImage(glc2, 0, 0, W, H);
+        ctx.restore();
+      }
       return;
     }
     var arr = [];
@@ -503,6 +535,8 @@ var Renderer = (function () {
      ============================================================ */
   function drawParticles(list) {
     if (!list.length) return;
+    // WebGL 画粒子时要在 flush 之前交过去（参与深度测试：飞机背后的爆炸会被机身挡住）
+    if (envGL && gfx.particles && !flushed) { RenderGL.pushParticles(list); return; }
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (var i = 0; i < list.length; i++) {
@@ -558,18 +592,23 @@ var Renderer = (function () {
     } else { shakeX = shakeY = 0; shake = 0; }
 
     glOn = mode !== '2d' && typeof RenderGL !== 'undefined' && RenderGL.begin(W, H, DPR);
+    envGL = glOn && gfx.env && RenderGL.envReady();
+    flushed = false;
 
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    var hy = drawSky();
-    drawClouds();
-    drawGround(hy);
+    if (!envGL) {
+      var hy = drawSky();
+      drawClouds();
+      drawGround(hy);
+    }
 
     ctx.save();
     if (shakeX || shakeY) ctx.translate(shakeX, shakeY);
   }
 
   function end() {
+    if (envGL && !flushed) flush();      // 菜单背景这类不推模型、也不调 flush 的帧
     ctx.restore();
   }
 
@@ -596,7 +635,7 @@ var Renderer = (function () {
 
   return {
     init: init, resize: resize, setCamera: setCamera, getCam: getCam,
-    setMode: setMode, usingGL: usingGL,
+    setMode: setMode, usingGL: usingGL, setGfx: setGfx, setQuality: setQuality,
     begin: begin, end: end, pushModel: pushModel, flush: flush,
     drawParticles: drawParticles, addShake: addShake,
     line: line, rect: rect, circle: circle, ring: ring, text: text,

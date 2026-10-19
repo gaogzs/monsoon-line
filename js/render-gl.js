@@ -1,9 +1,13 @@
 /* ============================================================
    render-gl.js —— 模型的 WebGL2 渲染（docs/2-0IMPL.md 阶段 2.5.4）
 
-   只负责"模型面"这一件事：深度缓冲让遮挡永远正确（翼下挂弹、机身与尾翼穿插）。
-   天空、云、海面、粒子、曳光、HUD 仍在 2D 画布上 —— Renderer.flush()
-   把这张离屏 GL 画布 drawImage 到主画布上，夹在环境层和粒子层之间。
+   模型面：深度缓冲让遮挡永远正确（翼下挂弹、机身与尾翼穿插）。
+   主画面实例（create({ env: true })）还画环境层 —— 天空、海面、云、高空云片、粒子
+   （render-env.js，2.5.9），全部与模型共用一个深度缓冲。曳光和 HUD 仍在 2D 画布上。
+   Renderer.flush() 把这张离屏 GL 画布 drawImage 到主画布上。
+
+   环境实例走离屏 MSAA 帧缓冲：画完天空 + 海面 + 不透明模型后，把深度解析到一张
+   深度纹理，云贴片读它做软粒子；最后把颜色 blit 到画布。
 
    着色规则全部来自 shading.js，并在着色器里逐面算（flat）：
    每个顶点带着它所在面的法线与面中心，三个顶点算出同一个颜色 ——
@@ -69,8 +73,10 @@ var RenderGL = (function () {
 
   /* 每个实例一个离屏画布 + 一个 GL 上下文。主画面用默认实例；
      单位详情页 / 机库的 3D 预览各建一个（RenderGL.create()），尺寸互不打架。 */
-  function create() {
+  function create(cfg) {
+  var withEnv = !!(cfg && cfg.env);
   var gl = null, canvas = null, prog = null, U = {};
+  var env = null, fb = null, pendingClouds = null;
   var ok = false, failed = false;
   var cache = (typeof WeakMap !== 'undefined') ? new WeakMap() : null;
   var queue = [], queueN = 0;
@@ -89,7 +95,8 @@ var RenderGL = (function () {
     try {
       if (typeof document === 'undefined' || typeof WebGL2RenderingContext === 'undefined') throw new Error('no webgl2');
       canvas = document.createElement('canvas');
-      gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: true, depth: true });
+      // 环境实例自己做 MSAA（离屏帧缓冲），画布本身不能再是多重采样的，否则 blit 不合法
+      gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: !withEnv, depth: true });
       if (!gl || !(gl instanceof WebGL2RenderingContext)) throw new Error('no webgl2');
       prog = gl.createProgram();
       gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
@@ -99,6 +106,15 @@ var RenderGL = (function () {
       ['uP', 'uRt', 'uUp', 'uFw', 'uScale', 'uTint', 'uEmis', 'uCamP', 'uCamR', 'uCamU', 'uCamF',
         'uFocal', 'uCx', 'uCy', 'uW', 'uH', 'uNear', 'uFar', 'uLight', 'uFogRGB', 'uFog', 'uLum',
         'uAlpha', 'uLogC'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+      if (withEnv && typeof RenderEnv !== 'undefined') {
+        try {
+          env = RenderEnv.create(gl, compile);
+          if (pendingClouds) env.setClouds(pendingClouds[0], pendingClouds[1], pendingClouds[2]);
+        } catch (e2) {
+          env = null;    // 环境着色器编译不过：模型照画，环境退回 2D
+          if (typeof console !== 'undefined') console.warn('render-env 不可用：', e2);
+        }
+      }
       canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); ok = false; failed = true; });
       ok = true;
     } catch (e) {
@@ -194,8 +210,50 @@ var RenderGL = (function () {
     var pw = Math.max(1, Math.floor(w * dpr)), ph = Math.max(1, Math.floor(h * dpr));
     if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
     queueN = 0;
+    if (env) env.beginParticles();
     return true;
   }
+
+  /* ---------- 离屏 MSAA 帧缓冲 + 深度纹理（只有环境实例用） ---------- */
+  function ensureFB() {
+    var w = canvas.width, h = canvas.height;
+    if (fb && fb.w === w && fb.h === h) return fb;
+    if (fb) {
+      gl.deleteFramebuffer(fb.ms); gl.deleteFramebuffer(fb.rs);
+      gl.deleteRenderbuffer(fb.col); gl.deleteRenderbuffer(fb.dep); gl.deleteTexture(fb.dtex);
+    }
+    var samples = Math.min(4, gl.getParameter(gl.MAX_SAMPLES) || 0);
+    var f = { w: w, h: h, ms: gl.createFramebuffer(), rs: gl.createFramebuffer() };
+    f.col = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, f.col);
+    gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.RGBA8, w, h);
+    f.dep = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, f.dep);
+    gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.DEPTH_COMPONENT24, w, h);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f.ms);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, f.col);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, f.dep);
+    f.dtex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, f.dtex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, w, h, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f.rs);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, f.dtex, 0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    fb = f;
+    return f;
+  }
+
+  function setClouds(seeds, cell, far) {
+    pendingClouds = [seeds, cell, far];
+    if (env) env.setClouds(seeds, cell, far);
+  }
+  function pushParticles(list) { if (env && list && list.length) env.pushParticles(list); }
 
   function push(model, P, fwd, up, opts) {
     if (!ok) return;
@@ -227,15 +285,27 @@ var RenderGL = (function () {
   }
 
   /* 画出本帧所有模型，返回离屏画布（调用方负责 drawImage）；没东西就返回 null。
-     opt.fog === false：不加雾（3D 预览里模型就在眼前，不该发灰） */
+     opt.fog === false：不加雾（3D 预览里模型就在眼前，不该发灰）
+     opt.env：{ sky, clouds, sheets, particles, soft } —— 环境层哪几项用 WebGL 画
+       （只有 create({ env: true }) 的实例认这个；sky 关掉时其余几项也不画，整层退回 2D） */
   function render(cam, opt) {
-    if (!ok || !queueN) return null;
+    var E = (env && opt && opt.env && opt.env.sky) ? opt.env : null;
+    if (!ok || (!queueN && !E)) return null;
+    var FAR = 400000, S = Shading;
+    var useFB = withEnv;
+    if (useFB) gl.bindFramebuffer(gl.FRAMEBUFFER, ensureFB().ms);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clearDepth(1);
+    gl.depthMask(true);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    var C = E ? { cam: cam, W: W, H: H, pw: canvas.width, ph: canvas.height,
+      dpr: canvas.width / Math.max(1, W), far: FAR, logC: 1 / Math.log2(FAR + 1) } : null;
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.disable(gl.CULL_FACE);
+    if (E) env.drawEnv(C);
     gl.useProgram(prog);
-    var FAR = 400000, S = Shading;
     gl.uniform3f(U.uCamP, cam.pos.x, cam.pos.y, cam.pos.z);
     gl.uniform3f(U.uCamR, cam.right.x, cam.right.y, cam.right.z);
     gl.uniform3f(U.uCamU, cam.up.x, cam.up.y, cam.up.z);
@@ -263,6 +333,23 @@ var RenderGL = (function () {
       if (queue[i].a < 1) trans.push(queue[i]);
       else drawItem(queue[i]);
     }
+    gl.bindVertexArray(null);
+    // 环境：高空云片 → 云贴片（读解析出来的深度做软粒子）
+    if (E) {
+      var dtex = null;
+      // 实体云要场景深度来截断厚度，所以开着云就总要解析深度
+      if (E.clouds && (E.soft || env.meshClouds)) {
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fb.ms);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, fb.rs);
+        gl.blitFramebuffer(0, 0, fb.w, fb.h, 0, 0, fb.w, fb.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb.ms);
+        dtex = fb.dtex;
+      }
+      if (E.sheets || E.clouds) env.drawSheets(C, !!E.clouds, !!E.sheets);
+      if (E.clouds) env.drawClouds(C, dtex, !!E.soft, fb.ms);
+      gl.useProgram(prog);
+      gl.disable(gl.BLEND);
+    }
     // 半透明：远 → 近，不写深度
     if (trans.length) {
       trans.sort(function (a, b) {
@@ -275,17 +362,29 @@ var RenderGL = (function () {
       gl.depthMask(true);
     }
     gl.bindVertexArray(null);
+    if (E && E.particles) env.drawParticles(C);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+    gl.bindVertexArray(null);
+    if (useFB) {
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fb.ms);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      gl.blitFramebuffer(0, 0, fb.w, fb.h, 0, 0, fb.w, fb.h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
     return canvas;
   }
 
   return {
     available: function () { return init(); },
+    envReady: function () { return init() && !!env; },
     begin: begin, push: push, render: render,
+    setClouds: setClouds, pushParticles: pushParticles,
     get canvas() { return canvas; }
   };
   }
 
-  var def = create();
+  var def = create({ env: true });
   def.create = create;
   return def;
 })();

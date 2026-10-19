@@ -228,7 +228,9 @@ var Game = (function () {
     // 追尾镜头飞机快出画时怎么办：0 = 静态拉远，1 = 侧滑软钳，2 = 拉远带滞回
     camFrame: 0,
     // 模型渲染：0 = 自动（有 WebGL2 就用），1 = 兼容（2D 画家算法）。见 render.js 的 setMode
-    renderMode: 0
+    renderMode: 0,
+    // 画面（只影响 WebGL）：0 = 标准（关软粒子），1 = 高
+    gfxQuality: 1
   };
 
   var S = {};
@@ -273,6 +275,10 @@ var Game = (function () {
            翼下挂弹偶尔会透到机翼上面。 */
         { k: 'renderMode', label: '渲染', type: 'select', options: [
           { v: 0, t: '自动（WebGL）' }, { v: 1, t: '兼容（2D）' }
+        ] },
+        /* 集成显卡掉帧时选"标准"。兼容（2D）模式下这项不起作用。 */
+        { k: 'gfxQuality', label: '画面', type: 'select', options: [
+          { v: 0, t: '标准' }, { v: 1, t: '高' }
         ] }
       ]
     }
@@ -313,12 +319,13 @@ var Game = (function () {
     if (key === 'volMaster' || key === 'volEngine' || key === 'volSfx' || key === 'muted') {
       applyAudioSettings();
     }
-    if (key === 'renderMode') applyRenderMode();
+    if (key === 'renderMode' || key === 'gfxQuality') applyRenderMode();
     // 视角与显示类不需要额外动作：渲染每帧直接读 S
   }
 
   function applyRenderMode() {
     if (Renderer.setMode) Renderer.setMode(S.renderMode === 1 ? '2d' : 'auto');
+    if (Renderer.setQuality) Renderer.setQuality(S.gfxQuality === 0 ? 0 : 1);
   }
 
   function makeSetRow(item) {
@@ -3276,14 +3283,14 @@ var Game = (function () {
       var mm = (ms.w && ms.w.look) ? MODELS.round(ms.w) : (MODELS[ms.model] || MODELS.missile);
       Renderer.pushModel(mm, ms.pos, ms.fwd, ms.up, {});
     }
+    // 粒子要在 flush 之前交：WebGL 下它们和模型一起做深度测试（2D 下照旧直接画）
+    Renderer.drawParticles(world.particles);
+    Renderer.drawParticles(Ent.flashRings(world));
     Renderer.flush();
 
     // 曳光弹画在模型之上并用加色混合 —— 弹道本来就该是亮线，
-    // 被机翼挡掉反而看不清楚
+    // 被机翼挡掉反而看不清楚（所以 WebGL 下也留在 2D 层）
     drawTracers();
-
-    Renderer.drawParticles(world.particles);
-    Renderer.drawParticles(Ent.flashRings(world));
     Renderer.end();
 
     // HUD

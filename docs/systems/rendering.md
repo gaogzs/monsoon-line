@@ -1,8 +1,9 @@
 # 渲染管线
 
-代码：`js/render.js`（2D 层 + 画家算法兜底） · `js/render-gl.js`（模型的 WebGL2 渲染，v2.0.0 起） · `js/shading.js`（着色规则，唯一一份） · 相机与投影数学在 `js/math3d.js`
+代码：`js/render.js`（2D 层 + 画家算法兜底） · `js/render-gl.js`（模型的 WebGL2 渲染，v2.0.0 起） · `js/render-env.js`（WebGL 环境层：天空 / 海面 / 云 / 粒子，v2.1.0 起） · `js/shading.js`（着色规则，唯一一份） · 相机与投影数学在 `js/math3d.js`
 
-> **v2.0.0 起模型改走 WebGL2**（docs/2-0IMPL.md 阶段 2.5）。天空、云、海面网格、粒子、曳光、HUD 仍是 Canvas 2D。
+> **v2.0.0 起模型改走 WebGL2**（docs/2-0IMPL.md 阶段 2.5）。**v2.1.0 起天空、海面、云、粒子也进了 WebGL**（2.5.9，见下面"WebGL 环境层"），
+> 与模型共用一个深度缓冲。曳光、HUD 仍是 Canvas 2D。下文"天空与太阳""云""地面""粒子"几节描述的是 **2D 回退**的画法。
 > 下文的画家算法 / 补接缝 / 近平面裁剪描述的是 **2D 兜底路径**，仍然存在、仍然正确。
 
 渲染器是一个 IIFE，只导出一个 `Renderer` 单例。它不认识实体、任务、HUD，
@@ -36,6 +37,41 @@
 **`shading.js` 是着色唯一来源**：光照方向 `LIGHT`、雾（900–9000 m，封顶 0.82，雾色 `[150,176,196]`）、
 `AMBIENT 0.44 / DIFFUSE 0.56 / DEGENERATE 0.62`、自发光封顶 1.5、16 档量化。
 `render.js` 与 `render-gl.js` 都读它 —— 改一处两边一起变。两条路径的画面差异由 `tools/probe-render.js` 盯着。
+
+---
+
+## WebGL 环境层（v2.1.0）
+
+只有主画面那个实例（`RenderGL` 默认实例 = `create({ env: true })`）画环境；3D 预览不画。
+`render-env.js` 编译失败时 `RenderGL.envReady()` 为 false，环境整层退回 2D，模型照旧走 GL。
+
+| 项 | 做法 |
+|---|---|
+| 帧缓冲 | 环境实例在离屏 **MSAA 帧缓冲**里画（画布本身 `antialias:false`），最后 blit 到画布 |
+| 天空 + 海面 | 一张全屏三角形。逐像素求视线与地球球面（`EARTH_R`）的交点：打中是海，没打中是天。地平线俯角、海面下弯都是几何真实的，没有网格、没有边界 |
+| 天空 | 按"高于视地平线的角度 ÷ 竖直视场"取 `SKY.stops`（与 2D 渐变同一组色），太阳光晕按角距离取 2D 同一组色标 |
+| 海面 | 底色按低于地平线的角度取 `SEA.stops`；40–320 m 四层程序波浪法线（按像素在海面上的覆盖宽度淡出，防闪）；1.3 / 5 km 两层大块明暗（高空时的速度感）；菲涅耳反射天空 + 太阳闪烁带；低空才看得见的白浪；`hazeDist` 指数雾融到地平线 |
+| 深度 | 所有环境着色器都写与模型相同的对数深度（`gl_FragDepth`），天空写 1 |
+| 云团（封存） | `render-env.js` 的 `BLOBS = false`：柔边贴片和低多边形实体云的代码都保留，但不画。现在天上只有平面云（远景云层 + 高空云片），远景云层也不再按距离淡入 |
+| 云 | 仍用 `render.js` 的 `CLOUD_LAYERS` / `cloudSeeds` 与 6400 m 平铺（5×5 格），10 km 以上不画云团。**实体云**：每朵 1–3 个随机低多边形团块（细分二十面体压扁、顶点随机扰动、底部压平），三遍画：① 背面 +视深 / 正面 −视深加进 R32F 得到穿过的厚度（先与场景深度取 min）② 最近正面的平涂颜色 ③ 合成 α = 1 − e^(−厚度×密度)。边缘不做淡出。拿不到 `EXT_color_buffer_float` + `EXT_float_blend` 时退回柔边贴片 |
+| 软粒子 | 不透明模型 + 海面画完后，把深度 blit 到一张深度纹理；云贴片读它，靠近机身 / 海面时淡出，不出现硬切边 |
+| 远景云层 | `DECKS`：2.1 km、5.2 km 两层低质量噪声云片，与高空云片同一个着色器。按水平距离 10→16 km 淡入，接上云团的淡出 —— 高空往下看四面都有低层云，不会只有脚下一块 |
+| 高空云片 | 12.6 km、17.4 km 两层（`SHEETS`），逐像素求视线与水平面交点，fbm 噪声，x 向拉长成卷云丝；穿过时不糊脸 |
+| 粒子 | `drawParticles()` 在 GL 下只收集（须在 `flush()` 之前调），flush 时实例化画：小圆片 / 破片短线，加色混合，**测深度不写深度** —— 飞机背后的爆炸会被机身挡住。规则与 2D 相同（`delay`、`grow`、`streak` 30 ms） |
+| 曳光 | 刻意留在 2D 层，画在一切之上（被机翼挡住反而看不清弹道） |
+| 抖动 | 整张图铺满屏幕，抖动改为移动投影中心 `cx/cy`（不能平移图片，边上会露空） |
+| 噪声精度 | 相机 xz 先对 `PERIOD = 40960` 取余再进着色器；所有噪声尺度都整除它，取余跳变时无缝 |
+
+GL 内顺序：天空 + 海面 → 不透明模型 →（深度解析）→ 高空云片 → 云贴片 → 半透明模型 → 粒子。
+
+**开关**：
+
+| 接口 | 作用 |
+|---|---|
+| `Renderer.setQuality(0\|1)` | 设置 显示→画面（`gfxQuality`）。0 = 标准：关软粒子 |
+| `Renderer.setGfx({ env, clouds, sheets, particles, soft })` | 单项开关，和旧画面并排对比用（控制台里调）。`env:false` = 天空 / 云 / 海面整层退回 2D |
+
+参数在 `shading.js` 的 `EARTH_R / SKY / SEA / CLOUD / SHEETS`。`tools/probe-render.js` 的 `env-*` 场景截新旧对比图（只报告）。
 
 ---
 
@@ -177,12 +213,13 @@ color = mix(baseColor, (150,176,196), fog)
 | `setCamera` | `setCamera(pos, fwd, up, fovDeg)` | 用 `M3.makeCamera(pos, fwd, up, W, H, fovDeg \|\| 58)` 重建 `cam`。`fovDeg` 为 0/缺省时退到 58° |
 | `getCam` | `getCam()` | 返回当前 `cam`，未设置时是 `null`。HUD 与准星大量使用 |
 | `begin` | `begin()` | 每帧开始。见"每帧顺序" |
-| `end` | `end()` | 仅 `ctx.restore()`，收掉 `begin` 里为了抖动做的 `save()` |
+| `end` | `end()` | `ctx.restore()`，收掉 `begin` 里为了抖动做的 `save()`。GL 环境层开着且本帧没 `flush()` 过（菜单背景）时先补一次 `flush()` |
 | `pushModel` | `pushModel(model, P, fwd, up, opts)` | **只收集不绘制**。把一个模型按位姿 `(P, fwd, up)` 变换到世界、逐面投影、着色，塞进面池。`opts` 见下 |
 | `flush` | `flush()` | 2D 路径：对面池排序并一次性画出所有面。GL 路径：`RenderGL.render(cam)`，把离屏画布 `drawImage` 上来 |
 | `setMode` | `setMode('auto'\|'gl'\|'2d')` | 选渲染路径；URL `?render=2d` 时无效（URL 优先） |
 | `usingGL` | `usingGL()` | 本帧是否走 WebGL（`begin()` 时决定） |
-| `drawParticles` | `drawParticles(list)` | 用 `globalCompositeOperation = 'lighter'` 画数组里的活粒子 |
+| `drawParticles` | `drawParticles(list)` | 2D：用 `globalCompositeOperation = 'lighter'` 画数组里的活粒子。GL 环境层：`flush()` 之前调用时交给 `RenderGL.pushParticles`，随模型一起画 |
+| `setQuality` / `setGfx` | 见"WebGL 环境层" | 环境层画质与单项开关 |
 | `addShake` | `addShake(v)` | `shake = min(shake + v, 26)`，给后续 `begin()` 消费。**目前 `js/` 里没有任何调用点**，是为受击/爆炸预留的接口 |
 | `line` / `rect` / `circle` / `ring` / `text` | 见左列签名 | 屏幕空间绘制辅助，HUD 用：线段 `(x1,y1,x2,y2,col,w=1)`、`fillRect` 简写 `(x,y,w,h,col)`、实心圆 `(x,y,r,col)`、描边圆 `(x,y,r,col,w=1)`、文本 `(t,x,y,col,font='12px Consolas, monospace',align='left')`（画完复位 `textAlign`） |
 | `W` / `H` / `ctx` | 只读 getter | CSS 像素宽高；原始 2D 上下文（HUD 直接拿去用） |
@@ -231,11 +268,13 @@ Renderer.begin()
 
   （begin() 里同时决定 glOn = mode≠'2d' && RenderGL.begin(W,H,DPR)）
 
+  （GL 环境层开着时跳过 drawSky / drawClouds / drawGround，由 flush 里的 GL 画）
+
 pushModel() × N        ← 只收集，不绘制（GL 路径转给 RenderGL.push）
+Renderer.drawParticles(world.particles)   ← 2D：直接画；GL 环境层：只收集
 Renderer.flush()       ← 2D：排序 + 绘制全部面；GL：渲染离屏画布并 drawImage
 
-drawTracers()          ← game.js 自己的曳光弹，画在模型之上
-Renderer.drawParticles(world.particles)   ← globalCompositeOperation = 'lighter'
+drawTracers()          ← game.js 自己的曳光弹，画在一切之上
 Renderer.end()                            ← ctx.restore()
 
 HUD.draw(world, player, 0, S)             ← 在 restore 之后，所以 HUD 不跟着抖

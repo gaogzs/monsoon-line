@@ -12,6 +12,14 @@
  *   ship        一艘大舰（面数最多）
  *   aircraft-*  几型飞机的固定角度
  *
+ * 环境场景（env-*，2.5.9）：WebGL 一侧开着天空 / 海面 / 云 / 粒子，2D 一侧是旧画面。
+ * 两边本来就不一样，只截图、只报告，不判失败：
+ *   env-low      300 m 平视海面（波纹、白浪、闪烁带）
+ *   env-high     20 km 俯看（海面往下弯、高空云片）
+ *   env-cloud    贴着一层积云飞（云团遮挡、软边）
+ *   env-blast    飞机背后的爆炸（应被机身挡住）
+ * 其余场景两边都关掉 WebGL 环境层，只比模型。
+ *
  * "差异"= 两边颜色差超过 24（0–255 每通道最大值）的像素占比。遮挡场景（wing-top）
  * 的差异是预期内的 —— 那正是迁移要修的问题，它只报告不判失败。
  *
@@ -33,6 +41,8 @@ function findChrome() {
     'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
     'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'
   ]) if (fs.existsSync(c)) return c;
   return null;
@@ -94,9 +104,31 @@ ${tags}
   ['sailfish', 'basalt', 'boulder'].forEach(function (t) {
     SC.push({ id: 'aircraft-' + t, fn: function () { look(M3.V(18, 3008, -22), O); pushPlane(plane(t, O, M3.V(0, 0, 1))); } });
   });
+  /* 环境场景：粒子固定一份（同一组随机数），两边画同一批 */
+  var blast = [];
+  Ent.explode(blast, M3.V(0, 3000, 60), 1.6, 26);
+  for (var bi = 0; bi < 6; bi++) Ent.stepParticles(blast, 0.05);
+  SC.push(
+    { id: 'env-low', env: true, fn: function () { look(M3.V(0, 300, 0), M3.V(400, 900, 3000)); } },
+    { id: 'env-high', env: true, fn: function () {
+      look(M3.V(0, 20000, 0), M3.V(2000, 12000, 30000));
+      pushPlane(plane('basalt', M3.V(4, 19996, 30), M3.V(0.2, -0.1, 1)));
+    } },
+    { id: 'env-cloud', env: true, fn: function () {
+      var c = M3.V(0, 1500, 0);
+      look(M3.V(-30, 1512, -60), M3.V(0, 1450, 3000));
+      pushPlane(plane('sailfish', c, M3.V(0.05, 0, 1)));
+    } },
+    { id: 'env-blast', env: true, fn: function () {
+      look(M3.V(-6, 3004, -24), M3.V(0, 3000, 60));
+      pushPlane(plane('basalt', O, M3.V(0, 0, 1)));
+      Renderer.drawParticles(blast);
+    } }
+  );
 
   function shot(sc, mode) {
     Renderer.setMode(mode);
+    Renderer.setGfx({ env: !!sc.env });
     sc.fn();
     Renderer.begin(); sc.fn(); Renderer.flush(); Renderer.end();
     var c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
@@ -114,7 +146,7 @@ ${tags}
       var d = Math.max(Math.abs(da[i] - db[i]), Math.abs(da[i + 1] - db[i + 1]), Math.abs(da[i + 2] - db[i + 2]));
       if (d > 24) diff++;
     }
-    report.push({ id: sc.id, occl: !!sc.occl, diff: diff / n });
+    report.push({ id: sc.id, occl: !!sc.occl || !!sc.env, diff: diff / n });
     [[a, 'WebGL'], [b, '2D']].forEach(function (p) {
       var cell = document.createElement('div'); cell.className = 'cell';
       p[0].style.width = W + 'px'; p[0].style.height = H + 'px';
@@ -137,7 +169,7 @@ function main() {
   fs.writeFileSync(html, page());
   const url = 'file:///' + html.replace(/\\/g, '/');
   const common = ['--headless=new', '--hide-scrollbars', '--no-sandbox', '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader', '--allow-file-access-from-files', '--window-size=990,1290', '--virtual-time-budget=6000'];
+    '--enable-unsafe-swiftshader', '--allow-file-access-from-files', '--window-size=990,3700', '--virtual-time-budget=6000'];
   spawnSync(chrome, common.concat(['--screenshot=' + png.replace(/\\/g, '/'), url]), { stdio: 'ignore' });
   const dom = spawnSync(chrome, common.concat(['--dump-dom', url]), { encoding: 'utf8' });
   const m = /RESULT (\{.*?\})<\/title>/.exec(dom.stdout || '');
