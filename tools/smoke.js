@@ -3599,22 +3599,36 @@ if (Ent && M3 && me && world) {
     pl.lockProgress = 1;
     pl.locked = true;
 
-    // ① 带对空弹锁一个海面浮台 → 必须打不出去
+    /* ① 带对空弹选中海面浮台：锁定不开始（进度被压在 0），
+       仍可强制开火，但按无锁定出膛 —— 弹不带这个目标、不往它导引。
+       AI 那边由 chooseWeapon 保证只有对空弹时根本不挑弹（见上面选弹一节）。 */
     const site = w.targets.find(t => t.alive && t.team === 1 && t.kind === 'target');
     if (site) {
       pl.special = 'qsr';                    // GIR-5，对空
       pl.spAmmo = 20;
       pl.slotCd.qsr = [0];
       pl.target = site;
+      for (let f = 0; f < 10; f++) pump(1);
+      if (pl.lockProgress !== 0 || pl.locked) {
+        bad.push('带对空弹选中海面设施，锁定应当压在 0，实际 progress=' +
+          pl.lockProgress + ' locked=' + pl.locked);
+      } else {
+        ok('带对空弹选中海面设施：锁定不开始');
+      }
+      if (pl.target !== site) bad.push('类别不对时目标选中不该被清掉');
+
+      pl.spCd = 0;
+      pl.slotCd.qsr = [0];
       const n0 = w.missiles.length;
       const enter = docListeners['keydown'] || [];
       enter.forEach(fn => fn({ code: 'Enter', preventDefault() {} }));
-      const fired = w.missiles.length - n0;
-      if (fired !== 0) {
-        bad.push('带对空弹（GIR-5）锁海面设施竟然打出了 ' + fired + ' 枚 —— ' +
-          '应该拒绝发射并说明原因');
+      const shot = w.missiles.slice(n0);
+      if (!shot.length) {
+        bad.push('带对空弹对海面设施强制开火没有出膛');
+      } else if (shot.some(m => m.target === site)) {
+        bad.push('强制开火的对空弹带着海面设施当目标 —— 应当按无锁定出膛');
       } else {
-        ok('带对空弹打海面设施被正确拒绝（0 枚出膛）');
+        ok('强制开火：' + shot.length + ' 枚无锁定出膛，不导引向海面设施');
       }
     } else {
       bad.push('第二关找不到可锁的敌方海面设施');
@@ -5660,6 +5674,153 @@ try {
   else ok('炮塔：炮位数与 arms 一致；射界夹紧 / 方位回绕；炮弹从炮口出、定时空爆伤人；机炮无战斗部；预览带炮塔');
 } catch (e) {
   fail('炮塔测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   舰船发射器：垂发 / 斜置架 / 旋转架（2-0IMPL 4.3）
+   ============================================================ */
+console.log('\n舰船发射器');
+try {
+  const bad = [];
+  const { Turret: TU, Ent: EN, M3: V3, _L: L } = sandbox;
+  const host = EN.makeTarget({ team: 0, model: 'dolphin', x: 0, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+  TU.attach(host, null, [
+    L('vls', 'vlsSsm', [0, 6, 20], 'vls', 2),
+    L('rail', 'railSsm', [4, 6, -10], { yaw: Math.PI / 2, elev: 0.3 }, 2),
+    L('rot', 'lnchSsm', [0, 6, -30], 'turret', 2)
+  ]);
+  const foe = EN.makeTarget({ team: 1, model: 'dolphin', x: 6000, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+  const w = { time: 0, actors: [], targets: [host, foe], bullets: [], missiles: [], particles: [], silent: true };
+  const by = {};
+  for (let i = 0; i < 60 * 20; i++) {
+    const n0 = w.missiles.length;
+    TU.stepAll(host, w, 1 / 60);
+    w.time += 1 / 60;
+    for (const m of w.missiles.slice(n0)) {
+      const tu = host.turrets.find(t => t.fired && !by[t.m.id]);
+      if (tu) by[tu.m.id] = { m, yaw: tu.yaw };
+    }
+  }
+  const vls = by.vls, rail = by.rail, rot = by.rot;
+  if (!vls) bad.push('垂发单元 20 s 内没有对右舷 6 km 的船发射');
+  else {
+    if (!(vls.m.fwd.y > 0.99)) bad.push('垂发出管方向不是竖直：fwd.y = ' + vls.m.fwd.y.toFixed(3));
+    if (Math.abs(vls.m.launchT - 1.2) > 1e-6) bad.push('ssm 出膛没带 1.2 s 助推段：launchT = ' + vls.m.launchT);
+  }
+  if (!rail) bad.push('右舷斜置架没有对右舷目标发射');
+  else if (!(rail.m.fwd.x > 0.9 && rail.m.fwd.y > 0.2)) bad.push('斜置架出管方向不对：' + JSON.stringify(rail.m.fwd));
+  if (!rot) bad.push('旋转反舰弹发射架没有发射');
+  else if (Math.abs(rot.yaw - Math.PI / 2) > 0.15) bad.push('旋转发射架没有转向目标：yaw = ' + rot.yaw.toFixed(2));
+  // 备弹 cells 覆盖 ammo，打完就停
+  for (const tu of host.turrets) if (tu.fired > 2) bad.push(tu.m.id + ' 打了 ' + tu.fired + ' 发，超过 cells 2');
+  // 斜置架扇区外的目标不打：目标挪到左舷
+  const h2 = EN.makeTarget({ team: 0, model: 'dolphin', x: 0, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+  TU.attach(h2, null, [L('rail', 'railSsm', [4, 6, -10], { yaw: Math.PI / 2, elev: 0.3 }, 2)]);
+  const foeL = EN.makeTarget({ team: 1, model: 'dolphin', x: -6000, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+  const w3 = { time: 0, actors: [], targets: [h2, foeL], bullets: [], missiles: [], particles: [], silent: true };
+  for (let i = 0; i < 60 * 10; i++) { TU.stepAll(h2, w3, 1 / 60); w3.time += 1 / 60; }
+  if (w3.missiles.length) bad.push('右舷斜置架对左舷目标发射了 ' + w3.missiles.length + ' 枚');
+  // 助推段：1.2 s 内不导引（垂发弹仍竖直），之后转平且没判丢失
+  if (vls) {
+    const m = EN.makeMissile({ weapon: 'ssm', team: 0, pos: V3.V(0, 10, 0), fwd: V3.V(0, 1, 0),
+      speed: 40, target: foe, launchT: 1.2 });
+    for (let i = 0; i < 60; i++) EN.stepMissile(m, 1 / 60, w);
+    if (!(m.fwd.y > 0.99)) bad.push('助推段内导弹就开始转向了：fwd.y = ' + m.fwd.y.toFixed(3));
+    for (let i = 0; i < 60 * 4; i++) EN.stepMissile(m, 1 / 60, w);
+    if (!m.seekerOn) bad.push('转平过程中导引头被判丢失目标');
+    if (!(m.fwd.y < 0.7)) bad.push('助推结束 4 s 后还没开始转平：fwd.y = ' + m.fwd.y.toFixed(3));
+  }
+  // 受控舰空弹：垂发当场竖直出管、弹种用关卡给的；旋转架先转到位再打
+  const SHL = sandbox.SHIP_LAUNCHERS;
+  const hv = EN.makeTarget({ team: 1, model: 'spermwhale', x: 0, y: 0, z: 0, hp: 1e9, radius: 40, big: true });
+  TU.attach(hv, null, SHL.spermwhale);
+  const air = { kind: 'aircraft', team: 0, alive: true, hp: 1e9, pos: V3.V(-5000, 3000, 2000), vel: V3.V(0, 0, 0) };
+  const w4 = { time: 0, actors: [air], targets: [hv], bullets: [], missiles: [], particles: [], silent: true };
+  if (!TU.cue(hv, air, 'dl9', w4) || w4.missiles.length !== 1) bad.push('垂发舰空弹 cue 后没有当场出管');
+  else {
+    const m = w4.missiles[0];
+    if (m.weapon !== 'dl9') bad.push('受控发射没用关卡给的弹种：' + m.weapon);
+    if (!(m.fwd.y > 0.99) || !(m.launchT >= 0.6)) bad.push('垂发舰空弹不是竖直出管 / 没有助推段');
+  }
+  for (let i = 0; i < 60 * 5; i++) TU.stepAll(hv, w4, 1 / 60);
+  if (w4.missiles.length !== 1) bad.push('受控垂发自己开了火（应只听 cue）');
+  const hd = EN.makeTarget({ team: 1, model: 'dolphin', x: 0, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+  TU.attach(hd, null, SHL.dolphin.filter(l => l.gun === 'rotSam'));
+  const w5 = { time: 0, actors: [air], targets: [hd], bullets: [], missiles: [], particles: [], silent: true };
+  TU.cue(hd, air, 'ss6', w5);
+  if (w5.missiles.length) bad.push('旋转舰空弹架 cue 当帧就出膛了（应先转向）');
+  for (let i = 0; i < 60 * 6 && !w5.missiles.length; i++) { TU.stepAll(hd, w5, 1 / 60); w5.time += 1 / 60; }
+  if (w5.missiles.length !== 1) bad.push('旋转舰空弹架 6 s 内没有转到位出膛');
+  else if (V3.dot(w5.missiles[0].fwd, V3.norm(V3.sub(air.pos, hd.pos))) < 0.8) bad.push('旋转舰空弹架出膛方向没对着目标');
+
+  if (bad.length) bad.forEach(fail);
+  else ok('发射器：垂发竖直出管、斜置架按架向出管且只打扇区内、旋转架转向目标；cells 限弹；助推段不导引、转平不判丢失；舰空弹按 cue 从垂发 / 旋转架出管');
+} catch (e) {
+  fail('发射器测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   近防拦截与命中反馈（2-0IMPL 4.7）
+   ============================================================ */
+console.log('\n近防拦截');
+try {
+  const bad = [];
+  const { Turret: TU, Ent: EN, M3: V3, SHIPS: SH, Combat: CB } = sandbox;
+  const orca = SH.find(s => s.id === 'orca');
+  const mk = () => {
+    const h = EN.makeTarget({ team: 0, model: 'orca', x: 0, y: 0, z: 0, hp: 1e9, radius: 44, big: true });
+    TU.attach(h, orca.mounts.filter(m => m.role === 'ciws'));
+    return h;
+  };
+  // 1. 有来袭导弹时近防先打导弹，不打旁边的飞机
+  {
+    const h = mk();
+    const plane = { kind: 'aircraft', team: 1, alive: true, hp: 1e9, pos: V3.V(0, 300, 900), vel: V3.V(0, 0, 0) };
+    const w = { time: 0, actors: [plane], targets: [h], bullets: [], missiles: [], particles: [], events: [], silent: true };
+    const m = EN.makeMissile({ weapon: 'ssm', team: 1, pos: V3.V(0, 30, 2600), fwd: V3.V(0, 0, -1), speed: 600, target: h });
+    w.missiles.push(m);
+    for (let f = 0; f < 60; f++) { TU.stepAll(h, w, 1 / 60); w.time += 1 / 60; }
+    if (h.turrets[0].target !== m) bad.push('近防没有优先打来袭导弹（目标：' + (h.turrets[0].target && h.turrets[0].target.kind) + '）');
+  }
+  // 2. 多枚来袭里至少拦下一枚，拦截时报 intercept 事件、弹标记 intercepted
+  {
+    const h = mk();
+    const w = { time: 0, actors: [], targets: [h], bullets: [], missiles: [], particles: [], events: [], silent: true };
+    for (let k = 0; k < 12; k++) {
+      const a = k * 0.5;
+      const p = V3.V(Math.sin(a) * 3500, 30, Math.cos(a) * 3500 + k * 600);
+      w.missiles.push(EN.makeMissile({ weapon: 'ssm', team: 1, pos: p, fwd: V3.norm(V3.sub(h.pos, p)), speed: 600, target: h }));
+    }
+    const all = w.missiles.slice(), evs = [];
+    for (let f = 0; f < 60 * 20; f++) {
+      TU.stepAll(h, w, 1 / 60);
+      for (const m of w.missiles) EN.stepMissile(m, 1 / 60, w);
+      w.missiles = w.missiles.filter(m => m.alive && !(m.intercepted));
+      evs.push(...w.events); w.events.length = 0;
+      w.time += 1 / 60;
+      if (!all.some(m => m.alive)) break;
+    }
+    const n = all.filter(m => m.intercepted).length;
+    if (!n) bad.push('12 枚来袭一枚都没拦下');
+    if (evs.filter(e => e.type === 'intercept').length !== n) bad.push('拦截事件数 ' + evs.length + ' 与被拦截弹数 ' + n + ' 不符');
+  }
+  // 3. 玩家的弹打中东西报 HIT 事件；别人的弹不报
+  {
+    const pl = { kind: 'aircraft', isPlayer: true, team: 0, alive: true, pos: V3.V(0, 0, 0) };
+    const foe = { kind: 'aircraft', team: 1, alive: true, hp: 1e9, maxHp: 1e9, pos: V3.V(0, 3000, 5), vel: V3.V(0, 0, 0), phys: { hp: 100 } };
+    const w = { time: 0, actors: [foe], targets: [], bullets: [], missiles: [], particles: [], events: [], silent: true };
+    const m = EN.makeMissile({ weapon: 'mrm', team: 0, pos: V3.V(0, 3000, 0), fwd: V3.V(0, 0, 1), owner: pl, target: foe });
+    CB.detonate(m, w, null, foe);
+    if (!w.events.some(e => e.type === 'hit')) bad.push('玩家导弹命中没有报 HIT 事件');
+    w.events.length = 0;
+    const m2 = EN.makeMissile({ weapon: 'mrm', team: 0, pos: V3.V(0, 3000, 0), fwd: V3.V(0, 0, 1), owner: { team: 0 }, target: foe });
+    CB.detonate(m2, w, null, foe);
+    if (w.events.length) bad.push('僚机的导弹命中也报了 HIT');
+  }
+  if (bad.length) bad.forEach(fail);
+  else ok('近防：来袭导弹优先；齐射里能拦下、拦截报事件；玩家导弹命中报 HIT，别人的不报');
+} catch (e) {
+  fail('近防拦截测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
 /* ============================================================

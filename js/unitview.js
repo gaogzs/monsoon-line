@@ -312,7 +312,7 @@ var UnitView = (function () {
     } else if (kind === 'ship') {
       list = (typeof SHIPS !== 'undefined') ? SHIPS : [];
       for (i = 0; i < list.length; i++) if (list[i].id === id) {
-        return { kind: 'ship', rec: list[i], model: MODELS.composeTurrets(MODELS[list[i].model], list[i].mounts), modelKey: list[i].model };
+        return { kind: 'ship', rec: list[i], model: MODELS.composeTurrets(MODELS[list[i].model], list[i].allMounts), modelKey: list[i].model };
       }
     } else if (kind === 'weapon') {
       var w = (typeof WEAPONS !== 'undefined') ? WEAPONS[id] : null;

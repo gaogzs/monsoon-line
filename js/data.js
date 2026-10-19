@@ -1212,19 +1212,35 @@ var SHIPS = [
    口径一律整数公制档，不用 23 / 76 / 127 这种英制换算出来的数。
    ============================================================ */
 var TURRET_GUNS = {
-  ciws20: { name: '近防炮 20mm', cal: 20, rpm: 450, speed: 1100, dmg: 4, range: 1800, airRange: 1200, spread: 0.006 },
+  ciws20: { name: '近防炮 20mm', cal: 20, rpm: 750, speed: 1100, dmg: 4, range: 1800, airRange: 1200, spread: 0.006 },
   aa30:   { name: '30mm 遥控炮', cal: 30, rpm: 300, speed: 1000, dmg: 9, range: 2500, spread: 0.005 },
   tail20: { name: '20mm 尾炮', cal: 20, rpm: 300, speed: 900, dmg: 5, range: 1200, spread: 0.006 },
-  n50:    { name: '50mm 速射炮', cal: 50, rpm: 80, speed: 1050, dmg: 12, range: 4500, spread: 0.012, spreadSurface: 0.002,
+  n50:    { name: '50mm 速射炮', cal: 50, rpm: 80, speed: 1050, dmg: 12, range: 4500, airRange: 4000, spread: 0.008, spreadSurface: 0.002,
             gravity: 1, fuze: 4, blast: 8, blastCore: 1.5, surface: true },
-  n75:    { name: '75mm 两用舰炮', cal: 75, rpm: 24, speed: 900, dmg: 30, range: 8000, spread: 0.016, spreadSurface: 0.0025,
+  n75:    { name: '75mm 两用舰炮', cal: 75, rpm: 24, speed: 900, dmg: 30, range: 8000, airRange: 6000, spread: 0.010, spreadSurface: 0.0025,
             gravity: 1, fuze: 6, blast: 13, blastCore: 2 },
   /* 发射架示例（目前没有舰船装）：kind 'launcher' + weapon（WEAPONS 的 id），
      cd 每发间隔、ammo 备弹（0 = 不限）、loft 发射时按距离抬高的比例、air / surface 打什么。
      mounts 里照常写 gun: 'lnchSam'，有实体模型就像炮塔一样转。 */
   lnchSam: { name: '旋转舰空弹发射架', kind: 'launcher', weapon: 'vlar', cd: 6, ammo: 8, loft: 0.15,
              air: true, surface: false, launchSpeed: 160 },
-  n120:   { name: '120mm 主炮', cal: 120, rpm: 8, speed: 800, dmg: 80, range: 14000, spread: 0.02, spreadSurface: 0.003,
+  /* 旋转反舰弹发射架：和 lnchSam 同一套（转向目标再出膛），只是弹换成 ssm、只打海面 */
+  lnchSsm: { name: '旋转反舰弹发射架', kind: 'launcher', weapon: 'ssm', cd: 8, ammo: 4, loft: 0.05,
+             air: false, surface: true, launchSpeed: 60 },
+  /* 固定发射器（4.3）：不转动，写在 SHIP_LAUNCHERS 里，按 mode 决定出管方向。
+     vls 竖直出管；rail 斜置发射架按 yaw / elev。ammo 由 cells 覆盖 */
+  /* 受控（cued）舰空弹发射器：自己不索敌。什么时候打、打谁、打哪种弹仍由 updateTargets
+     按关卡给的 weapon / fireCd 和发现规则决定，只是把弹交给这里出管（Turret.cue）。
+     备弹不限 —— 射速由 fireCd 管，和改之前一样。 */
+  vlsSam:  { name: '舰空弹垂发单元', kind: 'launcher', cued: true, cd: 0.5, ammo: 0,
+             air: true, surface: false, launchSpeed: 40 },
+  rotSam:  { name: '旋转舰空弹发射架', kind: 'launcher', cued: true, cd: 0.5, ammo: 0, loft: 0.15,
+             air: true, surface: false, launchSpeed: 160 },
+  vlsSsm:  { name: '反舰弹垂发单元', kind: 'launcher', weapon: 'ssm', cd: 6, ammo: 4,
+             air: false, surface: true, launchSpeed: 40 },
+  railSsm: { name: '斜置反舰弹发射架', kind: 'launcher', weapon: 'ssm', cd: 6, ammo: 4,
+             air: false, surface: true, launchSpeed: 60 },
+  n120:   { name: '120mm 主炮', cal: 120, rpm: 8, speed: 800, dmg: 80, range: 14000, airRange: 8000, spread: 0.013, spreadSurface: 0.003,
             gravity: 1, fuze: 8, blast: 18, blastCore: 3 }
 };
 
@@ -1236,6 +1252,72 @@ var TURRET_GUNS = {
 var ARC_BOW = { yawMin: -2.6, yawMax: 2.6, pitchMin: -0.1, pitchMax: 1.4 };
 var ARC_CIWS = { yawMin: -2.8, yawMax: 2.8, pitchMin: -0.2, pitchMax: 1.5 };
 var ARC_SIDE = { yawMin: -1.6, yawMax: 1.6, pitchMin: -0.1, pitchMax: 1.4 };
+/* 舰船发射器（2-0IMPL 4.3）。和炮位走同一套 Turret 运行时，但单独成表 ——
+   smoke 断言 mounts 的炮数与 arms 一致，发射器不算炮。
+     mode 'vls'           竖直出管，任意方位的目标都能打
+     mode {yaw, elev}     斜置发射架，固定朝向；目标在 yaw ± 半扇区内才发射
+     mode 'turret'        可旋转发射架，像炮塔一样转向目标（arc 是射界）
+   cells 是备弹数（覆盖发射器的 ammo）。 */
+var ARC_VLS = { yawMin: -Math.PI, yawMax: Math.PI, pitchMin: -0.3, pitchMax: 1.5 };
+var ARC_RAIL = { yawMin: -1.2, yawMax: 1.2, pitchMin: -0.3, pitchMax: 1.2 };
+function _L(id, gun, pos, mode, cells, arc, model) {
+  var o = { id: id, gun: gun, pos: pos, cells: cells, role: 'launcher', model: model || null };
+  if (mode === 'vls') { o.fixed = 'vls'; o.yaw0 = 0; o.arc = arc || ARC_VLS; }
+  else if (mode === 'turret') { o.yaw0 = 0; o.arc = arc || ARC_BOW; }
+  else { o.fixed = { yaw: mode.yaw, elev: mode.elev }; o.yaw0 = mode.yaw; o.arc = arc || ARC_RAIL; }
+  return o;
+}
+/* 位置都对着 models.js 里已经画出来的发射箱 / 垂发盖板：
+     · 上游驱逐舰 / 防空舰：前后甲板垂发盖板 → 受控舰空弹垂发
+     · Dolphin：中部双联反舰弹箱朝前上仰 20°；后部那个小方箱（原本无主）做旋转舰空弹架 ——
+       设定里它"没有垂发"，八发舰空弹就该在一座转塔上
+     · Humpback：设定 16 发舰空弹、模型里没有发射器 → 艏部两舷甲板边（近防炮后面）各一座旋转架
+     · Trilobite / Ammonite / Dunkleosteus：模型里的斜置反舰弹箱，cells 按 arms 的数目分
+     · Dunkleosteus 的 8 发舰空弹同理"没有垂发" → 艉部近防甲板室上的旋转架
+     · Ammonite 的舰空导弹箱上面压着近防炮，转不了 → 按垂发处理
+     · Cameroceras：三段垂发模块。312 单元按游戏节奏只放出一部分：每段 8 发反舰弹，前段兼舰空 */
+var SHIP_LAUNCHERS = {
+  orca: [
+    _L('vlsF', 'vlsSam', [0, 7.0, 47], 'vls')
+  ],
+  spermwhale: [
+    _L('vlsF', 'vlsSam', [0, 8.0, 52], 'vls'),
+    _L('vlsA', 'vlsSam', [0, 8.0, -42], 'vls')
+  ],
+  dolphin: [
+    _L('ssmL', 'railSsm', [-1.4, 6.6, -9], { yaw: 0, elev: 0.36 }, 2),
+    _L('ssmR', 'railSsm', [1.4, 6.6, -9], { yaw: 0, elev: 0.36 }, 2),
+    _L('sam', 'rotSam', [0, 4.8, -22], 'turret', 0, ARC_CIWS, 'lnch')
+  ],
+  humpback: [
+    _L('samL', 'rotSam', [-17, 19.2, 104], 'turret', 0, { yawMin: -2.8, yawMax: 0.3, pitchMin: -0.1, pitchMax: 1.4 }, 'lnch'),
+    _L('samR', 'rotSam', [17, 19.2, 104], 'turret', 0, { yawMin: -0.3, yawMax: 2.8, pitchMin: -0.1, pitchMax: 1.4 }, 'lnch')
+  ],
+  trilobite: [
+    _L('ssmL', 'railSsm', [-1.9, 4.8, -8], { yaw: 0, elev: 0.23 }, 4),
+    _L('ssmR', 'railSsm', [1.9, 4.8, -8], { yaw: 0, elev: 0.23 }, 4)
+  ],
+  ammonite: [
+    _L('ssmFL', 'railSsm', [-6.0, 7.8, 1], { yaw: 0, elev: 0.5 }, 2),
+    _L('ssmFR', 'railSsm', [6.0, 7.8, 1], { yaw: 0, elev: 0.5 }, 2),
+    _L('ssmAL', 'railSsm', [-6.0, 7.8, -11], { yaw: 0, elev: 0.5 }, 2),
+    _L('ssmAR', 'railSsm', [6.0, 7.8, -11], { yaw: 0, elev: 0.5 }, 2),
+    _L('sam', 'vlsSam', [0, 8.4, -30], 'vls')
+  ],
+  dunkleosteus: [
+    _L('ssmFL', 'railSsm', [-2.6, 10.8, 40], { yaw: 0, elev: 0.2 }, 8),
+    _L('ssmFR', 'railSsm', [2.6, 10.8, 40], { yaw: 0, elev: 0.2 }, 8),
+    _L('ssmAL', 'railSsm', [-2.6, 10.0, 11], { yaw: 0, elev: 0.2 }, 8),
+    _L('ssmAR', 'railSsm', [2.6, 10.0, 11], { yaw: 0, elev: 0.2 }, 8),
+    _L('sam', 'rotSam', [0, 7.5, -64], 'turret', 0, ARC_CIWS, 'lnchr')
+  ],
+  cameroceras: [
+    _L('vlsF', 'vlsSsm', [0, 9.2, 68], 'vls', 8),
+    _L('vlsM', 'vlsSsm', [0, 9.2, 10], 'vls', 8),
+    _L('vlsA', 'vlsSsm', [0, 9.2, -58], 'vls', 8),
+    _L('vlsSam', 'vlsSam', [0, 9.2, 60], 'vls')
+  ]
+};
 function _m(id, gun, pos, yaw0, arc, model, role) {
   return { id: id, gun: gun, pos: pos, yaw0: yaw0, arc: arc, model: model || null, role: role };
 }
@@ -1254,7 +1336,7 @@ var SHIP_MOUNTS = {
   ],
   dunkleosteus: [
     _m('bow', 'n120', [0, 6.4, 60], 0, { yawMin: -2.6, yawMax: 2.6, pitchMin: -0.1, pitchMax: 0.9 }, 'tur120r', 'dual'),
-    _m('ciws', 'ciws20', [0, 8.0, -30], Math.PI, ARC_CIWS, null, 'ciws'),
+    _m('ciws', 'ciws20', [0, 7.5, -56], Math.PI, ARC_CIWS, null, 'ciws'),
     _m('n50L', 'n50', [-7.4, 5.8, -36], -Math.PI / 2, ARC_SIDE, 'tur50r', 'dual'),
     _m('n50R', 'n50', [7.4, 5.8, -36], Math.PI / 2, ARC_SIDE, 'tur50r', 'dual')
   ],
@@ -1297,6 +1379,9 @@ var SHIP_MOUNTS = {
 (function () {
   for (var i = 0; i < SHIPS.length; i++) {
     if (SHIP_MOUNTS[SHIPS[i].id]) SHIPS[i].mounts = SHIP_MOUNTS[SHIPS[i].id];
+    if (SHIP_LAUNCHERS[SHIPS[i].id]) SHIPS[i].launchers = SHIP_LAUNCHERS[SHIPS[i].id];
+    /* 预览用（composeTurrets）：炮位 + 有实体模型的发射架。只拼一次 —— 预览按数组缓存网格 */
+    SHIPS[i].allMounts = SHIPS[i].launchers ? (SHIPS[i].mounts || []).concat(SHIPS[i].launchers) : SHIPS[i].mounts;
   }
   /* ROK-40 的尾炮：没有实体，从尾锥射出，管后半球。它本身没有前射机炮（gun: null） */
   for (i = 0; i < AIRCRAFT.length; i++) {
@@ -2117,6 +2202,22 @@ var WEAPONS = {
     fits: [], perPoint: 0, mass: 0,
     desc: '上游公约舰载垂发防空导弹。驱逐舰护得住的是自己周围 {{lockKm}} km 这一圈 ——' +
       '飞进来的敌机会先收到它的告警。'
+  },
+
+  /* ---------- 舰对舰：反舰导弹（2-0IMPL 4.3） ----------
+     只给舰船发射器用。出管先助推 boostT 秒（垂发竖直、斜发架按架子角度），
+     之后有限转率转平、爬到 loft 高度巡航，末段俯冲 —— 见 stepMissile 的 launchT 分支。 */
+  ssm: {
+    id: 'ssm', name: 'SPO-30', cn: '破浪 · WAVEBREAKER', kind: 'asm', model: 'missile',
+    speed: 620, boost: 160, life: 14.0, vsLife: 30.0,
+    turn: 0.60, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 16000,
+    dmg: 260, ammo: 4, cd: 6, salvo: 1, flare: 0.70, blast: 20, blastCore: 6,
+    target: 'ship',
+    boostT: 1.2,
+    loft: { alt: 600, dive: 3000 },
+    npcOnly: true,
+    fits: [], perPoint: 0, mass: 0,
+    desc: '舰载反舰导弹。垂发或斜置发射架出管，转平后中空巡航，最后 {{loftDiveKm}} km 俯冲。'
   }
 };
 
@@ -2232,6 +2333,7 @@ var STORE_LOOK = {
   v17:  { len: 4.4, dia: 0.24, fin: 'small' },
   dl9:  { len: 4.3, dia: 0.25, fin: 'small' },
   ss6:  { len: 4.3, dia: 0.25, fin: 'small' },
+  ssm:  { len: 5.2, dia: 0.34, fin: 'small' },
   hva:  { len: 4.7, dia: 0.28, fin: 'small', boost: true },
   vlar: { len: 5.2, dia: 0.32, fin: 'small', boost: true },
   /* 对地 / 反舰 */
@@ -2351,6 +2453,7 @@ var STORE_ROLE = {
   dl6:  '格斗',
   dl9:  '要地防空',
   ss6:  '舰载防空（上游）',
+  ssm:  '舰对舰 · 反舰',
   vzu:  '被动 · 抗锁定（下游）',
   vgt:  '对地攻击（下游）',
   vsr:  '反大型（下游）',
@@ -2532,7 +2635,7 @@ var MISSILE_LEAD = {
   vlar: 0.90, hwm: 0.74, kkv: 0.45,
   asl: 0.65, asl2: 0.70, sat: 0.68,
   v25: 0.66, v22: 0.74, v30: 0.48,
-  dl4: 0.74, dl6: 0.48, dl9: 0.80, ss6: 0.80,
+  dl4: 0.74, dl6: 0.48, dl9: 0.80, ss6: 0.80, ssm: 0.70,
   swm: 0.44, hva: 0.80, lcm: 0.62,
   /* 下游与分水 */
   vgt: 0.58, vsr: 0.70, vbn: 0.66, otr: 0.32
@@ -2581,6 +2684,7 @@ var FLARE_RD = {
      跳过它们，留着只是两行死数据，删掉。 */
   hva: 0.40,   // SPO-9 落雷
   ss6: 0.42,   // FAN-6 海墙（上游舰载）
+  ssm: 0.60,   // SPO-30 破浪（舰对舰，不装抗干扰）
   vlar: 0.42,  // CLA-12 极远
   v17: 0.44,   // CLA-17 长杆
   dl9: 0.42,   // BAD-9 高墙（下游的防空拦截弹）

@@ -988,8 +988,14 @@ var Ent = (function () {
          一次诱饵等于让这枚弹再也咬不到你。
 
          诱饵应该只买到**一段时间**，不是永久免疫。 */
-      reLockT: 0
+      reLockT: 0,
+      /* 出膛助推段（舰船发射器，4.3）：launchT 秒内强制无制导，沿出管方向飞；
+         之后 pitchOver 期间转平，导引头视场暂不判丢失，直到第一次把目标转进视场。 */
+      launchT: o.launchT || 0,
+      pitchOver: (o.launchT || 0) > 0
     };
+    /* 垂发时 fwd 竖直，和缺省 up 平行 —— 换一个水平的 up，免得基底退化 */
+    if (Math.abs(m.fwd.y) > 0.95) m.up = M3.V(0, 0, 1);
     m.right = M3.cross(m.up, m.fwd);
     return m;
   }
@@ -1104,6 +1110,16 @@ var Ent = (function () {
     if (m.decoy && !m.decoy.done && m.reLockT <= 0) decoyRecheck(m);
     /* 寿命到期：在空中自爆（包括被电子干扰骗走、盲飞到期的弹）—— 以前是哑弹 */
     if (m.age > m.life) { killMissile(m, world, false); return; }
+    /* 被近防炮判定拦截（turret.js 4.7）：短暂延迟后空爆，并报一个事件给 HUD / 无线电 */
+    if (m.ciwsKill > 0) {
+      m.ciwsKill -= dt;
+      if (m.ciwsKill <= 0) {
+        m.intercepted = true;
+        killMissile(m, world, false);
+        if (world && world.events) world.events.push({ type: 'intercept', m: m, host: m.ciwsHost });
+        return;
+      }
+    }
 
     // ---- 动力段 ----
     if (w.ballistic) {
@@ -1158,7 +1174,10 @@ var Ent = (function () {
 
        注意它跑在激光制导之前、制导段之前，所以这一帧挑中的目标
        当帧就能被修正。 */
-    if (w.seeker === 'ir' && (!t || !m.seekerOn) && m.reLockT <= 0 && world) {
+    var boosting = m.launchT > 0;
+    if (boosting) m.launchT -= dt;
+
+    if (!boosting && w.seeker === 'ir' && (!t || !m.seekerOn) && m.reLockT <= 0 && world) {
       var acq = irAcquire(m, world);
       if (acq) {
         t = acq;
@@ -1202,12 +1221,14 @@ var Ent = (function () {
 
     /* 被诱饵骗走的盲飞期：把那团诱饵云当作虚拟目标继续追（见 decoyTarget），
        而不是直飞 —— 追上了就在云里起爆，爆炸照样会波及旁边的人。 */
-    if (!t && world) {
+    if (!t && world && !boosting) {
       var dcT = decoyTarget(m);
       if (dcT) { t = dcT; m.seekerOn = true; }
     }
 
-    if (t && m.seekerOn) {
+    if (boosting) {
+      /* 助推段：不导引、不重捕获，沿出管方向直飞 */
+    } else if (t && m.seekerOn) {
       var toT = M3.sub(t.pos, m.pos);
       var dist = M3.len(toT);
       var los = M3.mul(toT, 1 / Math.max(1, dist));
@@ -1246,7 +1267,9 @@ var Ent = (function () {
          大离轴这项卖点在最需要它的那一段反而不成立。 */
       var fov = w.hobs ? Math.max(1.35, w.lockCone || 0) : 1.35;
       var off = M3.angleBetween(m.fwd, los);
-      if (off > fov) {
+      /* 转平中：目标还在视场外是正常的，不算丢失 */
+      if (m.pitchOver && off <= fov) m.pitchOver = false;
+      if (off > fov && !m.pitchOver) {
         m.lostTime += dt;
         if (m.lostTime > 0.5) m.seekerOn = false;
       } else {
@@ -2029,6 +2052,9 @@ var Ent = (function () {
       vel: M3.clone(vel),
       life: life, life0: life,
       size: size, color: color, alive: true,
+      /* minPx：屏幕上至少这么多像素（半径）。炮口焰、空爆闪光要在几公里外也看得见，
+         game.js 每帧按到相机的距离把 size 撑到这个下限（size0 是原值） */
+      size0: size, minPx: opt.minPx || 0,
       grow: !!opt.grow, alpha: opt.alpha === undefined ? 1 : opt.alpha,
       drag: opt.drag || 0, grav: opt.grav || 0,
       /* streak：按速度拉成短线（破片）；delay：先隐身这么多秒再开始（子母弹错开起爆） */
@@ -2122,7 +2148,9 @@ var Ent = (function () {
     if (world) {
       /* 设施/舰船的击毁要单独记一笔：主循环的 world.killed 只数飞机，
          没有这一行"摧毁 3 座浮空平台"在结算上就完全不体现。 */
-      if (world.groundKilled !== undefined && ent.team === 1 && !ent.friendlyAsset) {
+      // 舰船打掉的不算玩家的战果（ent.killedBy 由 game.js 的 hitTarget 写入）
+      var byShip = ent.killedBy && ent.killedBy.kind === 'target';
+      if (world.groundKilled !== undefined && ent.team === 1 && !ent.friendlyAsset && !byShip) {
         world.groundKilled++;           // 只有敌方的才算战果：调节单元、准绳、中立船不加分
       }
       var s = (ent.radius || 8) / 6;

@@ -125,6 +125,10 @@ var Combat = (function () {
         n++;
       }
     }
+    /* 玩家的弹（导弹 / 炸弹）打中了东西：报 HIT（game.js 的 combatEvents）。机炮不走这里 */
+    if (n && shot.kind === 'missile' && shot.owner && shot.owner.isPlayer && world.events) {
+      world.events.push({ type: 'hit' });
+    }
     /* 没被炸到、但就在旁边：也抖一下 —— 玩家要能感觉到"刚才那一发很近" */
     var pl = world.player;
     if (pl && pl.alive && R > 0 && typeof Renderer !== 'undefined' && Renderer.addShake) {
@@ -230,6 +234,18 @@ var Combat = (function () {
 
     var hemi = !!opt.ground;
     burst(list, pos, s, Math.round(fragCount(s, hemi) * lod), hemi, hemi ? null : inherit, 0);
+
+    /* 炮弹空爆（w.cal，舰炮）：战斗部只有几公斤，火球按比例小到看不见。
+       补一下闪光 + 一团久留的黑灰烟 —— 对空射击时天上该是一团团的烟 */
+    if (w && w.cal && !hemi && lod > 0) {
+      var k = Math.sqrt(w.cal / 75);
+      Ent.spawnParticle(list, pos, M3.V(0, 0, 0), 0.14, 3.5 * k, '#fff0c0', { grow: true, minPx: 4 });
+      Ent.spawnParticle(list, pos, M3.V(0, 0, 0), 0.3, 2.2 * k, '#ff9a40', { grow: true, minPx: 2.5 });
+      for (var sm = 0; sm < 3; sm++) {
+        Ent.spawnParticle(list, M3.add(pos, M3.mul(Ent.randUnit(), 1.5 * k)), M3.mul(Ent.randUnit(), 2),
+          M3.rnd(2.5, 4), M3.rnd(2.5, 3.5) * k, '#4a4642', { grow: true, drag: 0.8, grav: -0.4, alpha: 0.7, minPx: 2 });
+      }
+    }
 
     /* 落水：一根竖直水柱，高度约 0.6 × blast */
     if (hemi && pos.y <= 1.5) {

@@ -850,6 +850,16 @@ var HUD = (function () {
       if (!e.alive || e.team === p.team) continue;
       if (e.target === p) { any = true; plot(M3.sub(e.pos, p.pos), 'rgba(255,77,77,0.85)'); }
     }
+    /* 被对空雷达截获（world.detected，关卡按高度等条件判）也算 SPIKE：
+       和"有人锁我"合并成一个状态。截获没有具体的雷达位置，
+       就把带舰空 / 地空弹的敌方舰船、阵地当作照射源画上去 */
+    if (world.detected) {
+      any = true;
+      for (i = 0; i < world.targets.length; i++) {
+        var st = world.targets[i];
+        if (st.alive && st.weapon && st.team !== p.team && st.team !== 2) plot(M3.sub(st.pos, p.pos), 'rgba(255,176,58,0.85)');
+      }
+    }
 
     // 标签放环**上方** —— 环的底边已经贴到页边距了，写下面会出屏
     text(ctx, 'RWR', cx, cy - R - 26, 'rgba(255,176,58,0.5)', FS, 'center');
@@ -1117,6 +1127,17 @@ var HUD = (function () {
     text(ctx, distTxt, tx, ly, dim, FS, 'left');
   }
 
+  /* 舰种：spawnShip 写在 t.shipCls 上；不是走 spawnShip 生成的舰船按模型回查 SHIPS */
+  var SHIP_CLS = null;
+  function shipClsOf(t) {
+    if (t.shipCls) return t.shipCls;
+    if (!SHIP_CLS) {
+      SHIP_CLS = {};
+      for (var i = 0; i < SHIPS.length; i++) SHIP_CLS[SHIPS[i].model] = SHIPS[i].cls;
+    }
+    return SHIP_CLS[t.model] || null;
+  }
+
   function drawLockBox(ctx, s, t, p, dist, world) {
     var w = 30, h = 30;
     if (t.kind === 'target') { w = 46; h = 34; }
@@ -1127,7 +1148,8 @@ var HUD = (function () {
          橙色  最大射程之内 —— 能追上，但目标掉头还能跑掉
          红色  不可逃逸区（NEZ）—— 发射就有意义
 
-       非对空弹（对地 / 对海）没有包线，一律按橙色。
+       对面制导弹（对地 / 对海）也有包线：射程外 / 射程内 / 最佳射程（见 computeEnvelope）。
+       炸弹、火箭等无制导的没有，一律按橙色。
        **不要用绿色**。绿色在 HUD 里的语义是"友军 / 正常状态"，
        拿它标一个敌人，玩家会下意识以为那是友机 —— 这比颜色突变更糟。 */
     var env = computeEnvelope(p, t);
@@ -1203,7 +1225,9 @@ var HUD = (function () {
         ly += 14;
       }
     } else {
-      text(ctx, t.ttype === 'air' ? '浮空平台' : '海面设施', tx, ly, DIM, FS, 'left');
+      // 舰船写舰种（SHIPS[].cls）；其余按浮空 / 海面设施
+      var scls = shipClsOf(t);
+      text(ctx, scls ? '水面舰船 · ' + scls : (t.ttype === 'air' ? '浮空平台' : '海面设施'), tx, ly, DIM, FS, 'left');
       ly += 14;
     }
 
@@ -1287,7 +1311,15 @@ var HUD = (function () {
      两者都不超过锁定距离 —— 锁不上的东西谈不上射程。 */
   function computeEnvelope(p, t) {
     var w = WEAPONS[p.special];
-    if (!w || w.kind !== 'aam') return null;
+    if (!w) return null;
+    /* 对面制导弹（对地 / 对海）：目标几乎跑不掉，包线只看弹飞不飞得到 ——
+       rmax = min(锁定距离, 有效射程)，NEZ 取其 70% 作为"最佳射程"（留出目标移动和发射角的余量） */
+    if ((w.target === 'ground' || w.target === 'ship') && t.kind === 'target' &&
+        w.seeker && w.seeker !== 'none' && !w.unguided) {
+      var rs = Math.min(w.lockDist || 0, Ent.effRange(w, p.pos.y));
+      return rs > 0 ? { rmax: rs, nez: rs * 0.7 } : null;
+    }
+    if (w.kind !== 'aam') return null;
     if (t.kind !== 'air') return null;
 
     /* 导弹动力段能飞多远 —— 与机库里的 missileRange()（data.js）同一套分段：
@@ -1544,7 +1576,7 @@ var HUD = (function () {
      ============================================================ */
   /* 优先级（上 → 下）：雷达 / 导弹 > 低高度 > 失速 > 动压 > 其它状态。
      低高度排在失速前面：它意味着下一秒就是海面。 */
-  var ALERT_ORDER = ['missile', 'lit', 'damage', 'detected', 'terrain', 'stall', 'lowq', 'jammed', 'winchester', 'emcon'];
+  var ALERT_ORDER = ['missile', 'lit', 'damage', 'terrain', 'stall', 'lowq', 'jammed', 'winchester', 'emcon'];
 
   var alertsBottom = 0;      // 告警栈最后一行的下沿 —— 任务横幅从它下面开始
 
@@ -1562,13 +1594,13 @@ var HUD = (function () {
       var dTxt = th.minD < 1000 ? Math.round(th.minD) + ' M' : (th.minD / 1000).toFixed(1) + ' KM';
       list.push({ id: 'missile', txt: '▲ MISSILE  导弹逼近', col: RED, font: BIG, on: blFast, h: U(34),
         sub: dTxt, subH: U(26) });
-    } else if (th.lit) {
-      // 导弹已经在路上时不再单独报"被照射" —— 那是同一件事的前半段
-      list.push({ id: 'lit', txt: '▲ SPIKE  雷达照射', col: AMBER, font: BIG, on: true, h: U(34) });
+    } else if (th.lit || (world && world.detected)) {
+      /* 导弹已经在路上时不再单独报"被照射" —— 那是同一件事的前半段。
+         被对空雷达截获（DETECTED）并进 SPIKE：同一件事，只是照射源不同 */
+      list.push({ id: 'lit', txt: th.lit ? '▲ SPIKE  雷达照射' : '▲ SPIKE  对空雷达截获', col: AMBER, font: BIG, on: true, h: U(34) });
     }
     if (p.pos.y < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: 'TERRAIN  低高度告警', col: RED, font: F1, on: bl, h: U(30) });
     if (p.stall) list.push({ id: 'stall', txt: 'STALL  失速', col: RED, font: F1, on: bl, h: U(30) });
-    if (world && world.detected) list.push({ id: 'detected', txt: '▲ DETECTED  被对空雷达截获', col: RED, font: F2, on: Math.sin(now * 0.01) > 0, h: U(28) });
     if (p.pos.y > 18000 && p.q < 12) list.push({ id: 'lowq', txt: 'LOW Q  动压不足', col: AMBER, font: F2, on: bl, h: U(30) });
     /* 电子战的两个状态：受扰与静默。
        它们都是"你看不见别人 / 别人看不见你"的状态，必须一眼可辨 ——

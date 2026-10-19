@@ -1217,6 +1217,11 @@ var Game = (function () {
          设施与舰船从不进那个统计 —— 于是打掉一座平台在结算上等于没发生。
          新关卡里有大量反舰/压制目标，必须单独记一笔。 */
       groundKilled: 0,
+      /* 一帧里发生的战斗事件（命中 / 拦截），各模块往里推，主循环每帧消化后清空。
+         { type: 'hit' }                     玩家的弹打中了东西（Combat.blast）
+         { type: 'intercept', m, host }     导弹被近防炮拦下（stepMissile） */
+      events: [],
+      flags2: { icptRadioT: -99 },
       /* 关卡时限（秒）。timeLimit 是这一关的总额度、timeLeft 是剩余；
          0 表示没有时限。startMission 从 mission.timeLimit 落进来 ——
          在此之前 timeLimit 声明了却全项目没人读，于是"限时任务"只有
@@ -2333,6 +2338,9 @@ var Game = (function () {
     var t = player.target;
     player.lockInCone = false;            // HUD 用：目标在不在这件弹的锁定锥里（drawConeCue）
     player.lockInRange = false;           // HUD 用：目标在不在锁定距离内
+    /* 视场锥每帧重算；提前返回的分支（没目标 / 类别不对）清零，HUD 退回当前武器的锥 ——
+       否则切换武器后视场圈还停在上一件弹的大小 */
+    player.lockCone = 0;
     if (!t || !t.alive) {
       if (t && !t.alive) player.target = null;
       player.lockProgress = 0;
@@ -2564,7 +2572,14 @@ var Game = (function () {
          只有 cell 分支自己累加，准绳被打掉反而 +400。 */
       var penal = tg.friendlyAsset && source && source.isPlayer;
       if (penal) world.friendlyLoss = (world.friendlyLoss || 0) + 1;
+      tg.killedBy = source || null;
       Ent.killGround(tg, world);
+      /* 舰船之间的战果（2-0IMPL 4.1）：不归玩家，无线电播报 */
+      if (source && source.kind === 'target' && tg.big && tg.ttype !== 'air') {
+        var mine = tg.team === 0;
+        Radio.raw({ who: 'SEXTANT', cls: 'cmd',
+          tx: mine ? ('<b>' + tg.label + ' 被敌舰击沉。</b>') : (tg.label + ' 被我方舰炮击沉。'), gap: 1.0 });
+      }
       if (tg.model === 'cell') {
         /* 处罚已在上面的 penal 记过一次 —— 这里以前又加了一次，打掉一个单元算两次。
            这句只在玩家打的时候说：流弹打掉的不该算到"你"头上。 */
@@ -2592,13 +2607,22 @@ var Game = (function () {
      发射本身沿用原来那条路径（makeMissile + fireCd）。弹的阵营 = 发射者阵营，
      命中判定与近炸都按 m.team 过滤（见 entities.js），所以我方舰艇的弹
      不会伤到玩家与僚机。 */
+  /* 舰载雷达（有舰种的目标，spawnShip 带 shipCls）比弹自己的导引头看得远：
+     锁定距离 × SHIP_RADAR_K，但不超过弹真能飞到的距离（有效射程 × AI 余量）。
+     地面阵地照旧用 aiReach。 */
+  var SHIP_RADAR_K = 1.5;
+  function samReach(t, w) {
+    if (!t.shipCls) return Ent.aiReach(w, t.pos.y);
+    return Math.min(w.lockDist * SHIP_RADAR_K, Ent.effRange(w, t.pos.y) * Ent.AI_RANGE_K);
+  }
+
   function pickTargetFor(t, w) {
     if (t.team === 1) {
       if (player.alive) {
         var d = M3.dist(t.pos, player.pos);
         // 玩家的被动吊舱会压缩敌方对他的锁定距离
         /* 自己被压制：锁定距离打折、只锁"看得清"的距离以内（与 AI 同一套，Ent.jamLockOK） */
-        if (d <= Ent.aiReach(w, t.pos.y) * (1 - (player.lockResist || 0)) * Ent.jamLockK(t) && Ent.jamLockOK(t, player)) {
+        if (d <= samReach(t, w) * (1 - (player.lockResist || 0)) * Ent.jamLockK(t) && Ent.jamLockOK(t, player)) {
           // 低空突防可以躲开对空雷达；但贴得太近仍会被目视发现
           var lowExposed = t.ground && player.pos.y < (world.dangerAltitude || 1500) && d < 5200;
           if (world.detected || lowExposed) return player;
@@ -2610,7 +2634,7 @@ var Game = (function () {
       return null;
     }
     // 射程：min(锁定距离, 有效射程)（Ent.aiReach），不在打不到的距离上放弹
-    var best = null, bd = Ent.aiReach(w, t.pos.y) * Ent.jamLockK(t);
+    var best = null, bd = samReach(t, w) * Ent.jamLockK(t);
     for (var j = 0; j < world.actors.length; j++) {
       var e = world.actors[j];
       if (!e.alive || e === player || e.team === t.team || e.team === 2) continue;
@@ -2638,14 +2662,17 @@ var Game = (function () {
       var d = M3.dist(t.pos, tgt.pos);
 
       t.fireCd = w.cd + M3.rnd(0, 2);
-      var dir = M3.norm(M3.add(M3.sub(tgt.pos, t.pos), M3.V(0, 260, 0)));
-      var m = Ent.makeMissile({
-        weapon: t.weapon, team: t.team,
-        pos: M3.V(t.pos.x, t.pos.y + 5, t.pos.z),
-        fwd: dir, speed: 140,
-        target: tgt, owner: t
-      });
-      world.missiles.push(m);
+      /* 有舰空弹发射器（垂发 / 旋转架，SHIP_LAUNCHERS）的船从发射器出管；
+         没有的（地面 SAM 阵地等）沿用旧路径：从中心朝目标上方 260 m 射出 */
+      if (!(t.turrets && Turret.cue(t, tgt, t.weapon, world))) {
+        var dir = M3.norm(M3.add(M3.sub(tgt.pos, t.pos), M3.V(0, 260, 0)));
+        world.missiles.push(Ent.makeMissile({
+          weapon: t.weapon, team: t.team,
+          pos: M3.V(t.pos.x, t.pos.y + 5, t.pos.z),
+          fwd: dir, speed: 140,
+          target: tgt, owner: t
+        }));
+      }
       // 只有冲着玩家来的那一发才喊"发射"；告警音由主循环按 m.target 判
       if (tgt === player) {
         Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>发射！方位 ' + bearing(t.pos, player.pos) + '，距离 ' + (d / 1000).toFixed(1) + ' km。</b>', gap: 0.9 });
@@ -3190,11 +3217,21 @@ var Game = (function () {
     }
     world.wingKilled = kw;
     world.shipKilled = ks;
+    /* KILL：飞机（含机炮击落）和地面 / 海面目标都算；同一帧有 KILL 就不再报 HIT */
+    var gkNow = world.groundKilled || 0, killedNow = false;
     if (k > world.killed) {
       hits.push({ txt: 'KILL  ' + k, t: 1.1, col: HUD.AMBER });
       SFX.confirm();
+      killedNow = true;
     }
+    if (gkNow > (world.gkSeen || 0)) {
+      hits.push({ txt: 'KILL', t: 1.1, col: HUD.AMBER });
+      if (!killedNow) SFX.confirm();
+      killedNow = true;
+    }
+    world.gkSeen = gkNow;
     world.killed = k;
+    combatEvents(killedNow);
 
     // 胜负
     /* 时限判负在同一处兜住：声明了 timeLimit 的关卡不需要在自己的 lose()
@@ -3314,6 +3351,14 @@ var Game = (function () {
       Renderer.pushModel(mm, ms.pos, ms.fwd, ms.up, {});
     }
     // 粒子要在 flush 之前交：WebGL 下它们和模型一起做深度测试（2D 下照旧直接画）
+    /* minPx 粒子：按距离把世界尺寸撑到屏幕下限（两套渲染器都只认 size） */
+    var pcam = Renderer.getCam();
+    if (pcam) {
+      for (var pi = 0; pi < world.particles.length; pi++) {
+        var pp = world.particles[pi];
+        if (pp.minPx) pp.size = Math.max(pp.size0, pp.minPx * M3.dist(pp.pos, pcam.pos) / pcam.focal);
+      }
+    }
     Renderer.drawParticles(world.particles);
     Renderer.drawParticles(Ent.flashRings(world));
     Renderer.flush();
@@ -3412,6 +3457,12 @@ var Game = (function () {
       var dirv = M3.norm(b.vel);
       var bDist = M3.dist(b.pos, cam.pos);
       var trailLen = Math.min(90, Math.max(13, bDist * 0.045));
+      /* 中大口径炮弹（> 30 mm）不做角长度自适应：长度、粗细都是世界尺寸，
+         近大远小 —— 否则几公里外的一发炮弹在屏幕上和眼前的一样大 */
+      /* 炮塔打出来的弹（近防炮、遥控炮、尾炮）也按世界尺寸画：它们大多是远处的旁观者，
+         按角长度自适应会让几公里外的一串近防炮弹粗得不合常理。玩家 / 僚机的航炮仍自适应 —— 那是瞄准用的 */
+      var cal = b.cal || 20, big = cal > 30 || !!b.turret;
+      if (big) trailLen = (cal > 30 ? 16 : 10) * Math.sqrt(cal / 20);
       /* 尾巴不越过炮口，并且接在**当前**炮口上。
          刚出膛的子弹在生成那一帧就已经飞出去十几米，飞机也往前走了 ——
          若按世界坐标里的出膛点截，曳光会从炮口前方凭空出现；
@@ -3431,15 +3482,11 @@ var Game = (function () {
 
       var mine = player && b.team === player.team;
 
-      // 远弹略粗，抵消透视缩细
+      // 远弹略粗，抵消透视缩细（机炮）
       var wMul = 1 + Math.min(1, bDist / 1600) * 0.8;
-      /* 大口径炮弹画得更粗更亮：按口径的平方根放大（20 mm = 1，75 mm ≈ 1.9，120 mm ≈ 2.4），
-         远处也再多保一点，炮弹在几公里外飞过来要看得见 */
-      var cal = b.cal || 20;
-      if (cal > 30) {
-        wMul *= Math.sqrt(cal / 20);
-        wMul *= 1 + Math.min(1.5, bDist / 3000);
-      }
+      /* 炮弹 / 炮塔弹：曳光光晕半径按口径取世界尺寸（75 mm ≈ 0.55 m，20 mm ≈ 0.2 m），
+         投影后不小于约 0.6 px —— 远处是一道细亮线，不会消失 */
+      if (big) wMul = Math.max(0.5, cam.focal * (cal > 30 ? 0.28 : 0.2) * Math.sqrt(cal / 20) / Math.max(1, bDist));
       ctx.strokeStyle = mine ? 'rgba(255,228,150,0.92)' : 'rgba(255,148,88,0.85)';
       ctx.lineWidth = (mine ? 1.35 : 1.15) * wMul;
       ctx.beginPath();
@@ -3454,6 +3501,28 @@ var Game = (function () {
     }
 
     ctx.restore();
+  }
+
+  /* 消化 world.events：HIT / INTERCEPTED 提示，我方舰船替玩家拦下导弹的无线电 */
+  function combatEvents(killedNow) {
+    var ev = world.events, hit = false;
+    for (var i = 0; i < ev.length; i++) {
+      var e = ev[i];
+      if (e.type === 'hit') hit = true;
+      else if (e.type === 'intercept') {
+        var m = e.m;
+        if (m.owner && m.owner.isPlayer) {
+          hits.push({ txt: 'INTERCEPTED', t: 1.1, col: HUD.AMBER });
+        } else if (e.host && e.host.team === player.team && m.team !== player.team &&
+                   world.time - world.flags2.icptRadioT > 8) {
+          // 我方舰船拦下来袭弹：8 s 内只报一次，免得齐射时刷屏
+          world.flags2.icptRadioT = world.time;
+          Radio.raw({ who: e.host.label || '舰队', cls: 'ally', tx: '近防拦截一枚来袭导弹。', gap: 0.4 });
+        }
+      }
+    }
+    if (hit && !killedNow) hits.push({ txt: 'HIT', t: 0.8, col: HUD.AMBER });
+    ev.length = 0;
   }
 
   /* 一架敌机算谁的。没有记录击杀者的（自己失速撞海、被逼进海面）
@@ -3800,9 +3869,10 @@ var Game = (function () {
         SFX.unlock(); SFX.click();
         var go = this.getAttribute('data-go');
         if (go === 'hangar') {
-          /* 只有从简报页进来才是"选机出击"；从主菜单进来只是逛机库，
+          /* 从简报页、或任务结束的结算页进来是"选机出击"（结算页：换架飞机再打同一关，
+             missionIdx 还是刚打完的那一关）；从主菜单进来只是逛机库，
              没有选定的任务，出击按钮不该出现，返回也该回主菜单。 */
-          var sortie = !!(this.closest && this.closest('#scr-brief'));
+          var sortie = !!(this.closest && this.closest('#scr-brief, #scr-debrief'));
           setHangarMode(sortie);
           buildHangar(); show('hangar');
         }

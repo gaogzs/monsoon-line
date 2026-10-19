@@ -357,8 +357,9 @@ function spawnShip(w, o) {
     weapon: o.weapon || null,
     fireCd: o.fireCd === undefined ? M3.rnd(3, 8) : o.fireCd
   });
+  t.shipCls = s.cls;      // HUD 锁定框写舰种（makeTarget 只拷它认识的字段，所以在这里补）
   // 炮位（2-0IMPL 阶段 3）：近防炮、舰炮、遥控炮各自索敌开火
-  if (s.mounts && typeof Turret !== 'undefined') t.turrets = Turret.make(s.mounts);
+  if ((s.mounts || s.launchers) && typeof Turret !== 'undefined') Turret.attach(t, s.mounts, s.launchers);
   w.targets.push(t);
   return t;
 }
@@ -1758,8 +1759,7 @@ MISSIONS.push({
 两条登陆舰把弹药与燃油一趟一趟运进来，
 外面有一条巡洋舰画着防空圈。</p>
 <p>你能做的事只有一件：<b>在云下进去，把船打掉，再出来。</b>
-云底不到一千米，而对方舰空弹的锁定距离与高度差有关 ——
-你越低，他越难。</p>
+云底不到一千米，舰空弹的在低空阻力更大，但要注意闪避防空炮火。</p>
 <p><span class="am">代价是：干扰机一开，你的雷达光点也会丢。</span></p>`,
 
   objectives: [

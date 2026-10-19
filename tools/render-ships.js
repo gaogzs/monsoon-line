@@ -130,7 +130,7 @@ fs.mkdirSync(OUT, { recursive: true });
    ============================================================ */
 let n = 0;
 for (const s of SHIPS) {
-  const mdl = MODELS.composeTurrets(MODELS[s.model], s.mounts);   // 炮塔按零位合进来
+  const mdl = MODELS.composeTurrets(MODELS[s.model], s.allMounts);   // 炮塔按零位合进来
   if (!mdl) { console.error('缺少模型：' + s.model); continue; }
   const cam = frameCamera(mdl, SHIP_W, SHIP_H, FOV);
   cam.fov = FOV;
@@ -199,7 +199,7 @@ for (const s of SHIPS) {
     ras.clear(BG[0], BG[1], BG[2]);
 
     for (const it of row.items) {
-      const mdl = MODELS.composeTurrets(MODELS[it.s.model], it.s.mounts);
+      const mdl = MODELS.composeTurrets(MODELS[it.s.model], it.s.allMounts);
       if (!mdl) continue;
       // px 取负：屏幕右 = 世界 -x，不取负的话最大的船会跑到最右边
       const px = -(it.x0 + it.w / 2 - row.width / 2) * scale;
