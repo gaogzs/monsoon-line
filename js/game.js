@@ -3151,13 +3151,16 @@ var Game = (function () {
     updateJamming(dt);           // 范围压制场（下游的烧穿路线）
     updateAewc(dt);              // 预警机：通报、调度、被压制时沉默
 
-    // AI
+    /* AI。玩家也在 world.actors 里（startMission 把它推进去，好让 AI 的选敌、碰撞都看得见它），
+       但它上面已经单独 stepAircraft 过一次 —— 这里必须跳过。
+       以前没跳：从第一个版本起玩家每帧被推进两次，实际位移、转弯、加减速都是显示值的两倍，
+       无人僚机开满加力也追不上（v2.3 修）。 */
     for (var i = 0; i < world.actors.length; i++) {
       var a = world.actors[i];
-      if (!a.alive) continue;
-      if (!a.isPlayer && a.ai) AI.update(a, dt, world);
+      if (!a.alive || a.isPlayer) continue;
+      if (a.ai) AI.update(a, dt, world);
       Ent.stepAircraft(a, dt, world);
-      if (!a.isPlayer) updateDEW(dt, a);
+      updateDEW(dt, a);
     }
 
     watchdog(dt);
@@ -3666,8 +3669,10 @@ var Game = (function () {
       m6: '「在稀薄大气里，最会飞的人属于那支装备更差的空军。」',
       m7: '「雾保护你，也一样保护他。」',
       m8: '「他们要炸的是我们身后的东西。」',
-      m9: '「海面上漂着很多东西。有些是他们的。」',
-      m10: '「他来做交易的。」'
+      m9: '「油还在。中队明天还能飞。」',
+      m10: '「海面上漂着很多东西。有些是他们的。」',
+      m11: '「这片海上本来没有值得歼灭的舰队。」',
+      m12: '「他来做交易的。」'
     };
     document.getElementById('dQuote').textContent = win ? quotes[mission.id] || '' :
       '任务失败。那片空域还在他们手里，而下一次出动要等下一班油。';

@@ -146,8 +146,8 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | 角色 / 指令 | 规则 |
 |---|---|
 | `drone` + 数据链中断 | **降级为完全自主防御**：`s.target = null`，只规避、不开火 |
-| `drone` + `focus`（默认） | 继承长机的目标；长机没锁定就是 `null` |
-| `drone` + `cover` | 优先打正在威胁长机的敌机（`leadThreat`），找不到退回长机目标 |
+| `drone` + `focus`（默认） | 继承长机的目标；长机没锁定时打离自己 `WING_FREE_R`（6 km）内最近的敌机，仍守在编队槽位上；长机阵亡则不接战 |
+| `drone` + `cover` | 优先打正在锁定长机的敌机（`leadThreat`）；没有时打离**长机** 6 km 内最近的敌机（`nearestEnemyTo`）；再没有退回长机目标 |
 | `drone` + `spread` | 自主接战：`nearestEnemy(a, world, 9000)` |
 | `wingman` + `focus` | 继承长机的目标 |
 | `wingman` + `cover` | 同 `drone + cover`（共用 `leadThreat()`） |

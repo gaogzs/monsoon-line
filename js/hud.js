@@ -276,8 +276,10 @@ var HUD = (function () {
     var m = gap(132, W, 0.15);
     var x = m;
     tape(ctx, x, top, hgt, p.speed, 50, 200, 1, 'M/S', CY, 0.85);
-    text(ctx, (p.speed * 3.6).toFixed(0), x - 46, cy + 5, '#eaf4fb', FB, 'right');
-    text(ctx, (p.speed * 1.9438).toFixed(0) + ' KT', x - 46, cy + 21, DIM, FS, 'right');
+    /* 大数字和刻度同一单位（m/s）。以前大数字是没标单位的 km/h，和刻度对不上，
+       看着像速度读数和指针不一致 */
+    text(ctx, p.speed.toFixed(0), x - 46, cy + 5, '#eaf4fb', FB, 'right');
+    text(ctx, (p.speed * 3.6).toFixed(0) + ' KM/H · ' + (p.speed * 1.9438).toFixed(0) + ' KT', x - 46, cy + 21, DIM, FS, 'right');
 
     /* 引擎出力带与 FCS 舵量表不在这里 —— 它们挪到了雷达右侧，
        见 drawEnginePanel()。 */
@@ -685,7 +687,11 @@ var HUD = (function () {
         var t = world.targets[i];
         if (!t.alive || farCell(t, p)) continue;
         s = radarXY(p, t.pos, cx, cy, R, range);
+        /* 舰船和海上平台按阵营上色（与飞机同一套：友军绿、敌方红、中立灰）。
+           以前一律灰色，打舰队战时分不清哪条是自己的 */
+        var isShip = !!(t.ship || t.platform);
         ctx.strokeStyle = (t.team === 2) ? '#8fa3b2'
+          : isShip ? (t.team === p.team ? GREEN : RED)
           : (t.ttype === 'air' ? AMBER : '#8fa3b2');
         ctx.lineWidth = 1.4;
         ctx.strokeRect(s.x - 3.5, s.y - 3.5, 7, 7);

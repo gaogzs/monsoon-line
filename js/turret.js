@@ -92,6 +92,12 @@ var Turret = (function () {
     if (launchers && launchers.length) mounts = (mounts || []).concat(launchers);
     host.turrets = make(mounts);
     host.hasAA = !!(mounts && mounts.some(function (m) { return m.role === 'aa' || m.role === 'ciws'; }));
+    /* 齐射节奏（gun.salvo 的发射器，见 launch）：一波打几发按全舰这类备弹算，1–4 发 */
+    var tot = 0, T = host.turrets || [];
+    for (var i = 0; i < T.length; i++) if (T[i].gun.salvo) tot += T[i].ammo;
+    host.salvoN = tot ? M3.clamp(Math.round(tot / 4), 1, 4) : 0;
+    host.salvoShots = 0;
+    host.salvoUntil = 0;
     return host.turrets;
   }
 
@@ -502,9 +508,14 @@ var Turret = (function () {
   }
 
   /* 发射架出一发：从发射口沿发射架方向出膛，目标交给导弹自己 */
+  /* 齐射间隔：一波打完之后等这么久（±20%）再打下一波 —— 打一波、看效果、留着备弹 */
+  var SALVO_GAP = 40;
+
   function launch(tu, host, world, P0, dGun, t) {
     var g = tu.gun;
     if (g.ammo && tu.ammo <= 0) return;
+    // 一口一弹的发射器（垂发 / 斜置架）按整舰齐射节奏；旋转架按自己的装填（g.reload）
+    if (g.salvo && host.salvoN && world.time < (host.salvoUntil || 0)) return;
     var mz = tu.barrel ? M3.add(P0, M3.mul(dGun, tu.barrel)) : P0;
     var hs = host.vel ? M3.len(host.vel) : 0;
     var wid = (tu.cue && tu.cue.w) || g.weapon;
@@ -519,10 +530,15 @@ var Turret = (function () {
     });
     tu.cue = null;
     world.missiles.push(m);
-    tu.cd = g.cd || 4;
+    /* 带弹库的旋转架单独装填：g.reload = [最短, 最长] 秒，每发一次随机取一个（10–30 s） */
+    tu.cd = g.reload ? M3.rnd(g.reload[0], g.reload[1]) : (g.cd || 4);
     if (g.ammo) tu.ammo--;
     tu.fired++;
     tu.firing = true;
+    if (g.salvo && host.salvoN && ++host.salvoShots >= host.salvoN) {
+      host.salvoShots = 0;
+      host.salvoUntil = world.time + (host.salvoGap || SALVO_GAP) * M3.rnd(0.8, 1.2);
+    }
   }
 
   /* 受控发射（舰空弹，game.js 的 updateTargets 调）：把一发 wid 交给本舰的受控发射器。

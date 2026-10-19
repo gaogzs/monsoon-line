@@ -394,8 +394,8 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <p>用 <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> 可下达三种指令：</p>
 <ul>
 <li><kbd>1</kbd> <b>散开（SPREAD）</b> —— 僚机分开，扩大搜索扇面，自动接战</li>
-<li><kbd>2</kbd> <b>集火（FOCUS）</b> —— 全部僚机攻击你当前锁定的目标</li>
-<li><kbd>3</kbd> <b>掩护（COVER）</b> —— 僚机向你靠拢，优先攻击正在威胁你的敌机</li>
+<li><kbd>2</kbd> <b>集火（FOCUS）</b> —— 全部僚机攻击你当前锁定的目标；你没有锁定时，守在编队位置上打附近的敌机</li>
+<li><kbd>3</kbd> <b>掩护（COVER）</b> —— 僚机向你靠拢，优先攻击正在锁定你的敌机；没人锁定你时，攻击你附近的敌机</li>
 </ul>`
   },
 
@@ -814,7 +814,7 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <p>两栖船团出港了。三条登陆舰、两条护卫、几条快艇，
 目标是把一个营送上分水主岛的东岸。
 只要它们靠岸，岛上就会多出一个不需要谈判的据点。</p>
-<p>船团的掩护火网 {{ms.m9.limit}}后展开，之后就打不进去了。
+<p>船团的掩护火网 {{ms.m10.limit}}后展开，之后就打不进去了。
 <b>这是整场战役里唯一一次时限到了就直接输。</b></p>
 
 <h4>第十阶段 · 指挥所<br><span style="color:#6b7d8c">COMMAND POST</span></h4>
@@ -1030,7 +1030,7 @@ var _CX_VALS = {
   'ms.total': function () { return _cxMissions().total; },
   'ms.highN': function () { return _cxMissions().hi.length; },
   'ms.highList': function () { return _cxMissions().hi.join('、'); },
-  'ms.m9.limit': function () { var m = _cxMission('m9'); return m ? _cxDur(m.timeLimit) : '—'; }
+  'ms.m10.limit': function () { var m = _cxMission('m10'); return m ? _cxDur(m.timeLimit) : '—'; }
 };
 
 /** 把 {{键}} 换成现读的数值。未知键原样保留，交给 smoke.js 报错 */

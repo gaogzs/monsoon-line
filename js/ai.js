@@ -26,6 +26,20 @@ var AI = (function () {
     return best;
   }
 
+  /* 僚机自主接战的半径：集火档长机没锁定时、掩护档没人威胁长机时，只打这个距离内的 */
+  var WING_FREE_R = 6000;
+  /* 离某一点最近的敌机（掩护档：以长机为中心找） */
+  function nearestEnemyTo(p, a, world, maxR) {
+    var best = null, bd = maxR * maxR;
+    for (var i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || !Ent.hostile(e, a)) continue;
+      var d = M3.dist2(e.pos, p);
+      if (d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
+
   function nearestEnemy(a, world, maxR) {
     var best = null, bd = (maxR || 16000) * (maxR || 16000);
     for (var i = 0; i < world.actors.length; i++) {
@@ -658,8 +672,10 @@ var AI = (function () {
          而授权规则由僚机指令决定（1/2/3，见 codex「本作的表现形式：
          僚机指令」—— 那条说明是写给玩家的承诺，行为必须与它一致）：
 
-           focus   只打长机当前锁定的目标 —— 最保守，也是默认档
-           cover   优先打正在威胁长机的敌机，找不到就退回长机目标
+           focus   打长机当前锁定的目标；长机没锁定时，打离自己 WING_FREE_R 内最近的敌机
+                   （仍守在编队槽位上，不追出去）—— 默认档
+           cover   优先打正在锁定长机的敌机；没有时打离**长机** WING_FREE_R 内最近的敌机；
+                   再没有才退回长机目标
            spread  在编队附近自主接战（"扩大搜索扇面，自动接战"）
 
          另有一条凌驾于指令之上的规则：**数据链中断时降级为完全自主防御**。
@@ -673,9 +689,12 @@ var AI = (function () {
       } else if (s.cmd === 'spread') {
         s.target = nearestEnemy(a, world, 9000);
       } else if (s.cmd === 'cover') {
-        s.target = leadThreat(a, world) || (leadOk ? dLead.target : null);
+        s.target = leadThreat(a, world) ||
+          (dLead && dLead.alive ? nearestEnemyTo(dLead.pos, a, world, WING_FREE_R) : null) ||
+          (leadOk ? dLead.target : null);
       } else {
-        s.target = leadOk ? dLead.target : null;
+        // 长机阵亡时不自主接战（设定：无人机没有接管战局的能力，只会盘旋）
+        s.target = leadOk ? dLead.target : (dLead && dLead.alive ? nearestEnemy(a, world, WING_FREE_R) : null);
       }
     } else if (s.retargetT <= 0 || !s.target || !s.target.alive) {
       s.retargetT = 0.35 + (1 - s.skill) * 0.9;
@@ -760,10 +779,19 @@ var AI = (function () {
           M3.add(M3.mul(dLead2.right, sl.dx * ek),
             M3.add(M3.mul(dLead2.fwd, sl.dz * ek), M3.V(0, sl.dy, 0))));
         desired = M3.norm(M3.sub(wpD, a.pos));
-        var dWp = M3.dist(wpD, a.pos);
-        // 落后就开加力追，到位就收油门省油
-        if (dWp > 700) { throttle = 1; ab = true; }
-        else throttle = 0.75;
+        /* 油门：按长机当前速度 + 前后偏差连续调（速度匹配），而不是"700 m 外开加力、以内固定 0.75"。
+           ahead > 0：槽位在前面，要比长机快；< 0：冲过头了，要比长机慢。
+           目标速度超过军推才开加力。以前长机一开军推它就慢慢掉队，掉到 700 m 外才猛追，忽远忽近 */
+        var ahead = M3.dot(M3.sub(wpD, a.pos), dLead2.fwd);
+        /* 偏差按到槽位的实际距离算：槽位不在身后就按距离加速，冲过头才减速。
+           只看沿航向的分量的话，偏在侧面 / 高度上时目标速度就等于长机速度，永远收不回来 */
+        var gap = M3.dist(wpD, a.pos);
+        var err = ahead > -100 ? gap : -gap;
+        var vWant = (dLead2.speed || 0) + M3.clamp(err * 0.25, -120, 260);
+        var vMil = (a.phys && a.phys.vMil) || 400;
+        ab = vWant > vMil * 0.98;
+        throttle = M3.clamp(vWant / vMil, 0.25, 1);
+        if (ab) throttle = 1;
       } else {
         /* 长机没了：原地盘旋到燃料耗尽。
 

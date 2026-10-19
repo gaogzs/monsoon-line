@@ -321,9 +321,12 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       全凭长机把目标参数喂过来。
       <p>上游公约对它的定位很直白：<b>一架 DB-11 带两架 KA-7，
       等于用一个人的编制换三个发射架。</b>
-      代价是它没有判断力：长机被打掉，它就只会原地盘旋。</p>`,
-    stats: { spd: 0.50, mob: 0.76, stl: 0.32, fire: 0.42, dur: 0.28, rng: 0.38 },
-    phys: { vMax: 460, vMil: 380, vStall: 96, accel: 26, decel: 44, pitch: 0.78, roll: 2.65, yaw: 0.40, hp: 58 },
+      代价是它没有判断力：长机被打掉，它就只会原地盘旋。</p>
+      <p>不带座舱、弹射座椅和生命维持，飞翼外形又专门为高速巡航修过一遍 ——
+      所以它比任何一架有人机都快：<b>长机开加力往前冲，它也跟得上。</b></p>`,
+    stats: { spd: 0.96, mob: 0.76, stl: 0.32, fire: 0.42, dur: 0.28, rng: 0.38 },
+    /* 极速要压过最快的有人机（petrel 620）：跟不上长机的僚机替长机挡不了弹 */
+    phys: { vMax: 660, vMil: 540, vStall: 96, accel: 34, decel: 44, pitch: 0.78, roll: 2.65, yaw: 0.40, hp: 58 },
     /* 没有机炮：它是"发射架"，自己看不见东西，目标参数全靠长机喂 ——
        机炮要的是自己对准、自己判断开火时机，这两样它都没有。 */
     gun: null,
@@ -731,11 +734,12 @@ var SHIPS = [
     gunResist: 0.9,
     label: '虎鲸',
     vials: ['四面相控阵', '前甲板垂发阵位', '动力舱'],
-    arms: ['32 单元舰空弹垂发', '近防炮 ×2', '75 mm 舰炮 ×1', '反潜鱼雷 ×6'],
+    arms: ['32 单元垂发（舰空弹 24 · 反舰弹 8）', '近防炮 ×2', '75 mm 舰炮 ×1', '反潜鱼雷 ×6'],
     desc: `
 <p>上游公约海军留在分水方向的<b>两艘</b>护航驱逐舰之一。它的任务书里没有一条是"歼灭敌方舰队" ——
 这片海域上没有值得歼灭的舰队，只有漂在海上的平台、电缆和驳船。</p>
-<p>所以它全部的战斗力都朝<b>上</b>：四面相控阵、32 单元垂发、两座近防炮。
+<p>所以它几乎全部的战斗力都朝<b>上</b>：四面相控阵、32 单元垂发、两座近防炮 ——
+垂发里只留了 8 个单元给反舰弹，那是给"万一真遇上一条船"准备的。
 它的射界里绝大多数时间出现的是飞机和导弹，不是船。</p>
 <p><b>它替谁挡弹：</b>替 4 000 米的浮空中继平台、替海面的储油驳船、
 替那些上面还留着值班员的管理局设施。</p>
@@ -823,10 +827,10 @@ var SHIPS = [
     gunResist: 0.93,
     label: '抹香鲸',
     vials: ['四面大相控阵', '前后垂发阵位', '塔式综合桅杆'],
-    arms: ['96 单元舰空弹垂发', '75 mm 舰炮 ×1', '近防炮 ×2', '50 mm 速射炮 ×2', '反潜鱼雷 ×8'],
+    arms: ['96 单元垂发（舰空弹 80 · 反舰弹 16）', '75 mm 舰炮 ×1', '近防炮 ×2', '50 mm 速射炮 ×2', '反潜鱼雷 ×8'],
     desc: `
 <p>编队的防空指挥舰。它是这片海域上唯一能<b>同时盯住几百个目标</b>的东西：
-四面加大相控阵、96 单元舰空弹，以及一根把雷达与电子战天线全收进去的塔式桅杆。</p>
+四面加大相控阵、96 单元垂发（其中 16 单元是反舰弹），以及一根把雷达与电子战天线全收进去的塔式桅杆。</p>
 <p>抹香鲸是最大的齿鲸，它靠脑袋里那套声学系统在漆黑的深海里找食 ——
 这条船靠的是同一件事：<b>在它自己看不见的地方，先把别人找出来。</b></p>
 <p>全上游公约海军只有四艘同级舰，分水方向分到两艘。
@@ -969,7 +973,10 @@ var SHIPS = [
     gunResist: 0.92,
     label: '房角石',
     vials: ['三段发射模块', '前部火控与指挥舱', '动力舱'],
-    arms: ['垂发单元 ×312', '近防炮 ×2'],
+    arms: ['312 单元垂发（反舰弹 200 · 舰空弹 112）', '近防炮 ×2'],
+    /* 专属齐射节奏（turret.js launch）：弹库舰一波 6 发、约 8 s 一波 —— 每分钟约 45 发，
+       有压制力，但不会一百多发一口气打光 */
+    salvo: { n: 6, gap: 8 },
     desc: `
 <p><b>房角石是古生代的巨型直角石</b>：一整条九米长的壳分成几十个房室，
 而动物只住在最外面那一间 —— 其余的都充着气，用来调节浮力。</p>
@@ -977,7 +984,8 @@ var SHIPS = [
 <b>312 个垂发井分三段铺满整条甲板</b>，而舰员只有 210 人，
 全挤在前部那一段的指挥舱里。</p>
 <p>它不是为了一场交战造的，是为了<b>一次齐射</b>造的：
-把三百多枚弹在四分钟内全部放出去，然后掉头跑。
+312 个井里三分之二是反舰弹。设计上它能在几分钟里把这些弹全部放出去 ——
+实战里火控按批次放，一波六发、几秒一波，直到打光，然后掉头跑。
 它没有装甲、没有像样的防空、航速只有 24 节 ——
 <b>下游的算法很直白：如果一次齐射能换掉一条航母，那它就是划算的。</b></p>
 <p><b>它最怕的事：</b>在发射之前被找到。三百多个垂发井就是三百多个可爆点，
@@ -1224,11 +1232,14 @@ var TURRET_GUNS = {
      mounts 里照常写 gun: 'lnchSam'，有实体模型就像炮塔一样转。 */
   lnchSam: { name: '旋转舰空弹发射架', kind: 'launcher', weapon: 'vlar', cd: 6, ammo: 8, loft: 0.15,
              air: true, surface: false, launchSpeed: 160 },
-  /* 旋转反舰弹发射架：和 lnchSam 同一套（转向目标再出膛），只是弹换成 ssm、只打海面 */
-  lnchSsm: { name: '旋转反舰弹发射架', kind: 'launcher', weapon: 'ssm', cd: 8, ammo: 4, loft: 0.05,
+  /* 旋转反舰弹发射架：和 lnchSam 同一套（转向目标再出膛），只是弹换成 ssm、只打海面。
+     甲板下有弹库（现实里 Mk 26 那一类）：备弹是发射口的几倍，每发一次装填 reload 秒（10–30 s 随机） */
+  lnchSsm: { name: '旋转反舰弹发射架', kind: 'launcher', weapon: 'ssm', cd: 8, reload: [10, 30], ammo: 4, loft: 0.05,
              air: false, surface: true, launchSpeed: 60 },
   /* 固定发射器（4.3）：不转动，写在 SHIP_LAUNCHERS 里，按 mode 决定出管方向。
-     vls 竖直出管；rail 斜置发射架按 yaw / elev。ammo 由 cells 覆盖 */
+     vls 竖直出管；rail 斜置发射架按 yaw / elev。ammo 由 cells 覆盖。
+     一口一弹、海上不能重装（现实里的垂发单元和储运发射箱都是这样）：cells = 发射口数。
+     salvo: true —— 按整舰的齐射节奏打（turret.js 的 launch），不是每个口一有目标就连发 */
   /* 受控（cued）舰空弹发射器：自己不索敌。什么时候打、打谁、打哪种弹仍由 updateTargets
      按关卡给的 weapon / fireCd 和发现规则决定，只是把弹交给这里出管（Turret.cue）。
      备弹不限 —— 射速由 fireCd 管，和改之前一样。 */
@@ -1236,9 +1247,9 @@ var TURRET_GUNS = {
              air: true, surface: false, launchSpeed: 40 },
   rotSam:  { name: '旋转舰空弹发射架', kind: 'launcher', cued: true, cd: 0.5, ammo: 0, loft: 0.15,
              air: true, surface: false, launchSpeed: 160 },
-  vlsSsm:  { name: '反舰弹垂发单元', kind: 'launcher', weapon: 'ssm', cd: 6, ammo: 4,
+  vlsSsm:  { name: '反舰弹垂发单元', kind: 'launcher', weapon: 'ssm', cd: 3, salvo: true, ammo: 4,
              air: false, surface: true, launchSpeed: 40 },
-  railSsm: { name: '斜置反舰弹发射架', kind: 'launcher', weapon: 'ssm', cd: 6, ammo: 4,
+  railSsm: { name: '斜置反舰弹发射架', kind: 'launcher', weapon: 'ssm', cd: 3, salvo: true, ammo: 4,
              air: false, surface: true, launchSpeed: 60 },
   n120:   { name: '120mm 主炮', cal: 120, rpm: 8, speed: 800, dmg: 80, range: 14000, airRange: 8000, spread: 0.013, spreadSurface: 0.003,
             gravity: 1, fuze: 8, blast: 18, blastCore: 3 }
@@ -1251,6 +1262,10 @@ var TURRET_GUNS = {
    smoke 断言 mounts 的炮数与 arms 文本一致。 */
 var ARC_BOW = { yawMin: -2.6, yawMax: 2.6, pitchMin: -0.1, pitchMax: 1.4 };
 var ARC_CIWS = { yawMin: -2.8, yawMax: 2.8, pitchMin: -0.2, pitchMax: 1.5 };
+/* 全舰只有一座近防炮的船：射界给全向。ARC_CIWS 在零位背面留了 ±0.34 rad 的死角 ——
+   双近防的船前后各一座正好互补，单近防装在舰尾、零位朝后的话，船头正前方就没人管，
+   而迎头开过去的时候来袭弹正是从那里进来的（v2.3 舷对舷里菊石一枚都拦不下） */
+var ARC_CIWS_ALL = { yawMin: -Math.PI, yawMax: Math.PI, pitchMin: -0.2, pitchMax: 1.5 };
 var ARC_SIDE = { yawMin: -1.6, yawMax: 1.6, pitchMin: -0.1, pitchMax: 1.4 };
 /* 舰船发射器（2-0IMPL 4.3）。和炮位走同一套 Turret 运行时，但单独成表 ——
    smoke 断言 mounts 的炮数与 arms 一致，发射器不算炮。
@@ -1278,11 +1293,14 @@ function _L(id, gun, pos, mode, cells, arc, model) {
      · Cameroceras：三段垂发模块。312 单元按游戏节奏只放出一部分：每段 8 发反舰弹，前段兼舰空 */
 var SHIP_LAUNCHERS = {
   orca: [
-    _L('vlsF', 'vlsSam', [0, 7.0, 47], 'vls')
+    _L('vlsF', 'vlsSam', [0, 7.0, 47], 'vls'),
+    _L('vlsSsm', 'vlsSsm', [0, 7.0, 47], 'vls', 8)       // 同一块垂发盖板：32 单元里的 8 单元装反舰弹
   ],
   spermwhale: [
     _L('vlsF', 'vlsSam', [0, 8.0, 52], 'vls'),
-    _L('vlsA', 'vlsSam', [0, 8.0, -42], 'vls')
+    _L('vlsA', 'vlsSam', [0, 8.0, -42], 'vls'),
+    _L('ssmF', 'vlsSsm', [0, 8.0, 52], 'vls', 8),        // 96 单元里的 16 单元装反舰弹，前后各 8
+    _L('ssmA', 'vlsSsm', [0, 8.0, -42], 'vls', 8)
   ],
   dolphin: [
     _L('ssmL', 'railSsm', [-1.4, 6.6, -9], { yaw: 0, elev: 0.36 }, 2),
@@ -1312,9 +1330,11 @@ var SHIP_LAUNCHERS = {
     _L('sam', 'rotSam', [0, 7.5, -64], 'turret', 0, ARC_CIWS, 'lnchr')
   ],
   cameroceras: [
-    _L('vlsF', 'vlsSsm', [0, 9.2, 68], 'vls', 8),
-    _L('vlsM', 'vlsSsm', [0, 9.2, 10], 'vls', 8),
-    _L('vlsA', 'vlsSsm', [0, 9.2, -58], 'vls', 8),
+    /* 312 单元里 200 单元是反舰弹（三段模块按长度分），其余是舰空弹（前段，受控）。
+       它是为一次齐射造的：专属齐射节奏见 SHIPS 里的 salvo（一波 6 发、约 8 s 一波） */
+    _L('vlsF', 'vlsSsm', [0, 9.2, 68], 'vls', 50),
+    _L('vlsM', 'vlsSsm', [0, 9.2, 10], 'vls', 80),
+    _L('vlsA', 'vlsSsm', [0, 9.2, -58], 'vls', 70),
     _L('vlsSam', 'vlsSam', [0, 9.2, 60], 'vls')
   ]
 };
@@ -1336,7 +1356,7 @@ var SHIP_MOUNTS = {
   ],
   dunkleosteus: [
     _m('bow', 'n120', [0, 6.4, 60], 0, { yawMin: -2.6, yawMax: 2.6, pitchMin: -0.1, pitchMax: 0.9 }, 'tur120r', 'dual'),
-    _m('ciws', 'ciws20', [0, 7.5, -56], Math.PI, ARC_CIWS, null, 'ciws'),
+    _m('ciws', 'ciws20', [0, 7.5, -56], Math.PI, ARC_CIWS_ALL, null, 'ciws'),
     _m('n50L', 'n50', [-7.4, 5.8, -36], -Math.PI / 2, ARC_SIDE, 'tur50r', 'dual'),
     _m('n50R', 'n50', [7.4, 5.8, -36], Math.PI / 2, ARC_SIDE, 'tur50r', 'dual')
   ],
@@ -1345,7 +1365,7 @@ var SHIP_MOUNTS = {
   ],
   ammonite: [
     _m('bow', 'n75', [0, 5.5, 48], 0, ARC_BOW, 'tur75r', 'dual'),
-    _m('ciws', 'ciws20', [0, 9.5, -30], Math.PI, ARC_CIWS, null, 'ciws')
+    _m('ciws', 'ciws20', [0, 9.5, -30], Math.PI, ARC_CIWS_ALL, null, 'ciws')
   ],
   bluewhale: [
     _m('ciwsF', 'ciws20', [0, 18.0, 82], 0, ARC_CIWS, null, 'ciws'),
@@ -1476,7 +1496,7 @@ var PLATFORM_MOUNTS = {
     _m('ciwsB', 'ciws20', [15, 21, -15], Math.PI, ARC_CIWS, null, 'ciws')
   ],
   breakwater: [
-    _m('ciws', 'ciws20', [18, 24, -14], Math.PI, ARC_CIWS, null, 'ciws'),
+    _m('ciws', 'ciws20', [18, 24, -14], Math.PI, ARC_CIWS_ALL, null, 'ciws'),
     _m('n50L', 'n50', [-26, 16, 0], -Math.PI / 2, ARC_SIDE, 'tur50', 'dual'),
     _m('n50R', 'n50', [26, 16, 10], Math.PI / 2, ARC_SIDE, 'tur50', 'dual')
   ],
@@ -3198,8 +3218,8 @@ var VOICES = {
     ]
   },
 
-  /* ==================== 任务 9 · 登陆窗口 ==================== */
-  m9: {
+  /* ==================== 任务 10 · 登陆窗口 ==================== */
+  m10: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，登船警报。下游的两栖船团昨夜出港了。', gap: 1.4 },
       { who: 'VESPER-2', cls: 'ally', tx: '请求目标。', gap: 0.8 },
@@ -3228,8 +3248,8 @@ var VOICES = {
     ]
   },
 
-  /* ==================== 任务 11 · 补给线 ==================== */
-  m11: {
+  /* ==================== 任务 9 · 补给线 ==================== */
+  m9: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，东缘的平台群在挨炮。', gap: 1.1 },
       { who: 'SEXTANT', cls: 'cmd', tx: '两座防波堤、一座浅滩站。中队一半的油在那儿。', gap: 1.5 },
@@ -3239,8 +3259,8 @@ var VOICES = {
     ]
   },
 
-  /* ==================== 任务 12 · 舷对舷 ==================== */
-  m12: {
+  /* ==================== 任务 11 · 舷对舷 ==================== */
+  m11: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，抹香鲸已经离开浮岛，正往南压。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '对面是房角石。三百多个发射井，它是来一次打光的。', gap: 1.6 },
@@ -3249,8 +3269,8 @@ var VOICES = {
     ]
   },
 
-  /* ==================== 任务 10 · 指挥所 ==================== */
-  m10: {
+  /* ==================== 任务 12 · 指挥所 ==================== */
+  m12: {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，这是最后一件事。', gap: 1.1 },
       { who: 'VESPER-2', cls: 'ally', tx: '<b>明白，照办</b>。', gap: 0.8 },

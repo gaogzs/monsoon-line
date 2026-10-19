@@ -1612,12 +1612,13 @@ if (Ent && M3 && me && world) {
 
     const bad = [];
 
-    // 1. 长机没锁定时，无人机不得有任何目标
+    // 1. 长机没锁定时（集火档）：只打 6 km 内的敌机，远处的不追
     {
       const s = scenario();
       s.lead.target = null;
+      s.foe.pos = M3.V(0, 5000, 9000);        // 9 km 外
       for (let i = 0; i < 5; i++) AI.update(s.drone, 1 / 60, s.w);
-      if (s.drone.ai.target) bad.push('长机未锁定时，无人机自己找到了目标');
+      if (s.drone.ai.target) bad.push('长机未锁定时，无人机去追了 6 km 外的敌机');
     }
 
     // 2. 长机锁定后，无人机继承的必须是同一个目标
@@ -1675,12 +1676,12 @@ if (Ent && M3 && me && world) {
        role === 'wingman'，而僚机全是 drone —— 按下去只有一句台词。
        下面把"文案承诺的行为"逐条钉住。 */
     {
-      // focus（默认档）：长机没锁定，僚机就不许有目标
+      // focus（默认档）：长机没锁定时，守在编队上打附近（3 km）的敌机
       const s1 = scenario();
       s1.drone.ai.cmd = 'focus';
       s1.lead.target = null;
       for (let i = 0; i < 5; i++) AI.update(s1.drone, 1 / 60, s1.w);
-      if (s1.drone.ai.target) bad.push('focus 档：长机没锁定，僚机却自己找了目标');
+      if (s1.drone.ai.target !== s1.foe) bad.push('focus 档：长机没锁定时，僚机没有去打附近的敌机');
 
       // spread：扩大扇面、自动接战
       const s2 = scenario();
@@ -1700,6 +1701,13 @@ if (Ent && M3 && me && world) {
       if (s3.drone.ai.target !== s3.foe) {
         bad.push('cover 档：僚机没有去掩护被盯上的长机');
       }
+      // 没人锁定长机：打长机附近的敌机
+      const s3b = scenario();
+      s3b.drone.ai.cmd = 'cover';
+      s3b.lead.target = null;
+      s3b.foe.target = null;
+      for (let i = 0; i < 5; i++) AI.update(s3b.drone, 1 / 60, s3b.w);
+      if (s3b.drone.ai.target !== s3b.foe) bad.push('cover 档：没人锁定长机时，僚机没有打长机附近的敌机');
     }
 
     // 7. 数据链中断 → 降级为完全自主防御（只规避，不开火）
@@ -5690,6 +5698,7 @@ try {
     L('rail', 'railSsm', [4, 6, -10], { yaw: Math.PI / 2, elev: 0.3 }, 2),
     L('rot', 'lnchSsm', [0, 6, -30], 'turret', 2)
   ]);
+  host.salvoN = 0;            // 这一组只测出管方式；齐射节奏和旋转架装填在下面单独测
   const foe = EN.makeTarget({ team: 1, model: 'dolphin', x: 6000, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
   const w = { time: 0, actors: [], targets: [host, foe], bullets: [], missiles: [], particles: [], silent: true };
   const by = {};
@@ -5731,6 +5740,44 @@ try {
     if (!m.seekerOn) bad.push('转平过程中导引头被判丢失目标');
     if (!(m.fwd.y < 0.7)) bad.push('助推结束 4 s 后还没开始转平：fwd.y = ' + m.fwd.y.toFixed(3));
   }
+  // 齐射节奏：四个斜置架各 2 发（一口一弹，共 8 发）→ 一波 2 发，打完要等约 40 s，不会几秒内打空
+  {
+    const hs = EN.makeTarget({ team: 0, model: 'ammonite', x: 0, y: 0, z: 0, hp: 1e9, radius: 36, big: true });
+    TU.attach(hs, null, [0, 1, 2, 3].map(k => L('r' + k, 'railSsm', [k - 1.5, 7, 0], { yaw: Math.PI / 2, elev: 0.3 }, 2)));
+    const fs = EN.makeTarget({ team: 1, model: 'dolphin', x: 6000, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+    const ws = { time: 0, actors: [], targets: [hs, fs], bullets: [], missiles: [], particles: [], silent: true };
+    const at = [];
+    for (let i = 0; i < 60 * 90; i++) {
+      const n0 = ws.missiles.length;
+      TU.stepAll(hs, ws, 1 / 60);
+      for (let k = n0; k < ws.missiles.length; k++) at.push(ws.time);
+      ws.time += 1 / 60;
+    }
+    if (hs.salvoN !== 2) bad.push('8 发备弹的船一波应打 2 发，实际 salvoN = ' + hs.salvoN);
+    const first = at.filter(t => t < 20).length;
+    if (first !== 2) bad.push('齐射节奏：开头 20 s 打了 ' + first + ' 发（应为一波 2 发）');
+    if (!(at.length >= 4)) bad.push('齐射节奏：90 s 内只打了 ' + at.length + ' 发，第二波没来');
+  }
+  // 旋转架：弹库供弹，每发之后装填 10–30 s
+  {
+    const hr = EN.makeTarget({ team: 0, model: 'dolphin', x: 0, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+    TU.attach(hr, null, [L('rot', 'lnchSsm', [0, 6, -30], 'turret', 4)]);
+    const fr = EN.makeTarget({ team: 1, model: 'dolphin', x: 6000, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+    const wr = { time: 0, actors: [], targets: [hr, fr], bullets: [], missiles: [], particles: [], silent: true };
+    const at = [];
+    for (let i = 0; i < 60 * 120; i++) {
+      const n0 = wr.missiles.length;
+      TU.stepAll(hr, wr, 1 / 60);
+      for (let k = n0; k < wr.missiles.length; k++) at.push(wr.time);
+      wr.time += 1 / 60;
+    }
+    for (let k = 1; k < at.length; k++) {
+      const gap = at[k] - at[k - 1];
+      if (gap < 9.9 || gap > 30.1) { bad.push('旋转架两发间隔 ' + gap.toFixed(1) + ' s，不在 10–30 s'); break; }
+    }
+    if (at.length < 3) bad.push('旋转架 120 s 只打了 ' + at.length + ' 发');
+  }
+
   // 受控舰空弹：垂发当场竖直出管、弹种用关卡给的；旋转架先转到位再打
   const SHL = sandbox.SHIP_LAUNCHERS;
   const hv = EN.makeTarget({ team: 1, model: 'spermwhale', x: 0, y: 0, z: 0, hp: 1e9, radius: 40, big: true });
@@ -5787,13 +5834,16 @@ try {
   {
     const h = mk();
     const w = { time: 0, actors: [], targets: [h], bullets: [], missiles: [], particles: [], events: [], silent: true };
+    /* 来袭弹一枚一枚错开（每枚多隔 1.5 km）：这条只验"拦截会发生、会报事件"，
+       不是测饱和。以前 12 枚挤在 13 s 里到，饱和下正常也只拦 1–2 枚，拦下 0 枚的概率不小 */
     for (let k = 0; k < 12; k++) {
       const a = k * 0.5;
-      const p = V3.V(Math.sin(a) * 3500, 30, Math.cos(a) * 3500 + k * 600);
+      const r = 3500 + k * 1500;
+      const p = V3.V(Math.sin(a) * r, 30, Math.cos(a) * r);
       w.missiles.push(EN.makeMissile({ weapon: 'ssm', team: 1, pos: p, fwd: V3.norm(V3.sub(h.pos, p)), speed: 600, target: h }));
     }
     const all = w.missiles.slice(), evs = [];
-    for (let f = 0; f < 60 * 20; f++) {
+    for (let f = 0; f < 60 * 45; f++) {
       TU.stepAll(h, w, 1 / 60);
       for (const m of w.missiles) EN.stepMissile(m, 1 / 60, w);
       w.missiles = w.missiles.filter(m => m.alive && !(m.intercepted));

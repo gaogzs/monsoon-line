@@ -250,7 +250,7 @@ for (const e of dyn) {
 | `gunTable`、`gun.k3.*` | `WEAPONS` 中 `kind === 'gun'` 的全部条目（s2 机炮表、t1/s2 射程、初速、每秒发数、飞行时间） |
 | `w.e4.*` / `w.l2.*` | ZUN-4 的 `lockReduce` / `cd`（来自 `STORE_COOLDOWN`）/ `duration`；GUS-2 的拦截半径、锥角、概率、充能 |
 | `w.v17.*` / `w.mrm.*` / `w.srm.*` | CLA-17 动力段、高空降级后动力段、转弯率、总飞行时间；对比用的 CLA-4 / TOR-2 |
-| `ms.*` | `MISSIONS`：现在只有 `cmp1` 用 `ms.m9.limit`（m9 的 `timeLimit`）。`ms.total` / `ms.highN` / `ms.highList` 仍定义着，但 `t1` 那句"几个任务在 18–22 km"已删（非战役条目不提任务），没人用 |
+| `ms.*` | `MISSIONS`：现在只有 `cmp1` 用 `ms.m10.limit`（m10 的 `timeLimit`）。`ms.total` / `ms.highN` / `ms.highList` 仍定义着，但 `t1` 那句"几个任务在 18–22 km"已删（非战役条目不提任务），没人用 |
 
 规则：
 

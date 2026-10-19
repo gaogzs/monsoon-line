@@ -52,7 +52,8 @@ CAMPAIGNS.push({
   desc: '十六年里，调节场把雨往北推了四公里一个周期。2078 年三月，' +
     '这份偏移量被公开，下游带着四亿人的账北上。上游在分水方向只有一个中队 —— ' +
     '它守不住整条季风线，只能保证飞机还飞得起来。',
-  /* 11（补给线，04.16）排在 m8 之后，12（舷对舷，04.22）排在 m10 之前 —— 按日期 */
+  /* 数组下标 11（补给线 m9，04.16）排在 m8 之后，12（舷对舷 m11，04.22）排在指挥所 m12 之前 —— 按日期。
+     id 和 OPERATION 编号按游玩顺序排，数组下标只是追加的先后 */
   missions: [0, 1, 2, 3, 4, 5, 6, 7, 11, 8, 12, 9]
 });
 
@@ -362,6 +363,8 @@ function spawnShip(w, o) {
   t.ship = s;             // 舰船记录：尾流水花要读螺旋桨位置与最大航速（Ent.wakeSpray）
   // 炮位（2-0IMPL 阶段 3）：近防炮、舰炮、遥控炮各自索敌开火
   if ((s.mounts || s.launchers) && typeof Turret !== 'undefined') Turret.attach(t, s.mounts, s.launchers);
+  // 舰型专属的齐射节奏（房角石这种弹库舰）：覆盖 Turret.attach 按备弹算出来的缺省值
+  if (s.salvo && t.turrets) { t.salvoN = s.salvo.n; t.salvoGap = s.salvo.gap; }
   /* o.ssmK：这一关里反舰弹备弹的比例（满弹 = 1）。关卡按节奏调，不改 SHIP_LAUNCHERS 本身。
      o.ssmStagger：每个发射架的首发时间在 0 ~ 这么多秒里随机错开 —— 否则开场所有架子同时就绪，
      第一帧就是一次全舰队齐射，近防直接饱和 */
@@ -2185,15 +2188,15 @@ MISSIONS.push({
 });
 
 /* ============================================================
-   任务 9 · 登陆窗口
+   任务 10 · 登陆窗口
 
    第一次给出"时限"：下游的两栖船团正在横渡海峡。
    掩护火网五分钟后展开（timeLimit 300 秒）；在那之前不打断它，
    岛上就会多出一个他们不需要谈判的据点。
    ============================================================ */
 MISSIONS.push({
-  id: 'm9',
-  no: 'OPERATION 09',
+  id: 'm10',
+  no: 'OPERATION 10',
   name: '登陆窗口',
   en: 'THE WINDOW',
   loc: '分水海峡 / 11°38′N 133°26′E',
@@ -2347,11 +2350,11 @@ MISSIONS.push({
 
     if (!w.flags.warned && w.timeLeft < 90) {
       w.flags.warned = true;
-      w.radio.play('m9', 'windowClosing');
+      w.radio.play('m10', 'windowClosing');
     }
     if (landers === 1 && !w.flags.lastOne) {
       w.flags.lastOne = true;
-      w.radio.play('m9', 'lastOne');
+      w.radio.play('m10', 'lastOne');
     }
   },
 
@@ -2374,14 +2377,14 @@ MISSIONS.push({
 });
 
 /* ============================================================
-   任务 10 · 指挥所
+   任务 12 · 指挥所
 
    压轴：把下游的指挥链从中间摘掉。
    预警机调度、巡洋舰指挥、以及那个用活地名做呼号的人。
    ============================================================ */
 MISSIONS.push({
-  id: 'm10',
-  no: 'OPERATION 10',
+  id: 'm12',
+  no: 'OPERATION 12',
   name: '指挥所',
   en: 'COMMAND POST',
   loc: '分水海盆南缘 / 11°05′N 134°45′E',
@@ -2503,28 +2506,28 @@ MISSIONS.push({
 
     if (!w.flags.contact && w.time > 5) {
       w.flags.contact = true;
-      w.radio.play('m10', 'contact');
+      w.radio.play('m12', 'contact');
     }
     // 预警机被打掉 → 下游各机失去调度
     if (aews === 0 && !w.flags.aewDown) {
       w.flags.aewDown = true;
-      w.radio.play('m10', 'aewDown');
+      w.radio.play('m12', 'aewDown');
     }
     // 指挥舰被打掉 → 下游开始撤
     if (ships === 0 && !w.flags.cpDown) {
       w.flags.cpDown = true;
-      w.radio.play('m10', 'cpDown');
+      w.radio.play('m12', 'cpDown');
     }
     // 冬港血量过半 → 阶段二
     if (w.ace && w.ace.alive && !w.flags.aceP2 && w.ace.hp < w.ace.maxHp * 0.5) {
       w.flags.aceP2 = true;
-      w.radio.play('m10', 'bossPhase2');
+      w.radio.play('m12', 'bossPhase2');
       w.ace.ai.mode = 'pursue';
       w.ace.ai.skill = 1.0;
     }
     if (w.ace && !w.ace.alive && !w.flags.aceKilled) {
       w.flags.aceKilled = true;
-      w.radio.play('m10', 'aceKill');
+      w.radio.play('m12', 'aceKill');
     }
   },
 
@@ -2737,15 +2740,15 @@ MISSIONS.push({
 });
 
 /* ============================================================
-   任务 11 · 补给线（资产保卫，2-0IMPL 4.11）
+   任务 9 · 补给线（资产保卫，2-0IMPL 4.11）
    下游的护卫舰编队开到防波堤平台群外 7 km 停下炮击。三座平台全毁即失败；
    击沉编队长或打掉大半舰船，剩下的就掉头撤退 —— 撤出 26 km 或全沉即胜。
    剧情：接 m8（燧石）—— 打不到浮岛，就打给浮岛加油的东西。
-   邓氏鱼留给 m10 当指挥舰，所以这里是菊石编队。
+   邓氏鱼留给 m12（指挥所）当指挥舰，所以这里是菊石编队。
    平台受损到 75 / 50 / 25% 时友军报告（单位血量看不见，靠这个提醒）。
    ============================================================ */
-var M11_ASSET_MARKS = [0.75, 0.5, 0.25];
-function m11Retreat(w) {
+var M9_ASSET_MARKS = [0.75, 0.5, 0.25];
+function m9Retreat(w) {
   for (var i = 0; i < w.fleet.length; i++) {
     var t = w.fleet[i];
     if (!t.alive) continue;
@@ -2755,8 +2758,8 @@ function m11Retreat(w) {
   }
 }
 MISSIONS.push({
-  id: 'm11',
-  no: 'OPERATION 11',
+  id: 'm9',
+  no: 'OPERATION 09',
   name: '补给线',
   en: 'SUPPLY LINE',
   loc: '分水海盆东缘 / 12°40′N 135°10′E',
@@ -2878,8 +2881,8 @@ MISSIONS.push({
     // 平台受损报告
     var frac = hp / w.assetFull;
     w.flags.assetMark = w.flags.assetMark || 0;
-    while (w.flags.assetMark < M11_ASSET_MARKS.length && frac < M11_ASSET_MARKS[w.flags.assetMark]) {
-      var pct = Math.round(M11_ASSET_MARKS[w.flags.assetMark] * 100);
+    while (w.flags.assetMark < M9_ASSET_MARKS.length && frac < M9_ASSET_MARKS[w.flags.assetMark]) {
+      var pct = Math.round(M9_ASSET_MARKS[w.flags.assetMark] * 100);
       w.flags.assetMark++;
       w.radio.raw({ who: '防波堤', cls: 'ally',
         tx: pct > 50 ? '我们在挨炮。平台群结构还剩 ' + pct + '%。' :
@@ -2890,7 +2893,7 @@ MISSIONS.push({
     for (i = 0; i < w.fleet.length; i++) { if (!w.fleet[i].alive) sunk++; else left++; }
     if (!w.flags.retreat && left && (!w.flagship.alive || sunk >= 3)) {
       w.flags.retreat = true;
-      m11Retreat(w);
+      m9Retreat(w);
       w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>他们在掉头。</b>编队长没了，剩下的船往北撤。', gap: 1.0 });
     }
     w.objectiveSub = '平台 ' + alive + '/3 · 结构 ' + Math.round(frac * 100) + '% · 敌舰 ' + left + '/' + w.fleet.length;
@@ -2911,17 +2914,17 @@ MISSIONS.push({
 });
 
 /* ============================================================
-   任务 12 · 舰队对决（2-0IMPL 4.11）
+   任务 11 · 舷对舷（舰队对决，2-0IMPL 4.11）
    双方各一支水面编队从射程外对向接近，进入射程后边打边靠近，
    在相距约 9 km 处停下（不贴脸）。敌舰全沉即胜，我方旗舰沉没即败。
-   剧情：接 m9（登陆窗口）—— 船团没能靠岸，下游把弹库舰房角石派了出来，
-   想一次齐射打掉上游的水面编队；它沉了以后，下游只剩 m10 那条邓氏鱼指挥舰。
+   剧情：接 m10（登陆窗口）—— 船团没能靠岸，下游把弹库舰房角石派了出来，
+   想一次齐射打掉上游的水面编队；它沉了以后，下游只剩 m12（指挥所）那条邓氏鱼指挥舰。
    旗舰受损到 75 / 50 / 25% 时报告。
    ============================================================ */
-var M12_FLAG_MARKS = [0.75, 0.5, 0.25];
+var M11_FLAG_MARKS = [0.75, 0.5, 0.25];
 MISSIONS.push({
-  id: 'm12',
-  no: 'OPERATION 12',
+  id: 'm11',
+  no: 'OPERATION 11',
   name: '舷对舷',
   en: 'BROADSIDE',
   loc: '分水海盆中部 / 12°20′N 134°40′E',
@@ -2947,38 +2950,46 @@ MISSIONS.push({
   ],
   threats: [
     '房角石级弹库舰 二号舰 ×1（三段垂发，反舰弹最多的一条）',
-    '菊石级护卫舰 ×2、三叶虫级导弹快艇 ×3',
+    '菊石级护卫舰 ×4、三叶虫级导弹快艇 ×6',
     'GAL-31 / VAC-14 编队 ×4（VAC-14 挂对面弹）',
     'ROK-2「石英」预警机'
   ],
-  intel: `两支编队相距约 15 km，对向航行<br>
-    开场不久就进入反舰弹射程，最后会在约 8.5 km 处对峙<br>
+  intel: `两支编队前沿相距约 18 km，对向航行，开场一分钟左右进入反舰弹射程<br>
+    最后前沿会在约 8.5 km 处对峙，主力相距约 13 km<br>
+    敌编队：快艇打前哨，菊石在前方两侧，房角石在后方居中，两翼各一条快艇<br>
     我方近防能拦一部分来袭弹，拦不住齐射<br>
     <span class="am">房角石几乎没有自卫火力 —— 但它一开火，天上就全是弹</span>`,
   map: [
     { x: 0, z: -9000, type: 'start', dir: 0, label: '进入点' },
     { x: 0, z: -3000, type: 'base', label: '抹香鲸（旗舰）' },
-    { x: 0, z: 13000, type: 'enemy', label: '房角石编队' },
+    { x: -6000, z: -4500, type: 'base', label: '左翼护航 海豚' },
+    { x: 6000, z: -4500, type: 'base', label: '右翼护航 海豚' },
+    { x: 0, z: 19000, type: 'enemy', label: '房角石 二号舰' },
+    { x: -7000, z: 18000, type: 'enemy', label: '左翼护航' },
+    { x: 7000, z: 18000, type: 'enemy', label: '右翼护航' },
     { x: 7000, z: 30000, type: 'site', label: '石英 QUARTZ' }
   ],
 
   spawn: function (w) {
     var p = w.player;
-    spawnCellField(w, { xs: [-15000, 15000], zs: [-2000, 24000] });
+    spawnCellField(w, { xs: [-15000, 15000], zs: [-2000, 26000] });
     p.pos = M3.V(0, 6000, -9000);
     p.fwd = M3.V(0, 0, 1);
     p.speed = 380;
     spawnWingman(w, 2, -220, 24, -320);
     spawnWingman(w, 3, 220, 24, -320);
 
-    /* 我方：从 z ≈ −2 km 往北开到 +1 km 停下。敌方：从 +13 km 往南开到 +9.5 km。
-       开场两条主线相距约 15 km（不久就进反舰弹射程），停下时约 8.5 km。航速 14 m/s（约 27 节）。 */
+    /* 两个二维阵型，各自往前开 4.5 km 停下。航速 14 m/s（约 27 节），对向合计 28 m/s。
+         我方（向北）：旗舰居中；两条虎鲸在前方两侧（前卫 / 对空屏障）；两条海豚在后方两翼（护航）
+         敌方（向南）：一条快艇打前哨；两条菊石在前方两侧；房角石在后方居中；两翼各一条快艇
+       开场最近的一对（敌前哨快艇 ↔ 我方虎鲸）相距约 17.8 km，反舰弹开火距离 16 km ——
+       第一枪最早在开场约 60 s 后。停下时前沿相距约 8.5 km、主力相距约 13 km。 */
     var mine = [
-      { model: 'spermwhale', label: '抹香鲸 SPERMWHALE', x: 0, z: -2000, hp: 1500, sam: 'ss6', cd: 3, flag: true },
-      { model: 'orca', label: '虎鲸 A', x: -3500, z: -1500, hp: 900, sam: 'ss6', cd: 5 },
-      { model: 'orca', label: '虎鲸 B', x: 3500, z: -1500, hp: 900, sam: 'ss6', cd: 5 },
-      { model: 'dolphin', label: '海豚 A', x: -7000, z: -1000, hp: 520, sam: 'ss6', cd: 8 },
-      { model: 'dolphin', label: '海豚 B', x: 7000, z: -1000, hp: 520, sam: 'ss6', cd: 8 }
+      { model: 'spermwhale', label: '抹香鲸 SPERMWHALE', x: 0, z: -3000, hp: 1500, sam: 'ss6', cd: 3, flag: true },
+      { model: 'orca', label: '虎鲸 A', x: -3000, z: -1500, hp: 900, sam: 'ss6', cd: 5 },
+      { model: 'orca', label: '虎鲸 B', x: 3000, z: -1500, hp: 900, sam: 'ss6', cd: 5 },
+      { model: 'dolphin', label: '海豚 A（左翼）', x: -6000, z: -4500, hp: 520, sam: 'ss6', cd: 8 },
+      { model: 'dolphin', label: '海豚 B（右翼）', x: 6000, z: -4500, hp: 520, sam: 'ss6', cd: 8 }
     ];
     w.myFleet = [];
     for (var i = 0; i < mine.length; i++) {
@@ -2986,18 +2997,26 @@ MISSIONS.push({
       var t = spawnShip(w, {
         model: q.model, label: q.label, team: 0, x: q.x, z: q.z, hp: q.hp,
         weapon: q.sam, fireCd: q.cd,
-        route: { wp: [{ x: q.x, z: q.z + 3000 }], speed: 14 }
+        route: { wp: [{ x: q.x, z: q.z + 4500 }], speed: 14 }
       });
       if (q.flag) { w.flagship = t; w.guarded = [t]; }
       w.myFleet.push(t);
     }
     var foe = [
-      { model: 'cameroceras', label: '房角石 二号舰', x: 0, z: 13500, hp: 900, sam: 'dl9' },
-      { model: 'ammonite', label: '菊石 A', x: -4000, z: 13000, hp: 420, sam: 'dl9' },
-      { model: 'ammonite', label: '菊石 B', x: 4000, z: 13000, hp: 420, sam: 'dl9' },
-      { model: 'trilobite', label: '三叶虫 A', x: -8000, z: 12500, hp: 120 },
-      { model: 'trilobite', label: '三叶虫 B', x: 8000, z: 12500, hp: 120 },
-      { model: 'trilobite', label: '三叶虫 C', x: 0, z: 15500, hp: 120 }
+      /* ssmK 每条船单独给：房角石 200 发反舰弹只带一小部分进这一关（它的齐射节奏是一波 6 发 / 20 s），
+         其余船满弹，靠整舰齐射节奏控制速度 */
+      { model: 'cameroceras', label: '房角石 二号舰', x: 0, z: 19000, hp: 900, sam: 'dl9', k: 0.2, arsenal: true },
+      // 护航编队：菊石 ×4（前方两侧各一前一后）、快艇 ×6（前哨 2、两翼各 2）
+      { model: 'ammonite', label: '菊石 A', x: -3500, z: 17000, hp: 420, sam: 'dl9', k: 1 },
+      { model: 'ammonite', label: '菊石 B', x: 3500, z: 17000, hp: 420, sam: 'dl9', k: 1 },
+      { model: 'ammonite', label: '菊石 C', x: -5000, z: 18500, hp: 420, sam: 'dl9', k: 1 },
+      { model: 'ammonite', label: '菊石 D', x: 5000, z: 18500, hp: 420, sam: 'dl9', k: 1 },
+      { model: 'trilobite', label: '三叶虫 A（左翼）', x: -7000, z: 18000, hp: 120, k: 1 },
+      { model: 'trilobite', label: '三叶虫 B（右翼）', x: 7000, z: 18000, hp: 120, k: 1 },
+      { model: 'trilobite', label: '三叶虫 E（左翼）', x: -9000, z: 19500, hp: 120, k: 1 },
+      { model: 'trilobite', label: '三叶虫 F（右翼）', x: 9000, z: 19500, hp: 120, k: 1 },
+      { model: 'trilobite', label: '三叶虫 C（前哨）', x: -1500, z: 16000, hp: 120, k: 1 },
+      { model: 'trilobite', label: '三叶虫 D（前哨）', x: 1500, z: 16000, hp: 120, k: 1 }
     ];
     w.fleet = [];
     for (i = 0; i < foe.length; i++) {
@@ -3005,9 +3024,10 @@ MISSIONS.push({
       var es = spawnShip(w, {
         model: q.model, label: q.label, team: 1, x: q.x, z: q.z, hp: q.hp,
         weapon: q.sam || null, fireCd: 6,
-        ssmK: 0.2, ssmStagger: 300,
-        route: { wp: [{ x: q.x, z: q.z - 3500 }], speed: 14 }
+        ssmK: q.k, ssmStagger: 30,
+        route: { wp: [{ x: q.x, z: q.z - 4500 }], speed: 14 }
       });
+      if (q.arsenal) w.arsenal = es;
       /* 对舰火力优先打我方旗舰（prefer，不是 only：旗舰不在射界里时照样打别的船）。
          不下这道命令的话，反舰弹按"最好打"分配，打光之前根本轮不到居中的旗舰 */
       es.orders = { surface: { target: w.flagship, mode: 'prefer', weight: 2 } };
@@ -3037,10 +3057,38 @@ MISSIONS.push({
     var i, left = 0, mine = 0;
     for (i = 0; i < w.fleet.length; i++) if (w.fleet[i].alive) left++;
     for (i = 0; i < w.myFleet.length; i++) if (w.myFleet[i].alive) mine++;
+    /* 房角石的打法和别的船不一样：进入反舰弹射程（离我方任一舰 16 km）就停船，原地按批次齐射。
+       它没有装甲、没有像样的防空，再往前开只会进别人的射程 —— 设定里它就是"打完掉头跑"的船。
+       其余船照旧边打边靠近（航线走完在约 8.5 km 处停下） */
+    var ars = w.arsenal;
+    if (ars && ars.alive && !w.flags.arsenalHold) {
+      for (i = 0; i < w.myFleet.length; i++) {
+        var my = w.myFleet[i];
+        if (my.alive && M3.dist(my.pos, ars.pos) < 16000) {
+          w.flags.arsenalHold = true;
+          ars.wpIdx = ars.route.wp.length;       // 走完航线 = 原地停住（stepTarget）
+          w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>房角石停船了。</b>它要在原地一波一波往外放弹。', gap: 1.0 });
+          break;
+        }
+      }
+    }
+    /* 护航编队全灭、只剩房角石：我方舰队把停船点往前推，开到离它 6 km 停下 ——
+       在 75 mm 主炮的 8 km 射程内，全舰队都能用舰炮打它。各舰按自己相对房角石的方位停，不挤成一团 */
+    if (ars && ars.alive && !w.flags.closeIn && left === 1) {
+      w.flags.closeIn = true;
+      for (i = 0; i < w.myFleet.length; i++) {
+        var ms = w.myFleet[i];
+        if (!ms.alive) continue;
+        var dir = M3.norm(M3.V(ms.pos.x - ars.pos.x, 0, ms.pos.z - ars.pos.z));
+        ms.route = { wp: [{ x: ars.pos.x + dir.x * 6000, z: ars.pos.z + dir.z * 6000 }], speed: 14 };
+        ms.wpIdx = 0; ms.arrived = false;
+      }
+      w.radio.raw({ who: '抹香鲸', cls: 'ally', tx: '<b>敌方护航全灭。</b>编队全体前进，目标房角石！', gap: 1.0 });
+    }
     var f = w.flagship, frac = f.alive ? Math.max(0, f.hp) / f.maxHp : 0;
     w.flags.flagMark = w.flags.flagMark || 0;
-    while (f.alive && w.flags.flagMark < M12_FLAG_MARKS.length && frac < M12_FLAG_MARKS[w.flags.flagMark]) {
-      var pct = Math.round(M12_FLAG_MARKS[w.flags.flagMark] * 100);
+    while (f.alive && w.flags.flagMark < M11_FLAG_MARKS.length && frac < M11_FLAG_MARKS[w.flags.flagMark]) {
+      var pct = Math.round(M11_FLAG_MARKS[w.flags.flagMark] * 100);
       w.flags.flagMark++;
       w.radio.raw({ who: '抹香鲸', cls: 'ally',
         tx: pct > 50 ? '旗舰中弹，损管已经上去了。' :
@@ -3054,7 +3102,15 @@ MISSIONS.push({
         w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>' + s.label + ' 沉了。</b>', gap: 0.9 });
       }
     }
-    if (!w.flags.contact && left && Math.abs(w.fleet[0].pos.z - f.pos.z) < 16500) {
+    // 任意一对敌我舰船进入 16 km（反舰弹开火距离）就报
+    var inRange = false;
+    for (i = 0; i < w.fleet.length && !inRange; i++) {
+      if (!w.fleet[i].alive) continue;
+      for (var j = 0; j < w.myFleet.length; j++) {
+        if (w.myFleet[j].alive && M3.dist(w.fleet[i].pos, w.myFleet[j].pos) < 16000) { inRange = true; break; }
+      }
+    }
+    if (!w.flags.contact && inRange) {
       w.flags.contact = true;
       w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '双方进入反舰弹射程。<b>先打房角石，再打快艇。</b>', gap: 1.0 });
     }

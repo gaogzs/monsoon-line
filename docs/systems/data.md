@@ -47,7 +47,7 @@
 | `loadoutPenalty(lf)` | 函数 | — | `game.js` 面板 + `entities.js` 物理 |
 | `FLARE_RD` | 对象 | 14 键 → 注入 `flareRD`（只给雷达弹） | `breakLock()` |
 | `HARD_MODELS` | 对象 | 1 键（`radar`） | `entities.js` `isHard` / `warheadK`（加固目标的战斗部系数） |
-| `VOICES` | 对象 | 11 个任务（`m1`–`m10` + `sk1`） | `game.js` 的 `Radio` |
+| `VOICES` | 对象 | 13 个任务（`m1`–`m12` + `sk1`） | `game.js` 的 `Radio` |
 
 规模数字会随内容增长，以上是核对 `data.js` 时的值——数错不会报错，只当参考。
 
@@ -195,7 +195,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 `route` 有两种用法（都由 `entities.js` 的 `stepTarget` 航路分支执行，优先于 `drift`）：
 
 - `{ wp: [a, b], speed, loop: true }` —— 在两点间往返巡航，大部分舰船都是这种；
-- `{ wp: [...], speed, loop: false }` —— 真的航路，走到终点为止（m9 的登陆舰就是这样往北开）。
+- `{ wp: [...], speed, loop: false }` —— 真的航路，走到终点为止（m10 的登陆舰就是这样往北开）。
 
 不给 `route` 就是锚泊目标（只剩 `drift`）。
 
@@ -440,7 +440,7 @@ var tAcc = Math.min(w.life, Math.max(0, (w.speed - v0) / w.boost));
 ## VOICES（无线电台词）
 
 ```js
-VOICES = { m1: { start: [...], tally: [...] }, m2: {...}, ..., m10: {...}, sk1: {...} }   // 11 个任务
+VOICES = { m1: { start: [...], tally: [...] }, m2: {...}, ..., m12: {...}, sk1: {...} }   // 13 个任务
 ```
 
 每个事件是**数组**，元素 `{ who, cls, tx, gap }`：
@@ -473,8 +473,8 @@ if (!v || !v[evt]) return;      // 找不到就静默返回
 | m6 | `start` / `contact` `lowQ` `half` | M6 `tick` |
 | m7 | `start` / `spotted` `landersDown` | M7 `tick` |
 | m8 | `start` / `fleetHit` `shipLost` | M8 `tick` |
-| m9 | `start` / `windowClosing` `lastOne` | M9 `tick`（时间到的那句是 `game.js` 用 `Radio.raw` 直接发的） |
-| m10 | `start` / `contact` `aewDown` `cpDown` `bossPhase2` `aceKill` | M10 `tick` |
+| m10 | `start` / `windowClosing` `lastOne` | M10 `tick`（时间到的那句是 `game.js` 用 `Radio.raw` 直接发的） |
+| m12 | `start` / `contact` `aewDown` `cpDown` `bossPhase2` `aceKill` | M12 `tick` |
 | sk1 | `start` | `game.js` 开局 |
 | 全部 | `allyDown` | `game.js` 统一触发 —— **但只有 `m1` 定义了这个事件**，其余任务里僚机阵亡这句会静默跳过 |
 
