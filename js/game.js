@@ -3483,7 +3483,10 @@ var Game = (function () {
          从 300 米到 2000 米都一样显眼。上限 90 米防止近处拉成面条。 */
       var dirv = M3.norm(b.vel);
       var bDist = M3.dist(b.pos, cam.pos);
-      var trailLen = Math.min(90, Math.max(13, bDist * 0.045));
+      /* 航空机炮：随距离衰减，但比真实透视慢 —— 屏幕上的角长度按 1/√距离 缩小（真实是 1/距离）。
+         290 m 内维持 13 m；更远世界长度按 √距离 增长，1.5 km 外约 30 m，上限 90 m。
+         以前是角长度恒定（dist × 0.045），远处一串弹和眼前一样长 */
+      var trailLen = Math.min(90, 13 * Math.sqrt(Math.max(290, bDist) / 290));
       /* 中大口径炮弹（> 30 mm）不做角长度自适应：长度、粗细都是世界尺寸，
          近大远小 —— 否则几公里外的一发炮弹在屏幕上和眼前的一样大 */
       /* 炮塔打出来的弹（近防炮、遥控炮、尾炮）也按世界尺寸画：它们大多是远处的旁观者，
@@ -3509,8 +3512,8 @@ var Game = (function () {
 
       var mine = player && b.team === player.team;
 
-      // 远弹略粗，抵消透视缩细（机炮）
-      var wMul = 1 + Math.min(1, bDist / 1600) * 0.8;
+      // 航空机炮的粗细同样慢衰减：√(400 / 距离)，最细保留 0.6 倍
+      var wMul = M3.clamp(Math.sqrt(400 / Math.max(1, bDist)), 0.6, 1);
       /* 炮弹 / 炮塔弹：曳光光晕半径按口径取世界尺寸（75 mm ≈ 0.55 m，20 mm ≈ 0.2 m），
          投影后不小于约 0.6 px —— 远处是一道细亮线，不会消失 */
       if (big) wMul = Math.max(0.5, cam.focal * (cal > 30 ? 0.28 : 0.2) * Math.sqrt(cal / 20) / Math.max(1, bDist));
@@ -3552,6 +3555,35 @@ var Game = (function () {
     ev.length = 0;
   }
 
+  /* 友军损失（4.11）：任务指定要保护的单位（w.guarded / w.baseTarget）权重最大 ——
+       被摧毁每个 −4000，没摧毁按受损比例最多 −2500；
+     其他友军（僚机、我方舰船 / 设施）损失每个 −800。
+     被保护单位有损失时拿不到 S（见 finish）。 */
+  function friendlyLosses() {
+    var prot = (world.guarded || []).slice();
+    if (world.baseTarget && prot.indexOf(world.baseTarget) < 0) prot.push(world.baseTarget);
+    var lost = 0, dmg = 0, other = 0, i;
+    for (i = 0; i < prot.length; i++) {
+      var p = prot[i];
+      if (!p) continue;
+      if (!p.alive) lost++;
+      else if (p.maxHp) dmg += 1 - Math.max(0, p.hp) / p.maxHp;
+    }
+    for (i = 0; i < world.targets.length; i++) {
+      var t = world.targets[i];
+      if (t.team === 0 && !t.alive && prot.indexOf(t) < 0 && !t.friendlyAsset) other++;
+    }
+    for (i = 0; i < world.actors.length; i++) {
+      var a = world.actors[i];
+      if (a.team === 0 && !a.isPlayer && !a.alive && !a.escaped) other++;
+    }
+    var dmgP = Math.round(Math.min(1, dmg) * 2500);
+    var txt = prot.length
+      ? '保护目标 损失 ' + lost + ' / 受损 ' + Math.round(dmg / Math.max(1, prot.length - lost || 1) * 100) + '%' + '　其他 ' + other
+      : (other ? '其他 ' + other : '—');
+    return { lost: lost, other: other, penalty: lost * 4000 + dmgP + other * 800, txt: txt };
+  }
+
   /* 一架敌机算谁的。没有记录击杀者的（自己失速撞海、被逼进海面）
      算玩家的 —— 这和以前"所有敌机阵亡都算玩家"的口径一致。 */
   function killCredit(a) {
@@ -3581,12 +3613,13 @@ var Game = (function () {
     /* 地面/海面目标单独计分，权重低于一架飞机（1000）—— 否则"打设施"
        会变成比空战更划算的刷分方式，而这类目标既不会还手也不会跑。 */
     var gk = world.groundKilled || 0;
+    var loss = friendlyLosses();
     var score = world.killed * 1000 + gk * 400 + Math.round(acc * 3000)
-      + Math.round(hull * 2000) + (win ? 4000 : 0) - penalty * 2500;
+      + Math.round(hull * 2000) + (win ? 4000 : 0) - penalty * 2500 - loss.penalty;
 
     var rank = 'D';
     if (!win) rank = 'F';
-    else if (score >= 16000 && penalty === 0) rank = 'S';
+    else if (score >= 16000 && penalty === 0 && loss.lost === 0) rank = 'S';
     else if (score >= 11000) rank = 'A';
     else if (score >= 7000) rank = 'B';
     else rank = 'C';
@@ -3611,6 +3644,7 @@ var Game = (function () {
       ['机炮精度', (acc * 100).toFixed(0) + '%'],
       ['机体完整度', player.alive ? (hull * 100).toFixed(0) + '%' : '—'],
       ['误击友方设施', penalty],
+      ['友军损失', loss.txt],
       ['作战时间', world.timeLimit > 0
         ? fmtTime(world.time) + ' / ' + fmtTime(world.timeLimit)
         : fmtTime(world.time)],

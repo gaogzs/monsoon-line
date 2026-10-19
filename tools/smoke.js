@@ -3067,8 +3067,9 @@ if (Ent && M3 && me && world) {
       if (v17.speed < 1100) {
         bad.push('CLA-17 合并后应该继承 CLA-9 的速度（1150），现在是 ' + v17.speed);
       }
-      if (v17.perPoint !== 1) {
-        bad.push('CLA-17 的每点弹数应该是 1（重型远距弹），现在是 ' + v17.perPoint);
+      /* 2026-10-19 全面加弹药量：重型远距弹每点从 1 枚放宽到最多 2 枚 */
+      if (!(v17.perPoint >= 1 && v17.perPoint <= 2)) {
+        bad.push('CLA-17 的每点弹数应该在 1–2（重型远距弹），现在是 ' + v17.perPoint);
       }
     } else {
       bad.push('找不到 v17（CLA-17）');

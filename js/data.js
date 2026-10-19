@@ -1969,7 +1969,7 @@ var WEAPONS = {
     speed: 720, boost: 300, life: 3.5, vsLife: 9.0,
     turn: 2.55, seeker: 'ir', lockCone: 32 * Math.PI / 180, lockDist: 3400,
     dmg: 16, ammo: 8, cd: 0.17, salvo: 4, flare: 0.44, fuze: 8, blast: 14, blastCore: 2,
-    target: 'air',    desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下十六发，
+    target: 'air',    desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下 {{perPoint}} 发，
       一次齐射四枚，用来把蜂群从天上扫下来。
       <b>拿去打有人机是浪费。</b>`,
     stat: { dmg: 0.16, spd: 0.44, trn: 0.72, rng: 0.28, ecm: 0.22 }
@@ -2330,7 +2330,9 @@ var WEAPONS = {
      之后有限转率转平、爬到 loft 高度巡航，末段俯冲 —— 见 stepMissile 的 launchT 分支。 */
   ssm: {
     id: 'ssm', name: 'SPO-30', cn: '破浪 · WAVEBREAKER', kind: 'asm', model: 'missile',
-    speed: 620, boost: 160, life: 14.0, vsLife: 30.0,
+    /* 巡航发动机全程有动力（life 40 s）：以前按火箭弹的 14 s 动力段，
+       16 km 发射的弹在离目标约 2.8 km 处掉到 170 m/s、寿命到期自爆 */
+    speed: 620, boost: 160, life: 40.0, vsLife: 50.0,
     turn: 0.60, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 16000,
     dmg: 260, ammo: 4, cd: 6, salvo: 1, flare: 0.70, blast: 20, blastCore: 6,
     target: 'ship',
@@ -2371,34 +2373,34 @@ var WEAPONS = {
    ============================================================ */
 var STORE_ATTR = {
   /* 空空 */
-  srm:  { fits: ['tip', 'light', 'heavy'], perPoint: 8,  mass: 95 },
-  trm:  { fits: ['tip', 'light', 'heavy'], perPoint: 6,  mass: 105 },
-  hos:  { fits: ['tip', 'light', 'heavy'], perPoint: 4,  mass: 100 },
-  qsr:  { fits: ['tip', 'light', 'heavy'], perPoint: 12, mass: 92 },
-  wasp: { fits: ['tip', 'light', 'heavy'], perPoint: 3,  mass: 145 },
-  swm:  { fits: ['tip', 'light', 'heavy'], perPoint: 16, mass: 62 },
-  v9:   { fits: ['tip', 'light', 'heavy'], perPoint: 2,  mass: 110 },
-  v11:  { fits: ['light', 'heavy'],        perPoint: 2,  mass: 135 },
+  srm:  { fits: ['tip', 'light', 'heavy'], perPoint: 10,  mass: 95 },
+  trm:  { fits: ['tip', 'light', 'heavy'], perPoint: 8,  mass: 105 },
+  hos:  { fits: ['tip', 'light', 'heavy'], perPoint: 6,  mass: 100 },
+  qsr:  { fits: ['tip', 'light', 'heavy'], perPoint: 16, mass: 92 },
+  wasp: { fits: ['tip', 'light', 'heavy'], perPoint: 4,  mass: 145 },
+  swm:  { fits: ['tip', 'light', 'heavy'], perPoint: 20, mass: 62 },
+  v9:   { fits: ['tip', 'light', 'heavy'], perPoint: 4,  mass: 110 },
+  v11:  { fits: ['light', 'heavy'],        perPoint: 3,  mass: 135 },
   // 中距弹可以进内埋弹舱 —— 隐形机就是靠这个保住隐身的
-  mrm:  { fits: ['light', 'heavy', 'belly'], perPoint: 4, mass: 195 },
-  hwm:  { fits: ['light', 'heavy'],        perPoint: 2,  mass: 240 },
-  kkv:  { fits: ['tip', 'light', 'heavy'], perPoint: 10, mass: 90 },
-  v17:  { fits: ['heavy'],                 perPoint: 1,  mass: 285 },
-  arm:  { fits: ['heavy'],                 perPoint: 2,  mass: 310 },
+  mrm:  { fits: ['light', 'heavy', 'belly'], perPoint: 6, mass: 195 },
+  hwm:  { fits: ['light', 'heavy'],        perPoint: 3,  mass: 240 },
+  kkv:  { fits: ['tip', 'light', 'heavy'], perPoint: 12, mass: 90 },
+  v17:  { fits: ['heavy'],                 perPoint: 2,  mass: 285 },
+  arm:  { fits: ['heavy'],                 perPoint: 3,  mass: 310 },
   /* ram（CLA-9）已并入 v17 */
-  vlar: { fits: ['heavy'],                 perPoint: 1,  mass: 720 },
-  hva:  { fits: ['heavy'],                 perPoint: 1,  mass: 560 },
+  vlar: { fits: ['heavy'],                 perPoint: 2,  mass: 720 },
+  hva:  { fits: ['heavy'],                 perPoint: 2,  mass: 560 },
 
   /* 对地与反大型 */
-  v25:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 330 },
-  asl:  { fits: ['light', 'heavy'],        perPoint: 4,  mass: 240 },
-  asl2: { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 520 },
-  sat:  { fits: ['heavy'],                 perPoint: 2,  mass: 410 },
-  v22:  { fits: ['heavy'],                 perPoint: 1,  mass: 640 },
-  v30:  { fits: ['heavy', 'belly'],        perPoint: 1,  mass: 295 },
-  clb:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 350 },
-  rkt:  { fits: ['light', 'heavy'],        perPoint: 28, mass: 280 },
-  lcm:  { fits: ['heavy', 'belly'],        perPoint: 1,  mass: 780 },
+  v25:  { fits: ['heavy', 'belly'],        perPoint: 3,  mass: 330 },
+  asl:  { fits: ['light', 'heavy'],        perPoint: 6,  mass: 240 },
+  asl2: { fits: ['heavy', 'belly'],        perPoint: 3,  mass: 520 },
+  sat:  { fits: ['heavy'],                 perPoint: 3,  mass: 410 },
+  v22:  { fits: ['heavy'],                 perPoint: 2,  mass: 640 },
+  v30:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 295 },
+  clb:  { fits: ['heavy', 'belly'],        perPoint: 3,  mass: 350 },
+  rkt:  { fits: ['light', 'heavy'],        perPoint: 36, mass: 280 },
+  lcm:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 780 },
 
   /* 吊舱（主动） */
   e4:   { fits: ['light', 'belly'],        perPoint: 1,  mass: 215 },
@@ -3223,6 +3225,27 @@ var VOICES = {
     ],
     lose: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER 1 失去信号。船团继续往北。', gap: 0.8 }
+    ]
+  },
+
+  /* ==================== 任务 11 · 补给线 ==================== */
+  m11: {
+    start: [
+      { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，东缘的平台群在挨炮。', gap: 1.1 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '两座防波堤、一座浅滩站。中队一半的油在那儿。', gap: 1.5 },
+      { who: 'VESPER-2', cls: 'ally', tx: '来的是什么？', gap: 0.8 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '三条菊石、两条快艇。它们会停在七公里外打 —— 平台跑不掉。', gap: 1.6 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '<b>打掉编队长，剩下的就会走。</b>', gap: 0.9 }
+    ]
+  },
+
+  /* ==================== 任务 12 · 舷对舷 ==================== */
+  m12: {
+    start: [
+      { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，抹香鲸已经离开浮岛，正往南压。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '对面是房角石。三百多个发射井，它是来一次打光的。', gap: 1.6 },
+      { who: 'VESPER-3', cls: 'ally', tx: '我方编队的反舰弹不多。', gap: 0.9 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '所以要你们。<b>在它的弹飞出来之前，让它沉。</b>', gap: 1.0 }
     ]
   },
 

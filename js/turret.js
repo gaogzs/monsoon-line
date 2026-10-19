@@ -211,7 +211,8 @@ var Turret = (function () {
     var g = tu.gun;
     if (g.range) return g.range;
     var w = isLauncher(tu) ? WEAPONS[g.weapon] : null;
-    return w ? (w.lockDist || 8000) : 2000;
+    /* 发射器：和 AI 同一套 —— min(锁定距离, 有效射程 × 余量)，不在打不到的距离上放弹 */
+    return w ? Ent.aiReach(w, 30) : 2000;
   }
 
   /* 拦截点：tof = 距离 / 弹速，迭代两次；相对宿主速度外推，再补炮弹下坠 */
