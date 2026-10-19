@@ -2,9 +2,41 @@
    由 tools/release.js 从 CHANGELOG.md 写出，每次发版后重新生成。
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
-  "current": "v2.2.0",
-  "generated": "2026-10-19T17:36:54+09:00",
+  "current": "v2.3.0",
+  "generated": "2026-10-19T23:29:48+09:00",
   "releases": [
+    {
+      "version": "v2.3.0",
+      "date": "2026-10-19",
+      "title": "待润色",
+      "tag": "中版本",
+      "commit": "cbd2d87",
+      "lead": "",
+      "sections": [
+        {
+          "h": "新增",
+          "items": [
+            "feat: 舰队战调整、僚机修复、关卡按游玩顺序编号",
+            "feat: 平衡回归与两个新关卡（2-0IMPL 阶段 4 E）",
+            "feat: 舰尾水花与固定式海上平台（2-0IMPL 阶段 4 C、D）",
+            "feat: 舰对舰与近防拦截（2-0IMPL 阶段 4 A、B）"
+          ]
+        },
+        {
+          "h": "修复",
+          "items": [
+            "fix: 类别不对时不开始锁定，允许强制开火；系统提示改为统一 UI 风格"
+          ]
+        },
+        {
+          "h": "文档",
+          "items": [
+            "docs: 记录阶段 4 E 的实施说明",
+            "docs: 写 v2.2.0 更新日志（舷侧）"
+          ]
+        }
+      ]
+    },
     {
       "version": "v2.2.0",
       "date": "2026-10-19",
