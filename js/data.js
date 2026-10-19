@@ -73,7 +73,7 @@ var AIRCRAFT = [
     // 能力标签：决定它能挂哪些"有门槛"的武器，见下面的 STORE_NEEDS
     caps: ['strike', 'ew'],
     maker: '上游公约 · 北岸航空',
-    stats: { spd: 0.68, mob: 0.72, stl: 0.55, fire: 0.70, dur: 0.62, rng: 0.76 },
+    stats: { spd: 0.68, mob: 0.72, stl: 0.55, fire: 0.70, dur: 0.62, rng: 0.76, ecm: 0.40 },
     phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.76, roll: 2.34, yaw: 0.30, hp: 130 },
     gun: 'k3',
     variableSweep: true,
@@ -119,7 +119,7 @@ var AIRCRAFT = [
     planformType: '菱形翼',
     caps: ['intercept'],
     maker: '上游公约 · 高空试验局',
-    stats: { spd: 0.96, mob: 0.84, stl: 0.86, fire: 0.54, dur: 0.32, rng: 0.48 },
+    stats: { spd: 0.96, mob: 0.84, stl: 0.86, fire: 0.54, dur: 0.32, rng: 0.48, ecm: 0.30 },
     phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.80, roll: 2.65, yaw: 0.28, hp: 92 },
     gun: 'k3',
     maxLoad: 4800,
@@ -162,7 +162,7 @@ var AIRCRAFT = [
     planformType: '平直翼',
     caps: ['strike'],
     maker: '上游公约 · 北岸航空',
-    stats: { spd: 0.34, mob: 0.44, stl: 0.30, fire: 0.98, dur: 0.98, rng: 0.60 },
+    stats: { spd: 0.34, mob: 0.44, stl: 0.30, fire: 0.98, dur: 0.98, rng: 0.60, ecm: 0.24 },
     phys: { vMax: 380, vMil: 320, vStall: 88, accel: 18, decel: 44, pitch: 0.62, roll: 1.72, yaw: 0.34, hp: 250 },
     gun: 'k7',
     maxLoad: 7200,
@@ -217,7 +217,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
 <p><b>打它的办法就一个：让它慢下来。</b>
 逼它转弯、逼它爬升、逼它放弃速度 ——
 一旦空速掉下去，它就从"全场最快的截击机"变成"一架普通的飞机"。</p>`,
-    stats: { spd: 0.95, mob: 0.40, stl: 0.30, fire: 0.74, dur: 0.58, rng: 0.62 },
+    stats: { spd: 0.95, mob: 0.40, stl: 0.30, fire: 0.74, dur: 0.58, rng: 0.62, ecm: 0.28 },
     phys: { vMax: 620, vMil: 500, vStall: 138, accel: 34, decel: 32, pitch: 0.48, roll: 1.72, yaw: 0.24, hp: 110 },
     gun: 'k3',
     maxLoad: 5200,
@@ -248,7 +248,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>代价在载弹量上：为了保住隐身，大部分武器必须塞进内埋弹舱。
       一旦外挂，它的隐身性能会掉到和普通战机差不多的水平 ——
       <b>隐身不是一种属性，是一种状态。</b></p>`,
-    stats: { spd: 0.72, mob: 0.66, stl: 0.96, fire: 0.56, dur: 0.50, rng: 0.70 },
+    stats: { spd: 0.72, mob: 0.66, stl: 0.96, fire: 0.56, dur: 0.50, rng: 0.70, ecm: 0.72 },
     phys: { vMax: 540, vMil: 430, vStall: 118, accel: 26, decel: 36, pitch: 0.66, roll: 2.42, yaw: 0.26, hp: 96 },
     gun: 'k3',
     maxLoad: 4200,
@@ -281,7 +281,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>信天翁是上游公约第一架量产的前掠翼战斗机。
       它飞不快，加速也一般，但<b>滚转比这里任何一架都快</b>，
       低速缠斗时最灵活。</p>`,
-    stats: { spd: 0.52, mob: 0.90, stl: 0.24, fire: 0.60, dur: 0.62, rng: 0.80 },
+    stats: { spd: 0.52, mob: 0.90, stl: 0.24, fire: 0.60, dur: 0.62, rng: 0.80, ecm: 0.30 },
     phys: { vMax: 470, vMil: 380, vStall: 96, accel: 24, decel: 42, pitch: 0.74, roll: 2.81, yaw: 0.36, hp: 118 },
     gun: 'k3',
     maxLoad: 5000,
@@ -324,7 +324,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       代价是它没有判断力：长机被打掉，它就只会原地盘旋。</p>
       <p>不带座舱、弹射座椅和生命维持，飞翼外形又专门为高速巡航修过一遍 ——
       所以它比任何一架有人机都快：<b>长机开加力往前冲，它也跟得上。</b></p>`,
-    stats: { spd: 0.96, mob: 0.76, stl: 0.32, fire: 0.42, dur: 0.28, rng: 0.38 },
+    stats: { spd: 0.96, mob: 0.76, stl: 0.32, fire: 0.42, dur: 0.28, rng: 0.38, ecm: 0.20 },
     /* 极速要压过最快的有人机（petrel 620）：跟不上长机的僚机替长机挡不了弹 */
     phys: { vMax: 660, vMil: 540, vStall: 96, accel: 34, decel: 44, pitch: 0.78, roll: 2.65, yaw: 0.40, hp: 58 },
     /* 没有机炮：它是"发射架"，自己看不见东西，目标参数全靠长机喂 ——
@@ -362,7 +362,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     desc: `石林机械制造集团的主力。飞行性能大致相当于十年前的 DB-11，
       火控和电子设备还要更旧一代，但产量是上游的三倍 ——
       他们用数量补质量，而且从来不缺愿意坐进去的人。`,
-    stats: { spd: 0.62, mob: 0.58, stl: 0.18, fire: 0.68, dur: 0.55, rng: 0.52 },
+    stats: { spd: 0.62, mob: 0.58, stl: 0.18, fire: 0.68, dur: 0.55, rng: 0.52, ecm: 0.26 },
     phys: { vMax: 505, vMil: 398, vStall: 118, accel: 25, decel: 38, pitch: 0.58, roll: 2.11, yaw: 0.30, hp: 120 },
     gun: 'k11',
     maxLoad: 4000,
@@ -398,7 +398,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       低空笨得没法看，可它的战场从来不在低空。
       <p>开它的多半是那批老兵。在这个高度上，
       他们的手感比上游任何一个人都好。</p>`,
-    stats: { spd: 0.80, mob: 0.32, stl: 0.16, fire: 0.78, dur: 0.68, rng: 0.58 },
+    stats: { spd: 0.80, mob: 0.32, stl: 0.16, fire: 0.78, dur: 0.68, rng: 0.58, ecm: 0.24 },
     phys: { vMax: 585, vMil: 470, vStall: 142, accel: 30, decel: 30, pitch: 0.44, roll: 1.56, yaw: 0.22, hp: 150 },
     gun: 'k11',
     maxLoad: 6200,
@@ -431,7 +431,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       但它能在一条不到八百米的土跑道上起降，而且**便宜到可以损失**。
       <p>下游同盟前后造了四千多架。它在战场上的作用不是"打赢"，
       而是让对手的弹药先消耗完。</p>`,
-    stats: { spd: 0.36, mob: 0.50, stl: 0.12, fire: 0.62, dur: 0.60, rng: 0.44 },
+    stats: { spd: 0.36, mob: 0.50, stl: 0.12, fire: 0.62, dur: 0.60, rng: 0.44, ecm: 0.20 },
     phys: { vMax: 395, vMil: 330, vStall: 92, accel: 20, decel: 42, pitch: 0.60, roll: 1.95, yaw: 0.32, hp: 130 },
     gun: 'k11',
     maxLoad: 3400,
@@ -474,7 +474,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>它没有空战能力，也<b>不做规避机动</b> —— 遇到拦截只能靠护航机。
       <b>而下游的护航历来不够。</b>
       这句话在下游航空军内部既是一句牢骚，也是一个事实。</p>`,
-    stats: { spd: 0.16, mob: 0.05, stl: 0.06, fire: 0.18, dur: 0.95, rng: 0.74 },
+    stats: { spd: 0.16, mob: 0.05, stl: 0.06, fire: 0.18, dur: 0.95, rng: 0.74, ecm: 0.34 },
     phys: {
       vMax: 320, vMil: 272, vStall: 132,
       accel: 8, decel: 16, pitch: 0.15, roll: 0.66, yaw: 0.10, hp: 420
@@ -510,7 +510,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       发动机来自北边，雷达来自南边，两边都很乐意把上一代的东西卖过来。
       <p>它飞不快，也打不远。但在这片空域里，它是唯一一面
       不属于任何一方的旗。</p>`,
-    stats: { spd: 0.44, mob: 0.62, stl: 0.14, fire: 0.40, dur: 0.44, rng: 0.48 },
+    stats: { spd: 0.44, mob: 0.62, stl: 0.14, fire: 0.40, dur: 0.44, rng: 0.48, ecm: 0.18 },
     phys: { vMax: 430, vMil: 350, vStall: 102, accel: 21, decel: 40, pitch: 0.62, roll: 2.26, yaw: 0.32, hp: 100 },
     gun: 'k1',
     maxLoad: 2600,
@@ -544,7 +544,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>机腹挂一副搜救吊舱、机头一门 20 毫米炮 —— 就这些。
       它和屿级巡逻艇是这片海域里少数几样
       还会回应求救信号的东西。</p>`,
-    stats: { spd: 0.28, mob: 0.30, stl: 0.10, fire: 0.26, dur: 0.52, rng: 0.92 },
+    stats: { spd: 0.28, mob: 0.30, stl: 0.10, fire: 0.26, dur: 0.52, rng: 0.92, ecm: 0.30 },
     phys: { vMax: 340, vMil: 290, vStall: 82, accel: 14, decel: 36, pitch: 0.38, roll: 1.64, yaw: 0.30, hp: 110 },
     gun: 'k1',
     maxLoad: 1400,
@@ -575,7 +575,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       沿着编组一个一个巡过去，检查每个单元的状态 —— 那个高度上，
       飞得稳比飞得快重要得多。
       名义上没有武器，只有一门自卫用的 CEL-2。`,
-    stats: { spd: 0.30, mob: 0.22, stl: 0.20, fire: 0.10, dur: 0.72, rng: 0.86 },
+    stats: { spd: 0.30, mob: 0.22, stl: 0.20, fire: 0.10, dur: 0.72, rng: 0.86, ecm: 0.42 },
     phys: { vMax: 310, vMil: 260, vStall: 78, accel: 11, decel: 34, pitch: 0.34, roll: 1.56, yaw: 0.26, hp: 180 },
     gun: 'k2',
     maxLoad: 900,
@@ -616,7 +616,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>它飞得慢、转不动、没有任何武器。对方的飞行员管它叫
       "点灯的人" —— 因为它一开机，就等于把整片空域照亮，
       也包括它自己。</p>`,
-    stats: { spd: 0.26, mob: 0.18, stl: 0.10, fire: 0.05, dur: 0.84, rng: 0.94 },
+    stats: { spd: 0.26, mob: 0.18, stl: 0.10, fire: 0.05, dur: 0.84, rng: 0.94, ecm: 0.26 },
     phys: { vMax: 320, vMil: 268, vStall: 80, accel: 11, decel: 33, pitch: 0.32, roll: 1.48, yaw: 0.25, hp: 200 },
     /* 无武装。上面那段描述写了好几个版本，数值这里一直挂着 k3 ——
        所谓"没有任何武器"在数据里其实是有武器。现在对齐。 */
@@ -648,7 +648,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       他们本来也更习惯那样。</p>
       <p>机身锈得厉害，设备却是新的：这东西他们买得到，
       飞行员不好补。</p>`,
-    stats: { spd: 0.22, mob: 0.14, stl: 0.08, fire: 0.04, dur: 0.80, rng: 0.90 },
+    stats: { spd: 0.22, mob: 0.14, stl: 0.08, fire: 0.04, dur: 0.80, rng: 0.90, ecm: 0.32 },
     phys: { vMax: 302, vMil: 250, vStall: 78, accel: 10, decel: 32, pitch: 0.30, roll: 1.4, yaw: 0.24, hp: 190 },
     /* 无武装，同 J-2 —— 预警机是眼睛，不是枪手。 */
     gun: null,
@@ -682,7 +682,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       <p>下游的教条是"先让对手瞎掉，再打"，而它就是那个负责
       第一句的人。<b>代价是它开机的时候藏不住</b>：
       那片噪声就是它的位置。</p>`,
-    stats: { spd: 0.34, mob: 0.12, stl: 0.06, fire: 0.05, dur: 0.88, rng: 0.72 },
+    stats: { spd: 0.34, mob: 0.12, stl: 0.06, fire: 0.05, dur: 0.88, rng: 0.72, ecm: 0.56 },
     phys: { vMax: 390, vMil: 330, vStall: 122, accel: 14, decel: 30, pitch: 0.40, roll: 1.17, yaw: 0.22, hp: 260 },
     /* 没有机炮：设定写明"它不参加空战"，机体又是 ROK-40 轰炸机改的
        （ROK-40 同样 gun: null）。早先挂着 k11，于是会凑上去跟人对射。 */
@@ -714,6 +714,62 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
    —— 当前没有任何代码读取它们，与 `MODELS` 的 span / sea 同一个性质。
    接入方式见 docs/systems/missions.md。
    ============================================================ */
+/* ============================================================
+   海军呼号（2.3.1）
+
+   格式一律"XX号"，与空军呼号（VESPER / FLINT 这类英文代号）分开。
+     上游公约海军  洋流、潮汐、海况与气象术语
+     下游同盟海军  看起来像真实河流的地名：水 / 川 / 溪 / 渡 / 涧 + 一个植物字（纯架空）
+
+   剧情里有分量的船在关卡里写死 callsign（见 missions.js 的 spawnShip），
+   而且同一条船跨关卡用同一个名字；其余护航舰按名单顺序自动分配，
+   跳过 NAVAL_CS_RESERVED 里那些已被剧情船占用的名字。
+   ============================================================ */
+var NAVAL_CS = {
+  '上游公约': ['黑潮', '寒流', '回澜', '信风', '季雨', '霜降', '积云', '锋面', '涌浪', '气旋',
+    '晴空', '白露', '远涛', '潮信', '卷云', '骤雨', '晨雾', '高压', '平流', '霁色'],
+  '下游同盟': ['苇川', '葭水', '柘渎', '槲溪', '澄渡', '蒲涧', '蓼滨', '汀沽', '菖渎', '芷河',
+    '萩川', '薇渠', '荠溪', '枋水', '榆渡', '杞涧', '柽河', '蒹沙', '苕溪口', '楝川']
+};
+/* 剧情船的固定呼号 —— 关卡里直接写 callsign: NAVAL_NAMED.xxx */
+var NAVAL_NAMED = {
+  spermwhale: '信风号',     // 抹香鲸级：m8 守浮岛、m11 带队南压的旗舰
+  humpback: '晴空号',       // 座头鲸级浮岛：m8
+  bluewhale: '季雨号',      // 蓝鲸级支援舰：m8
+  cameroceras1: '槲溪号',   // 房角石级一号舰：m4
+  cameroceras2: '澄渡号',   // 房角石级二号舰：m11
+  ammoniteLead: '苇川号',   // 菊石级编队长：m9
+  dunkCmd: '柘渎号'         // 邓氏鱼级指挥舰：m12（m10 / m11 里提到的也是它）
+};
+var NAVAL_CS_RESERVED = {};
+(function () { for (var k in NAVAL_NAMED) NAVAL_CS_RESERVED[NAVAL_NAMED[k]] = true; })();
+
+/* 护航舰的名单按舰级切段：同一个名字在哪一关都是同一级的船
+   （否则 m2 的"黑潮号"是虎鲸、到 m4 又成了海豚）。
+   段长 = 这一级在单关里出现的最多条数；顺序 = 首次出场的顺序。
+   下游扣掉剧情船后正好剩 13 个：菊石 4 + 三叶虫 6 + 海蝎 3。 */
+var NAVAL_CS_POOL = (function () {
+  var plan = {
+    '上游公约': [['orca', 2], ['dolphin', 2]],
+    '下游同盟': [['ammonite', 4], ['trilobite', 6], ['seascorpion', 3]]
+  };
+  var out = {};
+  for (var f in plan) {
+    var free = [];
+    for (var i = 0; i < NAVAL_CS[f].length; i++) {
+      var nm = NAVAL_CS[f][i] + '号';
+      if (!NAVAL_CS_RESERVED[nm]) free.push(nm);
+    }
+    var at = 0;
+    for (var j = 0; j < plan[f].length; j++) {
+      out[plan[f][j][0]] = free.slice(at, at + plan[f][j][1]);
+      at += plan[f][j][1];
+    }
+    out['_rest_' + f] = free.slice(at);   // 没列进 plan 的舰级从这里取
+  }
+  return out;
+})();
+
 var SHIPS = [
   /* ---------- 上游公约 ---------- */
   {
@@ -1906,21 +1962,31 @@ var WEAPONS = {
     stat: { dmg: 0.44, spd: 0.18, trn: 0.26, rng: 0.42, ecm: 0.66 }
   },
 
+  /* 被动吊舱的两种防护要互相折算，不能一件吊舱两头都拉满：
+       lockResist  缩短敌方锁定距离 —— 取所有吊舱里的最大值，不叠加
+       ecmBonus    叠加到机体 ECM，削弱来袭弹的提前量 —— 每具都叠加
+     折算口径：lockResist 0.10 ≈ 每具 ecmBonus 0.04（一组两具 ≈ 0.08 ECM）。
+       ZUN-8  0.30 + 0.10/具   两头都给的通用干扰吊舱
+       SAV-6  0.22 + 0.10/具   下游同款，抗锁弱一档
+       GUS-9  0.15 + 0.03/具   本职是测距，干扰只是附带
+       ZUN-4 / SAV-14          主动干扰机：不给 lockResist，只给 ECM */
+
   /* ---------- 被动吊舱 ----------
      这几件不发射任何东西，装上去就一直在起作用。
      它们让"少带一枚弹"变成一个真实的取舍，而不只是纯损失。 */
 
   ecm2: {
     id: 'ecm2', name: 'ZUN-8', cn: '静默 · HUSH', kind: 'ecm',
+    ecmBonus: 0.10,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0,
     target: 'none', passive: true,
-    lockResist: 0.40,
+    lockResist: 0.30,
     /* 原文"拖曳式诱饵"—— 代码里它只有 lockResist，并不会把来袭弹引开。
        改成如实描述。 */
-    desc: '常开的被动干扰吊舱。敌方对你的锁定距离缩短 {{lockResistPct}}，且不需要手动开启 ——' +
+    desc: '常开的被动干扰吊舱。敌方对你的锁定距离缩短 {{lockResistPct}}，同时机体电子对抗 +10，来袭导弹的提前量预测变差，且不需要手动开启 ——' +
       '它不会把已经飞来的导弹引开，那仍然要靠干扰弹和机动；' +
       '代价是这个挂点永远空着。',
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.92 }
@@ -1928,6 +1994,7 @@ var WEAPONS = {
 
   dec: {
     id: 'dec', name: 'ZUN-12', cn: '雾障 · FOGSCREEN', kind: 'ecm',
+    ecmBonus: 0.05,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
@@ -1956,6 +2023,7 @@ var WEAPONS = {
 
   irp: {
     id: 'irp', name: 'GUS-9', cn: '夜枭 · NIGHTOWL', kind: 'ecm',
+    ecmBonus: 0.03,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
@@ -2128,6 +2196,7 @@ var WEAPONS = {
   },
   e4: {
     id: 'e4', name: 'ZUN-4', cn: '回声 · ECHO', kind: 'ecm',
+    ecmBonus: 0.12,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
@@ -2176,6 +2245,7 @@ var WEAPONS = {
   /* --- 下游：认知电子战是他们的看家本事 --- */
   vzu: {
     id: 'vzu', name: 'SAV-6', cn: '迷雾 · MISTVEIL', kind: 'ecm',
+    ecmBonus: 0.10,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
@@ -2187,7 +2257,7 @@ var WEAPONS = {
        而 passiveEffects() 汇总时读的是 w.lockResist（顶层）。
        结果是这枚吊舱的锁抗加成**完全没有生效**：
        它是六个被动吊舱里唯一用嵌套写法的，其余五个都写顶层。 */
-    lockResist: 0.30,
+    lockResist: 0.22,
     fits: [], perPoint: 0, mass: 0,
     npcFits: ['light', 'belly'],
     desc: `下游的干扰吊舱，比上游的 ZUN-8 老一代，但装得更多。
@@ -2207,6 +2277,7 @@ var WEAPONS = {
      打上 suppressed —— 也就是你能做的只有离开那片空域。 */
   vsc: {
     id: 'vsc', name: 'SAV-14', cn: '焦炬 · TORCH', kind: 'ecm',
+    ecmBonus: 0.10,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
@@ -3082,7 +3153,7 @@ var VOICES = {
       { who: 'VESPER-2', cls: 'ally', tx: '收到。', gap: 0.9 },
       { who: 'SEXTANT', cls: 'cmd', tx: '下游换了打法。拦不住我们，就要让这片海没法用。', gap: 1.6 },
       { who: 'SEXTANT', cls: 'cmd', tx: '海盆西北有一支水面编队正在展开：一条武库舰、一条巡洋舰、两条护卫、一条快艇。', gap: 1.8 },
-      { who: 'VESPER-3', cls: 'ally', tx: '武库舰识别：三百多个垂发单元。', gap: 1.5 },
+      { who: 'VESPER-3', cls: 'ally', tx: '武库舰识别：房角石级「槲溪号」，三百多个垂发单元。', gap: 1.5 },
       { who: 'SEXTANT', cls: 'cmd', tx: '水面还有我们的海豚级护卫舰。别把它当成目标。', gap: 1.3 },
       { who: 'SEXTANT', cls: 'cmd', tx: '带反舰挂载，对海作战。', gap: 0.9 }
     ],
@@ -3091,7 +3162,7 @@ var VOICES = {
       { who: 'SEXTANT', cls: 'cmd', tx: '压低高度，缩短他们的反应时间。', gap: 0.9 }
     ],
     hubHit: [
-      { who: 'VESPER-2', cls: 'ally', tx: '武库舰中弹，甲板起火。', gap: 1.2 },
+      { who: 'VESPER-2', cls: 'ally', tx: '槲溪号中弹，甲板起火。', gap: 1.2 },
       { who: 'SEXTANT', cls: 'cmd', tx: '继续压。它的弹药库比它的船体值钱。', gap: 1.0 }
     ],
     win: [
@@ -3169,7 +3240,7 @@ var VOICES = {
       { who: 'VESPER-2', cls: 'ally', tx: '请求云底高度。', gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>九百米。</b>云顶三千四。', gap: 1.5 },
       { who: 'SEXTANT', cls: 'cmd', tx: '下游的舰船补给点就在那层云下面。两条海蝎级登陆舰在往岸上运弹药。', gap: 1.8 },
-      { who: 'VESPER-3', cls: 'ally', tx: '识别：邓氏鱼级巡洋舰一条，外围防空。', gap: 1.3 },
+      { who: 'VESPER-3', cls: 'ally', tx: '识别：邓氏鱼级「柘渎号」，外围防空。', gap: 1.3 },
       { who: 'SEXTANT', cls: 'cmd', tx: '贴着云底飞，别让他们看见你。', gap: 1.2 }
     ],
     spotted: [
@@ -3194,14 +3265,14 @@ var VOICES = {
     start: [
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，紧急。下游的攻击机群出发了。', gap: 1.2 },
       { who: 'VESPER-2', cls: 'ally', tx: '请求目标。', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '<b>打浮岛。</b>座头鲸就在我们身后，它不能再挨一次。', gap: 1.6 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '<b>打浮岛。</b>晴空号就在我们身后，它不能再挨一次。', gap: 1.6 },
       { who: 'SEXTANT', cls: 'cmd', tx: '六架砂岩和片岩带对海弹从南面低空进来，后面跟着两架巨砾轰炸机。', gap: 1.7 },
       { who: 'VESPER-3', cls: 'ally', tx: '目标航线不经过我方编队。', gap: 1.1 },
       { who: 'SEXTANT', cls: 'cmd', tx: '对。在他们到投放线之前拦住。', gap: 1.3 },
-      { who: 'VESPER-2', cls: 'ally', tx: '我方编队：座头鲸、抹香鲸、蓝鲸。', gap: 1.4 }
+      { who: 'VESPER-2', cls: 'ally', tx: '我方编队：晴空号、信风号、季雨号。', gap: 1.4 }
     ],
     fleetHit: [
-      { who: 'VESPER-3', cls: 'ally', tx: '<b>编队中弹。</b>抹香鲸舰艏进水。', gap: 1.1 },
+      { who: 'VESPER-3', cls: 'ally', tx: '<b>编队中弹。</b>信风号舰艏进水。', gap: 1.1 },
       { who: 'SEXTANT', cls: 'cmd', tx: '三条船一条也不能沉。把攻击机赶走。', gap: 1.2 }
     ],
     shipLost: [
@@ -3254,7 +3325,7 @@ var VOICES = {
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，东缘的平台群在挨炮。', gap: 1.1 },
       { who: 'SEXTANT', cls: 'cmd', tx: '两座防波堤、一座浅滩站。中队一半的油在那儿。', gap: 1.5 },
       { who: 'VESPER-2', cls: 'ally', tx: '来的是什么？', gap: 0.8 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '三条菊石、两条快艇。它们会停在七公里外打 —— 平台跑不掉。', gap: 1.6 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '三条菊石、两条快艇，编队长是苇川号。它们会停在七公里外打 —— 平台跑不掉。', gap: 1.6 },
       { who: 'SEXTANT', cls: 'cmd', tx: '<b>打掉编队长，剩下的就会走。</b>', gap: 0.9 }
     ]
   },
@@ -3262,8 +3333,8 @@ var VOICES = {
   /* ==================== 任务 11 · 舷对舷 ==================== */
   m11: {
     start: [
-      { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，抹香鲸已经离开浮岛，正往南压。', gap: 1.2 },
-      { who: 'SEXTANT', cls: 'cmd', tx: '对面是房角石。三百多个发射井，它是来一次打光的。', gap: 1.6 },
+      { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，信风号已经离开浮岛，正往南压。', gap: 1.2 },
+      { who: 'SEXTANT', cls: 'cmd', tx: '对面是房角石级的二号舰「澄渡号」。三百多个发射井，它是来一次打光的。', gap: 1.6 },
       { who: 'VESPER-3', cls: 'ally', tx: '我方编队的反舰弹不多。', gap: 0.9 },
       { who: 'SEXTANT', cls: 'cmd', tx: '所以要你们。<b>在它的弹飞出来之前，让它沉。</b>', gap: 1.0 }
     ]
@@ -3275,7 +3346,7 @@ var VOICES = {
       { who: 'SEXTANT', cls: 'cmd', tx: 'VESPER，这是最后一件事。', gap: 1.1 },
       { who: 'VESPER-2', cls: 'ally', tx: '<b>明白，照办</b>。', gap: 0.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '把他们的指挥链从中间摘掉：预警机、舰上指挥所，还有把它们连起来的人。', gap: 1.9 },
-      { who: 'VESPER-3', cls: 'ally', tx: '指挥舰位于敌编队正面。', gap: 1.1 },
+      { who: 'VESPER-3', cls: 'ally', tx: '指挥舰「柘渎号」位于敌编队正面。', gap: 1.1 },
       { who: 'SEXTANT', cls: 'cmd', tx: '对。指挥舰在编队正中央，两翼护航，上面那架玄武岩是冬港。', gap: 1.8 },
       { who: 'SEXTANT', cls: 'cmd', tx: '再说一遍他的呼号：<b>冬港。一座还在用水的镇子。</b>', gap: 1.6 },
       { who: 'SEXTANT', cls: 'cmd', tx: '他上次说的那句话，打完再想。上去。', gap: 0.9 }
@@ -3289,7 +3360,7 @@ var VOICES = {
       { who: 'SEXTANT', cls: 'cmd', tx: '抓住这个窗口。', gap: 0.8 }
     ],
     cpDown: [
-      { who: 'VESPER-2', cls: 'ally', tx: '指挥舰进水。敌机各自选择目标。', gap: 1.3 },
+      { who: 'VESPER-2', cls: 'ally', tx: '柘渎号进水。敌机各自选择目标。', gap: 1.3 },
       { who: 'SEXTANT', cls: 'cmd', tx: '他们本来就更习惯那样。', gap: 1.0 }
     ],
     bossPhase2: [

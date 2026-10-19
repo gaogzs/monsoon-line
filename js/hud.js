@@ -1110,7 +1110,7 @@ var HUD = (function () {
     var dim = 'rgba(185,200,212,0.62)';
 
     // 地面设施只有名字，没有呼号也没有机型
-    if (isGnd) {
+    if (isGnd && !t.shipClass) {
       text(ctx, t.label || t.name || '海面设施',
         s.x + sz + 7, s.y - sz + 8, col, FS, 'left');
       text(ctx, distTxt, s.x + sz + 7, s.y - sz + 21, dim, FS, 'left');
@@ -1119,7 +1119,8 @@ var HUD = (function () {
 
     /* 空中目标：第一行机型（认机 —— 对火控来说这才是要紧的），
        第二行呼号（风味信息，压暗），最后一行距离。以前呼号在前。 */
-    var acTxt = t.ac ? (t.ac.name + ' ' + t.ac.cn) : null;
+    /* 两支海军的船同一格式：第一行舰级，第二行呼号 */
+    var acTxt = t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.shipClass || null);
     var line1 = acTxt || t.label || t.name || '';
     var line2 = acTxt && t.label ? t.label : null;
 
@@ -1209,8 +1210,8 @@ var HUD = (function () {
        用 cn（中文名）而不是 nick（英文绰号）。对火控来说认机型才是要紧的；
        呼号是风味信息，放第二行、用普通字重。以前呼号在前。 */
     var ly = ty + 10;
-    if (t.ac) {
-      text(ctx, t.ac.name + ' ' + t.ac.cn, tx, ly, col, 'bold 12px Consolas,monospace', 'left');
+    if (t.ac || t.shipClass) {
+      text(ctx, t.ac ? (t.ac.name + ' ' + t.ac.cn) : t.shipClass, tx, ly, col, 'bold 12px Consolas,monospace', 'left');
       ly += 14;
       if (t.label) { text(ctx, t.label, tx, ly, col, FS, 'left'); ly += 14; }
     } else {

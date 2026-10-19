@@ -536,13 +536,25 @@ var Game = (function () {
        右边再把净损失放在括号里。 */
     var stats = [
       ['最大速度', 'spd'], ['机动性', 'mob'], ['低可探测', 'stl'],
-      ['火力', 'fire'], ['生存性', 'dur'], ['航程', 'rng']
+      ['火力', 'fire'], ['生存性', 'dur'], ['航程', 'rng'], ['电子对抗', 'ecm']
     ];
+    var podEcm = passiveEffects(ac, lo).ecm;
     var sh = '';
     for (var k = 0; k < stats.length; k++) {
       var key = stats[k][1];
-      var base = ac.stats[key];
+      var base = ac.stats[key] || 0;
       var v = base;
+      /* ECM 是唯一会被挂载**加高**的维度：吊舱那一段用亮色接在机体值后面 */
+      if (key === 'ecm') {
+        var tot = Math.min(1, base + podEcm), gain = tot - base;
+        sh += '<div class="stat-row"><span class="l">' + stats[k][0] + '</span>' +
+          '<span class="stat-bar"><i style="width:' + Math.round(base * 100) + '%"></i>' +
+          (gain > 0.004 ? '<b style="left:' + Math.round(base * 100) + '%;width:' + (gain * 100).toFixed(1) + '%"></b>' : '') +
+          '</span><span class="v">' + Math.round(tot * 100) +
+          (gain > 0.004 ? '<em class="up">+' + Math.round(gain * 100) + '</em>' : '') +
+          '</span></div>';
+        continue;
+      }
       if (key === 'spd') v = base * lp.vMax;
       else if (key === 'mob') v = base * ((lp.pitch + lp.roll + lp.accel) / 3);
 
@@ -1510,6 +1522,7 @@ var Game = (function () {
     p.armor = pe.armor;              // 全向减伤
     p.lockResist = pe.lockResist;    // 缩短敌方对我的锁定距离
     p.lockRangeK = pe.lockRange;     // 放大我的锁定距离
+    Ent.setEcm(p, pe);               // 机体 ECM + 吊舱叠加
     p.flares += pe.flareBonus;
     /* 被动测距（GUS-6 明瞳 / GUS-9 夜枭）：用被动方式锁定时，
        对方的 RWR 收不到告警 —— 见 ai.js 里 rwrT 的判定。 */
@@ -2578,7 +2591,7 @@ var Game = (function () {
       if (source && source.kind === 'target' && tg.big && tg.ttype !== 'air') {
         var mine = tg.team === 0;
         Radio.raw({ who: 'SEXTANT', cls: 'cmd',
-          tx: mine ? ('<b>' + tg.label + ' 被敌舰击沉。</b>') : (tg.label + ' 被我方舰炮击沉。'), gap: 1.0 });
+          tx: mine ? ('<b>' + shipName(tg) + ' 被敌舰击沉。</b>') : (shipName(tg) + ' 被我方舰炮击沉。'), gap: 1.0 });
       }
       if (tg.model === 'cell') {
         /* 处罚已在上面的 penal 记过一次 —— 这里以前又加了一次，打掉一个单元算两次。

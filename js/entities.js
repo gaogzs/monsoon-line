@@ -519,6 +519,11 @@ var Ent = (function () {
          所有槽都在装填时按不出去。这就是"齐射数"的真正含义。 */
       slotCd: {},
       spActive: 0,        // ECM 剩余生效时间
+      /* 机体自带的电子对抗（AIRCRAFT[].stats.ecm，0–1）。吊舱的 ecmBonus
+         由 setEcm() 叠加上来。它削弱**瞄准自己的导弹**的提前量预测，
+         见 updateMissile 里的 ECM_LEAD_K。 */
+      ecmBody: ac.stats.ecm || 0,
+      ecm: ac.stats.ecm || 0,
       /* 认知电子战的闭环状态（设定集 7.3）。
 
          ewT       本次开机已持续的时间
@@ -1244,6 +1249,8 @@ var Ent = (function () {
          这个系数比转弯率更能体现"这枚弹聪不聪明"：一枚转弯率一般
          但预测准的弹，打机动目标反而比一枚只会死咬尾巴的灵活弹更有效。 */
       var lead = (w.lead === undefined) ? 0.6 : w.lead;
+      /* 目标的 ECM（机体 + 吊舱）压低预测品质：满值 ECM 把提前量砍掉 ECM_LEAD_K。 */
+      if (t.ecm) lead *= 1 - ECM_LEAD_K * Math.min(1, t.ecm);
       var aim = M3.add(t.pos, M3.mul(tvel, tGo * lead));
 
       /* 高抛 / 攻顶弹道（`w.loft`，GUT-25、BOX-14）。
@@ -2226,8 +2233,14 @@ var Ent = (function () {
      它不只是数值：silentLock（被动测距）会决定**敌方 RWR 是否看得到你**，
      所以结果必须写回 actor，而不只是留在机库面板上。
      ============================================================ */
+  var ECM_LEAD_K = 0.6;
+  /* 机体 ECM + 吊舱叠加，封顶 1。玩家与任务 NPC 都走这里。 */
+  function setEcm(a, pe) {
+    a.ecm = Math.min(1, (a.ecmBody || 0) + ((pe && pe.ecm) || 0));
+  }
+
   function passiveEffects(list) {
-    var e = { lockResist: 0, armor: 0, lockRange: 1, flareBonus: 0, silentLock: false };
+    var e = { lockResist: 0, armor: 0, lockRange: 1, flareBonus: 0, silentLock: false, ecm: 0 };
     if (!list) return e;
     for (var i = 0; i < list.length; i++) {
       var it = list[i];
@@ -2239,6 +2252,7 @@ var Ent = (function () {
       if (w.lockRangeBonus) e.lockRange += w.lockRangeBonus * n;
       if (w.flareBonus) e.flareBonus += w.flareBonus * n;
       if (w.silentLock) e.silentLock = true;
+      if (w.ecmBonus) e.ecm += w.ecmBonus * n;
     }
     e.armor = Math.min(e.armor, 0.55);
     e.lockRange = Math.min(e.lockRange, 1.9);
@@ -2397,7 +2411,7 @@ var Ent = (function () {
     /* 关卡里写错的 NPC 挂载（smoke.js 断言它是空的） */
     mountIssues: mountIssues, clearMountIssues: clearMountIssues,
     makeMissile: makeMissile, stepMissile: stepMissile, effectiveLife: effectiveLife,
-    breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects,
+    breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects, setEcm: setEcm, ECM_LEAD_K: ECM_LEAD_K,
     fireGun: fireGun, fireGunFrom: fireGunFrom, shellFuze: shellFuze, detonateShell: detonateShell, gunMuzzle: gunMuzzle, flashRings: flashRings, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
     spawnParticle: spawnParticle, stepParticles: stepParticles, explode: explode,
     damage: damage, kill: kill, killGround: killGround, explode2: explode,

@@ -154,6 +154,7 @@ function spawnEnemy(w, o) {
     a.armor = podE.armor;
     a.flares += podE.flareBonus;
     a.silentLock = podE.silentLock;
+    Ent.setEcm(a, podE);
   }
 
   w.actors.push(a);
@@ -335,6 +336,11 @@ function spawnCellField(w, o) {
    锚泊目标。注意 `SHIPS[].speed` 是**节**，而 route.speed 要米/秒 ——
    这里不替调用方换算，因为航速本来就是任务要做的决定（一条停在
    原地的支援舰和一条 40 节冲过来的快艇是两回事）。 */
+/* 无线电 / 文案里点名一条船："抹香鲸级「信风号」"；非海军船退回 label */
+function shipName(t) {
+  return t.shipClass ? t.shipClass + '「' + t.label + '」' : (t.label || '');
+}
+
 function spawnShip(w, o) {
   var s = null;
   for (var i = 0; i < SHIPS.length; i++) {
@@ -342,12 +348,25 @@ function spawnShip(w, o) {
   }
   if (!s) s = SHIPS[0];
 
+  /* 两支海军的船：第一行舰级（"抹香鲸级"），第二行呼号（"信风号"）。
+     callsign 没写就从这一级的名单段（NAVAL_CS_POOL）里按顺序取下一个没用过的。
+     其他势力（分水、调节场管理局……）的船照旧用 label。 */
+  var csList = NAVAL_CS[s.faction], cs = o.callsign || null;
+  if (csList && !cs) {
+    var used = w._navCs || (w._navCs = {});
+    var pool = (NAVAL_CS_POOL[s.model] || []).concat(NAVAL_CS_POOL['_rest_' + s.faction] || []);
+    for (var ci = 0; ci < pool.length; ci++) {
+      if (!used[pool[ci]]) { cs = pool[ci]; break; }
+    }
+  }
+  if (cs) (w._navCs || (w._navCs = {}))[cs] = true;
+
   var t = Ent.makeTarget({
     /* ttype 一律 'ground'：渲染按 MODELS[t.model] 查表，ttype 只影响
        HUD 那一行文案与"受损下沉"分支 —— 舰船不下沉，所以不能写 'air'。 */
     ttype: 'ground',
     model: s.model,
-    label: o.label || s.label || s.cn,
+    label: cs || o.label || s.label || s.cn,
     team: o.team === undefined ? 1 : o.team,
     x: o.x, y: o.y === undefined ? 0 : o.y, z: o.z,
     hp: o.hp || s.hp, radius: o.radius || s.radius,
@@ -360,6 +379,7 @@ function spawnShip(w, o) {
     fireCd: o.fireCd === undefined ? M3.rnd(3, 8) : o.fireCd
   });
   t.shipCls = s.cls;      // HUD 锁定框写舰种（makeTarget 只拷它认识的字段，所以在这里补）
+  if (csList) t.shipClass = s.hull || (s.cn + '级');   // 舰级：锁定框 / 目标框第一行
   t.ship = s;             // 舰船记录：尾流水花要读螺旋桨位置与最大航速（Ent.wakeSpray）
   // 炮位（2-0IMPL 阶段 3）：近防炮、舰炮、遥控炮各自索敌开火
   if ((s.mounts || s.launchers) && typeof Turret !== 'undefined') Turret.attach(t, s.mounts, s.launchers);
@@ -751,7 +771,7 @@ MISSIONS.push({
     /* 护航的虎鲸：上游在这片海域只有两艘驱逐舰，这是其中一艘。
        它不参与走位，只是停在那儿 —— 但这片海域从此不只有浮台。 */
     spawnShip(w, {
-      model: 'orca', team: 0, label: '虎鲸 ORCA',
+      model: 'orca', team: 0,
       x: -2600, z: -20000, hp: 900,
       // 32 单元舰空弹垂发（SHIPS 表的 arms）：会替基地打来袭的敌机
       weapon: 'ss6', fireCd: 5
@@ -790,12 +810,12 @@ MISSIONS.push({
        贴着水面目视接触。菊石带 BAD-9 舰空弹，会向被照到的目标开火；
        三叶虫只有反舰弹和一门遥控炮，没有防空。 */
     spawnShip(w, {
-      model: 'ammonite', label: '菊石 AMMONITE',
+      model: 'ammonite',
       x: -9000, z: 22000, hp: 420, weapon: 'dl9',
       route: { wp: [{ x: -9000, z: 22000 }, { x: 9000, z: 22000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
-      model: 'trilobite', label: '三叶虫 TRILOBITE',
+      model: 'trilobite',
       x: 12000, z: -2000, hp: 240,
       route: { wp: [{ x: 12000, z: -2000 }, { x: -2000, z: 14000 }], speed: 20, loop: true }
     });
@@ -1200,13 +1220,13 @@ MISSIONS.push({
   objectives: [
     '摧毁下游水面编队全部舰艇（5 艘）',
     '摧毁 2 座雷达浮台',
-    '注意：编队内四型舰艇，房角石级武库舰是核心目标',
+    '注意：编队内四型舰艇，房角石级武库舰「槲溪号」是核心目标',
     '击落空中的攻击机',
     '海面有海豚级护卫舰在己方一侧 —— 不要误击'
   ],
   threats: [
-    '房角石级武库舰（312 个垂发井）',
-    '邓氏鱼级巡洋舰 ×1 / 菊石级 ×2',
+    '房角石级武库舰「槲溪号」（312 个垂发井）',
+    '邓氏鱼级巡洋舰「柘渎号」 / 菊石级 ×2',
     '三叶虫级导弹快艇（40 节，贴海机动）',
     'BAD-9「高墙」舰空弹（邓氏鱼与两条菊石，射程 9 km）',
     'ROK-27「片岩」×2（BOX-14「坍方」反舰弹）/ VAC-14「砂岩」×1（TUM-7「碎石」）—— 会去打你的船'
@@ -1217,8 +1237,8 @@ MISSIONS.push({
     对方舰空弹的锁定与被照高度有关 —— 贴海进入可以缩短他们的反应时间`,
   map: [
     { x: 0, z: -18000, type: 'start', label: '进入点' },
-    { x: 0, z: 16000, type: 'enemy', label: '武库舰 房角石级' },
-    { x: -14000, z: 12000, type: 'enemy', label: '巡洋舰 邓氏鱼级' },
+    { x: 0, z: 16000, type: 'enemy', label: '房角石级「槲溪号」' },
+    { x: -14000, z: 12000, type: 'enemy', label: '邓氏鱼级「柘渎号」' },
     { x: 13000, z: 13000, type: 'enemy', label: '菊石级' },
     { x: 20000, z: 9000, type: 'enemy', label: '菊石级' },
     { x: -6000, z: 24000, type: 'enemy', label: '快艇' },
@@ -1244,26 +1264,26 @@ MISSIONS.push({
        邓氏鱼与两条菊石都带 BAD-9 舰空弹（SHIPS 表的 arms）。
        想打武库舰，得先穿过它们。 */
     spawnShip(w, {
-      model: 'cameroceras', label: '房角石级',
+      model: 'cameroceras', callsign: NAVAL_NAMED.cameroceras1,
       x: 0, z: 16000, hp: 1800,
       weapon: null
     });
     spawnShip(w, {
-      model: 'dunkleosteus', label: '邓氏鱼级',
+      model: 'dunkleosteus', callsign: NAVAL_NAMED.dunkCmd,
       x: -14000, z: 12000, hp: 900, weapon: 'dl9', fireCd: 4,
       route: { wp: [{ x: -14000, z: 12000 }, { x: -14000, z: 24000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
-      model: 'ammonite', label: '菊石级 A',
+      model: 'ammonite',
       x: 13000, z: 13000, hp: 420, weapon: 'dl9',
       route: { wp: [{ x: 13000, z: 13000 }, { x: 24000, z: 6000 }], speed: 14, loop: true }
     });
     spawnShip(w, {
-      model: 'ammonite', label: '菊石级 B',
+      model: 'ammonite',
       x: 20000, z: 9000, hp: 420, weapon: 'dl9'
     });
     spawnShip(w, {
-      model: 'trilobite', label: '三叶虫级 A',
+      model: 'trilobite',
       x: -6000, z: 24000, hp: 240,
       route: { wp: [{ x: -6000, z: 24000 }, { x: 12000, z: 26000 }], speed: 20, loop: true }
     });
@@ -1285,7 +1305,7 @@ MISSIONS.push({
        team: 0 必须显式写：漏了的话它会进玩家的锁定循环，
        也会被下游带对地弹的飞机当成目标（ai.js 的面目标判据）。 */
     spawnShip(w, {
-      model: 'dolphin', team: 0, label: '海豚 DOLPHIN',
+      model: 'dolphin', team: 0,
       x: 0, z: -11000, hp: 600, weapon: 'ss6', fireCd: 8   // 舰空弹 ×8：自卫级
     });
 
@@ -1810,11 +1830,11 @@ MISSIONS.push({
   objectives: [
     '摧毁 2 艘 海蝎级登陆舰',
     '击落 ROK-44 干扰机，清除空域内全部敌机',
-    '（可选）摧毁 邓氏鱼级巡洋舰（防空圈核心）',
+    '（可选）摧毁 邓氏鱼级巡洋舰「柘渎号」（防空圈核心）',
     '尽量保持在 1500 m 以下 —— 雷达暴露意味着被锁定'
   ],
   threats: [
-    '邓氏鱼级巡洋舰（舰空弹 ×8，编队旗舰）',
+    '邓氏鱼级巡洋舰「柘渎号」（舰空弹 ×8，编队旗舰）',
     '海蝎级登陆舰 ×2（武装薄弱、结构脆弱）',
     'ROK-44「磁石」干扰机（SAV-14 压制场）',
     'BAD-9 舰空弹（低空进入可缩短反应时间）'
@@ -1823,7 +1843,7 @@ MISSIONS.push({
     <span class="am">对空雷达探测下限约 1500 m；在这之下，他们的雷达看不见你</span>`,
   map: [
     { x: 0, z: -14000, type: 'start', label: '进入点' },
-    { x: -2000, z: 12000, type: 'enemy', label: '巡洋舰 邓氏鱼级' },
+    { x: -2000, z: 12000, type: 'enemy', label: '邓氏鱼级「柘渎号」' },
     { x: 8000, z: 16000, type: 'enemy', label: '登陆舰 ×2' },
     { x: -9000, z: 24000, type: 'relay', label: '干扰机' }
   ],
@@ -1842,7 +1862,7 @@ MISSIONS.push({
        原来这里放的是房角石（房角石级），而它是武库舰，不是巡洋舰；
        "96 单元垂发"则是上游抹香鲸的数字。 */
     spawnShip(w, {
-      model: 'dunkleosteus', label: '邓氏鱼级',
+      model: 'dunkleosteus', callsign: NAVAL_NAMED.dunkCmd,
       x: -2000, z: 12000, hp: 1600,
       route: { wp: [{ x: -2000, z: 12000 }, { x: 6000, z: 14000 }], speed: 13, loop: true },
       weapon: 'dl9', fireCd: 4
@@ -1850,12 +1870,12 @@ MISSIONS.push({
 
     /* 两条登陆舰 —— 这一关的目标。它们武装薄弱，跑得也慢。 */
     spawnShip(w, {
-      model: 'seascorpion', label: '海蝎级 A',
+      model: 'seascorpion',
       x: 8000, z: 16000, hp: 500,
       route: { wp: [{ x: 8000, z: 16000 }, { x: -2000, z: 18000 }], speed: 9, loop: true }
     });
     spawnShip(w, {
-      model: 'seascorpion', label: '海蝎级 B',
+      model: 'seascorpion',
       x: 11000, z: 14000, hp: 500,
       route: { wp: [{ x: 11000, z: 14000 }, { x: 2000, z: 12000 }], speed: 9, loop: true }
     });
@@ -1982,7 +2002,7 @@ MISSIONS.push({
     '击落全部攻击机（VAC-14「砂岩」×5 + ROK-27「片岩」×1）',
     '击落 2 架 ROK-40「巨砾」轰炸机',
     '拦住从东面来的第二波（ROK-40 ×2 + ROK-27 ×2）',
-    '保护上游编队：浮岛「座头鲸」、巡洋舰「抹香鲸」、支援舰「蓝鲸」（任意一艘被击沉即失败）'
+    '保护上游编队：座头鲸级浮岛「晴空号」、抹香鲸级巡洋舰「信风号」、蓝鲸级支援舰「季雨号」（任意一艘被击沉即失败）'
   ],
   threats: [
     'VAC-14「砂岩」攻击机 ×5（TUM-7「碎石」对面弹）/ ROK-27 ×1（BOX-14「坍方」反舰弹）',
@@ -1999,9 +2019,9 @@ MISSIONS.push({
     <span class="am">第一波打完不要散开：预警机会再调一波上来</span>`,
   map: [
     { x: 0, z: 4000, type: 'start', dir: 180, label: '进入点' },
-    { x: 0, z: -6000, type: 'base', label: '座头鲸（浮岛）' },
-    { x: -9000, z: -3000, type: 'base', label: '抹香鲸' },
-    { x: 9000, z: -3000, type: 'base', label: '蓝鲸' },
+    { x: 0, z: -6000, type: 'base', label: '晴空号（浮岛）' },
+    { x: -9000, z: -3000, type: 'base', label: '信风号' },
+    { x: 9000, z: -3000, type: 'base', label: '季雨号' },
     { x: 0, z: 24000, type: 'enemy', label: '砂岩攻击机群' },
     { x: 6000, z: 30000, type: 'site', label: '石英 QUARTZ' }
   ],
@@ -2023,18 +2043,18 @@ MISSIONS.push({
        （从不朝玩家打）—— 但攻击机贴海进、放完弹就走，拦截主要还是玩家的事。
        蓝鲸只有近防炮，不算防空火力（weapon: null）。 */
     var fb = spawnShip(w, {
-      model: 'humpback', team: 0, label: '座头鲸 HUMPBACK',
+      model: 'humpback', team: 0, callsign: NAVAL_NAMED.humpback,
       x: 0, z: -6000, hp: 2600, weapon: 'ss6', fireCd: 8
     });
     w.baseTarget = fb;
     w.baseHpFull = fb.maxHp;
     w.guarded = [];
     w.guarded.push(spawnShip(w, {
-      model: 'spermwhale', team: 0, label: '抹香鲸 SPERMWHALE',
+      model: 'spermwhale', team: 0, callsign: NAVAL_NAMED.spermwhale,
       x: -9000, z: -3000, hp: 1500, weapon: 'ss6', fireCd: 3
     }));
     w.guarded.push(spawnShip(w, {
-      model: 'bluewhale', team: 0, label: '蓝鲸 BLUEWHALE',
+      model: 'bluewhale', team: 0, callsign: NAVAL_NAMED.bluewhale,
       x: 9000, z: -3000, hp: 1200, weapon: null
     }));
 
@@ -2163,7 +2183,7 @@ MISSIONS.push({
       w.flags.shipLost = true;
       if (sunk.label) w.radio.raw({
         who: 'SEXTANT', cls: 'cmd',
-        tx: '<b>' + sunk.label + ' 沉了。</b>', gap: 1.0
+        tx: '<b>' + shipName(sunk) + ' 沉了。</b>', gap: 1.0
       });
       w.radio.play('m8', 'shipLost');
     }
@@ -2257,7 +2277,7 @@ MISSIONS.push({
     var i;
     for (i = 0; i < 3; i++) {
       spawnShip(w, {
-        model: 'seascorpion', label: '海蝎级 ' + (i + 1),
+        model: 'seascorpion',
         x: (i - 1) * 2500, z: 12000 + i * 1800, hp: 520,
         route: {
           wp: [{ x: (i - 1) * 2500, z: 12000 + i * 1800 },
@@ -2270,7 +2290,7 @@ MISSIONS.push({
     // 两艘护卫舰
     for (i = 0; i < 2; i++) {
       spawnShip(w, {
-        model: 'ammonite', label: '菊石级 ' + (i ? 'B' : 'A'),
+        model: 'ammonite',
         x: (i - 0.5) * 16000, z: 18000 + i * 4000, hp: 420,
         route: {
           wp: [{ x: (i - 0.5) * 16000, z: 18000 + i * 4000 },
@@ -2286,7 +2306,7 @@ MISSIONS.push({
     for (i = 0; i < 4; i++) {
       var sx = (i < 2) ? -1 : 1;
       spawnShip(w, {
-        model: 'trilobite', label: '三叶虫级 ' + (i + 1),
+        model: 'trilobite',
         x: sx * (9000 + (i % 2) * 3000), z: 8000 + (i % 2) * 6000, hp: 240,
         route: {
           wp: [{ x: sx * (9000 + (i % 2) * 3000), z: 8000 + (i % 2) * 6000 },
@@ -2407,24 +2427,24 @@ MISSIONS.push({
 
   objectives: [
     '击落 ROK-2「石英」预警机',
-    '摧毁 邓氏鱼级巡洋舰（下游编队旗舰、舰上指挥所）',
+    '摧毁 邓氏鱼级巡洋舰「柘渎号」（下游编队旗舰、舰上指挥所）',
     '击落 GAL-31「玄武岩」—— 呼号「冬港」',
     '清除 ROK-27 / GAL-31 护航编队'
   ],
   threats: [
     'GAL-31「玄武岩」×1（冬港本人，skill 极高）',
     'ROK-2「石英」预警机',
-    '邓氏鱼级旗舰（舰空弹只够自保，在正中央）',
+    '邓氏鱼级旗舰「柘渎号」（舰空弹只够自保，在正中央）',
     'GAL-31 / ROK-27 两翼护航 ×6',
     'DAR-4「砾石」中距弹 / BIN-9「双生」双导引头格斗弹'
   ],
   intel: `高度 <b>17 000 m</b> · 密度 0.14 kg/m³ · 温度 −57 ℃<br>
-    指挥舰在编队正中央，两翼各有护航<br>
+    指挥舰「柘渎号」在编队正中央，两翼各有护航<br>
     预警机在 30 km 外，它每十秒左右给下游分配一次目标<br>
     <span class="am">冬港的 GAL-31 在 18 600 m，比你的起步高度高一层</span>`,
   map: [
     { x: 0, z: -18000, type: 'start', label: '进入点' },
-    { x: 0, z: 18000, type: 'enemy', label: '旗舰 邓氏鱼级' },
+    { x: 0, z: 18000, type: 'enemy', label: '旗舰「柘渎号」' },
     { x: -12000, z: 14000, type: 'enemy', label: '护航' },
     { x: 12000, z: 14000, type: 'enemy', label: '护航' },
     { x: 0, z: 34000, type: 'site', label: '石英 QUARTZ' }
@@ -2450,7 +2470,7 @@ MISSIONS.push({
        自己降下来之后才能碰到"的目标。
        早先这里写的是房角石（房角石级，武库舰）。 */
     spawnShip(w, {
-      model: 'dunkleosteus', label: '邓氏鱼级',
+      model: 'dunkleosteus', callsign: NAVAL_NAMED.dunkCmd,
       x: 0, z: 18000, hp: 2000, weapon: 'dl9', fireCd: 5
     });
 
@@ -2782,14 +2802,14 @@ MISSIONS.push({
     '平台受损越少评分越高'
   ],
   threats: [
-    '菊石级护卫舰 ×3（75 mm 舰炮、反舰弹），其中一条是编队长',
+    '菊石级护卫舰 ×3（75 mm 舰炮、反舰弹），编队长是「苇川号」',
     '三叶虫级导弹快艇 ×2（反舰弹）',
     'GAL-31 / VAC-14 护航 ×4，ROK-2「石英」预警机'
   ],
   intel: `平台群在开场点正前方，敌编队从北面来<br>
     敌舰会在离平台约 7 km 的地方停下炮击<br>
     浅滩站的舰空弹和近防只够自保，挡不住整支编队<br>
-    <span class="am">先打编队长（居中那条菊石）：它沉了，剩下的船会掉头</span>`,
+    <span class="am">先打编队长「苇川号」（居中那条菊石）：它沉了，剩下的船会掉头</span>`,
   map: [
     { x: 0, z: -9000, type: 'start', dir: 0, label: '进入点' },
     { x: 0, z: 0, type: 'base', label: '防波堤 A' },
@@ -2822,17 +2842,17 @@ MISSIONS.push({
     /* 炮击编队：开到 z ≈ 6–7 km 停下（离最远的平台也在 75 mm 的 8 km 射程里），命令炮塔优先打平台。
        反舰弹备弹按 ssmK 缩减：满弹的话平台一分钟就没了，玩家来不及。 */
     var plan = [
-      { model: 'ammonite', label: '菊石 编队长', x: 0, z: 12000, stop: 7000, hp: 520, flag: true },
-      { model: 'ammonite', label: '菊石 A', x: -5000, z: 11500, stop: 6500, hp: 420 },
-      { model: 'ammonite', label: '菊石 B', x: 5000, z: 11500, stop: 6500, hp: 420 },
-      { model: 'trilobite', label: '三叶虫 A', x: -9000, z: 11000, stop: 6000, hp: 120 },
-      { model: 'trilobite', label: '三叶虫 B', x: 9000, z: 11000, stop: 6000, hp: 120 }
+      { model: 'ammonite', cs: NAVAL_NAMED.ammoniteLead, x: 0, z: 12000, stop: 7000, hp: 520, flag: true },
+      { model: 'ammonite', x: -5000, z: 11500, stop: 6500, hp: 420 },
+      { model: 'ammonite', x: 5000, z: 11500, stop: 6500, hp: 420 },
+      { model: 'trilobite', x: -9000, z: 11000, stop: 6000, hp: 120 },
+      { model: 'trilobite', x: 9000, z: 11000, stop: 6000, hp: 120 }
     ];
     w.fleet = [];
     for (var i = 0; i < plan.length; i++) {
       var q = plan[i];
       var sh = spawnShip(w, {
-        model: q.model, label: q.label, team: 1, x: q.x, z: q.z, hp: q.hp,
+        model: q.model, callsign: q.cs, team: 1, x: q.x, z: q.z, hp: q.hp,
         weapon: q.model === 'trilobite' ? null : 'dl9', fireCd: 6,
         ssmK: 0.5, ssmStagger: 240,
         route: { wp: [{ x: q.x * 0.6, z: q.stop }], speed: 16 }
@@ -2894,7 +2914,7 @@ MISSIONS.push({
     if (!w.flags.retreat && left && (!w.flagship.alive || sunk >= 3)) {
       w.flags.retreat = true;
       m9Retreat(w);
-      w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>他们在掉头。</b>编队长没了，剩下的船往北撤。', gap: 1.0 });
+      w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>他们在掉头。</b>苇川号没了，剩下的船往北撤。', gap: 1.0 });
     }
     w.objectiveSub = '平台 ' + alive + '/3 · 结构 ' + Math.round(frac * 100) + '% · 敌舰 ' + left + '/' + w.fleet.length;
   },
@@ -2936,20 +2956,20 @@ MISSIONS.push({
 
   prose: `
 <p>这片海上本来没有值得歼灭的舰队。现在有两支了。</p>
-<p>船团没能靠岸。下游把最后一张牌打了出来：<b>房角石级的二号舰</b>。
-一号舰三月在空白海域沉了，这一条一直留在南面的港里 ——
+<p>船团没能靠岸。下游把最后一张牌打了出来：<b>房角石级的二号舰「澄渡号」</b>。
+一号舰「槲溪号」三月在空白海域沉了，这一条一直留在南面的港里 ——
 现在它带着护卫舰和快艇往北，要在上游的水面编队反应过来之前把它整个打掉。</p>
-<p>上游把抹香鲸从浮岛身边调了出来，带着两条虎鲸、两条海豚往南压。
+<p>上游把抹香鲸级「信风号」从浮岛身边调了出来，带着两条虎鲸、两条海豚往南压。
 <b>双方都知道对方在哪，也都知道对方知道。</b></p>
 <p>上游的船是为防空造的：它们的近防炮能拦下一部分反舰弹，但手里的反舰弹不多。
 <span class="am">这一仗打赢的办法，是在对方的弹飞出来之前，把发射它们的船打沉。</span></p>`,
   objectives: [
     '击沉下游编队全部舰船',
-    '保住旗舰「抹香鲸」（沉没即失败）',
+    '保住旗舰「信风号」（沉没即失败）',
     '我方舰船损失越少评分越高'
   ],
   threats: [
-    '房角石级弹库舰 二号舰 ×1（三段垂发，反舰弹最多的一条）',
+    '房角石级弹库舰「澄渡号」×1（二号舰，三段垂发，反舰弹最多的一条）',
     '菊石级护卫舰 ×4、三叶虫级导弹快艇 ×6',
     'GAL-31 / VAC-14 编队 ×4（VAC-14 挂对面弹）',
     'ROK-2「石英」预警机'
@@ -2961,10 +2981,10 @@ MISSIONS.push({
     <span class="am">房角石几乎没有自卫火力 —— 但它一开火，天上就全是弹</span>`,
   map: [
     { x: 0, z: -9000, type: 'start', dir: 0, label: '进入点' },
-    { x: 0, z: -3000, type: 'base', label: '抹香鲸（旗舰）' },
+    { x: 0, z: -3000, type: 'base', label: '信风号（旗舰）' },
     { x: -6000, z: -4500, type: 'base', label: '左翼护航 海豚' },
     { x: 6000, z: -4500, type: 'base', label: '右翼护航 海豚' },
-    { x: 0, z: 19000, type: 'enemy', label: '房角石 二号舰' },
+    { x: 0, z: 19000, type: 'enemy', label: '澄渡号' },
     { x: -7000, z: 18000, type: 'enemy', label: '左翼护航' },
     { x: 7000, z: 18000, type: 'enemy', label: '右翼护航' },
     { x: 7000, z: 30000, type: 'site', label: '石英 QUARTZ' }
@@ -2985,17 +3005,17 @@ MISSIONS.push({
        开场最近的一对（敌前哨快艇 ↔ 我方虎鲸）相距约 17.8 km，反舰弹开火距离 16 km ——
        第一枪最早在开场约 60 s 后。停下时前沿相距约 8.5 km、主力相距约 13 km。 */
     var mine = [
-      { model: 'spermwhale', label: '抹香鲸 SPERMWHALE', x: 0, z: -3000, hp: 1500, sam: 'ss6', cd: 3, flag: true },
-      { model: 'orca', label: '虎鲸 A', x: -3000, z: -1500, hp: 900, sam: 'ss6', cd: 5 },
-      { model: 'orca', label: '虎鲸 B', x: 3000, z: -1500, hp: 900, sam: 'ss6', cd: 5 },
-      { model: 'dolphin', label: '海豚 A（左翼）', x: -6000, z: -4500, hp: 520, sam: 'ss6', cd: 8 },
-      { model: 'dolphin', label: '海豚 B（右翼）', x: 6000, z: -4500, hp: 520, sam: 'ss6', cd: 8 }
+      { model: 'spermwhale', cs: NAVAL_NAMED.spermwhale, x: 0, z: -3000, hp: 1500, sam: 'ss6', cd: 3, flag: true },
+      { model: 'orca', x: -3000, z: -1500, hp: 900, sam: 'ss6', cd: 5 },
+      { model: 'orca', x: 3000, z: -1500, hp: 900, sam: 'ss6', cd: 5 },
+      { model: 'dolphin', x: -6000, z: -4500, hp: 520, sam: 'ss6', cd: 8 },
+      { model: 'dolphin', x: 6000, z: -4500, hp: 520, sam: 'ss6', cd: 8 }
     ];
     w.myFleet = [];
     for (var i = 0; i < mine.length; i++) {
       var q = mine[i];
       var t = spawnShip(w, {
-        model: q.model, label: q.label, team: 0, x: q.x, z: q.z, hp: q.hp,
+        model: q.model, callsign: q.cs, team: 0, x: q.x, z: q.z, hp: q.hp,
         weapon: q.sam, fireCd: q.cd,
         route: { wp: [{ x: q.x, z: q.z + 4500 }], speed: 14 }
       });
@@ -3005,24 +3025,24 @@ MISSIONS.push({
     var foe = [
       /* ssmK 每条船单独给：房角石 200 发反舰弹只带一小部分进这一关（它的齐射节奏是一波 6 发 / 20 s），
          其余船满弹，靠整舰齐射节奏控制速度 */
-      { model: 'cameroceras', label: '房角石 二号舰', x: 0, z: 19000, hp: 900, sam: 'dl9', k: 0.2, arsenal: true },
+      { model: 'cameroceras', cs: NAVAL_NAMED.cameroceras2, x: 0, z: 19000, hp: 900, sam: 'dl9', k: 0.2, arsenal: true },
       // 护航编队：菊石 ×4（前方两侧各一前一后）、快艇 ×6（前哨 2、两翼各 2）
-      { model: 'ammonite', label: '菊石 A', x: -3500, z: 17000, hp: 420, sam: 'dl9', k: 1 },
-      { model: 'ammonite', label: '菊石 B', x: 3500, z: 17000, hp: 420, sam: 'dl9', k: 1 },
-      { model: 'ammonite', label: '菊石 C', x: -5000, z: 18500, hp: 420, sam: 'dl9', k: 1 },
-      { model: 'ammonite', label: '菊石 D', x: 5000, z: 18500, hp: 420, sam: 'dl9', k: 1 },
-      { model: 'trilobite', label: '三叶虫 A（左翼）', x: -7000, z: 18000, hp: 120, k: 1 },
-      { model: 'trilobite', label: '三叶虫 B（右翼）', x: 7000, z: 18000, hp: 120, k: 1 },
-      { model: 'trilobite', label: '三叶虫 E（左翼）', x: -9000, z: 19500, hp: 120, k: 1 },
-      { model: 'trilobite', label: '三叶虫 F（右翼）', x: 9000, z: 19500, hp: 120, k: 1 },
-      { model: 'trilobite', label: '三叶虫 C（前哨）', x: -1500, z: 16000, hp: 120, k: 1 },
-      { model: 'trilobite', label: '三叶虫 D（前哨）', x: 1500, z: 16000, hp: 120, k: 1 }
+      { model: 'ammonite', x: -3500, z: 17000, hp: 420, sam: 'dl9', k: 1 },
+      { model: 'ammonite', x: 3500, z: 17000, hp: 420, sam: 'dl9', k: 1 },
+      { model: 'ammonite', x: -5000, z: 18500, hp: 420, sam: 'dl9', k: 1 },
+      { model: 'ammonite', x: 5000, z: 18500, hp: 420, sam: 'dl9', k: 1 },
+      { model: 'trilobite', x: -7000, z: 18000, hp: 120, k: 1 },
+      { model: 'trilobite', x: 7000, z: 18000, hp: 120, k: 1 },
+      { model: 'trilobite', x: -9000, z: 19500, hp: 120, k: 1 },
+      { model: 'trilobite', x: 9000, z: 19500, hp: 120, k: 1 },
+      { model: 'trilobite', x: -1500, z: 16000, hp: 120, k: 1 },
+      { model: 'trilobite', x: 1500, z: 16000, hp: 120, k: 1 }
     ];
     w.fleet = [];
     for (i = 0; i < foe.length; i++) {
       q = foe[i];
       var es = spawnShip(w, {
-        model: q.model, label: q.label, team: 1, x: q.x, z: q.z, hp: q.hp,
+        model: q.model, callsign: q.cs, team: 1, x: q.x, z: q.z, hp: q.hp,
         weapon: q.sam || null, fireCd: 6,
         ssmK: q.k, ssmStagger: 30,
         route: { wp: [{ x: q.x, z: q.z - 4500 }], speed: 14 }
@@ -3067,7 +3087,7 @@ MISSIONS.push({
         if (my.alive && M3.dist(my.pos, ars.pos) < 16000) {
           w.flags.arsenalHold = true;
           ars.wpIdx = ars.route.wp.length;       // 走完航线 = 原地停住（stepTarget）
-          w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>房角石停船了。</b>它要在原地一波一波往外放弹。', gap: 1.0 });
+          w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>澄渡号停船了。</b>它要在原地一波一波往外放弹。', gap: 1.0 });
           break;
         }
       }
@@ -3083,14 +3103,14 @@ MISSIONS.push({
         ms.route = { wp: [{ x: ars.pos.x + dir.x * 6000, z: ars.pos.z + dir.z * 6000 }], speed: 14 };
         ms.wpIdx = 0; ms.arrived = false;
       }
-      w.radio.raw({ who: '抹香鲸', cls: 'ally', tx: '<b>敌方护航全灭。</b>编队全体前进，目标房角石！', gap: 1.0 });
+      w.radio.raw({ who: '信风号', cls: 'ally', tx: '<b>敌方护航全灭。</b>编队全体前进，目标澄渡号！', gap: 1.0 });
     }
     var f = w.flagship, frac = f.alive ? Math.max(0, f.hp) / f.maxHp : 0;
     w.flags.flagMark = w.flags.flagMark || 0;
     while (f.alive && w.flags.flagMark < M11_FLAG_MARKS.length && frac < M11_FLAG_MARKS[w.flags.flagMark]) {
       var pct = Math.round(M11_FLAG_MARKS[w.flags.flagMark] * 100);
       w.flags.flagMark++;
-      w.radio.raw({ who: '抹香鲸', cls: 'ally',
+      w.radio.raw({ who: '信风号', cls: 'ally',
         tx: pct > 50 ? '旗舰中弹，损管已经上去了。' :
           (pct > 25 ? '<b>旗舰受损一半</b>，前部垂发失去供电。' : '<b>旗舰进水，还剩四分之一。</b>请求支援 —— 立刻。'), gap: 0.8 });
     }
@@ -3099,7 +3119,7 @@ MISSIONS.push({
       var s = w.myFleet[i];
       if (!s.alive && !s._lost && s !== f) {
         s._lost = true;
-        w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>' + s.label + ' 沉了。</b>', gap: 0.9 });
+        w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>' + shipName(s) + ' 沉了。</b>', gap: 0.9 });
       }
     }
     // 任意一对敌我舰船进入 16 km（反舰弹开火距离）就报
@@ -3112,7 +3132,7 @@ MISSIONS.push({
     }
     if (!w.flags.contact && inRange) {
       w.flags.contact = true;
-      w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '双方进入反舰弹射程。<b>先打房角石，再打快艇。</b>', gap: 1.0 });
+      w.radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '双方进入反舰弹射程。<b>先打澄渡号，再打快艇。</b>', gap: 1.0 });
     }
     w.objectiveSub = '敌舰 ' + left + '/' + w.fleet.length + ' · 我方 ' + mine + '/' + w.myFleet.length +
       ' · 旗舰 ' + Math.round(frac * 100) + '%';

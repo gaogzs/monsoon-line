@@ -643,3 +643,6 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
   .cl-wrap{ padding:18px 18px 30px; }
   .ac-panel{ grid-template-columns:1fr; grid-template-areas:"view" "main" "weapons"; }
 }
+/* 吊舱叠加上去的 ECM：接在机体值右边，亮绿 */
+.stat-bar b{ position:absolute; top:0; bottom:0; display:block; background:#5fe39a; }
+.stat-row .v em.up{ color:#5fe39a; }
