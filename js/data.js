@@ -731,7 +731,7 @@ var SHIPS = [
     gunResist: 0.9,
     label: '虎鲸',
     vials: ['四面相控阵', '前甲板垂发阵位', '动力舱'],
-    arms: ['32 单元舰空弹垂发', '近防炮 ×2', '76 mm 舰炮 ×1', '反潜鱼雷 ×6'],
+    arms: ['32 单元舰空弹垂发', '近防炮 ×2', '75 mm 舰炮 ×1', '反潜鱼雷 ×6'],
     desc: `
 <p>上游公约海军留在分水方向的<b>两艘</b>护航驱逐舰之一。它的任务书里没有一条是"歼灭敌方舰队" ——
 这片海域上没有值得歼灭的舰队，只有漂在海上的平台、电缆和驳船。</p>
@@ -763,7 +763,7 @@ var SHIPS = [
     gunResist: 0.95,
     label: '蓝鲸',
     vials: ['三座补给门架', '艉部上层建筑', '货舱与油舱'],
-    arms: ['直升机 ×2', '近防炮 ×2'],
+    arms: ['直升机 ×2', '近防炮 ×2', '50 mm 速射炮 ×2'],
     desc: `
 <p>两万吨的油弹一条龙。它存在的理由非常具体：<b>上游在分水方向只有一个中队</b>，
 而那个中队的每一次出动都要烧掉一地板的油。</p>
@@ -794,7 +794,7 @@ var SHIPS = [
     gunResist: 0.995,
     label: '座头鲸',
     vials: ['飞行甲板与弹射器', '舰岛与航空管制', '机库与弹药升降机'],
-    arms: ['舰载机 ×40（含 DB-11）', '舰空弹 ×16', '近防炮 ×4'],
+    arms: ['舰载机 ×40（含 DB-11）', '舰空弹 ×16', '近防炮 ×4', '50 mm 速射炮 ×2'],
     desc: `
 <p><b>它就是 DB-11 那句"280 米长的浮岛平台"。</b>上游不叫它航母，叫浮岛 ——
 因为它不跟着舰队跑：<b>它开到哪片海，那片海就成了它的机场。</b></p>
@@ -823,7 +823,7 @@ var SHIPS = [
     gunResist: 0.93,
     label: '抹香鲸',
     vials: ['四面大相控阵', '前后垂发阵位', '塔式综合桅杆'],
-    arms: ['96 单元舰空弹垂发', '76 mm 舰炮 ×1', '近防炮 ×2', '反潜鱼雷 ×8'],
+    arms: ['96 单元舰空弹垂发', '75 mm 舰炮 ×1', '近防炮 ×2', '50 mm 速射炮 ×2', '反潜鱼雷 ×8'],
     desc: `
 <p>编队的防空指挥舰。它是这片海域上唯一能<b>同时盯住几百个目标</b>的东西：
 四面加大相控阵、96 单元舰空弹，以及一根把雷达与电子战天线全收进去的塔式桅杆。</p>
@@ -851,7 +851,7 @@ var SHIPS = [
     gunResist: 0.8,
     label: '海豚',
     vials: ['拖曳声呐与艉部绞车', '前主炮', '烟囱与动力段'],
-    arms: ['反舰导弹 ×4', '舰空弹 ×8', '76 mm 舰炮 ×1', '反潜鱼雷 ×4'],
+    arms: ['反舰导弹 ×4', '舰空弹 ×8', '75 mm 舰炮 ×1', '反潜鱼雷 ×4'],
     desc: `
 <p>编队里跑腿的那一条：反潜、护渔、给补给舰看门。
 它没有垂发、没有大相控阵 —— 一门 76 毫米炮、八发舰空弹、四枚反舰弹，
@@ -910,7 +910,7 @@ var SHIPS = [
     gunResist: 0.8,
     label: '菊石',
     vials: ['舰桥与前向搜索阵面', '前主炮', '烟囱与动力段'],
-    arms: ['反舰导弹 ×8', '舰空导弹箱 ×6', '76 mm 舰炮 ×1', '近防炮 ×1'],
+    arms: ['反舰导弹 ×8', '舰空导弹箱 ×6', '75 mm 舰炮 ×1', '近防炮 ×1'],
     desc: `
 <p>下游在分水海域最常出现的一条船。菊石是干涸的河床上最容易捡到的
 那种石头 —— 螺旋形、一层一层、到处都是，和它一样。</p>
@@ -1001,7 +1001,7 @@ var SHIPS = [
     gunResist: 0.93,
     label: '邓氏鱼',
     vials: ['前后反舰弹发射箱', '舰桥与前向阵面', '双烟囱'],
-    arms: ['反舰导弹 ×32', '76 mm 舰炮 ×1', '舰空弹 ×8', '近防炮 ×1'],
+    arms: ['反舰导弹 ×32', '120 mm 舰炮 ×1', '50 mm 速射炮 ×2', '舰空弹 ×8', '近防炮 ×1'],
     desc: `
 <p>泥盆纪的盾皮鱼，最早的海中巨兽之一 —— <b>咬合力是它唯一的本事。</b>
 这条船也一样：三十二枚反舰弹、一门大口径舰炮，
@@ -1197,6 +1197,116 @@ var SHIPS = [
 <p>打沉它不会有任何战术收益，只会得到一份措辞更强硬的声明。</p>`
   }
 ];
+
+/* ============================================================
+   炮塔用炮（2-0IMPL 3.4）—— NPC 专用，不进 WEAPONS（也就不进挂载图鉴）。
+   字段与机炮相同（rpm / speed / dmg / range / cal / spread），另加：
+     gravity              炮弹重力倍率
+     fuze / blast / blastCore  近炸引信与爆炸半径：写了才有空爆 / 近炸（Ent.fireGunFrom）
+     surface              也打海面 / 地面目标（目前只有 50 mm）
+   伤害保持原计划（近防炮 4 / 50 mm 12 / 75 mm 30 / 120 mm 80），平衡靠散布、射速和迟钝的提前量：
+   平直飞过去必死，稍微机动就大大降低。近防炮射速砍得最多（1800 → 700，高射速的东西少一截没人感觉得到），
+   50 / 75 mm 只略降（射速慢了一眼就看得出）；尾炮 / 30 mm 遥控炮比近防炮还慢。
+   spread 是对空散布：中大口径放得很大（天上炸成一片，气氛要足，但很少真打中机动目标）；
+   spreadSurface 是打舰船 / 设施时的散布，另算，小得多 —— 对地还是打得准。数值依据见 docs/systems/turret.md。
+   口径一律整数公制档，不用 23 / 76 / 127 这种英制换算出来的数。
+   ============================================================ */
+var TURRET_GUNS = {
+  ciws20: { name: '近防炮 20mm', cal: 20, rpm: 450, speed: 1100, dmg: 4, range: 1800, airRange: 1200, spread: 0.006 },
+  aa30:   { name: '30mm 遥控炮', cal: 30, rpm: 300, speed: 1000, dmg: 9, range: 2500, spread: 0.005 },
+  tail20: { name: '20mm 尾炮', cal: 20, rpm: 300, speed: 900, dmg: 5, range: 1200, spread: 0.006 },
+  n50:    { name: '50mm 速射炮', cal: 50, rpm: 80, speed: 1050, dmg: 12, range: 4500, spread: 0.012, spreadSurface: 0.002,
+            gravity: 1, fuze: 4, blast: 8, blastCore: 1.5, surface: true },
+  n75:    { name: '75mm 两用舰炮', cal: 75, rpm: 24, speed: 900, dmg: 30, range: 8000, spread: 0.016, spreadSurface: 0.0025,
+            gravity: 1, fuze: 6, blast: 13, blastCore: 2 },
+  /* 发射架示例（目前没有舰船装）：kind 'launcher' + weapon（WEAPONS 的 id），
+     cd 每发间隔、ammo 备弹（0 = 不限）、loft 发射时按距离抬高的比例、air / surface 打什么。
+     mounts 里照常写 gun: 'lnchSam'，有实体模型就像炮塔一样转。 */
+  lnchSam: { name: '旋转舰空弹发射架', kind: 'launcher', weapon: 'vlar', cd: 6, ammo: 8, loft: 0.15,
+             air: true, surface: false, launchSpeed: 160 },
+  n120:   { name: '120mm 主炮', cal: 120, rpm: 8, speed: 800, dmg: 80, range: 14000, spread: 0.02, spreadSurface: 0.003,
+            gravity: 1, fuze: 8, blast: 18, blastCore: 3 }
+};
+
+/* 舰船的炮位（2-0IMPL 3.5）。模型空间：船头 +z、右舷 +x、上 +y，pos 是甲板上的座圈位置。
+   yaw0 是零位朝向（相对船头），arc 是相对零位的射界。
+   model 有值的是实体炮塔（models.js 的 tur50 / tur75 / tur120，带 r 的是下游涂装）；
+   没有的（近防炮、遥控炮、尾炮）从 pos 直接射出。
+   smoke 断言 mounts 的炮数与 arms 文本一致。 */
+var ARC_BOW = { yawMin: -2.6, yawMax: 2.6, pitchMin: -0.1, pitchMax: 1.4 };
+var ARC_CIWS = { yawMin: -2.8, yawMax: 2.8, pitchMin: -0.2, pitchMax: 1.5 };
+var ARC_SIDE = { yawMin: -1.6, yawMax: 1.6, pitchMin: -0.1, pitchMax: 1.4 };
+function _m(id, gun, pos, yaw0, arc, model, role) {
+  return { id: id, gun: gun, pos: pos, yaw0: yaw0, arc: arc, model: model || null, role: role };
+}
+var SHIP_MOUNTS = {
+  orca: [
+    _m('bow', 'n75', [0, 6.2, 58], 0, ARC_BOW, 'tur75', 'dual'),
+    _m('ciwsF', 'ciws20', [0, 15.0, 27], 0, ARC_CIWS, null, 'ciws'),
+    _m('ciwsA', 'ciws20', [0, 7.8, -14], Math.PI, ARC_CIWS, null, 'ciws')
+  ],
+  spermwhale: [
+    _m('bow', 'n75', [0, 7.2, 66], 0, ARC_BOW, 'tur75', 'dual'),
+    _m('ciwsF', 'ciws20', [0, 21.5, 22], 0, ARC_CIWS, null, 'ciws'),
+    _m('ciwsA', 'ciws20', [0, 9.2, -30], Math.PI, ARC_CIWS, null, 'ciws'),
+    _m('n50L', 'n50', [-8.2, 6.4, -50], -Math.PI / 2, ARC_SIDE, 'tur50', 'dual'),
+    _m('n50R', 'n50', [8.2, 6.4, -50], Math.PI / 2, ARC_SIDE, 'tur50', 'dual')
+  ],
+  dunkleosteus: [
+    _m('bow', 'n120', [0, 6.4, 60], 0, { yawMin: -2.6, yawMax: 2.6, pitchMin: -0.1, pitchMax: 0.9 }, 'tur120r', 'dual'),
+    _m('ciws', 'ciws20', [0, 8.0, -30], Math.PI, ARC_CIWS, null, 'ciws'),
+    _m('n50L', 'n50', [-7.4, 5.8, -36], -Math.PI / 2, ARC_SIDE, 'tur50r', 'dual'),
+    _m('n50R', 'n50', [7.4, 5.8, -36], Math.PI / 2, ARC_SIDE, 'tur50r', 'dual')
+  ],
+  dolphin: [
+    _m('bow', 'n75', [0, 5.0, 44], 0, ARC_BOW, 'tur75', 'dual')
+  ],
+  ammonite: [
+    _m('bow', 'n75', [0, 5.5, 48], 0, ARC_BOW, 'tur75r', 'dual'),
+    _m('ciws', 'ciws20', [0, 9.5, -30], Math.PI, ARC_CIWS, null, 'ciws')
+  ],
+  bluewhale: [
+    _m('ciwsF', 'ciws20', [0, 18.0, 82], 0, ARC_CIWS, null, 'ciws'),
+    _m('ciwsA', 'ciws20', [0, 13.0, -100], Math.PI, ARC_CIWS, null, 'ciws'),
+    _m('n50L', 'n50', [-11.6, 11.0, 40], -Math.PI / 2, ARC_SIDE, 'tur50', 'dual'),
+    _m('n50R', 'n50', [11.6, 11.0, 40], Math.PI / 2, ARC_SIDE, 'tur50', 'dual')
+  ],
+  humpback: [
+    _m('ciwsFL', 'ciws20', [-18, 20.0, 120], -Math.PI / 4, ARC_CIWS, null, 'ciws'),
+    _m('ciwsFR', 'ciws20', [18, 20.0, 120], Math.PI / 4, ARC_CIWS, null, 'ciws'),
+    _m('ciwsAL', 'ciws20', [-18, 20.0, -125], -3 * Math.PI / 4, ARC_CIWS, null, 'ciws'),
+    _m('ciwsAR', 'ciws20', [18, 20.0, -125], 3 * Math.PI / 4, ARC_CIWS, null, 'ciws'),
+    _m('n50L', 'n50', [-18.5, 19.2, -60], -Math.PI / 2, ARC_SIDE, 'tur50', 'dual'),
+    _m('n50R', 'n50', [18.5, 19.2, -60], Math.PI / 2, ARC_SIDE, 'tur50', 'dual')
+  ],
+  cameroceras: [
+    _m('ciwsF', 'ciws20', [0, 10.0, 80], 0, ARC_CIWS, null, 'ciws'),
+    _m('ciwsA', 'ciws20', [0, 10.0, -85], Math.PI, ARC_CIWS, null, 'ciws')
+  ],
+  trilobite: [
+    _m('rws', 'aa30', [0, 3.8, 14], 0, ARC_CIWS, null, 'aa')
+  ],
+  seascorpion: [
+    _m('rwsF', 'aa30', [0, 8.6, 40], 0, ARC_CIWS, null, 'aa'),
+    _m('rwsA', 'aa30', [0, 7.0, -55], Math.PI, ARC_CIWS, null, 'aa')
+  ],
+  daplu: [
+    _m('rws', 'tail20', [0, 3.5, 10.5], 0, ARC_CIWS, null, 'aa')
+  ]
+};
+(function () {
+  for (var i = 0; i < SHIPS.length; i++) {
+    if (SHIP_MOUNTS[SHIPS[i].id]) SHIPS[i].mounts = SHIP_MOUNTS[SHIPS[i].id];
+  }
+  /* ROK-40 的尾炮：没有实体，从尾锥射出，管后半球。它本身没有前射机炮（gun: null） */
+  for (i = 0; i < AIRCRAFT.length; i++) {
+    if (AIRCRAFT[i].id === 'boulder') {
+      AIRCRAFT[i].mounts = [_m('tail', 'tail20', [0, 0.4, -22.2], Math.PI,
+        { yawMin: -1.5, yawMax: 1.5, pitchMin: -0.9, pitchMax: 0.9 }, null, 'aa')];
+    }
+  }
+})();
+
 
 /* ============================================================
    武器库

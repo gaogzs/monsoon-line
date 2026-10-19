@@ -247,6 +247,12 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 
 ---
 
+### 炮塔用炮
+
+舰炮、近防炮、遥控炮、尾炮不在 `WEAPONS` 里，在 `TURRET_GUNS`（NPC 专用，不进挂载图鉴）。
+字段与机炮相同，另有 `gravity` / `fuze` / `blast` / `blastCore`（大口径近炸、定时空爆）、`airRange`、`surface`，
+以及 `kind: 'launcher'` 的导弹发射架。全表与瞄准逻辑见 [turret.md](turret.md)。
+
 ## 机炮散布
 
 每发子弹在**垂直于炮口轴的两个方向上各取一个独立的高斯样本**，

@@ -98,7 +98,7 @@
 | `quad(a, b, c, d, col)` | 四边面 |
 | `tri(a, b, c, col)` | 三角面 |
 | `fuselage(secs, col, colCap)` | 轴向棱柱机身（菱形剖面），`secs = [{z, w, h, y?}]`；返回每节的 4 个顶点索引 |
-| `hull(secs, colSide, colDeck, colBottom)` | **船体**（矩形剖面：平甲板 / 直立舷侧 / 平底），`secs = [{z, w, y0, y1, x?}]` |
+| `hull(secs, colSide, colDeck, colBottom)` | **船体**（平甲板 / 直立舷侧 / 舭部收进 / V 形龙骨；`flat: true` 保留平底），`secs = [{z, w, y0, y1, x?, flat?}]` |
 | `box(cx, cy, cz, w, h, d, col, colTop)` | 长方体，`colTop` 可单独给顶面颜色 |
 | `boxTilt(cx, cy, cz, w, h, d, tilt, col, colTop)` | 绕 x 轴仰起 `tilt` 弧度的长方体（发射箱 / 吊架 / 艏门） |
 | `tube(a, b, ra, rb, seg, col, capCol)` | 任意轴圆柱 / 锥台，`seg` 是圆周分段数；`capCol` 非空才封底 |
@@ -268,6 +268,16 @@ b.hull([
 | `mast(b, x, z, y0, y1, r0, r1, col)` | 桅杆：桁架锥台 + 顶部小平台 |
 | `house(b, x, z, w, h, d, y0, col, colTop)` | 甲板上的箱形舱段（舰桥 / 机库 / 货舱） |
 | `boxTilt(...)`（`MB` 方法） | 绕 x 轴上仰的长方体（导弹发射箱 / A 型吊架 / 登陆舰艏门） |
+
+### 舰船后处理（v2.2）
+
+- **零件落座 `settle(m)`**：按"连通分量"（共享顶点的面）找出和任何其他零件都不接触的悬空零件，
+  把它最底下那一圈顶点**往下延长**到正下方最高的表面（零件本身不动）。对 `SHIPS` 用到的模型都跑一遍。
+  桅杆杆身和顶部平台互相接触、检测不到，所以桅杆是手动挪到舰桥顶上的。
+- **`boxTilt(..., tilt, col, colTop, yaw?)`**：负的 `tilt` 让 +z 端（箱口）抬起；可选 `yaw` 绕 y 轴转。
+  斜置反舰弹箱要保证弹道不撞舰桥：靠两舷放到舰桥宽度外，或抬高仰角从舰桥顶上越过（同一艘船各组仰角一致）。
+- **炮塔**：`tur50 / tur75 / tur120`（`_base` + `_gun`，带 `r` 的是下游涂装），
+  `MODELS.TURRET_SPEC`（耳轴高、炮管长）和 `MODELS.composeTurrets(base, mounts)` 都不可枚举。见 [turret.md](turret.md)。
 
 ## 重要常量 / 参数速查
 

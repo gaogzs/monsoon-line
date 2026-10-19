@@ -30,11 +30,15 @@ var RenderGL = (function () {
     'uniform vec3 uCamP, uCamR, uCamU, uCamF; uniform float uFocal, uCx, uCy, uW, uH, uNear, uFar;',
     'uniform vec3 uLight, uFogRGB; uniform vec4 uFog;',          // near, far, max, steps
     'uniform vec3 uLum;',                                          // ambient, diffuse, degenerate
+    'uniform float uCurve;',                                       // 1/(2R)：离镜头水平距离 d 的点下沉 d²/(2R)
     'flat out vec4 vCol; out float vW; out float vCull;',
     'float q(float v, float n) { float i = v < 0.0 ? 0.0 : (v > 0.999 ? n - 1.0 : floor(v * n)); return (i + 0.5) / n; }',
     'vec3 toWorld(vec3 p) { p *= uScale; return uP + uRt * p.x + uUp * p.y + uFw * p.z; }',
     'void main() {',
     '  vec3 wp = toWorld(aPos);',
+    /* 地球曲率：海面（render-env.js）是真的球面，远处的船若还停在 y = 0 就会浮在海上。
+       所有模型按离镜头的水平距离一起往下沉，和海面同一个弧度 */
+    '  vec3 dd = wp - uCamP; wp.y -= (dd.x * dd.x + dd.z * dd.z) * uCurve;',
     '  vec3 d = wp - uCamP;',
     '  float cx = dot(d, uCamR), cy = dot(d, uCamU), cz = dot(d, uCamF);',
     '  vec3 nW = uRt * aNrm.x + uUp * aNrm.y + uFw * aNrm.z;',
@@ -105,7 +109,7 @@ var RenderGL = (function () {
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
       ['uP', 'uRt', 'uUp', 'uFw', 'uScale', 'uTint', 'uEmis', 'uCamP', 'uCamR', 'uCamU', 'uCamF',
         'uFocal', 'uCx', 'uCy', 'uW', 'uH', 'uNear', 'uFar', 'uLight', 'uFogRGB', 'uFog', 'uLum',
-        'uAlpha', 'uLogC'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+        'uAlpha', 'uLogC', 'uCurve'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
       if (withEnv && typeof RenderEnv !== 'undefined') {
         try {
           env = RenderEnv.create(gl, compile);
@@ -299,7 +303,7 @@ var RenderGL = (function () {
     gl.clearDepth(1);
     gl.depthMask(true);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    var C = E ? { cam: cam, W: W, H: H, pw: canvas.width, ph: canvas.height,
+    var C = E ? { cam: cam, W: W, H: H, pw: canvas.width, ph: canvas.height, curve: 1 / (2 * Shading.EARTH_R),
       dpr: canvas.width / Math.max(1, W), far: FAR, logC: 1 / Math.log2(FAR + 1) } : null;
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -320,6 +324,7 @@ var RenderGL = (function () {
     if (opt && opt.fog === false) gl.uniform4f(U.uFog, 1e9, 2e9, 0, S.STEPS);
     else gl.uniform4f(U.uFog, S.FOG_NEAR, S.FOG_FAR, S.FOG_MAX, S.STEPS);
     gl.uniform3f(U.uLum, S.AMBIENT, S.DIFFUSE, S.DEGENERATE);
+    gl.uniform1f(U.uCurve, E ? 1 / (2 * S.EARTH_R) : 0);    // 只有画海面的主画面才弯
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);

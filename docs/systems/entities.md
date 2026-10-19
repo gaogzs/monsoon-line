@@ -54,6 +54,8 @@
 | `openEcm` | `openEcm(actor, wid, threatSkill)` | 电子战吊舱开机（认知电子战闭环的入口） |
 | `passiveEffects` | `passiveEffects([{wid, n}]) → {lockResist, armor, lockRange, flareBonus, silentLock}` | 汇总被动吊舱效果（`armor` 封顶 0.55）。玩家（`game.js` 同名包装按挂点组展开）与敌机 `pods`（`missions.js`）共用 |
 | `fireGun` | `fireGun(a, world)` | 按射速节流开火，生成子弹 + 炮口火光 |
+| `fireGunFrom` | `fireGunFrom(shooter, w, muzzle, dir, world, opt)` | 生成一发炮弹（机炮和炮塔共用）：带 `gw` / `grav` / `fuze` / `blast`；`w` 写了 fuze / blast 才有近炸与起爆，航空机炮没写 |
+| `shellFuze` / `detonateShell` | `(b, world)` / `(b, world, pos, direct, opt)` | 炮弹近炸检查 / 起爆（临时挂 `b.w = b.gw` 走 `Combat.detonate`）。带战斗部的炮弹寿命到点空爆、落水就地起爆（`stepBullet`） |
 | `stepBullet` | `stepBullet(b, dt)` | 子弹每帧：重力 + 位移 + 寿命 |
 | `SLOT_EMPTY` | 常量 `1e9` | 空挂架标记：永远不会装填完成 |
 | `spawnParticle` | `spawnParticle(list, pos, vel, life, size, color, opt)` | 生成一个粒子。`opt = {grow, alpha, drag, grav}` |

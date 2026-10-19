@@ -579,6 +579,8 @@ var Ent = (function () {
     /* NPC 的弹药池与发射槽。玩家那套由 startMission 按机库配置另建
        （那里要按 perPoint 算，和这里的口径不同）。 */
     if (!a.isPlayer) buildNpcMounts(a);
+    // 炮塔（目前只有 ROK-40 的尾炮）
+    if (ac.mounts && typeof Turret !== 'undefined') a.turrets = Turret.make(ac.mounts);
     return a;
   }
 
@@ -1841,6 +1843,54 @@ var Ent = (function () {
     return r * Math.cos(ang);
   }
 
+  /* 生成一发炮弹 / 子弹 —— 机炮、炮塔都走这里（2-0IMPL 3.1）。
+     shooter  开火的单位（飞机或舰船，取 team / vel / owner）
+     w        炮的武器数据：speed / dmg / cal / range，可选
+                gravity  重力倍率（缺省 1）
+                fuze / blast / blastCore  近炸引信与爆炸半径 —— 写了才会近炸 / 起爆，
+                                          没写（航空机炮）就只有直接命中
+     muzzle   炮口世界坐标；dir 单位方向（已含散布）
+     opt      { life }：缺省 range / speed
+     炮弹的武器数据挂在 b.gw，不挂 b.w：b.w 会让 warheadK 把普通机炮也当成战斗部打折。
+     起爆时 Combat.detonate 要读 shot.w，见 detonateShell。 */
+  function fireGunFrom(shooter, w, muzzle, dir, world, opt) {
+    var life = (opt && opt.life) || (w.range || 1600) / Math.max(1, w.speed);
+    var base = shooter.vel || M3.V(0, 0, 0);
+    var b = {
+      kind: 'bullet', team: shooter.team, alive: true,
+      pos: M3.clone(muzzle), prev: M3.clone(muzzle),
+      vel: M3.add(M3.mul(dir, w.speed), base),
+      dmg: w.dmg, cal: w.cal || 0, life: life, owner: shooter,
+      gw: w, grav: w.gravity === undefined ? 1 : w.gravity,
+      fuze: w.fuze || 0, blast: w.blast || 0
+    };
+    world.bullets.push(b);
+    return b;
+  }
+
+  /* 带战斗部的炮弹起爆：直接命中 / 近炸 / 寿命到点空爆 / 落地，都走 Combat.detonate */
+  function detonateShell(b, world, pos, direct, opt) {
+    b.w = b.gw;
+    Combat.detonate(b, world, pos, direct || null, opt);
+  }
+
+  /* 近炸：本帧弹道线段离某架敌机的最近距离小于 fuze 就在最近点起爆。
+     只查飞机（炮弹对空才用近炸；打舰船靠直接命中）。 */
+  function shellFuze(b, world) {
+    if (!b.alive || !(b.fuze > 0)) return false;
+    var p0 = b.prev, d = M3.sub(b.pos, p0), dd = M3.dot(d, d);
+    var acts = world.actors, R = Combat.HIT_R_AIR;
+    for (var i = 0; i < acts.length; i++) {
+      var a = acts[i];
+      if (!a.alive || a.team === b.team) continue;
+      var rel = M3.sub(a.pos, p0);
+      var s = dd > 1e-9 ? M3.clamp(M3.dot(rel, d) / dd, 0, 1) : 0;
+      var cp = M3.add(p0, M3.mul(d, s));
+      if (M3.dist(cp, a.pos) - R < b.fuze) { detonateShell(b, world, cp, null); return true; }
+    }
+    return false;
+  }
+
   function fireGun(a, world) {
     if (!a.alive || a.gunAmmo <= 0) return;
     var w = WEAPONS[a.gun];
@@ -1889,15 +1939,8 @@ var Ent = (function () {
          火光却画在右边，看上去子弹和火光不是一个地方出来的。
          现在按"发"轮换（a.gunSide 跨轮保留），火光跟着同一个点走。 */
       a.gunSide = a.gunSide ? 0 : 1;
-      var muzzle = gunMuzzle(a, a.gunSide);
-      world.bullets.push({
-        kind: 'bullet', team: a.team, alive: true,
-        pos: muzzle,
-        prev: M3.clone(muzzle),
-        side: a.gunSide,            // 哪一侧炮口：曳光尾巴接回当前炮口，见 game.js drawTracers
-        vel: M3.add(M3.mul(dir, w.speed), a.vel),
-        dmg: w.dmg, cal: w.cal || 0, life: bulletLife, owner: a
-      });
+      var b = fireGunFrom(a, w, gunMuzzle(a, a.gunSide), dir, world, { life: bulletLife });
+      b.side = a.gunSide;           // 哪一侧炮口：曳光尾巴接回当前炮口，见 game.js drawTracers
     }
 
     /* 炮口火光：只记"正在开火"，真正的画法在 flashRings。
@@ -1957,16 +2000,23 @@ var Ent = (function () {
     return M3.add(a.pos, M3.add(M3.mul(a.fwd, 6), M3.mul(a.right, side ? 0.7 : -0.7)));
   }
 
-  function stepBullet(b, dt) {
+  function stepBullet(b, dt, world) {
     if (!b.alive) return;
     // 保留上一帧位置，渲染曳光弹时用它画线段。
     // M3.add 返回新对象，所以这里的引用不会被下一步覆盖。
     b.prev = b.pos;
-    b.vel.y -= G * dt;
+    b.vel.y -= G * (b.grav === undefined ? 1 : b.grav) * dt;
     b.pos = M3.add(b.pos, M3.mul(b.vel, dt));
     b.steps = (b.steps || 0) + 1;      // 走了几帧：drawTracers 只让第一帧的曳光接回炮口
     b.life -= dt;
-    if (b.life <= 0 || b.pos.y <= 0) b.alive = false;
+    if (b.life <= 0 || b.pos.y <= 0) {
+      /* 带战斗部的炮弹：落水就地起爆，寿命到点在空中自毁（对空射击时天上一团团的烟） */
+      if (b.blast > 0 && world) {
+        var gnd = b.pos.y <= 0;
+        if (gnd) b.pos.y = 0;
+        detonateShell(b, world, null, null, { ground: gnd });
+      } else b.alive = false;
+    }
   }
 
   /* ============================================================
@@ -2264,7 +2314,7 @@ var Ent = (function () {
     mountIssues: mountIssues, clearMountIssues: clearMountIssues,
     makeMissile: makeMissile, stepMissile: stepMissile, effectiveLife: effectiveLife,
     breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects,
-    fireGun: fireGun, gunMuzzle: gunMuzzle, flashRings: flashRings, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
+    fireGun: fireGun, fireGunFrom: fireGunFrom, shellFuze: shellFuze, detonateShell: detonateShell, gunMuzzle: gunMuzzle, flashRings: flashRings, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
     spawnParticle: spawnParticle, stepParticles: stepParticles, explode: explode,
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
     detonate: detonate,

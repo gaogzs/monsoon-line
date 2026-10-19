@@ -26,6 +26,7 @@
 | `probe-render.js` | 无头 Chrome（swiftshader）把同一组场景用 WebGL 与 2D 各画一张并逐像素比 | 改了 `render-gl.js` / `render.js` / `shading.js` 之后 |
 | `probe-balance.js` | 玩家无敌且不作为，按关（m2/m5/m8）多种子统计敌方压力 | 改了敌方航线 / 轰炸 / 反舰弹之后 |
 | `probe-missions.js` | **逐关验证"清空敌人之后到底能不能赢"**，并检查 NPC 挂载问题 | 加了新关卡、改了胜负条件之后 |
+| `probe-turret.js` | 近防炮打 1.2 km 外横穿目标的命中率（直线 / 慢转 / 加速 / 乱机动），射界外不开火、转速受限；Dunkleosteus 贴近通场的掉血（直线 20–40、机动 ≤ 8） | 改了 `turret.js` 或 `TURRET_GUNS` 之后 |
 | `probe-blast.js` | 每种空空弹按 straight / gentle / hard / jink / max / flare 六档机动各打 N 发，统计命中率、平均伤害（占 `dmg` 比例）、起爆距离，与 `probe-blast.baseline.json` 对比 | 改了近炸 / 爆炸半径 / 导引之后 |
 | `release.js` | 按命令里给的版本号追加 `CHANGELOG.md` 草稿，生成 `js/changelog.js` 与 `js/version.js` | **每次发一个版本**（`node tools/release.js vX.Y.Z`） |
 | `stamp-version.js` | 只把上一次提交写进 `js/version.js`（版本号从 `CHANGELOG.md` 顶部读） | **每次 `git commit` 之前** |

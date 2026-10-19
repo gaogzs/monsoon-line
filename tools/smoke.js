@@ -1527,9 +1527,9 @@ if (Ent && M3 && me && world) {
       const w = m2();
       /* 判据是**航线的尾炮标记**而不是"有没有 route" ——
          预警机（spawnAewc）也是航线型单位，它会让"route 数量"多出
-         一架。tailGun 只有炸基地的那条航线写了（虽然 ROK-40 现在
-         没有机炮、尾炮是无效配置，它仍是这条航线的唯一标记）。 */
-      const bmb = w.actors.filter(a => a.route && a.route.tailGun && a.alive);
+         一架。带炮塔（尾炮）的航线机只有炸基地的 ROK-40（以前靠 route.tailGun 认，
+         那是无效配置，已删）。 */
+      const bmb = w.actors.filter(a => a.route && a.turrets && a.alive);
       if (bmb.length !== 2) bad.push('M2 应该有 2 架轰炸机，实际 ' + bmb.length);
       if (!w.baseTarget) bad.push('M2 没有设置基地目标');
       else if (!w.baseTarget.alive) bad.push('基地一开局就是毁的');
@@ -1538,7 +1538,7 @@ if (Ent && M3 && me && world) {
     // 2. 轰炸机不得自己选目标、不得开加力缠斗
     {
       const w = m2();
-      const bmb = w.actors.find(a => a.route && a.route.tailGun && a.alive);
+      const bmb = w.actors.find(a => a.route && a.turrets && a.alive);
       for (let i = 0; i < 120; i++) AI.update(bmb, 1 / 60, w);
       if (bmb.ai.target) bad.push('轰炸机自己选了目标 —— 它不该有空战逻辑');
       if (bmb.ab) bad.push('轰炸机开了加力 —— 它不追人');
@@ -1547,7 +1547,7 @@ if (Ent && M3 && me && world) {
     // 3. 飞到投弹点后应当真的伤到基地
     {
       const w = m2();
-      const bmb = w.actors.find(a => a.route && a.route.tailGun && a.alive);
+      const bmb = w.actors.find(a => a.route && a.turrets && a.alive);
       const hp0 = w.baseTarget.hp;
       // 直接挪到投弹点附近，省掉八十多秒的航程（分段航线：第一段 goto 的 wp 就是投弹点）
       bmb.pos = M3.add(bmb.route.legs[0].wp, M3.V(0, 700, 2200));
@@ -1564,7 +1564,7 @@ if (Ent && M3 && me && world) {
     // 4. 投弹两次足以摧毁基地，且摧毁后判定为失败
     {
       const w = m2();
-      const bmb = w.actors.find(a => a.route && a.route.tailGun && a.alive);
+      const bmb = w.actors.find(a => a.route && a.turrets && a.alive);
       Ent.damage(w.baseTarget, 100000, w, bmb);
       const ms = sandbox.MISSIONS[1];
       if (w.baseTarget.alive) bad.push('基地承受致命伤害后仍然存活');
@@ -5580,6 +5580,86 @@ try {
   else ok('锁定：没锁满的弹不带目标、锁满才带；锁满才触发对方告警；长按 F 取消选择、短按切换');
 } catch (e) {
   fail('锁定与目标选择测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   旋转炮塔（2-0IMPL 阶段 3）
+   ============================================================ */
+console.log('\n旋转炮塔');
+try {
+  const bad = [];
+  const { SHIPS: SH, TURRET_GUNS: TG, Turret: TU, Ent: EN, M3: V3, MODELS: MD } = sandbox;
+  // 1. 炮位数量与 arms 文本一致
+  const ARMS = [[/近防炮 ×(\d+)/, 'ciws20'], [/75 mm 舰炮 ×(\d+)/, 'n75'], [/120 mm 舰炮 ×(\d+)/, 'n120'],
+    [/50 mm 速射炮 ×(\d+)/, 'n50'], [/30 mm 遥控炮 ×(\d+)/, 'aa30'], [/20 mm 遥控炮 ×(\d+)/, 'tail20']];
+  for (const s of SH) {
+    const arms = (s.arms || []).join(' / ');
+    for (const [re, gun] of ARMS) {
+      const m = re.exec(arms), want = m ? +m[1] : 0;
+      const have = (s.mounts || []).filter(x => x.gun === gun).length;
+      if (want !== have) bad.push(s.id + '：arms 写 ' + gun + ' ×' + want + '，mounts 里有 ' + have);
+    }
+    if (/76 mm/.test(arms)) bad.push(s.id + ' 的 arms 还写着 76 mm');
+    for (const m of s.mounts || []) if (!TG[m.gun]) bad.push(s.id + ' 的炮位 ' + m.id + ' 用了不存在的炮 ' + m.gun);
+  }
+  // 2. 射界夹紧与方位回绕
+  if (Math.abs(TU.wrapPi(3.5) - (3.5 - 2 * Math.PI)) > 1e-9) bad.push('wrapPi(3.5) 没有回绕到 −π..π');
+  const fake = { m: { yaw0: Math.PI, arc: { yawMin: -1, yawMax: 1, pitchMin: -0.1, pitchMax: 1 } } };
+  const c1 = TU.clampArc(fake, 0, 2);
+  if (Math.abs(Math.abs(c1.yaw) - (Math.PI - 1)) > 1e-6 || c1.pitch !== 1) bad.push('clampArc 没有把越界角夹到射界边上：' + JSON.stringify(c1));
+  if (!TU.inArc(fake, -Math.PI + 0.5, 0)) bad.push('inArc：零位 π 附近（跨 ±π）的方位被判成射界外');
+  // 3. 炮弹从炮口出：Dolphin 的 75 mm 打一架正前方的飞机
+  const dol = SH.find(s => s.id === 'dolphin');
+  const host = EN.makeTarget({ team: 0, model: 'dolphin', x: 0, y: 0, z: 0, hp: 1e9, radius: 30, big: true });
+  host.turrets = TU.make(dol.mounts);
+  // 考的是"定时空爆"这个机制：去掉引信误差和瞄准漂移（游戏里两者都在，3 km 外大多打不中静止目标以外的东西）
+  host.turrets[0].aim = Object.assign({}, host.turrets[0].aim, { fuzeErr: 0, err: 0 });
+  host.turrets[0].gun = Object.assign({}, host.turrets[0].gun, { spread: 0 });
+  // 对海面的散布另算，且比对空小得多
+  for (const id of ['n50', 'n75', 'n120']) {
+    if (!(TG[id].spreadSurface < TG[id].spread)) bad.push(id + ' 的对海面散布（spreadSurface）应小于对空散布');
+  }
+  const foe = { kind: 'aircraft', team: 1, alive: true, hp: 1e9, maxHp: 1e9, pos: V3.V(0, 900, 3000), vel: V3.V(0, 0, 0) };
+  const w2 = { time: 0, actors: [foe], targets: [host], bullets: [], missiles: [], particles: [], silent: true };
+  let shot = null, mz = null;
+  for (let i = 0; i < 900 && !shot; i++) {
+    TU.stepAll(host, w2, 1 / 60);
+    if (w2.bullets.length) { shot = w2.bullets[0]; mz = TU.muzzlePos(host.turrets[0], host); }
+  }
+  if (!shot) bad.push('Dolphin 的 75 mm 15 s 内没有对正前方 3 km 的飞机开火');
+  else {
+    if (V3.dist(shot.pos, mz) > 0.5) bad.push('炮弹出膛点离炮口 ' + V3.dist(shot.pos, mz).toFixed(2) + ' m');
+    if (!(shot.blast > 0 && shot.fuze > 0)) bad.push('75 mm 炮弹没带近炸 / 爆炸半径');
+    // 4. 定时引信：在预计到达的那一刻空爆。单发可能因开火容差 / 散布偏出爆炸范围，所以连打 20 s
+    const hp0 = foe.hp;
+    for (let i = 0; i < 600 && shot.alive; i++) EN.stepBullet(shot, 1 / 60, w2);
+    if (shot.alive) bad.push('75 mm 炮弹飞完也没有空爆');
+    for (let i = 0; i < 1200; i++) {
+      TU.stepAll(host, w2, 1 / 60);
+      for (const b of w2.bullets) EN.stepBullet(b, 1 / 60, w2);
+      w2.bullets = w2.bullets.filter(b => b.alive);
+    }
+    if (!(foe.hp < hp0)) bad.push('75 mm 连打 20 s，空爆一次也没有伤到正对着打的静止目标');
+  }
+  // 5. 航空机炮不带战斗部：只有直接命中
+  const k1 = sandbox.WEAPONS.k1;
+  const b1 = EN.fireGunFrom({ team: 0, vel: V3.V(0, 0, 0) }, k1, V3.V(0, 1000, 0), V3.V(0, 0, 1), { bullets: [] });
+  if (b1.blast || b1.fuze) bad.push('航空机炮的子弹带上了近炸 / 爆炸半径');
+  // 6. 预览网格带炮塔：面数 = 船体 + 各实体炮塔两件
+  for (const s of SH) {
+    if (!s.mounts) continue;
+    let want = MD[s.model].f.length;
+    for (const m of s.mounts) if (m.model) want += MD[m.model + '_base'].f.length + MD[m.model + '_gun'].f.length;
+    const got = MD.composeTurrets(MD[s.model], s.mounts).f.length;
+    if (got !== want) bad.push(s.id + ' 的预览网格面数 ' + got + '，应为 ' + want);
+  }
+  // 7. ROK-40 有尾炮炮塔
+  const bo = sandbox.AIRCRAFT.find(a => a.id === 'boulder');
+  if (!bo.mounts || bo.mounts[0].gun !== 'tail20') bad.push('ROK-40 没有 tail20 尾炮炮位');
+  if (bad.length) bad.forEach(fail);
+  else ok('炮塔：炮位数与 arms 一致；射界夹紧 / 方位回绕；炮弹从炮口出、定时空爆伤人；机炮无战斗部；预览带炮塔');
+} catch (e) {
+  fail('炮塔测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
 /* ============================================================

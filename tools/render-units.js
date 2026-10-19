@@ -85,7 +85,7 @@ for (const a of AIRCRAFT) {
 
 /* ---------- 舰船 ---------- */
 for (const s of SHIPS) {
-  const mdl = MODELS[s.model];
+  const mdl = MODELS.composeTurrets(MODELS[s.model], s.mounts);
   if (!mdl) { miss.push(s.id); continue; }
   const ras = shoot(mdl);
   fs.writeFileSync(path.join(OUT, 'unit-ship-' + s.id + '.png'),

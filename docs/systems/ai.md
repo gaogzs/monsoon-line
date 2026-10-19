@@ -345,7 +345,6 @@ a.route = {
   phase: 'ingress',
   wp: 投弹点, alt: 4300, arrive: 3000,
   exit: 脱离点, exitAlt: 6500,
-  tailGun: 1700,                    // 目前无效配置，见下面「已知问题」
   onArrive: bombTheBase        // 到点要做的事
 };
 ```
@@ -362,7 +361,7 @@ a.route = {
 | `loiter` | `a, b, alt, time, until, jam` | a↔b 来回飞，time 到或 until 为真下一段，都不给就永远盘旋 |
 | `egress` | `wp, alt` | 到点离场消失（escaped） |
 
-`plan` 级 `jam` 整条航线生效（飞往站位途中也开机），`loiter` 段的 `jam` 可覆盖。已改用分段的：m2 轰炸机（goto → call bombTheBase → egress，`tailGun` 仍挂在 route 上）、m5 巡航（goto → call 播无线电 → egress）、m8 轰炸机（strike vsr，rangeK 0.8、alt 4500、timeout 150 → egress）、`jammerRoute`（goto → loiter，plan 级 jam）。
+`plan` 级 `jam` 整条航线生效（飞往站位途中也开机），`loiter` 段的 `jam` 可覆盖。已改用分段的：m2 轰炸机（goto → call bombTheBase → egress；尾炮是炮塔，见 turret.md）、m5 巡航（goto → call 播无线电 → egress）、m8 轰炸机（strike vsr，rangeK 0.8、alt 4500、timeout 150 → egress）、`jammerRoute`（goto → loiter，plan 级 jam）。
 
 **盘旋型**（`route.loiter: true`，预警机，`missions.js` 的 `spawnAewc()`）：
 到点后 `wp` 与 `exit` 互换，在两点之间来回飞、永不退场 —— 击落是唯一让它
@@ -399,15 +398,8 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
 >    敌机在正前方 17° 内 —— 两个条件不可能同时成立。
 > 2. **`fireGun` 没有方向参数**：弹丸方向写死 `a.fwd`、炮口在
 >    `a.pos + fwd*6`（机头）。就算放开角度，它也是朝前打。
-> 3. **`tailGun` 依赖 `a.gun`**：`updateRoute` 第一句是
->    `if (!r.tailGun || a.gunAmmo <= 0) return`，而 `gunAmmo` 来自
->    机型的 `gun`。ROK-40 现在是 `gun: null`（它没有任何武器），
->    所以这条路径直接返回。
->
-> **修法**（需要时）：给 `fireGun(a, world, dir)` 加可选方向（默认 `a.fwd`），
-> 把第 1 条的角度判据改成按**炮塔指向**算（炮塔指向 = `norm(target - pos)`，
-> 服从尾后锥即可），并给 ROK-40 恢复一个只走尾炮的 `gun`。
-> 注意这会**实质提高 m2 的难度**（轰炸机会有自卫火力），所以不在本次改动范围内。
+> **已解决（v2.2 阶段 3）**：尾炮整段删掉，改成 ROK-40 的 `mounts` 里一门没有实体的 `tail20` 炮塔
+> （`js/turret.js`，管后半球），由 `game.js` 每帧 `Turret.stepAll` 驱动，不影响航向。`route.tailGun` 已删除。见 [turret.md](turret.md)。
 
 > 为什么不做成通用 AI：它们在战场上不是战斗单位，而是**事件**。
 > 玩家要处理的不是"一个会缠斗的对手"，而是"一个正在飞向某处的进程"。

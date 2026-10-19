@@ -2484,6 +2484,11 @@ var Game = (function () {
             Combat.detonate(b, world, M3.add(prev, M3.mul(dir, t)), a);
             break;
           }
+          /* 带战斗部的炮弹（舰炮）同样起爆；航空机炮没有 blast，走下面的直接命中 */
+          if (b.blast > 0) {
+            Ent.detonateShell(b, world, M3.add(prev, M3.mul(dir, t)), a);
+            break;
+          }
           b.alive = false;
           Ent.damage(a, b.dmg * Ent.gunResistK(a, b), world, b.owner);
           Ent.spawnParticle(world.particles, b.pos, M3.V(0, 0, 0), 0.22, 1.4, '#ffdd88', { grow: true });
@@ -2514,6 +2519,10 @@ var Game = (function () {
             SFX.hit();
             break;
           }
+          if (b.blast > 0) {
+            Ent.detonateShell(b, world, M3.add(prev, M3.mul(dir, t2)), tg);
+            break;
+          }
           b.alive = false;
           // 加固目标对普通战斗部打折（Ent.warheadK；子弹的 b.w 是 undefined → 1）
           // 小口径航炮再乘机炮抗性（Ent.gunResistK；导弹 / 炸弹 → 1）
@@ -2522,8 +2531,10 @@ var Game = (function () {
           break;
         }
       }
-      /* 子弹落地就没了；无制导弹落地的起爆在 stepMissile 里 */
-      if (b.pos.y <= 0 && b.kind !== 'missile') b.alive = false;
+      /* 没撞上：带近炸引信的炮弹看看有没有擦着敌机 */
+      if (b.alive && b.fuze > 0) Ent.shellFuze(b, world);
+      /* 子弹落地就没了（带战斗部的炮弹在 stepBullet 里落水起爆）；无制导弹落地的起爆在 stepMissile 里 */
+      if (b.alive && b.pos.y <= 0 && b.kind !== 'missile') b.alive = false;
   }
 
   /* 导弹 / 炸弹的起爆（Combat.blast）打设施也走这里 ——
@@ -2602,6 +2613,7 @@ var Game = (function () {
       var t = world.targets[i];
       if (!t.alive) continue;
       Ent.stepTarget(t, dt);
+      if (t.turrets && t.team !== 2) Turret.stepAll(t, world, dt);
 
       if (!t.weapon || t.team === 2) continue;
       if (t.fireCd > 0) { t.fireCd -= dt; continue; }
@@ -3091,10 +3103,14 @@ var Game = (function () {
     // 导弹
     for (i = 0; i < world.missiles.length; i++) Ent.stepMissile(world.missiles[i], dt, world);
     // 子弹
-    for (i = 0; i < world.bullets.length; i++) Ent.stepBullet(world.bullets[i], dt);
+    for (i = 0; i < world.bullets.length; i++) Ent.stepBullet(world.bullets[i], dt, world);
 
     resolveBullets(dt);
     updateTargets(dt);
+    // 飞机上的炮塔（ROK-40 尾炮）
+    for (i = 0; i < world.actors.length; i++) {
+      if (world.actors[i].alive && world.actors[i].turrets) Turret.stepAll(world.actors[i], world, dt);
+    }
     Ent.stepParticles(world.particles, dt);
 
     /* 附近飞机的引擎声：取**最近的一架**驱动那条共享音链。
@@ -3265,6 +3281,7 @@ var Game = (function () {
       // 调节单元每关几十个、大多在 30 km 外 —— 远处那些画出来也只是雾里一个点
       if (t.model === 'cell' && M3.dist2(t.pos, player.pos) > CELL_DRAW_RANGE2) continue;
       Renderer.pushModel(mdl, t.pos, t.fwd, t.up, {});
+      if (t.turrets) Turret.push(t, Renderer.pushModel);
     }
     // 飞机
     for (i = 0; i < world.actors.length; i++) {
@@ -3403,6 +3420,13 @@ var Game = (function () {
 
       // 远弹略粗，抵消透视缩细
       var wMul = 1 + Math.min(1, bDist / 1600) * 0.8;
+      /* 大口径炮弹画得更粗更亮：按口径的平方根放大（20 mm = 1，75 mm ≈ 1.9，120 mm ≈ 2.4），
+         远处也再多保一点，炮弹在几公里外飞过来要看得见 */
+      var cal = b.cal || 20;
+      if (cal > 30) {
+        wMul *= Math.sqrt(cal / 20);
+        wMul *= 1 + Math.min(1.5, bDist / 3000);
+      }
       ctx.strokeStyle = mine ? 'rgba(255,228,150,0.92)' : 'rgba(255,148,88,0.85)';
       ctx.lineWidth = (mine ? 1.35 : 1.15) * wMul;
       ctx.beginPath();

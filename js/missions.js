@@ -357,6 +357,8 @@ function spawnShip(w, o) {
     weapon: o.weapon || null,
     fireCd: o.fireCd === undefined ? M3.rnd(3, 8) : o.fireCd
   });
+  // 炮位（2-0IMPL 阶段 3）：近防炮、舰炮、遥控炮各自索敌开火
+  if (s.mounts && typeof Turret !== 'undefined') t.turrets = Turret.make(s.mounts);
   w.targets.push(t);
   return t;
 }
@@ -731,11 +733,7 @@ MISSIONS.push({
         { do: 'call', fn: bombTheBase },
         { do: 'egress', wp: M3.V(br.ox, 0, br.oz), alt: 6500 }
       ]);
-      /* tailGun 目前是**无效配置**：ROK-40 已经没有机炮
-         （gun: null），updateRoute 的尾炮段第一句就返回。
-         留着它是因为将来若要恢复自卫火力，改的就是这一处。
-         原因见 docs/systems/ai.md「已知问题」。 */
-      bmb.route.tailGun = 1700;
+      // 尾炮自卫：ROK-40 的 mounts 里有 tail20（turret.js），不用在航线里配
       bmb.bigTarget = true;
     }
 

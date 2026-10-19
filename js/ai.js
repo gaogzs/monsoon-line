@@ -528,30 +528,9 @@ var AI = (function () {
       }
     }
 
-    /* 尾炮：只打正后方很近的东西，而且**绝不为了开火改变航向**。
-       这是它唯一的自卫手段 —— 设定里"遇到拦截只能靠护航机和尾炮"。 */
+    /* 尾炮改由炮塔模块（turret.js）负责：ROK-40 的 mounts 里有一门 tail20，
+       game.js 每帧对带 turrets 的飞机调 Turret.step —— 自己索敌、转动、开火，不影响航向。 */
     a.firingGun = false;
-    if (!r.tailGun || a.gunAmmo <= 0) return;
-
-    var t = null, best = 1e9;
-    var i;
-    for (i = 0; i < world.actors.length; i++) {
-      var e = world.actors[i];
-      if (!e.alive || !Ent.hostile(e, a)) continue;
-      var d = M3.dist(e.pos, a.pos);
-      if (d > r.tailGun || d > best) continue;
-      // 必须在尾后锥内
-      var back = M3.norm(M3.sub(e.pos, a.pos));
-      if (M3.dot(back, a.fwd) > -0.72) continue;
-      best = d; t = e;
-    }
-    if (!t) return;
-
-    var off = M3.angleBetween(a.fwd, M3.norm(M3.sub(t.pos, a.pos)));
-    if (off < 0.30) {
-      a.firingGun = true;
-      Ent.fireGun(a, world);
-    }
   }
 
   /* ---------- 实用升限：性能不够就别硬追 ----------

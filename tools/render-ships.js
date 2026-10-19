@@ -31,8 +31,8 @@ const LINE_W = 1200, LINE_H = 640;
 
    FOV 取小值、距离按比例拉远，是为了压掉透视：一条 210 米的船
    如果用近距广角拍，艏部会被放大到框外，前后段的比例也会失真。 */
-const AZ = 0.70;      // 方位角（从 +z 绕到 +x）
-const EL = 0.33;      // 俯角
+const AZ = process.env.AZ ? +process.env.AZ : 0.70;   // 方位角（从 +z 绕到 +x）
+const EL = process.env.EL ? +process.env.EL : 0.33;   // 俯角（EL=-0.05 之类可以从水线下方看船底）
 const FOV = 26;
 const MARGIN = 1.35;  // 边距系数：1.0 = 刚好卡满画面宽度，越大留白越多
 
@@ -130,7 +130,7 @@ fs.mkdirSync(OUT, { recursive: true });
    ============================================================ */
 let n = 0;
 for (const s of SHIPS) {
-  const mdl = MODELS[s.model];
+  const mdl = MODELS.composeTurrets(MODELS[s.model], s.mounts);   // 炮塔按零位合进来
   if (!mdl) { console.error('缺少模型：' + s.model); continue; }
   const cam = frameCamera(mdl, SHIP_W, SHIP_H, FOV);
   cam.fov = FOV;
@@ -199,7 +199,7 @@ for (const s of SHIPS) {
     ras.clear(BG[0], BG[1], BG[2]);
 
     for (const it of row.items) {
-      const mdl = MODELS[it.s.model];
+      const mdl = MODELS.composeTurrets(MODELS[it.s.model], it.s.mounts);
       if (!mdl) continue;
       // px 取负：屏幕右 = 世界 -x，不取负的话最大的船会跑到最右边
       const px = -(it.x0 + it.w / 2 - row.width / 2) * scale;

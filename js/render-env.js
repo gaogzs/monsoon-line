@@ -31,14 +31,15 @@ var RenderEnv = (function () {
     '#version 300 es',
     'precision highp float;',
     'uniform vec3 uCamP, uCamR, uCamU, uCamF;',
-    'uniform float uFocal, uCx, uCy, uW, uH, uNear, uFar, uLogC, uDpr;',
+    'uniform float uFocal, uCx, uCy, uW, uH, uNear, uFar, uLogC, uDpr, uCurve;',
     'vec4 clipOf(vec3 c) {',
     '  float xc = (2.0 * uCx / uW - 1.0) * c.z + 2.0 * uFocal * c.x / uW;',
     '  float yc = (1.0 - 2.0 * uCy / uH) * c.z + 2.0 * uFocal * c.y / uH;',
     '  float zc = c.z * (uFar + uNear) / (uFar - uNear) - 2.0 * uFar * uNear / (uFar - uNear);',
     '  return vec4(xc, yc, zc, c.z);',
     '}',
-    'vec3 toCam(vec3 wp) { vec3 d = wp - uCamP; return vec3(dot(d, uCamR), dot(d, uCamU), dot(d, uCamF)); }',
+    /* 与模型同一套地球曲率下沉（render-gl.js 的 uCurve） */
+    'vec3 toCam(vec3 wp) { vec3 d = wp - uCamP; d.y -= (d.x * d.x + d.z * d.z) * uCurve; return vec3(dot(d, uCamR), dot(d, uCamU), dot(d, uCamF)); }',
     'float logDepth(float w) { return min(0.999999, log2(max(1e-6, 1.0 + w)) * uLogC); }',
     'float linDepth(float d) { return exp2(d / uLogC) - 1.0; }',
     'float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }',
@@ -472,7 +473,7 @@ var RenderEnv = (function () {
       gl.linkProgram(p);
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
       var U = {};
-      ['uCamP', 'uCamR', 'uCamU', 'uCamF', 'uFocal', 'uCx', 'uCy', 'uW', 'uH', 'uNear', 'uFar', 'uLogC', 'uDpr']
+      ['uCamP', 'uCamR', 'uCamU', 'uCamF', 'uFocal', 'uCx', 'uCy', 'uW', 'uH', 'uNear', 'uFar', 'uLogC', 'uDpr', 'uCurve']
         .concat(names).forEach(function (n) { U[n] = gl.getUniformLocation(p, n); });
       return { p: p, U: U };
     }
@@ -574,6 +575,7 @@ var RenderEnv = (function () {
       gl.uniform1f(U.uW, C.W); gl.uniform1f(U.uH, C.H);
       gl.uniform1f(U.uNear, cam.near); gl.uniform1f(U.uFar, C.far);
       gl.uniform1f(U.uLogC, C.logC); gl.uniform1f(U.uDpr, C.dpr);
+      gl.uniform1f(U.uCurve, C.curve || 0);
       return U;
     }
     function flatStops(stops) {

@@ -158,39 +158,61 @@ var MODELS = (function () {
      其余（上层建筑、桅杆、发射装置）全部由 box / tube 拼。
      ============================================================ */
 
-  /** 船体：一系列矩形截面。
-      secs = [{z, w, y0, y1, x?}]，w 是半宽，y0 龙骨、y1 甲板面，
+  /** 船体：一系列截面，从甲板到龙骨收成 V 形。
+      secs = [{z, w, y0, y1, x?, flat?}]，w 是甲板处半宽，y0 龙骨、y1 甲板面，
       x 是可选的整体横向偏移（双体船的片体用它）。
       水线取 y = 0：y0 通常为负（水下部分），y1 为正（干舷）。
-      水下部分画出来不影响观感 —— 俯视时甲板与舷侧会盖住它。 */
+
+      截面（右半边，左边对称）：
+        甲板边 (w, y1) → 舷侧直落到舭部上缘 (w, yb) → 舭部收进 (0.72w, yt) → 龙骨 (0, y0)
+      yb 在水线下一点、yt 再往下，水下是一个圆钝的 V —— 以前是平底的箱子，
+      出图和 2D 模式下（海面不挡水下部分）一眼就能看出是平底。
+      flat: true 保留平底（驳船、浮台）。 */
   MB.prototype.hull = function (secs, colSide, colDeck, colBottom) {
     var idx = [], i, s, x;
     for (i = 0; i < secs.length; i++) {
       s = secs[i]; x = s.x || 0;
+      var dep = s.y1 - s.y0;
+      var yb = Math.min(-0.2, s.y0 + dep * 0.55 - 0.0001);
+      if (yb <= s.y0) yb = s.y0 + dep * 0.5;
+      var yt = s.y0 + (yb - s.y0) * 0.38;
+      var wt = s.flat ? s.w : s.w * 0.72;
+      var wk = s.flat ? s.w : 0.0;
       idx.push([
-        this.pt(x + s.w, s.y1, s.z),      // 右舷甲板
-        this.pt(x + s.w, s.y0, s.z),      // 右舷底
-        this.pt(x - s.w, s.y0, s.z),      // 左舷底
-        this.pt(x - s.w, s.y1, s.z)       // 左舷甲板
+        this.pt(x + s.w, s.y1, s.z),      // 0 右舷甲板
+        this.pt(x + s.w, yb, s.z),        // 1 右舷舭部上缘
+        this.pt(x + wt, yt, s.z),         // 2 右舷舭部
+        this.pt(x + wk, s.y0, s.z),       // 3 龙骨（右）
+        this.pt(x - wk, s.y0, s.z),       // 4 龙骨（左）—— 非平底时与 3 重合
+        this.pt(x - wt, yt, s.z),         // 5 左舷舭部
+        this.pt(x - s.w, yb, s.z),        // 6 左舷舭部上缘
+        this.pt(x - s.w, s.y1, s.z)       // 7 左舷甲板
       ]);
     }
     for (i = 0; i < idx.length - 1; i++) {
       var A = idx[i], B = idx[i + 1];
       this.quad(A[0], A[1], B[1], B[0], colSide);     // 右舷
-      this.quad(A[1], A[2], B[2], B[1], colBottom);   // 船底
-      this.quad(A[2], A[3], B[3], B[2], colSide);     // 左舷
-      this.quad(A[3], A[0], B[0], B[3], colDeck);     // 甲板
+      this.quad(A[1], A[2], B[2], B[1], colBottom);   // 右舷舭部
+      this.quad(A[2], A[3], B[3], B[2], colBottom);   // 右侧船底
+      this.quad(A[3], A[4], B[4], B[3], colBottom);   // 龙骨（平底时是平板）
+      this.quad(A[4], A[5], B[5], B[4], colBottom);   // 左侧船底
+      this.quad(A[5], A[6], B[6], B[5], colBottom);   // 左舷舭部
+      this.quad(A[6], A[7], B[7], B[6], colSide);     // 左舷
+      this.quad(A[7], A[0], B[0], B[7], colDeck);     // 甲板
     }
     var F = idx[0], L = idx[idx.length - 1];
-    this.quad(F[0], F[3], F[2], F[1], colSide || colDeck);   // 艏封口
-    this.quad(L[0], L[1], L[2], L[3], colSide || colDeck);   // 艉封口
+    this.face([F[0], F[7], F[6], F[5], F[4], F[3], F[2], F[1]], colSide || colDeck);   // 艏封口
+    this.face([L[0], L[1], L[2], L[3], L[4], L[5], L[6], L[7]], colSide || colDeck);   // 艉封口
     return idx;
   };
 
   /** 可上仰的长方体 —— 导弹发射箱、A 型吊架、艏门的斜面都用它。
-      tilt 是绕 x 轴的仰角（弧度，正值为箱口朝上）。 */
-  MB.prototype.boxTilt = function (cx, cy, cz, w, h, d, tilt, col, colTop) {
+      tilt 是绕 x 轴的转角（弧度）：负值让 +z 端（朝船头的箱口）抬起，正值让它压低。
+      yaw（可选）再绕 y 轴转：正值让箱口偏向右舷 —— 舷外斜置的反舰弹箱用它，
+      箱口朝正前的话导弹一出筒就撞舰桥。 */
+  MB.prototype.boxTilt = function (cx, cy, cz, w, h, d, tilt, col, colTop, yaw) {
     var c = Math.cos(tilt), s = Math.sin(tilt);
+    var cyw = Math.cos(yaw || 0), syw = Math.sin(yaw || 0);
     var hw = w / 2, hh = h / 2, hd = d / 2;
     var corners = [
       [-hw, hh, -hd], [hw, hh, -hd], [hw, hh, hd], [-hw, hh, hd],
@@ -201,7 +223,8 @@ var MODELS = (function () {
       v = corners[i];
       y = v[1] * c - v[2] * s;
       z = v[1] * s + v[2] * c;
-      p.push(this.pt(cx + v[0], cy + y, cz + z));
+      // 可选的偏航：绕 y 轴转，正值让 +z 端偏向 +x（右舷）
+      p.push(this.pt(cx + v[0] * cyw + z * syw, cy + y, cz - v[0] * syw + z * cyw));
     }
     this.quad(p[0], p[1], p[2], p[3], colTop || col);
     this.quad(p[7], p[6], p[5], p[4], col);
@@ -760,6 +783,75 @@ var MODELS = (function () {
      上游在分水方向唯一的水面战舰。它不找对手的主力打 ——
      它只做一件事：替上面那些漂着的东西挡导弹。
      ============================================================ */
+  /* ---------- 舰炮炮塔（2-0IMPL 3.6）----------
+     每门拆成两件：_base 随方位角转（原点在甲板上），_gun 随方位 + 俯仰转（原点在耳轴，炮管沿 +z）。
+     TURRET_SPEC：耳轴离甲板多高、炮口离耳轴多远 —— turret.js 用它算炮口，game.js 画的时候也用它。 */
+  // 不可枚举：MODELS 的其余键都是模型，遍历它的工具（smoke、出图）不该把它当模型
+  Object.defineProperty(M, 'TURRET_SPEC', { enumerable: false, value: {
+    tur50: { pivot: 1.35, barrel: 4.25 },
+    tur75: { pivot: 1.7, barrel: 6.0 },
+    tur120: { pivot: 2.05, barrel: 8.45 }
+  } });
+  /* 把有实体的炮塔按零位朝向（yaw0、俯仰 0）合进船体网格 —— 图鉴、单位详情页、离线出图
+     凡是只画 MODELS[ship.model] 的地方都用它，否则炮塔拆出去以后预览里少一截炮。 */
+  Object.defineProperty(M, 'composeTurrets', { enumerable: false, value: function (base, mounts) {
+    if (!base || !mounts || !mounts.length) return base;
+    // 记住结果：预览每帧都会来要，换新对象会让 WebGL 的顶点缓冲每帧重建
+    if (mounts.__composed && mounts.__composed.base === base) return mounts.__composed.out;
+    var out = { v: base.v.slice(), f: base.f.slice() };
+    Object.defineProperty(mounts, '__composed', { enumerable: false, writable: true, configurable: true, value: { base: base, out: out } });
+    for (var k in base) if (k !== 'v' && k !== 'f') out[k] = base[k];
+    function add(part, ox, oy, oz, yaw) {
+      if (!part) return;
+      var c = Math.cos(yaw), s = Math.sin(yaw), o = out.v.length, i;
+      for (i = 0; i < part.v.length; i++) {
+        var v = part.v[i];
+        out.v.push([ox + v[0] * c + v[2] * s, oy + v[1], oz - v[0] * s + v[2] * c]);
+      }
+      for (i = 0; i < part.f.length; i++) {
+        var f = part.f[i], nf = {};
+        for (var key in f) nf[key] = f[key];
+        nf.i = f.i.map(function (j) { return j + o; });
+        out.f.push(nf);
+      }
+    }
+    for (var i = 0; i < mounts.length; i++) {
+      var m = mounts[i];
+      if (!m.model || !M[m.model + '_base']) continue;
+      var sp = M.TURRET_SPEC[m.model], p = m.pos, y = m.yaw0 || 0;
+      add(M[m.model + '_base'], p[0], p[1], p[2], y);
+      add(M[m.model + '_gun'], p[0], p[1] + sp.pivot, p[2], y);
+    }
+    return out;
+  } });
+
+  function turret(w, h, d, bl, br, twin, c1, c2) {
+    var b = new MB();
+    // 底座：一圈矮座圈 + 炮罩，前部收一截
+    b.box(0, 0.25, 0, w * 1.05, 0.5, d * 0.9, c2, c2);
+    b.box(0, 0.5 + h * 0.5, -d * 0.08, w, h, d * 0.8, c1, c2);
+    b.box(0, 0.5 + h * 0.85, d * 0.25, w * 0.82, h * 0.35, d * 0.35, c1, c2);
+    var base = done(b);
+    var g = new MB();
+    g.box(0, 0, 0.2, w * 0.42, h * 0.5, d * 0.4, c1, c2);          // 炮盾
+    var xs = twin ? [-w * 0.18, w * 0.18] : [0];
+    for (var i = 0; i < xs.length; i++) g.tube(V(xs[i], 0, d * 0.35), V(xs[i], 0, d * 0.35 + bl), br, br * 0.8, 6, C.rod, C.rod);
+    return { base: base, gun: done(g) };
+  }
+  (function () {
+    /* 两套涂装：上游舰的灰（hull），下游舰的锈红（rust）—— 名字带 r 的是后者 */
+    var SZ = { tur50: [2.6, 1.4, 3.0, 3.2, 0.12, true], tur75: [3.8, 2.0, 4.6, 4.4, 0.20, false],
+      tur120: [5.0, 2.6, 6.4, 6.2, 0.30, false] };
+    for (var k in SZ) {
+      var z = SZ[k];
+      [['', C.hull2, C.hull], ['r', C.rust2, C.rust]].forEach(function (pal) {
+        var t = turret(z[0], z[1], z[2], z[3], z[4], z[5], pal[1], pal[2]);
+        M[k + pal[0] + '_base'] = t.base; M[k + pal[0] + '_gun'] = t.gun;
+      });
+      M.TURRET_SPEC[k + 'r'] = M.TURRET_SPEC[k];
+    }
+  })();
+
   M.orca = (function () {
     var b = new MB();
     b.hull([
@@ -773,9 +865,7 @@ var MODELS = (function () {
       { z: -74, w: 6.2, y0: -3.0, y1: 5.4 }
     ], C.hull, C.deck, C.boot);
 
-    // 舰艏主炮
-    b.box(0, 7.3, 58, 4.4, 2.6, 5.2, C.hull2, C.hull);
-    b.tube(V(0, 7.6, 60), V(0, 8.3, 65.5), 0.34, 0.28, 6, C.rod);
+    // 舰艏炮：实体炮塔（tur75），见 SHIPS[].mounts
 
     // 前甲板垂发：一块盖板，格栅用金属色带表示
     b.box(0, 6.1, 47, 5.8, 1.2, 9.0, C.hull2, C.metal);
@@ -783,15 +873,17 @@ var MODELS = (function () {
 
     // 舰桥（三层收分）
     house(b, 0, 24, 12.2, 4.6, 17.0, 5.4, C.hull2, C.hull);
-    house(b, 0, 22, 10.0, 3.4, 12.0, 10.0, C.hull, C.hull);
-    house(b, 0, 21, 8.0, 2.4, 8.0, 13.4, C.hull2, C.hull);
-    b.box(0, 14.6, 21, 8.4, 0.7, 8.4, C.canopy);       // 驾驶室窗带
+    /* 第二层一直做到相控阵顶：阵面要贴在实心舱壁上，
+       以前阵面挂在一层窄舱室外面，中间空一米、背后没封，看着是个空心支架 */
+    house(b, 0, 21.4, 9.8, 8.9, 12.4, 10.0, C.hull, C.hull);
+    house(b, 0, 21, 8.0, 2.4, 8.0, 18.9, C.hull2, C.hull);
+    b.box(0, 20.1, 21, 8.4, 0.7, 8.4, C.canopy);       // 驾驶室窗带
     // 四面相控阵
     b.box(5.15, 16.2, 20, 0.5, 5.4, 9.4, C.metal);
     b.box(-5.15, 16.2, 20, 0.5, 5.4, 9.4, C.metal);
     b.box(0, 16.2, 27.4, 8.4, 5.4, 0.5, C.metal);
 
-    mast(b, 0, 13, 15.8, 30.0, 1.5, 0.5, C.hull2);
+    mast(b, 0, 18, 10.0, 30.0, 1.5, 0.5, C.hull2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
     b.box(0, 12.6, -4, 6.2, 8.6, 8.0, C.hull2, C.boot); // 烟囱
 
     // 后部机库 + 近防炮 + 直升机甲板
@@ -854,7 +946,7 @@ var MODELS = (function () {
     b.box(0, 25.8, -72, 8.6, 0.7, 8.6, C.canopy);
     b.tube(V(4.2, 22.0, -86), V(4.2, 31.0, -86), 2.2, 1.9, 6, C.hull2, C.boot);
     b.tube(V(-4.2, 22.0, -86), V(-4.2, 31.0, -86), 2.2, 1.9, 6, C.hull2, C.boot);
-    mast(b, 0, -62, 22.0, 38.0, 1.4, 0.5, C.hull2);
+    mast(b, 0, -65, 22.0, 38.0, 1.4, 0.5, C.hull2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
 
     return done(b, { span: 26.6, len: 210, ground: true, sea: true, radius: 62 });
   })();
@@ -878,11 +970,11 @@ var MODELS = (function () {
     // 舰桥（低矮、后倾）
     house(b, 0, -1, 4.8, 2.4, 7.0, 2.6, C.rust2, C.rust);
     b.box(0, 5.2, -1, 3.0, 0.5, 4.4, C.canopy);
-    mast(b, 0, -5, 5.6, 11.0, 0.6, 0.22, C.rust2);
+    mast(b, 0, -1, 5.5, 11.0, 0.6, 0.22, C.rust2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
 
     // 两座四联装反舰弹发射箱（后甲板，上仰 13°）
-    b.boxTilt(1.9, 4.2, -11, 1.9, 1.9, 11.0, 0.23, C.rust2, C.rust);
-    b.boxTilt(-1.9, 4.2, -11, 1.9, 1.9, 11.0, 0.23, C.rust2, C.rust);
+    b.boxTilt(1.9, 4.2, -11, 1.9, 1.9, 11.0, -0.23, C.rust2, C.rust);
+    b.boxTilt(-1.9, 4.2, -11, 1.9, 1.9, 11.0, -0.23, C.rust2, C.rust);
 
     // 舰艏小口径炮 + 缆桩
     b.box(0, 3.3, 14, 2.2, 1.4, 2.6, C.rust2, C.metal);
@@ -909,20 +1001,20 @@ var MODELS = (function () {
       { z: -59, w: 5.0, y0: -2.6, y1: 5.0 }
     ], C.rust, C.deck, C.boot);
 
-    b.box(0, 6.6, 48, 3.6, 2.2, 4.4, C.rust2, C.rust);   // 舰艏主炮
-    b.tube(V(0, 6.8, 50), V(0, 7.4, 54.5), 0.28, 0.24, 6, C.rod);
+    // 舰艏炮：实体炮塔，见 SHIPS[].mounts
 
     house(b, 0, 18, 10.0, 4.2, 14.0, 5.0, C.rust2, C.rust);
     house(b, 0, 16, 8.0, 3.0, 9.6, 9.2, C.rust, C.rust);
     b.box(0, 12.8, 16, 8.3, 0.6, 9.9, C.canopy);
     b.box(0, 15.4, 20.6, 6.6, 3.4, 0.5, C.metal);         // 前向搜索阵面
-    mast(b, 0, 8, 12.6, 25.0, 1.2, 0.4, C.rust2);
+    mast(b, 0, 13, 12.2, 25.0, 1.2, 0.4, C.rust2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
 
-    // 中部两座四联装反舰弹
-    b.boxTilt(1.5, 6.4, -2, 1.5, 1.5, 8.0, 0.24, C.rust2, C.rust);
-    b.boxTilt(-1.5, 6.4, -2, 1.5, 1.5, 8.0, 0.24, C.rust2, C.rust);
-    b.boxTilt(1.5, 6.4, -14, 1.5, 1.5, 8.0, 0.24, C.rust2, C.rust);
-    b.boxTilt(-1.5, 6.4, -14, 1.5, 1.5, 8.0, 0.24, C.rust2, C.rust);
+    // 中部两座四联装反舰弹：靠两舷放（舰桥半宽 5，箱子内侧在它外面）。
+    // 两对仰角一样（约 29°），后面那一对的弹道从前面那一对头顶越过去
+    b.boxTilt(6.0, 6.9, -2, 1.5, 1.5, 8.0, -0.50, C.rust2, C.rust);
+    b.boxTilt(-6.0, 6.9, -2, 1.5, 1.5, 8.0, -0.50, C.rust2, C.rust);
+    b.boxTilt(6.0, 6.9, -14, 1.5, 1.5, 8.0, -0.50, C.rust2, C.rust);
+    b.boxTilt(-6.0, 6.9, -14, 1.5, 1.5, 8.0, -0.50, C.rust2, C.rust);
 
     // 后部舰空弹箱 + 烟囱
     b.box(0, 6.8, -30, 4.4, 3.0, 7.0, C.rust2, C.metal);
@@ -966,7 +1058,7 @@ var MODELS = (function () {
     house(b, 0, -46, 17.0, 8.0, 24.0, 5.4, C.rust2, C.rust);
     house(b, 0, -44, 12.0, 4.0, 12.0, 13.4, C.rust, C.rust);
     b.box(0, 17.8, -44, 9.0, 0.6, 9.0, C.canopy);
-    mast(b, 0, -35, 17.4, 27.0, 1.0, 0.35, C.rust2);
+    mast(b, 0, -40, 17.5, 27.0, 1.0, 0.35, C.rust2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
 
     return done(b, { span: 20.4, len: 132, ground: true, sea: true, radius: 40 });
   })();
@@ -989,7 +1081,7 @@ var MODELS = (function () {
 
     house(b, 0, -0.5, 3.9, 2.0, 6.2, 2.2, C.snow2, C.snow);
     b.box(0, 4.5, -0.5, 2.7, 0.5, 4.2, C.canopy);
-    mast(b, 0, -4.5, 4.7, 9.8, 0.5, 0.18, C.snow2);
+    mast(b, 0, -0.5, 4.8, 9.8, 0.5, 0.18, C.snow2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
     b.box(0, 2.9, 10.5, 1.9, 1.2, 2.2, C.snow2, C.metal);   // 前甲板小炮
     b.box(0, 2.5, -12.5, 2.6, 0.9, 3.2, C.deck, C.hull);    // 艉部小艇座
 
@@ -1022,7 +1114,7 @@ var MODELS = (function () {
     house(b, 0, 16, 12.0, 4.4, 16.0, 8.4, C.snow2, C.snow);
     house(b, 0, 15, 9.4, 3.0, 10.0, 12.8, C.snow, C.snow);
     b.box(0, 16.3, 15, 9.8, 0.7, 10.4, C.canopy);
-    mast(b, 0, 8, 15.8, 28.0, 1.2, 0.4, C.snow2);
+    mast(b, 0, 11, 16.0, 28.0, 1.2, 0.4, C.snow2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
 
     // 艉部布缆机 + 滑轮门架
     b.tube(V(5.6, 9.8, -42), V(-5.6, 9.8, -42), 3.4, 3.4, 10, C.metal);
@@ -1145,7 +1237,7 @@ var MODELS = (function () {
     house(b, 0, 12, 13.0, 4.8, 18.0, 5.6, C.snow2, C.snow);
     house(b, 0, 10, 9.6, 3.0, 11.0, 10.4, C.snow, C.snow);
     b.box(0, 13.8, 10, 10.0, 0.7, 11.2, C.canopy);
-    mast(b, 0, 4, 13.4, 26.0, 1.1, 0.4, C.snow2);
+    mast(b, 0, 7, 13.5, 26.0, 1.1, 0.4, C.snow2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
     b.tube(V(0, 26.0, 4), V(0, 29.4, 4), 2.2, 1.4, 10, C.white);  // 球形罩
 
     // 艉部 A 型吊架 + 绞车（采水、采沉积柱）
@@ -1183,7 +1275,7 @@ var MODELS = (function () {
     house(b, 0, 4, 8.2, 3.4, 12.0, 3.6, C.white, C.grey);
     b.box(0, 7.7, 4, 6.6, 0.6, 9.0, C.canopy);
     // 它最显眼的部分是桅杆 —— 而桅杆上能挂的东西只有天线和旗
-    mast(b, 0, -6, 7.0, 22.0, 0.9, 0.3, C.grey);
+    mast(b, 0, -1.5, 7.0, 22.0, 0.9, 0.3, C.grey);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
     b.box(0, 12.5, -6, 6.0, 0.25, 0.25, C.grey2);
     b.box(0, 17.0, -6, 4.4, 0.25, 0.25, C.grey2);
     b.box(0, 4.4, -20, 3.0, 0.9, 4.0, C.deck, C.hull);      // 艉部工作平台
@@ -1245,20 +1337,26 @@ var MODELS = (function () {
     house(b, 12.5, -52, 12.0, 15.0, 32.0, 19.4, C.hull2, C.hull);
     house(b, 12.5, -50, 9.4, 5.0, 18.0, 34.4, C.hull, C.hull);
     b.box(12.5, 39.7, -50, 9.8, 0.8, 18.4, C.canopy);
-    mast(b, 12.5, -40, 39.7, 58.0, 1.5, 0.5, C.hull2);
+    mast(b, 12.5, -44, 39.4, 58.0, 1.5, 0.5, C.hull2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
     b.tube(V(12.5, 24.0, -68), V(12.5, 33.0, -68), 2.2, 1.9, 6, C.hull2, C.boot);
 
     // 甲板上的舰载机（简化剪影，停在两舷与艉部）
     var parked = [[-9, 96], [-9, 66], [-9, 30], [-9, -6], [-9, -40], [7, 92], [7, 58]];
     for (var pi = 0; pi < parked.length; pi++) {
       var px = parked[pi][0], pz = parked[pi][1];
+      /* 机身中心在 (px, pz)。两侧机翼都按 px 写 —— 以前右翼用 wingM 镜像，
+         而 wingM 是绕船的中线（x = 0）镜像，右翼于是跑到了甲板另一侧 */
       b.box(px, 20.0, pz, 2.0, 1.2, 10.4, C.grey, C.white);          // 机身
-      b.wing(V(px - 1.0, 20.2, pz + 1.6), V(px - 7.0, 20.2, pz - 2.0),
-        V(px - 7.0, 20.2, pz - 3.8), V(px - 1.0, 20.2, pz - 2.2), C.metal);
-      b.wingM(V(px - 1.0, 20.2, pz + 1.6), V(px - 7.0, 20.2, pz - 2.0),
-        V(px - 7.0, 20.2, pz - 3.8), V(px - 1.0, 20.2, pz - 2.2), C.metal);
-      b.wing(V(px, 20.6, pz - 2.8), V(px, 23.2, pz - 4.4),
-        V(px, 23.2, pz - 5.3), V(px, 20.6, pz - 4.2), C.metal);      // 垂尾
+      b.wing(V(px - 1.0, 20.2, pz + 1.6), V(px - 6.0, 20.2, pz - 2.0),
+        V(px - 6.0, 20.2, pz - 3.4), V(px - 1.0, 20.2, pz - 2.4), C.metal);   // 左翼
+      b.wing(V(px + 1.0, 20.2, pz + 1.6), V(px + 6.0, 20.2, pz - 2.0),
+        V(px + 6.0, 20.2, pz - 3.4), V(px + 1.0, 20.2, pz - 2.4), C.metal);   // 右翼
+      b.wing(V(px - 1.0, 20.3, pz - 4.0), V(px - 3.0, 20.3, pz - 4.9),
+        V(px - 3.0, 20.3, pz - 5.4), V(px - 1.0, 20.3, pz - 5.2), C.metal);   // 平尾
+      b.wing(V(px + 1.0, 20.3, pz - 4.0), V(px + 3.0, 20.3, pz - 4.9),
+        V(px + 3.0, 20.3, pz - 5.4), V(px + 1.0, 20.3, pz - 5.2), C.metal);
+      b.wing(V(px, 20.6, pz - 2.8), V(px, 23.0, pz - 4.4),
+        V(px, 23.0, pz - 5.2), V(px, 20.6, pz - 5.2), C.metal);      // 垂尾
     }
 
     return done(b, { span: 40, len: 280, ground: true, sea: true, radius: 84 });
@@ -1284,8 +1382,7 @@ var MODELS = (function () {
     ], C.hull, C.deck, C.boot);
 
     // 舰艏主炮 + 前后垂发阵位
-    b.box(0, 8.4, 66, 5.0, 3.0, 6.0, C.hull2, C.hull);
-    b.tube(V(0, 8.8, 68.5), V(0, 9.6, 74.5), 0.40, 0.32, 6, C.rod);
+    // 舰艏炮：实体炮塔，见 SHIPS[].mounts
     b.box(0, 7.0, 52, 7.4, 1.4, 12.0, C.hull2, C.metal);
     b.box(0, 7.8, 52, 6.4, 0.28, 10.6, C.boot);
     b.box(0, 7.0, -42, 8.8, 1.5, 16.0, C.hull2, C.metal);
@@ -1293,16 +1390,16 @@ var MODELS = (function () {
 
     // 舰桥：比驱逐舰高一整层，因为里面是编队的防空指挥席
     house(b, 0, 22, 15.0, 6.0, 22.0, 6.4, C.hull2, C.hull);
-    house(b, 0, 20, 12.4, 4.6, 15.0, 12.4, C.hull, C.hull);
-    house(b, 0, 19, 9.6, 2.6, 9.6, 17.0, C.hull2, C.hull);
-    b.box(0, 20.3, 19, 10.0, 0.7, 10.0, C.canopy);
+    house(b, 0, 20.5, 12.4, 6.1, 15.0, 12.4, C.hull, C.hull);    // 做到阵面顶，阵面贴实
+    house(b, 0, 19, 9.6, 2.6, 9.6, 18.5, C.hull2, C.hull);
+    b.box(0, 19.8, 19, 10.0, 0.7, 10.0, C.canopy);
     // 四面大相控阵（比驱逐舰那四面整整大一圈）
     b.box(6.45, 15.0, 20, 0.6, 7.0, 12.0, C.metal);
     b.box(-6.45, 15.0, 20, 0.6, 7.0, 12.0, C.metal);
     b.box(0, 15.0, 27.8, 9.6, 7.0, 0.6, C.metal);
 
     // 塔式综合桅杆 + 双烟囱
-    mast(b, 0, 8, 19.6, 40.0, 2.4, 0.7, C.hull2);
+    mast(b, 0, 15, 19.5, 40.0, 2.4, 0.7, C.hull2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
     b.box(0, 15.4, -6, 7.0, 10.0, 9.0, C.hull2, C.boot);
     b.box(0, 15.4, -22, 7.0, 10.0, 9.0, C.hull2, C.boot);
 
@@ -1333,18 +1430,18 @@ var MODELS = (function () {
       { z: -54, w: 4.2, y0: -2.2, y1: 5.0 }
     ], C.hull, C.deck, C.boot);
 
-    b.box(0, 6.0, 44, 3.4, 2.0, 4.2, C.hull2, C.hull);          // 舰艏炮
-    b.tube(V(0, 6.2, 46), V(0, 6.7, 50.0), 0.26, 0.22, 6, C.rod);
+    // 舰艏炮：实体炮塔（tur75），见 SHIPS[].mounts
 
     house(b, 0, 16, 9.0, 4.2, 13.0, 4.8, C.hull2, C.hull);
     house(b, 0, 14, 7.0, 3.0, 9.0, 9.0, C.hull, C.hull);
     b.box(0, 12.3, 14, 7.4, 0.6, 9.4, C.canopy);
     b.box(0, 14.6, 18.4, 5.8, 3.0, 0.5, C.metal);               // 前向阵面
-    mast(b, 0, 6, 12.0, 22.0, 1.0, 0.35, C.hull2);
+    mast(b, 0, 11, 12.0, 22.0, 1.0, 0.35, C.hull2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
 
-    // 中部反舰弹（两座双联）+ 后部近防
-    b.boxTilt(1.4, 5.9, 2, 1.4, 1.4, 6.6, 0.22, C.hull2, C.hull);
-    b.boxTilt(-1.4, 5.9, 2, 1.4, 1.4, 6.6, 0.22, C.hull2, C.hull);
+    // 中部反舰弹（两座双联）+ 后部近防。
+    // 放在舰桥与烟囱之间那段空甲板上，离舰桥远一点、仰角 20°：弹道从舰桥顶上越过
+    b.boxTilt(1.4, 6.0, -11, 1.4, 1.4, 6.6, -0.36, C.hull2, C.hull);
+    b.boxTilt(-1.4, 6.0, -11, 1.4, 1.4, 6.6, -0.36, C.hull2, C.hull);
     b.box(0, 5.9, -22, 3.0, 2.2, 3.4, C.hull2, C.metal);
     b.tube(V(0, 11.0, -32), V(0, 15.4, -32), 1.2, 1.0, 6, C.hull2, C.boot);
 
@@ -1397,7 +1494,7 @@ var MODELS = (function () {
     // 低矮的舰桥 —— 它不需要高大，它需要的是一整片甲板
     house(b, 0, 42, 14.0, 4.4, 16.0, 6.4, C.rust2, C.rust);
     b.box(0, 11.2, 42, 10.4, 0.7, 10.4, C.canopy);
-    mast(b, 0, 34, 11.2, 27.0, 1.7, 0.55, C.rust2);
+    mast(b, 0, 34, 10.8, 27.0, 1.7, 0.55, C.rust2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
 
     // 艉部动力：两台烟囱挤在一起
     b.box(0, 10.4, -80, 9.0, 8.4, 12.0, C.rust2, C.boot);
@@ -1425,22 +1522,23 @@ var MODELS = (function () {
     ], C.rust, C.deck, C.boot);
 
     // 舰艏主炮：下游口径最大的一门
-    b.box(0, 7.8, 60, 5.2, 3.0, 6.4, C.rust2, C.rust);
-    b.tube(V(0, 8.2, 62.5), V(0, 9.0, 69.0), 0.40, 0.32, 6, C.rod);
+    // 舰艏炮：实体炮塔，见 SHIPS[].mounts
 
     // 前部八联装反舰弹：左右各一座，这是它存在的理由
-    b.boxTilt(3.2, 8.4, 30, 4.6, 2.4, 20.0, 0.26, C.rust2, C.rust);
-    b.boxTilt(-3.2, 8.4, 30, 4.6, 2.4, 20.0, 0.26, C.rust2, C.rust);
+    // 两组发射架仰角统一为约 26°
+    b.boxTilt(3.2, 11.9, 30, 4.6, 2.4, 20.0, -0.45, C.rust2, C.rust);
+    b.boxTilt(-3.2, 11.9, 30, 4.6, 2.4, 20.0, -0.45, C.rust2, C.rust);
 
     house(b, 0, 4, 13.0, 5.0, 20.0, 5.8, C.rust2, C.rust);
     house(b, 0, 3, 9.6, 3.4, 12.0, 10.8, C.rust, C.rust);
     b.box(0, 14.2, 3, 10.0, 0.7, 12.4, C.canopy);
     b.box(0, 16.2, 9.6, 7.0, 3.6, 0.6, C.metal);           // 前向搜索阵面
-    mast(b, 0, -8, 14.2, 27.0, 1.5, 0.5, C.rust2);
+    mast(b, 0, -1.5, 14.2, 27.0, 1.5, 0.5, C.rust2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
 
-    // 中部另一组反舰弹 + 双烟囱
-    b.boxTilt(2.6, 8.0, -26, 3.8, 2.2, 16.0, 0.26, C.rust2, C.rust);
-    b.boxTilt(-2.6, 8.0, -26, 3.8, 2.2, 16.0, 0.26, C.rust2, C.rust);
+    // 中部另一组反舰弹 + 双烟囱。
+    // 这里船宽不够把箱子挪出舰桥的宽度，靠仰角（与前组一样约 26°）让弹道从舰桥顶上越过去
+    b.boxTilt(2.6, 10.4, -26, 3.8, 2.2, 16.0, -0.45, C.rust2, C.rust);
+    b.boxTilt(-2.6, 10.4, -26, 3.8, 2.2, 16.0, -0.45, C.rust2, C.rust);
     b.tube(V(3.0, 10.0, -48), V(3.0, 16.0, -48), 1.6, 1.3, 6, C.rust2, C.boot);
     b.tube(V(-3.0, 10.0, -48), V(-3.0, 16.0, -48), 1.6, 1.3, 6, C.rust2, C.boot);
 
@@ -2157,6 +2255,83 @@ var MODELS = (function () {
     rootFins(mm);
     seatCanopies(mm);
   }
+
+  /* ---------- 舰船零件落座 ----------
+     舰船是一个个 box / tube 拼出来的，手写坐标时常有零件悬在半空
+     （集装箱、烟囱、甲板标线离甲板一截）。这里按"连通分量"（共享顶点的一组面）
+     找出**和任何其他零件都不接触**的那些，把它们的底面**往下延长**到正下方最高的表面上
+     （只拉最底下那一圈顶点，零件本身的高度、位置不变 —— 集装箱、烟囱长出一截"脚"）。
+     接触到别的零件的（贴在舰桥侧面的相控阵、桅杆顶的平台）不动。
+     穿进船体一点也没关系 —— 从外面看不出来。 */
+  function settle(m) {   // 名字沿用"落座"，做法是向下延长
+    var nv = m.v.length, par = new Array(nv), i, k;
+    for (i = 0; i < nv; i++) par[i] = i;
+    function find(x) { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; }
+    m.f.forEach(function (f) { for (var j = 1; j < f.i.length; j++) { var a = find(f.i[0]), b = find(f.i[j]); if (a !== b) par[a] = b; } });
+    var g = {};
+    m.f.forEach(function (f, fi) { var r = find(f.i[0]); (g[r] = g[r] || { fs: [], vs: {} }).fs.push(fi); f.i.forEach(function (j) { g[r].vs[j] = 1; }); });
+    var C = Object.keys(g).map(function (r) { var c = g[r]; c.vs = Object.keys(c.vs).map(Number); return c; });
+    function box(c) {
+      var mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+      c.vs.forEach(function (j) { for (var q = 0; q < 3; q++) { var x = m.v[j][q]; if (x < mn[q]) mn[q] = x; if (x > mx[q]) mx[q] = x; } });
+      c.mn = mn; c.mx = mx;
+    }
+    C.forEach(box);
+    C.sort(function (a, b) { return b.fs.length - a.fs.length; });
+    var EPS = 0.15;
+    function touches(c, o) {
+      for (var q = 0; q < 3; q++) if (c.mn[q] > o.mx[q] + EPS || c.mx[q] < o.mn[q] - EPS) return false;
+      return true;
+    }
+    /* 竖直向下打到别的零件：在 (x, z) 处、高度不超过 ymax 的最高面 */
+    function hitBelow(x, z, ymax, self) {
+      var best = -1e9;
+      for (var ci = 0; ci < C.length; ci++) {
+        var o = C[ci];
+        if (o === self || x < o.mn[0] || x > o.mx[0] || z < o.mn[2] || z > o.mx[2] || o.mn[1] > ymax) continue;
+        for (var fi = 0; fi < o.fs.length; fi++) {
+          var idx = m.f[o.fs[fi]].i;
+          for (var t = 1; t < idx.length - 1; t++) {
+            var A = m.v[idx[0]], B = m.v[idx[t]], D = m.v[idx[t + 1]];
+            var d = (B[2] - D[2]) * (A[0] - D[0]) + (D[0] - B[0]) * (A[2] - D[2]);
+            if (Math.abs(d) < 1e-9) continue;
+            var w1 = ((B[2] - D[2]) * (x - D[0]) + (D[0] - B[0]) * (z - D[2])) / d;
+            var w2 = ((D[2] - A[2]) * (x - D[0]) + (A[0] - D[0]) * (z - D[2])) / d;
+            var w3 = 1 - w1 - w2;
+            if (w1 < -1e-6 || w2 < -1e-6 || w3 < -1e-6) continue;
+            var y = w1 * A[1] + w2 * B[1] + w3 * D[1];
+            if (y <= ymax + 0.05 && y > best) best = y;
+          }
+        }
+      }
+      return best;
+    }
+    for (var pass = 0; pass < 3; pass++) {
+      var moved = false;
+      var order = C.slice(1).sort(function (a, b) { return a.mn[1] - b.mn[1]; });
+      for (i = 0; i < order.length; i++) {
+        var c = order[i], free = true;
+        for (k = 0; k < C.length && free; k++) if (C[k] !== c && touches(c, C[k])) free = false;
+        if (!free) continue;
+        var cx = (c.mn[0] + c.mx[0]) / 2, cz = (c.mn[2] + c.mx[2]) / 2;
+        var hx = (c.mx[0] - c.mn[0]) * 0.3, hz = (c.mx[2] - c.mn[2]) * 0.3;
+        var sup = -1e9;
+        [[0, 0], [-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz]].forEach(function (o) {
+          sup = Math.max(sup, hitBelow(cx + o[0], cz + o[1], c.mn[1], c));
+        });
+        var gap = c.mn[1] - sup;
+        if (sup < -1e8 || gap < 0.02 || gap > 40) continue;
+        var y0 = c.mn[1] + 0.05;
+        c.vs.forEach(function (j) { if (m.v[j][1] <= y0) m.v[j] = [m.v[j][0], m.v[j][1] - gap, m.v[j][2]]; });
+        box(c);
+        moved = true;
+      }
+      if (!moved) break;
+    }
+    return m;
+  }
+  ['orca', 'bluewhale', 'humpback', 'spermwhale', 'dolphin', 'trilobite', 'ammonite', 'seascorpion',
+    'cameroceras', 'dunkleosteus', 'daplu', 'skori', 'diklo', 'cross', 'icecore', 'atoll'].forEach(function (id) { if (M[id]) settle(M[id]); });
 
   return M;
 })();
