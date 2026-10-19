@@ -369,8 +369,9 @@ rate = 1 / (w.nezer ? 1.5
 
 脱锁时进度以 `2.2 / s` 衰减。`player.locked = lockProgress >= 1`。
 
-> **`lockProgress` 现在不拦发射**。`fireSpecial()` 里唯一保留的拦截是
-> **目标类型对不上**（拿对空弹锁海面浮台，见 `targetMismatch()`）；
+> **`lockProgress` 现在不拦发射**，目标类型对不上也不拦。
+> 类型对不上（拿对空弹选着海面浮台，见 `targetMismatch()`）时
+> `updateLock()` **根本不开始锁定**；此时仍可强制开火，但按无锁定处理（弹不带目标出膛）。
 > `lockProgress` 只驱动 HUD 上的锁定环，是"火控解算进度"，
 > 不是开火许可。以前"必须先锁定才能开火"会拦掉两种正当用法：
 > 无制导武器、以及俯冲扫射式的对地攻击。

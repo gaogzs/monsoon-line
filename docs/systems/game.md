@@ -411,7 +411,7 @@ player.lockInCone = (对空 ? off : Ent.lockOff(...)) < cone;              // HU
 ### `fireSpecial()`（右键 / `Enter`）
 1. `state !== 'playing' || !player.alive` → 返回。
 2. `ecm` → 转 `launch()`；`dew` → 播“GUS-2 是自动拦截系统”并返回；`spAmmo <= 0` 或 `spCd > 0` → `SFX.loseLock()` 返回。
-3. **只保留一条目标检查**：`targetMismatch(w, t)` —— 武器对空/对面与目标类别矛盾时说清楚（“按 R 换成对地挂载”）。不拦开火，但**锁定决定导弹拿不拿得到目标**：制导武器（`guided`）只有 `player.locked` 时才把选中目标交给 `launch()`，否则传 `null` —— 红外弹靠 `irAcquire` 在导引头视场里自己找、雷达 / 对面弹直飞（只有 `reAcquire` 类会再捕获），并出 SysNote `未锁定：…`。无制导武器不受影响。
+3. **目标类别检查不拦开火**：`targetMismatch(w, t)` 矛盾时 `updateLock()` 不开始锁定（进度归零、目标保留）；开火时允许强制开火，按无锁定处理（`t = null`），出 SysNote `强制开火（无锁定）：…`（“按 R 换成对地挂载”）。类别对得上时同样不拦开火，但**锁定决定导弹拿不拿得到目标**：制导武器（`guided`）只有 `player.locked` 时才把选中目标交给 `launch()`，否则传 `null` —— 红外弹靠 `irAcquire` 在导引头视场里自己找、雷达 / 对面弹直飞（只有 `reAcquire` 类会再捕获），并出 SysNote `未锁定：…`。无制导武器不受影响。
    > 以前：发射总是带上选中目标，`lockProgress` 只驱动 HUD 锁定环和锁定音，不是开火条件。
 4. `launch()` 成功后按武器类型播无线电：无制导 / `bomb/agm/asm` → **投放**；`seeker === 'radar'` → **Fox 3**；`laser` → **照射**；其余 → **Fox 2**。
 

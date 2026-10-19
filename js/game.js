@@ -70,7 +70,10 @@ var SysNote = (function () {
     opt = opt || {};
     var box = document.getElementById('sysnote');
     if (!box) return;
-    box.innerHTML = '<div class="sys-line' + (opt.warn ? ' warn' : '') + '">' + html + '</div>';
+    /* 和无线电行同一套写法：左侧一截等宽标签 + 色条，正文跟在后面 */
+    box.innerHTML = '<div class="sys-line' + (opt.warn ? ' warn' : '') + '">' +
+      '<span class="tag">' + (opt.warn ? 'CAUTION' : 'SYS') + '</span>' +
+      '<span class="tx">' + html + '</span></div>';
     var line = box.firstChild;
     clearTimeout(timer);
     timer = setTimeout(function () {
@@ -1855,17 +1858,17 @@ var Game = (function () {
        ② 俯冲扫射式的对地攻击。玩家压低机头对准目标，按下去却只
           得到一句"没有锁定目标"。
 
-       现在只保留**一条**拦截：目标类型和武器对不上（拿对空弹打浮台）。
-       那是真的打不出去，必须说清楚；而"打不打得中"是玩家自己的判断。 */
+       目标类别和武器对不上（拿对空弹打浮台）也不再拦 —— 类别不对时
+       锁定根本不会开始（updateLock），这里允许强制开火，
+       但按**无锁定**处理：弹不带这个目标出膛。"打不打得中"是玩家自己的判断。 */
     var t = player.target;
     if (t && !t.alive) t = null;
 
     if (t) {
       var mism = targetMismatch(w, t);
       if (mism) {
-        SysNote.show(mism, { warn: true });
-        SFX.fail();
-        return;
+        SysNote.show('强制开火（无锁定）：' + mism, { warn: true });
+        t = null;
       }
     }
 
@@ -2346,6 +2349,16 @@ var Game = (function () {
     }
     var w = WEAPONS[player.special];
     if (!w || w.kind === 'ecm' || w.kind === 'dew') { player.lockProgress = 1; return; }
+
+    /* 目标类别和当前武器对不上（对空弹选着浮台 / 对面弹选着飞机）：
+       **根本不开始锁定** —— 目标照样保留选中，换回对路的弹就接着锁。
+       以前这一关放在开火那一刻：锁得满满的，按下去才被拦。 */
+    if (targetMismatch(w, t)) {
+      player.lockOk = false;
+      player.lockProgress = 0;
+      player.locked = false;
+      return;
+    }
 
     var toT = M3.sub(t.pos, player.pos);
     var dist = M3.len(toT);
