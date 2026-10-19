@@ -53,3 +53,5 @@ tools/preview/
 *.bak
 *.orig
 *.rej
+
+.claude

@@ -186,7 +186,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 
 **没有数据时不给空画布。** `PLANFORM.paint()` 在数据缺失时会画一个
 `NO DATA`，但那在详情页里更像"坏了"。所以那一栏改成一句说明：
-"这一型没有画俯视识别图 —— 资料的来源是敌方制式机的识别卡片，不是每一型都有。"
+"无数据"
 
 ### 俯视图画布固定 640×440
 
