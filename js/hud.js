@@ -1227,7 +1227,7 @@ var HUD = (function () {
     } else {
       // 舰船写舰种（SHIPS[].cls）；其余按浮空 / 海面设施
       var scls = shipClsOf(t);
-      text(ctx, scls ? '水面舰船 · ' + scls : (t.ttype === 'air' ? '浮空平台' : '海面设施'), tx, ly, DIM, FS, 'left');
+      text(ctx, scls ? (t.platform ? '海上平台 · ' : '水面舰船 · ') + scls : (t.ttype === 'air' ? '浮空平台' : '海面设施'), tx, ly, DIM, FS, 'left');
       ly += 14;
     }
 

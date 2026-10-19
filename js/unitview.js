@@ -310,7 +310,8 @@ var UnitView = (function () {
         return { kind: 'aircraft', rec: list[i], model: MODELS[list[i].model], modelKey: list[i].model };
       }
     } else if (kind === 'ship') {
-      list = (typeof SHIPS !== 'undefined') ? SHIPS : [];
+      // 海上平台（PLATFORMS）也走 ship 这一类：详情页布局一样，参数表按 fixed 分支
+      list = ((typeof SHIPS !== 'undefined') ? SHIPS : []).concat(typeof PLATFORMS !== 'undefined' ? PLATFORMS : []);
       for (i = 0; i < list.length; i++) if (list[i].id === id) {
         return { kind: 'ship', rec: list[i], model: MODELS.composeTurrets(MODELS[list[i].model], list[i].allMounts), modelKey: list[i].model };
       }
@@ -383,6 +384,7 @@ var UnitView = (function () {
   function gunResistTxt(r) { return (Math.round(r * 1000) / 10) + '%'; }
 
   function shipParams(s) {
+    if (s.fixed) return platformParams(s);
     var rows = [
       ['舰种', esc(s.cls || '—')],
       ['阵营', esc(s.faction || '—')],
@@ -401,6 +403,29 @@ var UnitView = (function () {
       rows.push(['任务价值分', s.value]);
     } else {
       rows.push(['交战国籍', '<span class="uv-neutral">未参战 · 攻击它没有战术收益</span>']);
+    }
+    return paraTable(rows);
+  }
+
+  /* 固定式海上平台：没有排水量和航速，主尺度是甲板 */
+  function platformParams(s) {
+    var rows = [
+      ['类型', esc(s.cls || '—')],
+      ['阵营', esc(s.faction || '—')],
+      s.operator ? ['使用方', esc(s.operator)] : null,
+      ['定位', esc(s.role || '—')],
+      ['甲板', s.dim[0] + ' × ' + s.dim[1] + ' m，甲板高 ' + s.dim[2] + ' m'],
+      ['机动', '固定式，不能移动'],
+      ['人员', s.crew ? s.crew + ' 人' : '无人值守'],
+      ['武备', esc(s.arms.join(' · '))],
+      ['要害（识别参考）', esc(s.vials.join(' · '))]
+    ];
+    if (!s.neutral) {
+      rows.push(['结构 / 受击半径', s.hp + ' / ' + s.radius + ' m']);
+      if (s.gunResist) rows.push(['机炮抗性', gunResistTxt(s.gunResist) + '（小口径航炮伤害减免）']);
+      rows.push(['任务价值分', s.value]);
+    } else {
+      rows.push(['归属', '<span class="uv-neutral">中立设施 · 攻击它没有战术收益</span>']);
     }
     return paraTable(rows);
   }

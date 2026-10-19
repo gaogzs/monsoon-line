@@ -358,7 +358,37 @@ function spawnShip(w, o) {
     fireCd: o.fireCd === undefined ? M3.rnd(3, 8) : o.fireCd
   });
   t.shipCls = s.cls;      // HUD 锁定框写舰种（makeTarget 只拷它认识的字段，所以在这里补）
+  t.ship = s;             // 舰船记录：尾流水花要读螺旋桨位置与最大航速（Ent.wakeSpray）
   // 炮位（2-0IMPL 阶段 3）：近防炮、舰炮、遥控炮各自索敌开火
+  if ((s.mounts || s.launchers) && typeof Turret !== 'undefined') Turret.attach(t, s.mounts, s.launchers);
+  w.targets.push(t);
+  return t;
+}
+
+/* 固定式海上平台（2-0IMPL 4.9）。o = { platform: 'sluice', x, z（或 pos: [x, z]）, yaw, team, hp, weapon, fireCd }。
+   和 spawnShip 同一条路：Ent.makeTarget + 炮位 / 发射器；不走航线、不发水花。
+   有舰空弹发射器的平台（PLATFORMS[].sam）默认把那种弹落到 t.weapon，由 updateTargets 按发现规则开火。
+   被击毁后不移除：game.js 改画 <model>_wreck、往下沉一截、上层冒火冒烟。 */
+function spawnPlatform(w, o) {
+  var s = null;
+  for (var i = 0; i < PLATFORMS.length; i++) if (PLATFORMS[i].id === o.platform) { s = PLATFORMS[i]; break; }
+  if (!s) s = PLATFORMS[0];
+  var x = o.pos ? o.pos[0] : o.x, z = o.pos ? o.pos[1] : o.z, yaw = o.yaw || 0;
+  var t = Ent.makeTarget({
+    ttype: 'ground', model: s.model,
+    label: o.label || s.label,
+    team: o.team === undefined ? (s.neutral ? 2 : 1) : o.team,
+    x: x, y: 0, z: z,
+    fwd: M3.V(Math.sin(yaw), 0, Math.cos(yaw)),
+    hp: o.hp || s.hp, radius: o.radius || s.radius,
+    gunResist: o.gunResist !== undefined ? o.gunResist : (s.gunResist || 0),
+    ground: true, big: true,
+    value: o.value === undefined ? s.value : o.value,
+    weapon: o.weapon || s.sam || null,
+    fireCd: o.fireCd === undefined ? M3.rnd(3, 8) : o.fireCd
+  });
+  t.platform = s;
+  t.shipCls = s.cls;      // 锁定框写"海上平台 · 类型"（hud.js）
   if ((s.mounts || s.launchers) && typeof Turret !== 'undefined') Turret.attach(t, s.mounts, s.launchers);
   w.targets.push(t);
   return t;

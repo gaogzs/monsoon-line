@@ -129,7 +129,12 @@ fs.mkdirSync(OUT, { recursive: true });
    一、单船 3/4 视角
    ============================================================ */
 let n = 0;
-for (const s of SHIPS) {
+/* 海上平台（PLATFORMS）也出单张；它们另外出一张残骸（<model>_wreck）。
+   同比例总览按吨位排，平台没有吨位，不进总览 */
+const PLATFORMS = sandbox.PLATFORMS || [];
+const singles = SHIPS.concat(PLATFORMS,
+  PLATFORMS.map(p => ({ id: p.id + '-wreck', model: p.model + '_wreck', hull: p.hull, cn: '残骸', allMounts: null })));
+for (const s of singles) {
   const mdl = MODELS.composeTurrets(MODELS[s.model], s.allMounts);   // 炮塔按零位合进来
   if (!mdl) { console.error('缺少模型：' + s.model); continue; }
   const cam = frameCamera(mdl, SHIP_W, SHIP_H, FOV);

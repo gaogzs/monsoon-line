@@ -2062,6 +2062,62 @@ var Ent = (function () {
     });
   }
 
+  /* ============================================================
+     舰尾螺旋桨水花（2-0IMPL 4.8）—— 纯演出
+
+     每根轴每秒发 WAKE_RATE × (航速 / 最大航速) 个白色水花粒子，
+     出生在螺旋桨后方 2–4 m 的水面上，往上溅一点再被重力拉回去，
+     随寿命放大、淡出 —— 连起来是一条从舰尾往后拖开的翻腾白带。
+     螺旋桨位置：SHIPS[].props（模型局部坐标 { x, z }），没写的按 dim 推导：
+       舰尾 −len/2 × 0.92；船长 60 m 以上双轴（左右 beam × 0.18），以下单轴。
+     转弯时外侧那根轴 ×1.3；航速 < 2 m/s 不发；离玩家 3 km 外减半、6 km 外不画；
+     全场粒子太多（> WAKE_CAP）时停发，给爆炸特效让路。
+     ============================================================ */
+  var WAKE_RATE = 30, WAKE_CAP = 500, KNOT = 0.5144;
+  function shipProps(s) {
+    if (s.props) return s.props;
+    var len = s.dim ? s.dim[0] : 100, beam = s.dim ? s.dim[1] : 12;
+    var z = -len / 2 * 0.92;
+    s.props = len >= 60 ? [{ x: -beam * 0.18, z: z }, { x: beam * 0.18, z: z }] : [{ x: 0, z: z }];
+    return s.props;
+  }
+  function wakeSpray(t, world, dt) {
+    var s = t.ship;
+    if (!s || !t.alive || !t.vel || !world.particles) return;
+    var spd = Math.sqrt(t.vel.x * t.vel.x + t.vel.z * t.vel.z);
+    if (spd < 2 || world.particles.length > WAKE_CAP) return;
+    var lod = 1, pl = world.player;
+    if (pl) {
+      var dp = M3.dist(pl.pos, t.pos);
+      if (dp > 6000) return;
+      if (dp > 3000) lod = 0.5;
+    }
+    var f = t.fwd || M3.norm(t.vel);
+    var fh = M3.norm(M3.V(f.x, 0, f.z));
+    var r = M3.V(fh.z, 0, -fh.x);                         // 右舷（与炮塔的 hostBasis 同一手性）
+    // 转弯方向：船头往右舷偏 → 左舷那根是外侧
+    var turn = 0;
+    if (t.wakePrevF) turn = M3.dot(M3.sub(fh, t.wakePrevF), r) / Math.max(1e-4, dt);
+    t.wakePrevF = fh;
+    var k = M3.clamp(spd / Math.max(1, (s.speed || 30) * KNOT), 0, 1);
+    var P = shipProps(s);
+    for (var i = 0; i < P.length; i++) {
+      var outer = (turn > 0.01 && P[i].x < 0) || (turn < -0.01 && P[i].x > 0);
+      t.wakeAcc = t.wakeAcc || [];
+      t.wakeAcc[i] = (t.wakeAcc[i] || 0) + WAKE_RATE * k * lod * (outer ? 1.3 : 1) * dt;
+      while (t.wakeAcc[i] >= 1) {
+        t.wakeAcc[i] -= 1;
+        var back = P[i].z - M3.rnd(2, 4);
+        var px = t.pos.x + r.x * P[i].x + fh.x * back, pz = t.pos.z + r.z * P[i].x + fh.z * back;
+        var side = M3.rnd(-1.5, 1.5);
+        spawnParticle(world.particles, M3.V(px + r.x * side * 0.4, 0.3, pz + r.z * side * 0.4),
+          M3.V(r.x * side, M3.rnd(1, 3), r.z * side),
+          M3.rnd(0.6, 1.2), M3.rnd(1.2, 2.0) * (0.6 + 0.4 * k), Math.random() < 0.7 ? '#e8f4f8' : '#cfe8ee',
+          { grow: true, grav: 9.8, drag: 0.6, alpha: 0.55 });
+      }
+    }
+  }
+
   function stepParticles(list, dt) {
     for (var i = 0; i < list.length; i++) {
       var p = list[i];
@@ -2347,6 +2403,7 @@ var Ent = (function () {
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
+    wakeSpray: wakeSpray,
     effRange: effRange, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
     isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     jamState: jamState, jamShown: jamShown, jamDuty: jamDuty, jamRanges: jamRanges, jamPress: jamPress, jamLockOK: jamLockOK, jamLockK: jamLockK, JAM_BURN_R: JAM_BURN_R, JAM_SURF_K: JAM_SURF_K, JAM_BURN_SURF: JAM_BURN_SURF,

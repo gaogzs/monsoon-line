@@ -2648,9 +2648,10 @@ var Game = (function () {
   function updateTargets(dt) {
     for (var i = 0; i < world.targets.length; i++) {
       var t = world.targets[i];
-      if (!t.alive) continue;
+      if (!t.alive) { if (t.platform) platformWreck(t, dt); continue; }
       Ent.stepTarget(t, dt);
       if (t.turrets && t.team !== 2) Turret.stepAll(t, world, dt);
+      if (t.ship) Ent.wakeSpray(t, world, dt);
 
       if (!t.weapon || t.team === 2) continue;
       if (t.fireCd > 0) { t.fireCd -= dt; continue; }
@@ -2677,6 +2678,27 @@ var Game = (function () {
       if (tgt === player) {
         Radio.raw({ who: 'SEXTANT', cls: 'cmd', tx: '<b>发射！方位 ' + bearing(t.pos, player.pos) + '，距离 ' + (d / 1000).toFixed(1) + ' km。</b>', gap: 0.9 });
         SFX.missileFar();
+      }
+    }
+  }
+
+  /* 被击毁的海上平台：不移除，残骸（<model>_wreck）下沉一截，
+     上层起火冒烟 —— 火 40 s 内渐弱，黑烟拖到 90 s。离玩家 8 km 外不出粒子 */
+  var WRECK_SINK = 5, WRECK_FIRE_T = 40, WRECK_SMOKE_T = 90;
+  function platformWreck(t, dt) {
+    t.wreckT = (t.wreckT || 0) + dt;
+    t.wreckY = Math.min(WRECK_SINK, (t.wreckY || 0) + dt * 0.4);
+    if (t.wreckT > WRECK_SMOKE_T || M3.dist(t.pos, player.pos) > 8000) return;
+    var top = (t.platform.dim[2] || 15) - t.wreckY, R = (t.radius || 20) * 0.4;
+    t.wreckAcc = (t.wreckAcc || 0) + dt * 6;
+    while (t.wreckAcc >= 1) {
+      t.wreckAcc -= 1;
+      var p = M3.V(t.pos.x + M3.rnd(-R, R), top + M3.rnd(0, 3), t.pos.z + M3.rnd(-R, R));
+      Ent.spawnParticle(world.particles, p, M3.V(M3.rnd(-1, 1), M3.rnd(3, 6), M3.rnd(-1, 1)),
+        M3.rnd(3, 5), M3.rnd(4, 7), '#2e2b28', { grow: true, drag: 0.4, alpha: 0.6 });
+      if (t.wreckT < WRECK_FIRE_T && Math.random() < 1 - t.wreckT / WRECK_FIRE_T) {
+        Ent.spawnParticle(world.particles, p, M3.V(0, M3.rnd(2, 5), 0),
+          M3.rnd(0.4, 0.8), M3.rnd(2, 3.5), Math.random() < 0.5 ? '#ff9a3c' : '#ffcf5c', { grow: true, drag: 1 });
       }
     }
   }
@@ -3325,7 +3347,12 @@ var Game = (function () {
     // 目标物
     for (i = 0; i < world.targets.length; i++) {
       var t = world.targets[i];
-      if (!t.alive) continue;
+      if (!t.alive) {
+        // 海上平台的残骸留在原地，下沉一截（platformWreck）
+        var wk = t.platform && MODELS[t.model + '_wreck'];
+        if (wk) Renderer.pushModel(wk, M3.V(t.pos.x, t.pos.y - (t.wreckY || 0), t.pos.z), t.fwd, t.up, {});
+        continue;
+      }
       var mdl = MODELS[t.model];
       if (!mdl) continue;
       // 调节单元每关几十个、大多在 30 km 外 —— 远处那些画出来也只是雾里一个点

@@ -638,6 +638,8 @@ mounts: [{
 - 舰船受损沉没时停止发射；高速转向时外侧一轴的发射率 ×1.3，让转弯尾迹略不对称。
 - 验证：smoke 跑一艘 Orca 全速航行 10 s，断言粒子数稳定在上限以下；截图检查舰尾有连续水花、停船后 2 s 内消失；帧时间与关闭特效时相比增加不超过 5%。
 
+> **已实施（v2.3 开发中）**：`Ent.wakeSpray`（entities.js），由 `updateTargets` 对 `t.ship` 调用。螺旋桨位置按 `dim` 推导（60 m 以上双轴），没有单独写 `props` 的船。全场粒子超过 500 时停发（爆炸特效 650 起降级，给它留余量），没有另设 600 的水花上限。smoke：Orca 全速 10 s，峰值约 60 个粒子，停船 2 s 内消失。
+
 ### D · 各势力固定式海上平台
 
 ### 4.9 海上平台单位
@@ -659,6 +661,13 @@ mounts: [{
 - 图鉴：codex 新增"海上平台"分类（或并入舰艇图鉴，单独一个分组），显示势力、定位、武装和 desc。
 - 任务接口：mission `spawn` 可以写 `{ platform:'sluice', pos:[x,z], yaw, team }` 生成平台，供以后的关卡使用。
 - 验证：smoke 断言每个 `PLATFORMS` 条目都有模型、hp > 0、`arms` 与 `mounts` / `launchers` 数量一致；临时探针在空场景里各生成一个平台，确认能被玩家武器打掉、炮塔会对空 / 对海开火、`beacon` 不开火。
+
+> **已实施（v2.3 开发中）**：
+> - `PLATFORMS` + `PLATFORM_MOUNTS` / `PLATFORM_LAUNCHERS`（data.js）；`dim` 对平台是 [甲板宽, 甲板长, 甲板高]。"50 mm 机炮"统一写成"50 mm 速射炮"（n50），和舰船的 arms 规则一致。`reed` 的防空弹是旋转架（`rotSam`，弹种 dl9），`shoal` 是垂发（ss6）。
+> - 生成：`spawnPlatform(w, { platform, x, z | pos, yaw, team, ... })`（missions.js）。中立平台（`beacon`）缺省 team 2。
+> - 击毁：平台不从 `targets` 里移除，改画 `<model>_wreck`（甲板歪斜烧黑、断一根腿、上层没了），40 s 内下沉 5 m，上层火 40 s、黑烟 90 s，8 km 外不出粒子。
+> - 图鉴：舰艇图鉴里单独一组"海上平台"；详情页走 ship 那一类，参数表换成甲板尺寸 / 固定式 / 人员。锁定框写"海上平台 · 类型"。
+> - `tools/render-ships.js` 也出平台和残骸的单张图（不进同比例总览）。
 
 ### E · 平衡回归与新关卡
 

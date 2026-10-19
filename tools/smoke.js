@@ -5824,6 +5824,103 @@ try {
 }
 
 /* ============================================================
+   舰尾水花（2-0IMPL 4.8）
+   ============================================================ */
+console.log('\n舰尾水花');
+try {
+  const bad = [];
+  const { Ent: EN, M3: V3, SHIPS: SH } = sandbox;
+  const orca = SH.find(s => s.id === 'orca');
+  const t = EN.makeTarget({ team: 0, model: 'orca', x: 0, y: 0, z: 0, hp: 900, radius: 44, big: true });
+  t.ship = orca;
+  t.fwd = V3.V(0, 0, 1);
+  t.vel = V3.V(0, 0, orca.speed * 0.5144);
+  const w = { particles: [], player: null };
+  let peak = 0;
+  for (let f = 0; f < 600; f++) {
+    t.pos = V3.add(t.pos, V3.mul(t.vel, 1 / 60));
+    EN.wakeSpray(t, w, 1 / 60);
+    EN.stepParticles(w.particles, 1 / 60);
+    w.particles = w.particles.filter(p => p.alive);
+    peak = Math.max(peak, w.particles.length);
+  }
+  if (!w.particles.length) bad.push('Orca 全速航行 10 s 舰尾没有水花');
+  if (peak > 600) bad.push('水花粒子峰值 ' + peak + '，超过 600 上限');
+  const behind = w.particles.every(p => p.pos.z < t.pos.z - 40);
+  if (!behind) bad.push('水花不全在舰尾后方');
+  // 停船：2 s 内消失
+  t.vel = V3.V(0, 0, 0);
+  for (let f = 0; f < 120; f++) {
+    EN.wakeSpray(t, w, 1 / 60);
+    EN.stepParticles(w.particles, 1 / 60);
+    w.particles = w.particles.filter(p => p.alive);
+  }
+  if (w.particles.length) bad.push('停船 2 s 后还有 ' + w.particles.length + ' 个水花粒子');
+  if (bad.length) bad.forEach(fail);
+  else ok('舰尾水花：全速有、峰值 ' + peak + ' 在上限内、都在舰尾后方，停船 2 s 内消失');
+} catch (e) {
+  fail('舰尾水花测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
+   海上平台（2-0IMPL 4.9）
+   ============================================================ */
+console.log('\n海上平台');
+try {
+  const bad = [];
+  const { PLATFORMS: PL, MODELS: MD, Game: GM, M3: V3 } = sandbox;
+  // 1. 数据：模型 / 残骸都在，hp > 0，arms 与炮位、发射器数量一致
+  const ARMS = [[/近防炮 ×(\d+)/, 'ciws20'], [/75 mm 舰炮 ×(\d+)/, 'n75'], [/120 mm 舰炮 ×(\d+)/, 'n120'],
+    [/50 mm 速射炮 ×(\d+)/, 'n50'], [/30 mm 遥控炮 ×(\d+)/, 'aa30']];
+  const LAUNCH = [[/反舰弹发射架 ×(\d+)/, 'railSsm'], [/旋转防空弹发射架 ×(\d+)/, 'rotSam']];
+  for (const p of PL) {
+    if (!MD[p.model]) bad.push(p.id + ' 没有模型');
+    if (!MD[p.model + '_wreck']) bad.push(p.id + ' 没有残骸模型');
+    if (!(p.hp > 0)) bad.push(p.id + ' 的 hp 不是正数');
+    const arms = p.arms.join(' / ');
+    for (const [re, gun] of ARMS) {
+      const m = re.exec(arms), want = m ? +m[1] : 0;
+      const have = (p.mounts || []).filter(x => x.gun === gun).length;
+      if (want !== have) bad.push(p.id + '：arms 写 ' + gun + ' ×' + want + '，mounts 里有 ' + have);
+    }
+    for (const [re, gun] of LAUNCH) {
+      const m = re.exec(arms), want = m ? +m[1] : 0;
+      const have = (p.launchers || []).filter(x => x.gun === gun).length;
+      if (want !== have) bad.push(p.id + '：arms 写 ' + gun + ' ×' + want + '，launchers 里有 ' + have);
+    }
+    if (/舰空弹垂发/.test(arms) !== (p.launchers || []).some(x => x.gun === 'vlsSam')) bad.push(p.id + '：舰空弹垂发与 launchers 对不上');
+  }
+  // 2. 空场景里各生成一个：会对空开火（beacon 不开火）、能被打掉、打掉后残骸留着
+  for (const p of PL) {
+    GM.startMission(0);
+    const w = GM.__world();
+    w.actors.length = 0; w.targets.length = 0; w.missiles.length = 0; w.bullets.length = 0;
+    w.detected = true;
+    const t = sandbox.spawnPlatform(w, { platform: p.id, x: 0, z: 0, team: p.neutral ? 2 : 1 });
+    const foe = { kind: 'aircraft', team: 0, alive: true, hp: 1e9, maxHp: 1e9, pos: V3.V(0, 500, 1000), vel: V3.V(0, 0, 0), fwd: V3.V(1, 0, 0) };
+    w.actors.push(foe);
+    let shots = 0;
+    for (let f = 0; f < 60 * 8; f++) {
+      if (t.turrets) sandbox.Turret.stepAll(t, w, 1 / 60);
+      shots += w.bullets.length + w.missiles.length;
+      w.bullets.length = 0; w.missiles.length = 0;
+      w.time += 1 / 60;
+    }
+    if (p.neutral && shots) bad.push(p.id + ' 是中立设施，却开了火');
+    if (!p.neutral && (p.mounts || []).some(m => m.role === 'ciws' || m.role === 'aa' || m.role === 'dual') && !shots) {
+      bad.push(p.id + ' 8 s 内没有对 1.1 km 外的敌机开火');
+    }
+    sandbox.Ent.hitAny(t, 1e9, w, null);
+    if (t.alive) bad.push(p.id + ' 打不掉');
+    if (w.targets.indexOf(t) < 0) bad.push(p.id + ' 被击毁后从 targets 里消失了（残骸应留着）');
+  }
+  if (bad.length) bad.slice(0, 8).forEach(fail);
+  else ok('海上平台：' + PL.length + ' 种都有模型与残骸、arms 与炮位一致；对 1.1 km 的敌机会开火（航标不开火）、能被打掉、残骸留在原地');
+} catch (e) {
+  fail('海上平台测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+
+/* ============================================================
    结果
    ============================================================ */
 console.log('');

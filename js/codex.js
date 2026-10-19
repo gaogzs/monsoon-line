@@ -1348,6 +1348,26 @@ CODEX.push({
     }
     h += '</table>';
 
+    /* 固定式海上平台（PLATFORMS）：单独一组。它们不动，所以不列排水量与航速，
+       主尺度写甲板宽 × 长 × 甲板高 */
+    if (typeof PLATFORMS !== 'undefined' && PLATFORMS.length) {
+      h += '<h4>海上平台</h4><p class="cx-note">打在海床上或系泊在原地的固定设施。' +
+        '它们不会机动，被击毁后残骸留在原地。</p>' +
+        '<table class="cx-table"><tr><th>名称</th><th>势力</th><th>类型</th><th>定位</th>' +
+        '<th>甲板 m（宽 × 长 × 高）</th><th>武备</th><th>结构</th><th>机炮抗性</th></tr>';
+      for (si = 0; si < PLATFORMS.length; si++) {
+        s = PLATFORMS[si];
+        h += '<tr><td><span class="cx-unit" data-unit="ship:' + s.id + '">' +
+          '<b>' + s.hull + '</b><br><span class="d">' + s.name + '</span>' +
+          (s.neutral ? ' <span class="cx-fly">不该打</span>' : '') + '</span></td>' +
+          '<td>' + s.faction + '</td><td>' + s.cls + '</td><td>' + s.role + '</td>' +
+          '<td>' + s.dim[0] + ' × ' + s.dim[1] + ' × ' + s.dim[2] + '</td>' +
+          '<td>' + s.arms.join(' · ') + '</td><td>' + s.hp + '</td>' +
+          '<td>' + _gunResistTxt(s.gunResist) + '</td></tr>';
+      }
+      h += '</table>';
+    }
+
     h += '<p class="cx-note">舰载弹药与机载弹药<b>共用同一套逻辑语编号</b>，' +
       '编号不随包装改变，所以下游可以用同一批 <b>BAD-</b> 系列弹' +
       '同时喂它的防空浮台和它的护卫舰。</p>';

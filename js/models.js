@@ -1574,6 +1574,144 @@ var MODELS = (function () {
     return done(b, { span: 18.8, len: 152, ground: true, sea: true, radius: 46 });
   })();
 
+  /* ============================================================
+     固定式海上平台（2-0IMPL 4.9）
+
+     和舰船同一套坐标：水线 y = 0，"船头"朝 +z（平台的 yaw 只决定炮位零位朝哪边）。
+     每种平台一个构造函数，wreck = true 时出残骸版本：
+       甲板歪斜、上层建筑与炮座没了、一根桩腿断掉，甲板上散几块碎件 ——
+     game.js 在平台被击毁后改画 <model>_wreck，并让它往下沉一截。
+     炮塔 / 发射架不烘焙在这里，位置见 data.js 的 PLATFORM_MOUNTS / PLATFORM_LAUNCHERS。
+     ============================================================ */
+  /** 导管架：四根桩腿 + 每面两道 X 形撑杆。broken = 断掉的那根腿的序号（-1 不断） */
+  function jacket(b, hw, hd, y0, y1, r, col, broken) {
+    var L = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]], i;
+    for (i = 0; i < 4; i++) {
+      var top = i === broken ? y0 + (y1 - y0) * 0.45 : y1;
+      b.tube(V(L[i][0], y0, L[i][1]), V(L[i][0], top, L[i][1]), r, r * 0.85, 6, col, C.boot);
+    }
+    var ya = y0 + (y1 - y0) * 0.25, yb = y0 + (y1 - y0) * 0.7;
+    for (i = 0; i < 4; i++) {
+      if (i === broken || (i + 1) % 4 === broken) continue;        // 断腿那两面的撑杆跟着没了
+      var A = L[i], B2 = L[(i + 1) % 4];
+      b.tube(V(A[0], ya, A[1]), V(B2[0], yb, B2[1]), r * 0.3, r * 0.3, 4, col);
+      b.tube(V(A[0], yb, A[1]), V(B2[0], ya, B2[1]), r * 0.3, r * 0.3, 4, col);
+    }
+  }
+  /** 平台甲板：完好是一块平板；残骸是一块往断腿那边歪下去的板，外加几块碎件 */
+  function pDeck(b, w, d, y, col, colTop, wreck) {
+    if (!wreck) { b.box(0, y, 0, w, 2.0, d, col, colTop); return; }
+    // 甲板烧黑、往一边歪；碎块按甲板大小缩放，摆在甲板面上（歪的那一面跟着降）
+    b.boxTilt(0, y - 2.5, 0, w, 2.0, d, 0.16, C.darker, C.dark);
+    var k = Math.min(w, d) / 36;
+    for (var i = 0; i < 5; i++) {
+      var dz = (i % 3 - 1) * d * 0.25;
+      b.box((i - 2) * w * 0.17, y - 1.0 + 0.16 * dz + 0.8 * k, dz, (2.5 + i % 2) * k, 1.6 * k, (3 + i % 3) * k, C.dark, C.black);
+    }
+  }
+
+  /** shoal 浅滩站 · 上游公约 · 导管架防空平台：雷达罩 + 舰空弹垂发 + 两座近防 */
+  function buildShoal(wreck) {
+    var b = new MB();
+    jacket(b, 13, 13, -6, 19, 1.5, C.hull2, wreck ? 2 : -1);
+    pDeck(b, 36, 36, 20, C.hull2, C.deck, wreck);
+    if (!wreck) {
+      house(b, 0, -6, 16, 7, 12, 21, C.hull, C.hull);
+      b.box(0, 24.6, 0.1, 12, 4.6, 0.5, C.metal);                       // 前向阵面
+      mast(b, 0, -8, 28, 38, 0.8, 0.3, C.hull2);
+      b.tube(V(0, 38.6, -8), V(0, 42.6, -8), 2.6, 2.6, 8, C.white, C.white);   // 雷达罩
+      b.box(8, 21.5, 9, 8, 1.0, 8, C.hull2, C.metal);                   // 垂发盖板
+      b.box(-12, 21.2, -13, 8, 0.2, 8, C.yellow);                       // 直升机吊运区
+    }
+    return done(b, { span: 36, len: 36, ground: true, sea: true, radius: 30 });
+  }
+  /** breakwater 防波堤 · 上游公约 · 半潜补给平台：两条浮箱 + 四根立柱 + 油罐与吊车 */
+  function buildBreakwater(wreck) {
+    var b = new MB();
+    for (var sx = -1; sx <= 1; sx += 2) {
+      b.tube(V(sx * 20, -1.5, -30), V(sx * 20, -1.5, 30), 4.2, 4.2, 8, C.hull2, C.boot);    // 浮箱
+      for (var sz = -1; sz <= 1; sz += 2) {
+        if (wreck && sx > 0 && sz > 0) continue;
+        b.tube(V(sx * 20, 0, sz * 20), V(sx * 20, 14, sz * 20), 3.2, 3.2, 8, C.hull, C.hull2);
+      }
+    }
+    pDeck(b, 56, 48, 15, C.hull2, C.deck, wreck);
+    if (!wreck) {
+      for (var i = 0; i < 3; i++) b.tube(V(-14 + i * 9, 18.5, -10), V(-14 + i * 9, 18.5, 10), 3.4, 3.4, 8, C.white, C.snow2);  // 油罐
+      house(b, 18, -14, 12, 8, 12, 16, C.hull, C.hull);
+      b.boxTilt(10, 26, 8, 1.4, 1.4, 22, -0.6, C.yellow);              // 吊车臂
+      b.tube(V(10, 16, 0), V(10, 24, 0), 1.0, 0.8, 6, C.yellow);
+      b.box(-14, 16.1, 18, 14, 0.2, 10, C.yellow);                      // 直升机甲板
+    }
+    return done(b, { span: 56, len: 60, ground: true, sea: true, radius: 40 });
+  }
+  /** sluice 闸口 · 下游同盟 · 重型炮台平台：前后两座 120 炮、两舷反舰弹架、中央塔楼 */
+  function buildSluice(wreck) {
+    var b = new MB();
+    jacket(b, 18, 15, -6, 17, 1.8, C.rust2, wreck ? 0 : -1);
+    pDeck(b, 50, 40, 18, C.rust2, C.deck, wreck);
+    if (!wreck) {
+      house(b, 0, 0, 14, 7, 10, 19, C.rust, C.rust);                    // 中央塔楼，顶上是 30 mm
+      b.box(0, 23.5, 5.1, 10, 3.4, 0.5, C.metal);
+      mast(b, 0, -3, 26, 36, 0.8, 0.3, C.rust2);
+      // 两舷四座斜置反舰弹箱，箱口朝外（yaw ±90°）
+      b.boxTilt(17, 20.6, 7, 1.8, 1.8, 8, -0.3, C.rust2, C.rust, Math.PI / 2);
+      b.boxTilt(17, 20.6, -7, 1.8, 1.8, 8, -0.3, C.rust2, C.rust, Math.PI / 2);
+      b.boxTilt(-17, 20.6, 7, 1.8, 1.8, 8, -0.3, C.rust2, C.rust, -Math.PI / 2);
+      b.boxTilt(-17, 20.6, -7, 1.8, 1.8, 8, -0.3, C.rust2, C.rust, -Math.PI / 2);
+    }
+    return done(b, { span: 50, len: 50, ground: true, sea: true, radius: 36 });
+  }
+  /** reed 芦苇 · 下游同盟 · 轻型哨戒平台：单桩小平台，一门 75 炮 + 一座旋转防空弹架 */
+  function buildReed(wreck) {
+    var b = new MB();
+    jacket(b, 5, 5, -5, 11, 1.0, C.rust2, wreck ? 1 : -1);
+    pDeck(b, 18, 20, 12, C.rust2, C.deck, wreck);
+    if (!wreck) {
+      house(b, 5, 0, 6, 4, 6, 13, C.rust, C.rust);
+      mast(b, 6, 0, 17, 25, 0.5, 0.2, C.rust2);
+      b.box(6, 22, 0, 3.0, 1.6, 0.3, C.metal);
+    }
+    return done(b, { span: 18, len: 20, ground: true, sea: true, radius: 14 });
+  }
+  /** cairn 石堆 · 分水群岛国 · 改装钻井平台：粗桩腿、钻塔、生活舱、直升机坪 —— 民用平台加装了炮 */
+  function buildCairn(wreck) {
+    var b = new MB();
+    jacket(b, 18, 18, -6, 23, 2.6, C.yellow, wreck ? 3 : -1);
+    pDeck(b, 48, 48, 24, C.grey2, C.deck, wreck);
+    if (!wreck) {
+      // 钻塔：四根往上收的立柱
+      for (var i = 0; i < 4; i++) {
+        var dx = i % 2 ? 4 : -4, dz = i < 2 ? 4 : -4;
+        b.tube(V(dx, 25, dz), V(dx * 0.25, 52, dz * 0.25), 0.5, 0.35, 4, C.white);
+      }
+      b.box(0, 52.5, 0, 3, 1.2, 3, C.red);
+      house(b, -14, 12, 16, 9, 14, 25, C.white, C.snow2);                 // 生活舱
+      b.box(14, 33.2, -16, 14, 0.4, 14, C.yellow);                        // 悬臂直升机坪
+      b.tube(V(14, 25, -16), V(14, 33, -16), 1.0, 1.0, 6, C.grey2);
+    }
+    return done(b, { span: 48, len: 48, ground: true, sea: true, radius: 36 });
+  }
+  /** beacon 航标 · 调节场管理局 · 无人测量 / 中继平台：单立柱 + 小甲板 + 天线桅 */
+  function buildBeacon(wreck) {
+    var b = new MB();
+    b.tube(V(0, -5, 0), V(0, wreck ? 4 : 8, 0), 2.2, 2.0, 8, C.snow, C.snow2);
+    pDeck(b, 12, 12, 9, C.snow2, C.snow, wreck);
+    if (!wreck) {
+      mast(b, 0, 0, 10, 22, 0.4, 0.15, C.snow2);
+      b.wing(V(-5.5, 10.8, -3), V(-1.5, 10.8, -3), V(-1.5, 12, 1), V(-5.5, 12, 1), C.canopy);   // 太阳能板
+      b.box(3.5, 11, 3, 3, 2, 3, C.snow, C.snow2);
+      b.box(0, 22.6, 0, 2.4, 0.3, 0.3, C.red);
+    }
+    return done(b, { span: 12, len: 12, ground: true, sea: true, radius: 10 });
+  }
+  [['shoal', buildShoal], ['breakwater', buildBreakwater], ['sluice', buildSluice],
+   ['reed', buildReed], ['cairn', buildCairn], ['beacon', buildBeacon]].forEach(function (e) {
+    M[e[0]] = e[1](false);
+    // 残骸不可枚举：MODELS 的遍历（预览、smoke）只看正式模型
+    Object.defineProperty(M, e[0] + '_wreck', { enumerable: false, value: e[1](true) });
+  });
+
   /* ---------- 按武器外观（WEAPONS[id].look）生成的弹体 / 挂架 ----------
      以前所有导弹共用一个 3.4 m 的壳子：短矢和极远挂在翼下长得一模一样，
      火箭巢、三联巢也只是"一枚导弹"。现在：

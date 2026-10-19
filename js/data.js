@@ -1392,6 +1392,127 @@ var SHIP_MOUNTS = {
   }
 })();
 
+/* ============================================================
+   固定式海上平台（2-0IMPL 4.9）
+
+   结构对齐 SHIPS（图鉴、详情页、spawn 共用一套字段），另外：
+     fixed: true    固定不动，speed 0，不走航线、不发水花
+     dim            [甲板宽, 甲板长, 甲板高]（米）—— 不是舰船的"长 × 宽 × 吃水"
+     sam            受控舰空弹的弹种（有舰空弹发射器的平台），spawnPlatform 落到 t.weapon
+   arms 文本里的炮数要和 PLATFORM_MOUNTS 对得上（smoke 断言，与舰船同一条）。
+   本阶段只"加入游戏"：图鉴可见、任务可生成、能被打掉、炮塔会开火 —— 还没有放进任何关卡。
+   ============================================================ */
+var PLATFORMS = [
+  {
+    id: 'shoal', model: 'shoal', hull: '浅滩站', name: 'Shoal', cn: '浅滩站',
+    cls: '导管架防空平台', faction: '上游公约', operator: '上游公约海军',
+    role: '前沿雷达 / 区域防空', dim: [36, 36, 20], speed: 0, fixed: true, crew: 46,
+    hp: 1400, radius: 30, value: 500, gunResist: 0.9, label: '浅滩站', sam: 'ss6',
+    vials: ['雷达罩', '垂发盖板', '生活舱'],
+    arms: ['16 单元舰空弹垂发', '近防炮 ×2'],
+    desc: `<p>打在浅水区的一座导管架，<b>上游</b>拿它当一艘永远不会开走的驱逐舰用：
+一部对海对空雷达、十六单元舰空弹、两座近防炮。</p>
+<p>它守的是海底电缆的登陆段和停在附近的储油驳船 —— 那些东西动不了，所以守它们的也不该动。</p>`
+  },
+  {
+    id: 'breakwater', model: 'breakwater', hull: '防波堤', name: 'Breakwater', cn: '防波堤',
+    cls: '半潜补给平台', faction: '上游公约', operator: '上游公约海军',
+    role: '燃油 / 弹药中转', dim: [56, 48, 15], speed: 0, fixed: true, crew: 80,
+    hp: 1600, radius: 40, value: 450, gunResist: 0.92, label: '防波堤',
+    vials: ['油罐', '吊车', '浮箱'],
+    arms: ['近防炮 ×1', '50 mm 速射炮 ×2'],
+    desc: `<p>半潜式补给平台：两条浮箱压在水下，四根立柱撑起一整块甲板，上面是油罐、吊车和直升机坪。</p>
+<p>它是蓝鲸的"岸上版本"。补给舰来回跑一趟要两天，<b>这里的油是一直在的</b>。
+自身只有一座近防和两门 50 炮 —— 它的安全靠的是别人。</p>`
+  },
+  {
+    id: 'sluice', model: 'sluice', hull: '闸口', name: 'Sluice', cn: '闸口',
+    cls: '重型炮台平台', faction: '下游同盟', operator: '下游同盟海军',
+    role: '航道封锁 / 对海', dim: [50, 40, 18], speed: 0, fixed: true, crew: 120,
+    hp: 1800, radius: 36, value: 700, gunResist: 0.93, label: '闸口',
+    vials: ['中央塔楼', '120 mm 炮塔', '反舰弹箱'],
+    arms: ['120 mm 舰炮 ×2', '反舰弹发射架 ×4', '30 mm 遥控炮 ×1'],
+    desc: `<p>下游把邓氏鱼的主炮拆了两门，焊在一座导管架上 —— 这就是<b>闸口</b>。
+它卡在主航道最窄的地方，四座反舰弹箱朝两舷，前后两门 120 炮。</p>
+<p>它不需要航速，也不需要防空：它的意思是<b>"这条水道归我们"</b>，而它确实做到了。
+防空只有塔楼顶上一门 30 mm，这是它最大的弱点。</p>`
+  },
+  {
+    id: 'reed', model: 'reed', hull: '芦苇', name: 'Reed', cn: '芦苇',
+    cls: '轻型哨戒平台', faction: '下游同盟', operator: '下游同盟海军',
+    role: '观测 / 近程防空', dim: [18, 20, 12], speed: 0, fixed: true, crew: 14,
+    hp: 420, radius: 14, value: 200, gunResist: 0.6, label: '芦苇', sam: 'dl9',
+    vials: ['观测桅', '旋转发射架'],
+    arms: ['75 mm 舰炮 ×1', '旋转防空弹发射架 ×1'],
+    desc: `<p>单桩小平台，下游在浅水区插了一大片。每一座只有一门 75 炮、一座旋转防空弹架和十几个人。</p>
+<p>它们像芦苇一样<b>数量多、单根脆</b>：拔掉一根不难，但它的观测桅会在被拔掉之前把你报出去。</p>`
+  },
+  {
+    id: 'cairn', model: 'cairn', hull: '石堆', name: 'Cairn', cn: '石堆',
+    cls: '改装钻井平台', faction: '分水群岛国', operator: '分水群岛国海岸警备队',
+    role: '据点 / 民用改装', dim: [48, 48, 24], speed: 0, fixed: true, crew: 60,
+    hp: 2200, radius: 36, value: 400, gunResist: 0.9, label: '石堆',
+    vials: ['钻塔', '生活舱', '悬臂直升机坪'],
+    arms: ['75 mm 舰炮 ×1', '50 mm 速射炮 ×2'],
+    desc: `<p>一座退役的钻井平台。群岛国没有钱造炮台，于是把三门从旧巡逻艇上拆下来的炮焊在了甲板上。</p>
+<p>火力杂，但<b>它非常结实</b> —— 钻井平台本来就是按百年一遇的风暴造的。</p>`
+  },
+  {
+    id: 'beacon', model: 'beacon', hull: '航标', name: 'Beacon', cn: '航标',
+    cls: '无人测量 / 中继平台', faction: '调节场管理局', operator: '调节场管理局',
+    role: '测量 / 通信中继', dim: [12, 12, 9], speed: 0, fixed: true, crew: 0,
+    hp: 300, radius: 10, value: 0, gunResist: 0.5, label: '航标', neutral: true,
+    vials: ['天线桅', '太阳能板'],
+    arms: ['无'],
+    desc: `<p>管理局的无人平台：一根立柱、一块小甲板、一根天线桅和一片太阳能板。
+它记录海面高度、风和电磁环境，把数据中继给控制平台。</p>
+<p>它不设防，也不属于任何一方 —— 但两边都很想知道它记下了什么。</p>`
+  }
+];
+/* 平台的炮位与发射器。坐标对着 models.js 的平台模型：pos 的 y 是甲板顶面（甲板高 + 1） */
+var PLATFORM_MOUNTS = {
+  shoal: [
+    _m('ciwsA', 'ciws20', [-15, 21, 15], 0, ARC_CIWS, null, 'ciws'),
+    _m('ciwsB', 'ciws20', [15, 21, -15], Math.PI, ARC_CIWS, null, 'ciws')
+  ],
+  breakwater: [
+    _m('ciws', 'ciws20', [18, 24, -14], Math.PI, ARC_CIWS, null, 'ciws'),
+    _m('n50L', 'n50', [-26, 16, 0], -Math.PI / 2, ARC_SIDE, 'tur50', 'dual'),
+    _m('n50R', 'n50', [26, 16, 10], Math.PI / 2, ARC_SIDE, 'tur50', 'dual')
+  ],
+  sluice: [
+    _m('gunF', 'n120', [0, 19, 14], 0, { yawMin: -2.6, yawMax: 2.6, pitchMin: -0.1, pitchMax: 0.9 }, 'tur120r', 'dual'),
+    _m('gunA', 'n120', [0, 19, -14], Math.PI, { yawMin: -2.6, yawMax: 2.6, pitchMin: -0.1, pitchMax: 0.9 }, 'tur120r', 'dual'),
+    _m('aa', 'aa30', [0, 26, 0], 0, ARC_CIWS, null, 'aa')
+  ],
+  reed: [
+    _m('gun', 'n75', [-3, 13, 6], 0, ARC_BOW, 'tur75r', 'dual')
+  ],
+  cairn: [
+    _m('gun', 'n75', [16, 25, 16], 0, ARC_BOW, 'tur75', 'dual'),
+    _m('n50L', 'n50', [-18, 25, -12], -Math.PI / 2, ARC_SIDE, 'tur50', 'dual'),
+    _m('n50R', 'n50', [20, 25, 4], Math.PI / 2, ARC_SIDE, 'tur50', 'dual')
+  ]
+};
+var PLATFORM_LAUNCHERS = {
+  shoal: [_L('vls', 'vlsSam', [8, 22, 9], 'vls')],
+  sluice: [
+    _L('ssmRF', 'railSsm', [21, 21.8, 7], { yaw: Math.PI / 2, elev: 0.3 }, 1),
+    _L('ssmRA', 'railSsm', [21, 21.8, -7], { yaw: Math.PI / 2, elev: 0.3 }, 1),
+    _L('ssmLF', 'railSsm', [-21, 21.8, 7], { yaw: -Math.PI / 2, elev: 0.3 }, 1),
+    _L('ssmLA', 'railSsm', [-21, 21.8, -7], { yaw: -Math.PI / 2, elev: 0.3 }, 1)
+  ],
+  reed: [_L('sam', 'rotSam', [-3, 13, -5], 'turret', 0, ARC_CIWS, 'lnchr')]
+};
+(function () {
+  for (var i = 0; i < PLATFORMS.length; i++) {
+    var P = PLATFORMS[i];
+    if (PLATFORM_MOUNTS[P.id]) P.mounts = PLATFORM_MOUNTS[P.id];
+    if (PLATFORM_LAUNCHERS[P.id]) P.launchers = PLATFORM_LAUNCHERS[P.id];
+    P.allMounts = P.launchers ? (P.mounts || []).concat(P.launchers) : P.mounts;
+  }
+})();
+
 
 /* ============================================================
    武器库
