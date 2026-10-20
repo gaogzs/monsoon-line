@@ -1043,8 +1043,7 @@ if (Ent && M3 && me && world) {
       return { hit: tg.hp < 99999, extra: extra };
     };
     const CASES = {
-      asl: [[3000, 1500], [3000, 3000], [4500, 1500], [4500, 3000], [4500, 4500], [6000, 4500]],
-      v30: [[1500, 1500], [2000, 800], [2000, 1500], [2400, 1500], [2400, 2400]]
+      asl: [[3000, 1500], [3000, 3000], [4500, 1500], [4500, 3000], [4500, 4500], [6000, 4500]]
     };
     const bad = [];
     const rep = [];
@@ -1059,10 +1058,21 @@ if (Ent && M3 && me && world) {
       rep.push(WEAPONS[wid].name + ' ' + hit + '/' + CASES[wid].length);
       if (rate < 0.8) bad.push(WEAPONS[wid].name + ' 投放包线内命中率只有 ' + (rate * 100).toFixed(0) + '%，未命中：' + miss.join('、'));
     }
-    // 集束：覆盖半径内的第二个目标也要掉血
-    const side = TG(WEAPONS.v30.cluster * 0.7, 0);
-    drop('v30', 2000, 1500, [side]);
-    if (!(side.hp < 99999)) bad.push('PEJ-30 集束弹没有波及覆盖半径内的第二个目标（cluster 字段没生效）');
+    /* 集束：PEJ-30 无制导，先空投一次量出自由落体落点，
+       再把主目标和覆盖半径内的第二个目标摆在落点上，第二个也要掉血 */
+    {
+      const free = Ent.makeMissile({ weapon: 'v30', team: 0, pos: M3.V(0, 1500, 0),
+        fwd: M3.V(0, 0, 1), speed: 370, target: null, owner: null });
+      for (let f = 0; f < 60 * 60 && free.pos.y > 1; f++) Ent.stepMissile(free, 1 / 60, null);
+      const land = free.pos.z;
+      const tg = TG(0, land), side = TG(WEAPONS.v30.cluster * 0.7, land);
+      const fw = { actors: [], targets: [tg, side], missiles: [], particles: [] };
+      const mm = Ent.makeMissile({ weapon: 'v30', team: 0, pos: M3.V(0, 1500, 0),
+        fwd: M3.V(0, 0, 1), speed: 370, target: null, owner: null });
+      fw.missiles.push(mm);
+      for (let f = 0; f < 60 * 60 && mm.alive; f++) Ent.stepMissile(mm, 1 / 60, fw);
+      if (!(side.hp < 99999)) bad.push('PEJ-30 集束弹没有波及覆盖半径内的第二个目标（cluster 字段没生效）');
+    }
 
     if (bad.length) bad.forEach(fail);
     else ok('无动力制导弹会修正弹道：' + rep.join(' · ') + '；集束弹面杀伤生效');
@@ -2988,17 +2998,14 @@ if (Ent && M3 && me && world) {
       bad.push('PEJ-6 是火箭巢，必须有 boost');
     }
 
-    // 激光制导炸弹反过来：该有制导，但不该有发动机与导引头
+    // PEJ-30（5.3 起无制导集束弹）：没有发动机，也没有任何导引字段
     {
       const w = W4.v30;
-      if (w.turn === undefined) bad.push('PEJ-30 是制导炸弹，不该没有 turn');
-      if (w.boost !== undefined) bad.push('PEJ-30 是滑翔弹，不该有 boost');
-      /* 光电制导**要**显式写 flare: 0。
-         省略它不是"免疫"，而是每次都被骗走 —— 见 data.js 里的说明。 */
-      if (w.flare !== 0) {
-        bad.push('PEJ-30 的 flare 必须显式写 0（光电免疫干扰弹），现在是 ' +
-          (w.flare === undefined ? '缺失' : w.flare));
-      }
+      if (!w.unguided) bad.push('PEJ-30 是无制导集束弹，必须有 unguided');
+      if (w.boost !== undefined) bad.push('PEJ-30 无动力，不该有 boost');
+      ['seeker', 'turn', 'lead', 'flare', 'lockCone', 'lockDist', 'fin'].forEach(k => {
+        if (w[k] !== undefined) bad.push('PEJ-30 无制导，不该有 ' + k);
+      });
     }
 
     /* 弹道测试：水平投放，看它会不会掉高度。
@@ -3104,8 +3111,8 @@ if (Ent && M3 && me && world) {
 
        有发动机 + 有制导   普通导弹
        有发动机 + 无制导   PEJ-6 火箭巢
-       无发动机 + 有制导   GUT-9 滑翔弹 / PEJ-30 激光制导炸弹
-       无发动机 + 无制导   PEJ-9 自由落体
+       无发动机 + 有制导   GUT-9 滑翔弹
+       无发动机 + 无制导   PEJ-9 / PEJ-30 自由落体
 
      判据是：
        ballistic（无动力）→ 不拉烟、弹体顺弹道
@@ -3121,7 +3128,7 @@ if (Ent && M3 && me && world) {
       ['lcm', true, true, '远程巡航弹'],
       ['rkt', true, false, '无制导火箭巢'],
       ['clb', false, false, '自由落体子母弹'],
-      ['v30', false, true, '激光制导炸弹']
+      ['v30', false, false, '无制导集束弹']
     ];
     CASES.forEach(([id, powered, guided, what]) => {
       const w = W7[id];
@@ -3383,7 +3390,7 @@ if (Ent && M3 && me && world) {
 
   /* ---- 激光制导机制（休眠中，但代码要能跑）----
 
-     PEJ-30 已经从 laser 改成 eo（光电制导），所以现在**没有任何武器**
+     PEJ-30 先从 laser 改成 eo，5.3 起又改成无制导，所以现在**没有任何武器**
      使用 seeker: 'laser'。这段机制是完整的，只是休眠 —— 为了不让它
      悄悄烂掉，测试里临时借一件弹挂上 'laser' 来验，验完还回去。
 
@@ -3393,15 +3400,15 @@ if (Ent && M3 && me && world) {
     const E9 = sandbox.Ent, M3i = sandbox.M3;
     const bad = [];
 
-    // 借 v30 的数值一用，临时改成激光制导
-    const realSeeker = sandbox.WEAPONS.v30.seeker;
-    sandbox.WEAPONS.v30.seeker = 'laser';
+    // 借 asl（GUT-9）的数值一用，临时改成激光制导
+    const realSeeker = sandbox.WEAPONS.asl.seeker;
+    sandbox.WEAPONS.asl.seeker = 'laser';
 
     const mk = (shooter) => {
       const tgt = { pos: M3i.V(0, 0, 3000), alive: true, kind: 'target',
         radius: 10, dead: false };
       const m = E9.makeMissile({
-        weapon: 'v30', team: 0,
+        weapon: 'asl', team: 0,
         pos: M3i.V(0, 2000, 0), fwd: M3i.norm(M3i.V(0, -0.4, 1)), speed: 280,
         target: tgt, owner: shooter
       });
@@ -3426,70 +3433,25 @@ if (Ent && M3 && me && world) {
       ok('激光制导（休眠）：载机一转向，弹立即失去修正');
     }
 
-    sandbox.WEAPONS.v30.seeker = realSeeker;      // 还回去
+    sandbox.WEAPONS.asl.seeker = realSeeker;      // 还回去
     if (bad.length) bad.forEach(fail);
   }
 
-  /* ---- PEJ-30 现在是光电制导：有制导、无动力、不吃干扰弹 ---- */
+  /* ---- PEJ-30 无制导：带着目标引用投出去也不追 ---- */
   {
-    const W10 = sandbox.WEAPONS, bad = [];
-    const w = W10.v30;
-
-    if (w.seeker !== 'eo') {
-      bad.push('PEJ-30 的 seeker 应该是 eo（光电），现在是 ' + w.seeker);
-    }
-    // 有制导 → 必须有可用过载；无动力 → 必须有 ballistic 且没有 boost
-    if (w.turn === undefined) bad.push('光电制导的 PEJ-30 必须有 turn');
-    if (!w.ballistic) bad.push('PEJ-30 是无动力炸弹，必须有 ballistic');
-    if (w.boost !== undefined) bad.push('PEJ-30 无动力，不该有 boost');
-    /* 不吃干扰弹 —— 实现方式是 **flare: 0**，而且这个 0 必须显式写。
-
-       breakLock 的判定是 `if (Math.random() >= w.flare) continue;`：
-         写成 0        → Math.random() >= 0 恒真 → 永远跳过 → 骗不到
-         省略这个字段   → chance 是 undefined/NaN → 比较恒假 →
-                          continue 不执行 → **每次都被骗走**
-       也就是说"不设字段"和"设成 0"的效果正好相反。
-       这条断言两头都拦：既不许有非零值，也不许缺失。 */
-    if (w.flare !== 0) {
-      bad.push('PEJ-30 要免疫干扰弹，flare 必须显式写成 0，现在是 ' +
-        (w.flare === undefined ? '缺失（会导致每次都被骗走）' : w.flare));
-    }
-
-    /* 实测"不吃干扰弹" —— 不能只验 flare 字段不存在，
-       要真的投一组干扰弹看它会不会被甩掉。 */
-    {
-      const E10 = sandbox.Ent, M3k = sandbox.M3;
-      const tgt = { pos: M3k.V(0, 0, 3000), alive: true, kind: 'target',
-        radius: 10, dead: false };
-      const shooter = { pos: M3k.V(0, 2000, 0), alive: true, fwd: M3k.V(0, 0, 1),
-        vel: M3k.V(0, 0, 250), up: M3k.V(0, 1, 0), flares: 80, flareCd: 0,
-        team: 0, pos0: null };
-      const m = E10.makeMissile({
-        weapon: 'v30', team: 1,
-        pos: M3k.V(0, 1900, 100), fwd: M3k.norm(M3k.V(0, -0.3, 1)), speed: 300,
-        target: shooter, owner: null
-      });
-      // 目标就是那架"载机"，朝他投干扰弹
-      const wd2 = { particles: [], actors: [], targets: [tgt], missiles: [m] };
-      let spoofed = false;
-      for (let n = 0; n < 40 && !spoofed; n++) {
-        E10.breakLock(shooter, wd2);
-        if (m.target !== shooter) spoofed = true;
-      }
-      if (spoofed) {
-        bad.push('光电制导炸弹被干扰弹骗走了 —— 它本该完全不受影响');
-      } else {
-        ok('光电制导不受干扰弹影响（连投 40 组也没骗走）');
-      }
-    }
-
-    if (bad.length) bad.forEach(fail);
-    else ok('PEJ-30 光电制导：无动力 + 有制导 + 不受干扰弹影响');
+    const E10 = sandbox.Ent, M3k = sandbox.M3;
+    const tgt = { pos: M3k.V(400, 0, 3000), alive: true, kind: 'target', radius: 10, dead: false };
+    const m = E10.makeMissile({ weapon: 'v30', team: 0, pos: M3k.V(0, 1500, 0),
+      fwd: M3k.V(0, 0, 1), speed: 300, target: tgt, owner: null });
+    const wd = { particles: [], actors: [], targets: [], missiles: [m] };
+    for (let f = 0; f < 120 && m.alive; f++) E10.stepMissile(m, 1 / 60, wd);
+    if (m.target || Math.abs(m.pos.x) > 0.01) fail('PEJ-30 无制导，却朝侧面的目标修正了（x=' + m.pos.x.toFixed(2) + '）');
+    else ok('PEJ-30 无制导：给了目标引用也不修正，弹道只看投放姿态');
   }
 
   /* ---- 端到端：激光制导炸弹的完整使用流程 ----
 
-     模拟玩家实际会做的动作：挂 PEJ-30 → 锁地面目标 → 对准俯冲 →
+     模拟玩家实际会做的动作：挂 GUT-9 → 锁地面目标 → 对准俯冲 →
      按发射 → 继续保持照射，直到命中。 */
   {
     const G8 = sandbox.Game, M3j = sandbox.M3;
@@ -3503,11 +3465,11 @@ if (Ent && M3 && me && world) {
     if (!site) {
       fail('第二关找不到可投弹的地面设施');
     } else {
-      // 挂上 PEJ-30
-      pl.special = 'v30';
+      // 挂上 GUT-9
+      pl.special = 'asl';
       pl.spAmmo = 6;
       pl.spCd = 0;
-      pl.slotCd.v30 = [0];
+      pl.slotCd.asl = [0];
       pl.target = site;
       pl.lockProgress = 0;
 
@@ -3523,7 +3485,7 @@ if (Ent && M3 && me && world) {
       if (pl.lockProgress < 1) {
         bad.push('对着目标飞了 10 秒锁定环都没转满');
       } else {
-        ok('光电制导炸弹锁定耗时 ' + lockSec + ' s（光电与红外同属被动成像，都快）');
+        ok('红外制导炸弹锁定耗时 ' + lockSec + ' s');
       }
 
       // 投放
@@ -3560,14 +3522,14 @@ if (Ent && M3 && me && world) {
         }
       }
 
-      /* 光电制导**不需要**保持照射 —— 它应该表现得像一枚普通制导炸弹。
+      /* 红外导引头**不需要**保持照射 —— 它应该表现得像一枚普通制导炸弹。
 
          和休眠中的激光机制正好相反：那个要求载机一直照着目标，
-         一转向就丢修正；光电导引头是成像的，投出去之后自己看，
+         一转向就丢修正；红外导引头，投出去之后自己看，
          载机可以立刻脱离。这条断言就是在保护这个区别 ——
-         如果哪天有人在 PEJ-30 上重新启用激光机制，它会立刻失败。 */
+         如果哪天有人在 GUT-9 上启用激光机制，它会立刻失败。 */
       pl.spCd = 0;
-      pl.slotCd.v30 = [0];
+      pl.slotCd.asl = [0];
       pl.lockProgress = 1;
       pl.target = site;
       pl.pos = M3j.V(site.pos.x, site.pos.y + 1800, site.pos.z - 3200);
@@ -3584,10 +3546,10 @@ if (Ent && M3 && me && world) {
           if (!m2.alive) break;
         }
         if (m2.laserLost) {
-          bad.push('光电制导炸弹竟然有"失去照射"这回事 —— ' +
+          bad.push('红外制导炸弹竟然有"失去照射"这回事 —— ' +
             '它应该像普通制导炸弹一样自己找目标');
         } else {
-          ok('光电制导：投放后载机立即脱离，弹仍自行修正');
+          ok('红外制导：投放后载机立即脱离，弹仍自行修正');
         }
       }
     }

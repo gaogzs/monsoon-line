@@ -1879,19 +1879,21 @@ var WEAPONS = {
     id: 'asl', name: 'GUT-9', cn: '滑翔锤 · GLIDEHAMMER', kind: 'agm',
     model: 'bomb',
     speed: 320, life: 14.0, vsLife: 26.0,
-    turn: 0.55, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 6000,
+    turn: 0.55, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 35000,   // 按高空（8–12 km、300 m/s 左右）投放的滑翔距离定；低空投放够不着这么远
     dmg: 150, ammo: 4, cd: 0.48, salvo: 1, blast: 30, blastCore: 8,
     /* flare 是"被干扰弹骗到的概率"，它属于**导引头**，不属于发动机。
        滑翔锤没有发动机，但有红外导引头 —— 所以 flare 该留。
        （我上一轮按 unguided 删除制导类字段时把它一起删了，那是错的。） */
     flare: 0.55,
     target: 'ground', ballistic: true,
-    desc: '无动力滑翔制导炸弹，红外导引头只找地面热源。轻、便宜、能多带 —— 一个挂点塞得下不少。没有发动机，射程全靠投放高度与速度换；转弯能力很弱，目标挪远了就打空。',
+    glide: 2.5,      // 升阻比：把下沉换成前进，见 entities.js stepMissile
+    fin: 25,         // 弹翼修正的加速度上限（m/s²，海平面 250 m/s 时，随 ρ·v² 变）：只能横向修和往下压，托不住重力
+    desc: '无动力滑翔制导炸弹，红外导引头只找地面热源。轻、便宜、能多带 —— 一个挂点塞得下不少。没有发动机，射程全靠投放高度与速度换：<b>飞得越高，弹道越平，理论射程很远，但落到目标时弹速很慢</b>。要更大的弹速，就拉近距离，或者压低机头让弹道变陡。',
     stat: { dmg: 0.52, spd: 0.20, trn: 0.30, rng: 0.48, ecm: 0.60 }
   },
 
   asl2: {
-    id: 'asl2', name: 'GUT-12', cn: '重锤-B · SLEDGE-B', kind: 'agm',
+    id: 'asl2', name: 'GUT-12', cn: '凿岩 · ROCKBORE', kind: 'agm',
     model: 'missile',
     speed: 480, boost: 140, life: 10.0, vsLife: 22.0,
     turn: 0.90, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 9000,
@@ -1939,7 +1941,7 @@ var WEAPONS = {
        能覆盖一整片区域而不是自由落体。它没有的只是导引头。
        我先前把"无制导"当成了"无动力"，把推进也删了，那是错的：
        没发动机的是滑翔弹和激光制导炸弹，不是火箭。 */
-    boost: 520,
+    boost: 520, burn: 0.7,      // 推力只持续 burn 秒，之后和炸弹一样走重力 + 阻力
     dmg: 22, ammo: 28, cd: 0.22, salvo: 7, blast: 14, blastCore: 4,
     target: 'ground', unguided: true,
     desc: '无制导火箭巢。一个挂点就是一片弹雨，覆盖而不瞄准 ——' +
@@ -2142,39 +2144,14 @@ var WEAPONS = {
   v30: {
     id: 'v30', name: 'PEJ-30', cn: '铁蒺藜 · CALTROP', kind: 'bomb',
     model: 'bomb',
-    /* 无动力**但**有制导：激光制导炸弹。
-
-       所以这里保留 turn（它会顺着照射点修正），但删掉 boost ——
-       没有发动机。删掉 seeker：它没有导引头，靠的是载机或僚机的
-       激光照射，被干扰弹骗不到。也删掉 flare。
-       原来的 unguided: true 是错的，它明明写着"命中前保持照射"。 */
+    /* 无动力 / 无制导的集束炸弹（阶段 5.3 起；之前是光电制导）。
+       比 PEJ-9 碎玉更重、覆盖更大，同样靠投放时的高度、速度和机头指向决定落点 ——
+       瞄准交给 HUD 的预计落点标记（5.5）。精确制导的活交给 5.6 的新炸弹。 */
     speed: 280, life: 12.0, vsLife: 24.0,
-    /* ---- seeker: 'eo'（光电制导）----
-
-       导引头是可见光 / 近红外**成像**的，像普通制导弹一样工作：
-       锁定、追踪、修正，没有额外机制。
-       这在物理上也说得通：热焰弹是骗红外**点源**导引头的，
-       箔丝是骗雷达的，两者对成像导引头都没有意义。
-
-       **flare: 0 是必须写出来的，不能省。**
-
-       breakLock 的判定是 `if (Math.random() >= w.flare) continue;`。
-       如果不给这个字段，chance 就是 undefined → NaN，
-       而 NaN 参与的任何比较都是 false，于是那个 continue 永远不执行，
-       弹**每次都会被骗走** —— 和"不受干扰"正好相反。
-       写成 0 才能让 `Math.random() >= 0` 恒真，从而永远跳过。
-       （这个坑是测试抓出来的：注释里一度写着"不设就会免疫"。） */
-    flare: 0,
-
-    /* 关于原来的激光制导：机制代码还留在 entities.js 里
-       （seeker === 'laser' 那条分支），HUD 的照射提示也还在 hud.js，
-       但当前没有任何武器使用它，所以整条路径是休眠的。
-       将来要启用，把某件弹的 seeker 填成 'laser' 即可。 */
-    turn: 0.20, seeker: 'eo', lockCone: 60 * Math.PI / 180, lockDist: 2400,
     dmg: 210, ammo: 6, cd: 0.24, salvo: 1, blast: 80, blastCore: 80, blastAir: false,
-    target: 'ground', cluster: 80, ballistic: true,
-    desc: '光电制导集束炸弹，抛撒子弹药覆盖一大片区域，范围内每个地面目标都吃满额伤害（加固目标大打折扣）。导引头看的是可见光 / 近红外图像，<b>热焰弹和箔丝都骗不到它</b>。代价是没有发动机、转弯能力很弱：得从目标上空近距离投放。',
-    stat: { dmg: 0.90, spd: 0.10, trn: 0.08, rng: 0.20, ecm: 1.0 }
+    target: 'ground', cluster: 80, unguided: true, ballistic: true,
+    desc: '重型集束炸弹，抛撒子弹药覆盖一大片区域，范围内每个地面目标都吃满额伤害（加固目标大打折扣）。<b>无制导，自由落体</b>：落点完全由投放时的高度、速度和机头指向决定，得从目标上空附近投放。',
+    stat: { dmg: 0.90, spd: 0.10, trn: 0.00, rng: 0.20, ecm: 1.0 }
   },
   e4: {
     id: 'e4', name: 'ZUN-4', cn: '回声 · ECHO', kind: 'ecm',
@@ -2855,7 +2832,7 @@ var MISSILE_LEAD = {
   v9: 0.52, v11: 0.62, mrm: 0.78, v17: 0.86, arm: 0.72,
   vlar: 0.90, hwm: 0.74, kkv: 0.45,
   asl: 0.65, asl2: 0.70, sat: 0.68,
-  v25: 0.66, v22: 0.74, v30: 0.48,
+  v25: 0.66, v22: 0.74,
   dl4: 0.74, dl6: 0.48, dl9: 0.80, ss6: 0.80, ssm: 0.70,
   swm: 0.44, hva: 0.80, lcm: 0.62,
   /* 下游与分水 */
@@ -2913,7 +2890,7 @@ var FLARE_RD = {
   vsr: 0.50,   // BOX-14 坍方（下游）
 
   /* 对地 / 反大型：不装抗干扰设备，箔丝照样好使 */
-  asl2: 0.68,  // GUT-12 重锤-B
+  asl2: 0.68,  // GUT-12 凿岩
   v25: 0.72,   // GUT-25 重锤
   v22: 0.78,   // SPO-22 锚
   lcm: 0.80    // GUT-30 远帆

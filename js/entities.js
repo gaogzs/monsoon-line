@@ -76,6 +76,8 @@ var Ent = (function () {
   /* 阻力 / 掉速的密度系数（阶段 5.1）：以中空 7 km 为 1，
      低空放大、高空缩小，上下限免得两头失控。
      导弹滑翔掉速（基准 140 m/s²）和转弯掉速（基准 62 m/s²）都乘它。 */
+  var BOMB_DRAG = 0.00006;    // 无动力弹 / 火箭的阻力系数：a = BOMB_DRAG × ρ × v²
+  var FIN_BLEED = 0.3;        // 弹翼修正的诱导阻力：每 1 m/s 侧向速度改变耗掉 0.3 m/s 速率
   var DRAG_REF_Y = 7000, DRAG_K_MIN = 0.4, DRAG_K_MAX = 1.4;
   function airDragK(y) {
     return M3.clamp(airDensity(y) / airDensity(DRAG_REF_Y), DRAG_K_MIN, DRAG_K_MAX);
@@ -963,7 +965,7 @@ var Ent = (function () {
          有发动机的弹每帧都会用 vel = fwd × speed 重算速度，所以初始
          零向量无所谓。无动力弹的速度却完全靠 vel 自己累积 ——
          初值给 0 的话它是"从空中静止开始往下掉"，扔出去的动能全丢了。 */
-      vel: w.ballistic
+      vel: (w.ballistic || w.burn)
         ? M3.mul(M3.norm(o.fwd), o.speed || 120)
         : M3.V(0, 0, 0),
       target: o.target || null,
@@ -1116,7 +1118,9 @@ var Ent = (function () {
     if (m.reLockT > 0) m.reLockT -= dt;
     if (m.decoy && !m.decoy.done && m.reLockT <= 0) decoyRecheck(m);
     /* 寿命到期：在空中自爆（包括被电子干扰骗走、盲飞到期的弹）—— 以前是哑弹 */
-    if (m.age > m.life) { killMissile(m, world, false); return; }
+    /* 无动力弹和火箭不按寿命自爆：重力迟早让它落地，动能耗尽砸偏也只是打空。
+       有动力弹的滑翔段有 170 m/s 保底、不会自己落下，仍然要靠寿命收场。 */
+    if (m.age > m.life && !w.ballistic && !w.burn) { killMissile(m, world, false); return; }
     /* 被近防炮判定拦截（turret.js 4.7）：短暂延迟后空爆，并报一个事件给 HUD / 无线电 */
     if (m.ciwsKill > 0) {
       m.ciwsKill -= dt;
@@ -1129,18 +1133,34 @@ var Ent = (function () {
     }
 
     // ---- 动力段 ----
-    if (w.ballistic) {
+    if (w.ballistic || w.burn) {
       /* 无动力弹：出膛之后只剩重力和阻力。
+         火箭（`w.burn`，PEJ-6）走同一条积分，只是前 burn 秒多一份沿弹轴的推力。
 
          以前它们和导弹走同一条路（speed 恒定、vel = fwd × speed），
          所以炸弹是"贴着机头平飞出去"的 —— 不加速也不下坠，
          完全不像扔出去的东西。现在它是一条真正的抛物线：
          初速来自载机，之后每一次下坠都由重力累积。 */
       m.vel.y -= G * dt;
+      if (w.burn && m.age < w.burn) m.vel = M3.add(m.vel, M3.mul(m.fwd, w.boost * dt));
       var sp0 = M3.len(m.vel);
       if (sp0 > 1) {
+        var rho0 = airDensity(m.pos.y);
+        /* 滑翔弹的升力（`w.glide` = 升阻比）：垂直于速度、在铅垂面内向上，
+           大小 = 升阻比 × 阻力加速度，封顶在 g·cosγ（刚好托住重力的法向分量，
+           不会把弹往上拉）。高空稀薄升力小、先自由下落，进了稠密空气才滑得起来；
+           速度越快动压越大、封顶越早到，滑得越远。 */
+        var vh2 = m.vel.x * m.vel.x + m.vel.z * m.vel.z;
+        /* 导引上一帧要往下修（目标在弹道下方）→ 卸掉升力（压低迎角），弹道变陡 */
+        if (w.glide && vh2 > 1 && !m.glideOff) {
+          var hs = Math.sqrt(vh2);
+          var lift = Math.min(w.glide * BOMB_DRAG * rho0 * sp0 * sp0, G * hs / sp0);
+          var lk = lift * dt / (hs * sp0);
+          m.vel = M3.V(m.vel.x - m.vel.x * m.vel.y * lk, m.vel.y + hs * hs * lk, m.vel.z - m.vel.z * m.vel.y * lk);
+        }
         // 阻力与动压同量级：低空稠密掉速快，高空稀薄掉得慢
-        var dragK = 0.00006 * airDensity(m.pos.y) * sp0;
+        var dragK = BOMB_DRAG * rho0 * sp0;
+        m.glideOff = false;
         m.vel = M3.mul(m.vel, Math.max(0.2, 1 - dragK * dt));
       }
       m.speed = M3.len(m.vel);
@@ -1201,7 +1221,7 @@ var Ent = (function () {
     /* ---------- 激光制导：弹没有导引头，靠的是载机的照射 ----------
 
        **当前处于休眠状态** —— 没有任何武器在使用 seeker: 'laser'
-       （PEJ-30 已改成 eo 光电制导）。整段代码留着是因为机制本身是
+       （PEJ-30 先改 eo 光电制导、5.3 起又改成无制导）。整段代码留着是因为机制本身是
        完整的、验证过的，将来要用直接给某件弹填上 'laser' 即可。
 
        原理：弹每一帧都去问投放它的那架飞机"你还在照着目标吗"。
@@ -1303,13 +1323,40 @@ var Ent = (function () {
         var Bo = M3.orthonormalize(m.fwd, m.up);
         m.fwd = Bo.fwd; m.up = Bo.up; m.right = Bo.right;
 
-        /* 无动力制导弹（GUT-9 滑翔锤、PEJ-30 铁蒺藜）：修正的是**速度矢量**。
+        /* 无动力制导弹（GUT-9 滑翔锤）：修正的是**速度矢量**。
 
            以前这里只转了 m.fwd，而 ballistic 弹的位置靠 vel 积分、
            每帧末尾又把 fwd 掰回 vel 方向 —— 等于导引头算完了、舵面没动，
            "有制导"的炸弹其实全是自由落体。现在把 vel 转到新的 fwd 上、
            保持速率不变：能量仍然只来自投放初速与重力，弹翼只负责改方向。 */
-        if (w.ballistic) {
+        if (w.ballistic && w.fin) {
+          /* 带弹翼的无动力制导弹（`w.fin`，GUT-9）：弹翼只能产生一个有限的加速度，
+             上限随动压（ρ·v²）走。能横向修、能往下压，往上托只靠升阻比那份升力。 */
+          var spv = M3.len(m.vel);
+          if (spv > 1) {
+            var vh = M3.mul(m.vel, 1 / spv);
+            var dv = M3.sub(M3.mul(desired, spv), m.vel);
+            var perp = M3.sub(dv, M3.mul(vh, M3.dot(dv, vh)));
+            if (perp.y < 0) m.glideOff = true;
+            else {
+              /* 往上修不归弹翼管：托住重力只能靠升阻比那份升力（有 g·cosγ 封顶），
+                 否则弹翼会变成第二份升力，把抛物线掰成平飞。只留横向分量。 */
+              var lat = M3.cross(vh, M3.V(0, 1, 0)), ll = M3.len(lat);
+              perp = ll > 1e-3 ? M3.mul(lat, M3.dot(perp, lat) / (ll * ll)) : M3.V(0, 0, 0);
+            }
+            var pl = M3.len(perp);
+            if (pl > 1e-3) {
+              var aFin = w.fin * (airDensity(m.pos.y) / RHO0) * (spv / 250) * (spv / 250);
+              var dvFin = Math.min(pl, aFin * dt);
+              var nv = M3.add(m.vel, M3.mul(perp, dvFin / pl));
+              /* 修正同样耗速：诱导阻力 ≈ 实际侧向加速度 × FIN_BLEED。
+                 按弹翼真正用了多少力算，不按机头转角 —— 机头永远追不上重力，
+                 按转角算会让滑翔弹一路持续掉速。 */
+              var spn = Math.max(0, spv - dvFin * FIN_BLEED);
+              m.vel = M3.mul(nv, spn / Math.max(1, M3.len(nv)));
+            }
+          }
+        } else if (w.ballistic) {
           m.vel = M3.mul(m.fwd, M3.len(m.vel));
         }
 
@@ -1371,10 +1418,10 @@ var Ent = (function () {
     }
 
     // ---- 位置 ----
-    if (!w.ballistic) m.vel = M3.mul(m.fwd, m.speed);
+    if (!w.ballistic && !w.burn) m.vel = M3.mul(m.fwd, m.speed);
     m.pos = M3.add(m.pos, M3.mul(m.vel, dt));
 
-    if (w.ballistic) {
+    if (w.ballistic || w.burn) {
       // 弹体顺着弹道走 —— 自由落体的炸弹是"跟着速度矢量"的，不是昂着头的
       var sp2 = M3.len(m.vel);
       if (sp2 > 1) {
@@ -1401,7 +1448,7 @@ var Ent = (function () {
 
          PEJ-6 撒星    有发动机 / 无制导  → 拉烟（火箭当然有排气）
          GUT-9 滑翔锤  无发动机 / 有制导  → 不拉烟
-         PEJ-30 铁蒺藜 无发动机 / 有制导  → 不拉烟
+         PEJ-30 铁蒺藜 无发动机 / 无制导  → 不拉烟
          PEJ-9 碎玉    无发动机 / 无制导  → 不拉烟
 
        之前按 unguided 判断，结果正好反了：火箭巢被当成纯炸弹不冒烟，
@@ -1432,7 +1479,8 @@ var Ent = (function () {
      和实战用同一份弹道代码 —— 改了速度、寿命、loft，射程自动跟着变。
      结果按 2 km 高度分档缓存在武器上，第一次用到时才算（一次 < 2400 步）。
      ============================================================ */
-  var EFF_BAND = 2000, EFF_LAUNCH_V = 250;
+  // 步数上限 5 分钟：不按寿命自爆的滑翔弹从高空投放要飞一分多钟
+  var EFF_BAND = 2000, EFF_LAUNCH_V = 250, EFF_MAX_FRAMES = 60 * 300;
   function effRange(w, alt) {
     if (!w || !w.vsLife) return w ? (w.lockDist || 0) : 0;
     var band = Math.max(0, Math.round((alt || 0) / EFF_BAND));
@@ -1440,7 +1488,7 @@ var Ent = (function () {
     if (c[band] !== undefined) return c[band];
     var y0 = Math.max(200, band * EFF_BAND);
     var surf = w.target === 'ground' || w.target === 'ship';
-    var far = 60000;
+    var far = 200000;   // 足够远：从 24 km 高空投放的滑翔弹也飞不到
     var dummy = surf
       ? { kind: 'target', alive: true, team: 99, radius: 10, pos: M3.V(0, 0, far), vel: M3.V(0, 0, 0) }
       : { kind: 'dummy', alive: true, team: 99, pos: M3.V(0, y0, far), vel: M3.V(0, 0, 0) };
@@ -1450,7 +1498,7 @@ var Ent = (function () {
       fwd: M3.norm(M3.sub(dummy.pos, M3.V(0, y0, 0))), speed: EFF_LAUNCH_V, target: dummy });
     m.owner = null;
     var last = M3.clone(m.pos);
-    for (var f = 0; f < 60 * 60 && m.alive; f++) {
+    for (var f = 0; f < EFF_MAX_FRAMES && m.alive; f++) {
       last = M3.clone(m.pos);
       stepMissile(m, 1 / 60, world);
       world.particles.length = 0;
@@ -1462,13 +1510,38 @@ var Ent = (function () {
     return (c[band] = Math.round(r));
   }
 
+  /* 无动力制导弹从**当前投放状态**出发能滑多远（水平距离，米）。
+     HUD 包线用（hud.js computeEnvelope）：和 effRange 同一份弹道代码，
+     但初始位置、速度、方向都取本机此刻的真实值，不按高度分档。
+     假目标在投放方向的水平延长线上 200 km 外的海面，弹一路滑到落地为止。
+     步长 1/30 s（HUD 每 0.3 s 才算一次，精度够用）。 */
+  function glideReach(w, pos, fwd, speed) {
+    var hx = fwd.x, hz = fwd.z, hl = Math.sqrt(hx * hx + hz * hz);
+    if (hl < 1e-3) { hx = 0; hz = 1; hl = 1; }
+    hx /= hl; hz /= hl;
+    var far = 200000;
+    var dummy = { kind: 'target', alive: true, team: 98, radius: 10,
+      pos: M3.V(pos.x + hx * far, 0, pos.z + hz * far), vel: M3.V(0, 0, 0) };
+    var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
+    var m = makeMissile({ weapon: w.id, team: 98, pos: pos, fwd: fwd, speed: speed, target: dummy });
+    m.owner = null;
+    var last = M3.clone(m.pos);
+    for (var f = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
+      last = M3.clone(m.pos);
+      stepMissile(m, 1 / 30, world);
+      world.particles.length = 0;
+    }
+    var dx = last.x - pos.x, dz = last.z - pos.z;
+    return Math.sqrt(dx * dx + dz * dz);
+  }
+
   function hitsAt(w, y0, D) {
     // 与弹同队：起爆照常判，但不结算伤害（不会碰到 game.js 的 hitTarget）
     var tg = { kind: 'target', alive: true, team: 98, radius: 10, pos: M3.V(0, 0, D), vel: M3.V(0, 0, 0) };
     var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
     var m = makeMissile({ weapon: w.id, team: 98, pos: M3.V(0, y0, 0),
       fwd: M3.norm(M3.sub(tg.pos, M3.V(0, y0, 0))), speed: EFF_LAUNCH_V, target: tg });
-    for (var f = 0; f < 60 * 60 && m.alive; f++) { stepMissile(m, 1 / 60, world); world.particles.length = 0; }
+    for (var f = 0; f < EFF_MAX_FRAMES && m.alive; f++) { stepMissile(m, 1 / 60, world); world.particles.length = 0; }
     return M3.dist(m.pos, tg.pos) < tg.radius + 15;
   }
   function loftReach(w, y0, r0) {
@@ -2441,7 +2514,7 @@ var Ent = (function () {
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
     wakeSpray: wakeSpray,
-    effRange: effRange, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
+    effRange: effRange, glideReach: glideReach, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
     isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     jamState: jamState, jamShown: jamShown, jamDuty: jamDuty, jamRanges: jamRanges, jamPress: jamPress, jamLockOK: jamLockOK, jamLockK: jamLockK, JAM_BURN_R: JAM_BURN_R, JAM_SURF_K: JAM_SURF_K, JAM_BURN_SURF: JAM_BURN_SURF,
     gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,

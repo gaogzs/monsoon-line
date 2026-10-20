@@ -9,6 +9,7 @@
 var HUD = (function () {
 
   var GREEN = '#4fe08a', AMBER = '#ffb03a', CY = '#45d6ff', RED = '#ff4d4d';
+  var BLUE = '#5aa8ff';                    // 友军：屏幕上的友军框、本方射弹的菱形框
   var DIM = 'rgba(79,224,138,0.42)';
 
   /* ---------- HUD 缩放 ----------
@@ -96,6 +97,7 @@ var HUD = (function () {
     drawLaserStatus(ctx, W, H, p, world);
     drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
     drawConeCue(ctx, W, H, cam, p);
+    drawFriendlyShots(ctx, W, H, cam, p, world);
     drawIncomingMissiles(ctx, W, H, cam, p, world);
     drawStores(ctx, W, H, p);
     drawWeaponPanel(ctx, W, H, p);
@@ -981,7 +983,7 @@ var HUD = (function () {
   /* ============================================================
      激光照射状态（**当前休眠**：没有任何武器用 seeker: 'laser'）
 
-     PEJ-30 已改成光电制导，所以下面两个分支都不会触发。
+     PEJ-30 已改成无制导，所以下面两个分支都不会触发。
      留着是为了将来给某件弹填上 'laser' 时，HUD 反馈能立刻跟上 ——
      没有这段提示，玩家不会知道有"保持照射"这回事。
 
@@ -1041,7 +1043,7 @@ var HUD = (function () {
      呼号优先，没有呼号就退到机型。
      ============================================================ */
   function drawAllyMark(ctx, s, t, dist) {
-    var col = 'rgba(79,224,138,0.62)';
+    var col = 'rgba(90,168,255,0.70)';
     var c = 9, g = c * 0.45;
 
     ctx.strokeStyle = col;
@@ -1060,7 +1062,7 @@ var HUD = (function () {
       : (dist / 1000).toFixed(1) + ' KM';
     var nm = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.name || '僚机'));
     text(ctx, nm, s.x + c + 6, s.y - c + 8, col, FS, 'left');
-    text(ctx, distTxt, s.x + c + 6, s.y - c + 21, 'rgba(120,170,140,0.55)', FS, 'left');
+    text(ctx, distTxt, s.x + c + 6, s.y - c + 21, 'rgba(130,170,215,0.60)', FS, 'left');
 
     /* 僚机的当前指令。
 
@@ -1074,7 +1076,7 @@ var HUD = (function () {
         : (t.ai.cmd === 'cover' ? 'COVER 掩护' : 'FOCUS 集火');
       text(ctx, jammed ? 'LINK LOST 数据链中断' : cmdTxt,
         s.x + c + 6, s.y - c + 34,
-        jammed ? '#ff8b2a' : 'rgba(120,170,140,0.55)', FS, 'left');
+        jammed ? '#ff8b2a' : 'rgba(130,170,215,0.60)', FS, 'left');
     }
   }
 
@@ -1323,7 +1325,21 @@ var HUD = (function () {
        rmax = min(锁定距离, 有效射程)，NEZ 取其 70% 作为"最佳射程"（留出目标移动和发射角的余量） */
     if ((w.target === 'ground' || w.target === 'ship') && t.kind === 'target' &&
         w.seeker && w.seeker !== 'none' && !w.unguided) {
-      var rs = Math.min(w.lockDist || 0, Ent.effRange(w, p.pos.y));
+      /* 无动力制导弹（滑翔弹）：射程完全取决于此刻的高度、速度和机头指向，
+         按本机真实状态模拟（Ent.glideReach），每 0.3 s 刷新一次。
+         有动力弹仍按高度分档的 effRange（阶段 5.4 再统一）。 */
+      var reach;
+      if (w.ballistic) {
+        var now = performance.now(), gc = p.__glideEnv;
+        if (!gc || gc.w !== w.id || now - gc.at > 300) {
+          gc = p.__glideEnv = { w: w.id, at: now,
+            r: Ent.glideReach(w, p.pos, p.fwd, (p.speed || 0) + 70) };
+        }
+        reach = gc.r;
+      } else {
+        reach = Ent.effRange(w, p.pos.y);
+      }
+      var rs = Math.min(w.lockDist || 0, reach);
       return rs > 0 ? { rmax: rs, nez: rs * 0.7 } : null;
     }
     if (w.kind !== 'aam') return null;
@@ -1427,12 +1443,12 @@ var HUD = (function () {
     var pt = edgePoint(cx, cy, dx, dy, rect);
     var ang = Math.atan2(dy, dx);
 
-    /* 屏幕外的箭头沿用同一套敌我语义：**友军绿、敌人红**。
+    /* 屏幕外的箭头沿用同一套敌我语义：**友军蓝、敌人红**。
 
        以前这里地面目标用灰蓝、锁定状态用琥珀 —— 屏外本来就看不到
        NEZ 状态，用琥珀表示"够不着"没有意义，反而让同一种色系
        承担了三种含义（说明文字、中立物、锁定）。现在只剩两种：
-       绿色是我的，红色是别人的。
+       蓝色是我的，红色是别人的。
 
        ---- 已锁定：额外的小修饰 ----
 
@@ -1449,11 +1465,11 @@ var HUD = (function () {
        箭头画在安全矩形边界上，外环半径 +3.5 仍在 CLR 让出的余量里。 */
     var lockPulse = 0;
     var neutral = !isAlly && t.team > 1;
-    var col = isAlly ? 'rgba(79,224,138,0.52)' : (neutral ? 'rgba(160,170,178,0.50)' : 'rgba(255,77,77,0.55)');
+    var col = isAlly ? 'rgba(90,168,255,0.60)' : (neutral ? 'rgba(160,170,178,0.50)' : 'rgba(255,77,77,0.55)');
     var sz = isLock ? 11 : (isAlly ? 8 : 9);
     if (isLock) {
       lockPulse = (Math.sin(performance.now() * 0.006) + 1) * 0.5;   // 0..1
-      col = isAlly ? 'rgba(79,224,138,0.98)' : 'rgba(255,96,96,0.98)';
+      col = isAlly ? 'rgba(90,168,255,0.98)' : 'rgba(255,96,96,0.98)';
       sz = 13;
     }
     var sz0 = isLock ? 11 : (isAlly ? 8 : 9);
@@ -1688,6 +1704,35 @@ var HUD = (function () {
       { compact: true, cd: cd });
 
     text(ctx, 'STORES', bx + size / 2, by - 5, DIM, FS, 'center');
+  }
+
+  /* ============================================================
+     本方射弹
+     玩家和友军打出去的导弹 / 炸弹套蓝色菱形（和来袭导弹的红菱形同形），
+     方便追踪落点 —— 尤其是没有尾迹的无动力炸弹。火箭（`burn`）一次一大把、
+     飞行时间短，不标。离本机 FRIENDLY_SHOT_MIN 米以内不画，免得刚离架就套框。
+     只画屏幕内的，不给屏外箭头：边缘已经够挤了。
+     ============================================================ */
+  var FRIENDLY_SHOT_MIN = 300;
+  function drawFriendlyShots(ctx, W, H, cam, p, world) {
+    if (!world || !world.missiles || !world.missiles.length) return;
+    ctx.strokeStyle = BLUE;
+    ctx.lineWidth = 1.4;
+    for (var i = 0; i < world.missiles.length; i++) {
+      var m = world.missiles[i];
+      if (!m.alive || m.team !== p.team || m.w.burn) continue;
+      if (M3.dist(m.pos, p.pos) < FRIENDLY_SHOT_MIN) continue;
+      var s = M3.project(cam, m.pos);
+      if (!s || s.x < 16 || s.x > W - 16 || s.y < 16 || s.y > H - 16) continue;
+      var r = 8;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y - r);
+      ctx.lineTo(s.x + r, s.y);
+      ctx.lineTo(s.x, s.y + r);
+      ctx.lineTo(s.x - r, s.y);
+      ctx.closePath();
+      ctx.stroke();
+    }
   }
 
   /* ============================================================
