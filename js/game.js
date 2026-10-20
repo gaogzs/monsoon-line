@@ -1773,12 +1773,24 @@ var Game = (function () {
       player.ewWid = null;
     }
     SysNote.show(player.emcon
-      ? '<b>EMCON-Δ 电磁静默。</b>雷达关机，数据链断开。'
+      ? '<b>EMCON-Δ 电磁静默。</b>雷达关机，数据链断开 —— 无法给无人僚机下令，僚机仍按现有指令行动。'
       : '解除静默，雷达开机。');
     SFX.confirm();
   }
 
   function setWingCmd(cmd) {
+    /* 发不出指令的两种情况（都只管"下令"，不动僚机的攻击授权）：
+         电磁静默   —— 数据链是自己断的
+         长机被压制 —— 数据链被敌方干扰机压断
+       僚机自己被压制才会停火，见 ai.js 的 drone 分支。 */
+    if (player && player.emcon) {
+      SysNote.show('<b>电磁静默中。</b>无法给无人僚机下令。');
+      return;
+    }
+    if (player && (player.suppressed || 0) > 0.35) {
+      SysNote.show('<b>数据链被压制。</b>无法给无人僚机下令。', { warn: true });
+      return;
+    }
     var names = { spread: '散开 SPREAD', focus: '集火 FOCUS', cover: '掩护 COVER' };
     for (var k in world.wings) {
       if (world.wings[k] && world.wings[k].ai) world.wings[k].ai.cmd = cmd;

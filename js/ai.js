@@ -684,6 +684,8 @@ var AI = (function () {
          压制来自干扰机辐射场打在它身上的 suppressed（见 entities.js）。 */
       var dLead = world.player;
       var leadOk = dLead && dLead.alive && dLead.target && dLead.target.alive;
+      /* 只看僚机自己是否被压制。长机电磁静默或被压制只是下不了令，
+         已有的授权照旧，僚机仍会按当前指令攻击。 */
       if (a.suppressed > 0.35) {
         s.target = null;                       // 自主防御：只规避，不开火
       } else if (s.cmd === 'spread') {

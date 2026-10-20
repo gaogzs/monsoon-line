@@ -158,7 +158,7 @@ hits / banner 计时衰减
 **`suppressed` 是这三套东西的共同输入**：HUD 的雷达雪花、僚机的"数据链中断"降级、预警机的沉默都读它。
 
 开机只有一个入口 `fireEcm(actor, wid)`（手动扣扳机 / 协处理器自主 / 任务脚本的干扰机航线到站），
-它内部调 `Ent.openEcm()` 写状态、再扣冷却与播报。`toggleEmcon()` 是 EMCON-Δ 的开关（`N`）。
+它内部调 `Ent.openEcm()` 写状态、再扣冷却与播报。`toggleEmcon()` 是 EMCON-Δ 的开关（`N`）；`setWingCmd()` 在电磁静默（`emcon`）或玩家被压制（`suppressed > 0.35`）时直接拒绝下令并弹 SYS 提示（后者为 CAUTION 样式）；这只影响下令，僚机的攻击授权不变 —— 僚机自己被压制才会停火（ai.js drone 分支）。
 
 ### `render()` 的职责
 `state !== 'playing' || !world || !player` 时只 `Renderer.begin() + end()`（空镜头背景）并返回。否则：

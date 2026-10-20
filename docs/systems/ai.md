@@ -153,7 +153,7 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | `wingman` + `cover` | 同 `drone + cover`（共用 `leadThreat()`） |
 | 其余（含 `enemy`） | 被主动雷达照射时优先咬照射者（12 km 内）；否则 `nearestEnemy(a, world, role === 'wingman' ? 11000 : 15000)`；**空中一个都没有时**，带得动对面弹的飞机转去挑面目标（`surfaceTargetFor`） |
 
-**照射判定（RWR，`a.rwrT / a.rwrSrc`）**：敌对、`target === a`、挂主动雷达弹（`seeker === 'radar'`）才算照射；`silentLock` / `emcon` 不告警。
+**照射判定（RWR，`a.rwrT / a.rwrSrc`）**：敌对、`target === a`、挂主动雷达弹（`seeker === 'radar'`）才算照射；`silentLock` / `emcon` 不告警。无人僚机的目标选择里，只有**它自己**被压制（`suppressed > 0.35`）才会放弃目标、只规避不开火；长机电磁静默或被压制只是下不了令，僚机照旧按现有指令攻击。
 **玩家要锁满（`player.locked`）才算** —— 只是选中、锁定环还在走，对方收不到告警，可以贴近了再锁。以前选中即照射。AI 之间仍是"选中即照射"。
 
 > **面目标（海上平台 / 地面设施）是后加的。** 在这之前 `nearestEnemy` 只扫
