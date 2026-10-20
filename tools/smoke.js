@@ -5935,7 +5935,7 @@ try {
     w.actors.length = 0; w.targets.length = 0; w.missiles.length = 0; w.bullets.length = 0;
     w.detected = true;
     const t = sandbox.spawnPlatform(w, { platform: p.id, x: 0, z: 0, team: p.neutral ? 2 : 1 });
-    const foe = { kind: 'aircraft', team: 0, alive: true, hp: 1e9, maxHp: 1e9, pos: V3.V(0, 500, 1000), vel: V3.V(0, 0, 0), fwd: V3.V(1, 0, 0) };
+    const foe = { kind: 'aircraft', team: 0, alive: true, hp: 1e9, maxHp: 1e9, pos: V3.V(0, 150, 1090), vel: V3.V(0, 0, 0), fwd: V3.V(1, 0, 0) };   // 仰角约 0.13 rad：近防炮的射击包线（5.2）仰射更近，高处的 1.1 km 够不着
     w.actors.push(foe);
     let shots = 0;
     for (let f = 0; f < 60 * 8; f++) {
