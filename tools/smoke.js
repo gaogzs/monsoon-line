@@ -3870,50 +3870,37 @@ if (Ent && M3 && me && world) {
       g.rpm + ' rpm 兜住）');
   }
 
-  /* ---- ③ DEW 充能必须按 recharge 计时，不能立刻补满 ---- */
+  /* ---- ③ DEW 没有充能储备，每次拦截后发射槽按 cd 冷却 ---- */
   {
     const W13 = sandbox.WEAPONS, E13 = sandbox.Ent, M3n = sandbox.M3;
     const bad = [];
     const w = W13.l2;      // GUS-2 日光
 
-    if (w.charges === undefined) bad.push('GUS-2 没有 charges');
-    if (w.recharge === undefined) bad.push('GUS-2 没有 recharge（desc 说每 18 秒）');
+    if (w.charges !== undefined) bad.push('GUS-2 不该再有 charges（储备无限）');
+    if (!(w.cd > 0)) bad.push('GUS-2 没有 cd（单次拦截冷却）');
 
     const a = E13.makeAircraft({
       type: 'frigatebird', team: 0, isPlayer: true, x: 0, y: 6000, z: 0,
       fwd: M3n.V(0, 0, 1), speed: 300
     });
     a.special = 'l2';
-    a.spCharges = w.charges;
-    a.spChargeT = 0;
+    a.slotCd = { l2: [w.cd] };
+    a.ammoPool = { l2: 1 };
     const wd = { particles: [], bullets: [], actors: [], targets: [], missiles: [] };
 
-    // 模拟拦掉一发
-    a.spCharges--;
-    a.spChargeT = w.recharge || 18;
-    const before = a.spCharges;
+    for (let f = 0; f < 60 * (w.cd - 8); f++) E13.stepAircraft(a, 1 / 60, wd);
+    if (!(a.slotCd.l2[0] > 0)) bad.push('冷却中的槽不该已经就绪');
 
-    // 跑 10 秒：不该恢复（recharge 是 18）
-    for (let f = 0; f < 600; f++) E13.stepAircraft(a, 1 / 60, wd);
-    if (a.spCharges !== before) {
-      bad.push('充能在 ' + a.spCharges + ' 秒内就恢复了 —— ' +
-        '应该等满 recharge（' + w.recharge + ' 秒）');
-    }
-
-    // 再跑到 18 秒以后，应该恢复一发
     let restored = -1;
-    for (let f = 600; f < 60 * 30; f++) {
+    for (let f = 60 * (w.cd - 8); f < 60 * (w.cd + 10); f++) {
       E13.stepAircraft(a, 1 / 60, wd);
-      if (a.spCharges > before) { restored = f / 60; break; }
+      if (a.slotCd.l2[0] === 0) { restored = f / 60; break; }
     }
-    if (restored < 0) bad.push('30 秒内充能始终没有恢复');
-    else if (restored < (w.recharge || 18) - 0.5) {
-      bad.push('充能恢复太早：第 ' + restored.toFixed(1) + ' 秒');
-    }
+    if (restored < 0) bad.push('冷却结束后槽始终没有就绪');
+    else if (restored < w.cd - 0.5) bad.push('槽恢复太早：第 ' + restored.toFixed(1) + ' 秒');
 
     if (bad.length) bad.forEach(fail);
-    else ok('DEW 充能按 recharge 计时：第 ' + restored.toFixed(1) +
-      ' 秒恢复一发（recharge ' + (w.recharge || 18) + ' 秒）');
+    else ok('DEW 单次拦截冷却 ' + w.cd + ' 秒，第 ' + restored.toFixed(1) + ' 秒就绪');
   }
 
   /* ---- 关卡时限：声明了 timeLimit 的关卡到点判负 ----

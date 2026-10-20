@@ -121,8 +121,8 @@ if (!w.fits || !w.fits.length) continue;   // 敌方专用不列（第一轮，�
 if (w.fits && w.fits.length) continue;     // 只列敌方专用（第二轮，下游表）
 ```
 
-- **`kind: 'gun'` 与 `kind: 'dew'` 不在 `cats` 里**，所以机炮与定向能不会出现在正面表。
-- **⚠️ 已知缺口：`l2`（GUS-2「日光」，`kind: 'dew'`）在两张表里都进不去**——正面表没有 `dew` 分类，下游表又要求 `fits` 为空。它只在 `t4` 的散文里出现。加新 `kind` 时记得同步 `cats`。
+- **`kind: 'gun'` 不在 `cats` 里**，所以机炮不会出现在正面表。
+- `cats` 里有 `dew` 分类，`l2`（GUS-2「日光」）出现在正面表的「定向能」一节；「射程」列写拦截半径，「导引」列写「自动拦截」。加新 `kind` 时记得同步 `cats`。
 - 「单点」列对被动吊舱显示 `—`（`w.passive ? '—' : '×' + w.perPoint`）。
 - 「导引」列由 `_seekerLabel()` 生成：被动 → `被动`；`seeker: 'none'` → `无制导`；`eo` / `laser` 有专门文案；其余按 `ir` / 雷达 + `lead` 百分比。
 - **静默回退**：`_seekerLabel` 的默认分支是"雷达"。**新武器如果漏写 `seeker`，图鉴会把它的导引方式标成"雷达"**，不会报错。
@@ -248,7 +248,7 @@ for (const e of dyn) {
 |---|---|
 | `rho.*` | `Ent.airDensity()` / `Ent.turnFactor()`（t1 密度表、20 km 的 7%、3.7 倍动压速度） |
 | `gunTable`、`gun.k3.*` | `WEAPONS` 中 `kind === 'gun'` 的全部条目（s2 机炮表、t1/s2 射程、初速、每秒发数、飞行时间） |
-| `w.e4.*` / `w.l2.*` | ZUN-4 的 `lockReduce` / `cd`（来自 `STORE_COOLDOWN`）/ `duration`；GUS-2 的拦截半径、锥角、概率、充能 |
+| `w.e4.*` / `w.l2.*` | ZUN-4 的 `lockReduce` / `cd`（来自 `STORE_COOLDOWN`）/ `duration`；GUS-2 的拦截半径、锥角、概率、单次冷却 `cd` |
 | `w.v17.*` / `w.mrm.*` / `w.srm.*` | CLA-17 动力段、高空降级后动力段、转弯率、总飞行时间；对比用的 CLA-4 / TOR-2 |
 | `ms.*` | `MISSIONS`：现在只有 `cmp1` 用 `ms.m10.limit`（m10 的 `timeLimit`）。`ms.total` / `ms.highN` / `ms.highList` 仍定义着，但 `t1` 那句"几个任务在 18–22 km"已删（非战役条目不提任务），没人用 |
 

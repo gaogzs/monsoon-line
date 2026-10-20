@@ -1814,7 +1814,6 @@ var Game = (function () {
     var w = WEAPONS[player.special];
     // 注意不重置 spCd —— syncWeapon 已经从 slotCd 取回这把武器最快就绪的槽
     player.spActive = 0;
-    if (w.kind === 'dew') player.spCharges = w.charges;
 
     /* 切枪**不清零锁定进度**。
 
@@ -2734,9 +2733,18 @@ var Game = (function () {
      定向能自动拦截
      ============================================================ */
   function updateDEW(dt, actor) {
-    var w = WEAPONS[actor.special];
-    if (!w || w.kind !== 'dew') return;
-    if (actor.spCharges <= 0) return;
+    /* 吊舱是自动系统，不要求被选为当前武器；每个挂点一个发射槽，
+       各自冷却（slotCd，和导弹同一套，画在右下角缩略图里）。 */
+    var wid = null, slot = -1, sl, w;
+    for (var k in actor.slotCd) {
+      w = WEAPONS[k];
+      if (!w || w.kind !== 'dew') continue;
+      sl = actor.slotCd[k];
+      for (var si = 0; si < sl.length; si++) if (sl[si] === 0) { slot = si; break; }
+      if (slot >= 0) { wid = k; break; }
+    }
+    if (wid === null) return;
+    w = WEAPONS[wid];
     for (var i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
       if (!m.alive || m.team === actor.team) continue;
@@ -2758,14 +2766,12 @@ var Game = (function () {
       m.dewRolled = rollKey;
       if (!(Math.random() < chance)) continue;
       // 拦截成功
-      actor.spCharges--;
-      // 开始充能倒计时（打空了就一直走到补满为止）
-      if (actor.spChargeT <= 0) actor.spChargeT = w.recharge || 18;
+      sl[slot] = w.cd;
+      if (actor.special === wid) actor.spCd = Math.min.apply(null, sl);
       m.alive = false;
       Ent.spawnParticle(world.particles, m.pos, M3.V(0, 0, 0), 0.4, 3.2, '#7dfaff', { grow: true });
       Ent.explode(world.particles, m.pos, 0.6, 8);
       SFX.laser();
-      Radio.raw({ who: CALLSIGN.wing2, cls: 'ally', tx: 'GUS-2 烧掉了它。', gap: 0.6 });
       return;
     }
   }
@@ -2849,6 +2855,9 @@ var Game = (function () {
   }
 
   /* B 侧滑软钳：保持深度，把飞机在画面上的坐标软压进 FRAME_SOFT_LIM。
+      if (actor.isPlayer) {
+        SysNote.show('定向能拦截：<b>' + w.name + ' 「' + w.cn + '」</b> 烧毁来袭导弹');
+      }
      静态底座已经保证稳态位置在 FRAME_FILL 以内，所以玩家设的高度/距离不受影响。
      深度不足（视线甩得太快，镜头几乎到了飞机侧面甚至前方）时只能退到最小深度。 */
   function softClampFrame(off, camDir, fr) {

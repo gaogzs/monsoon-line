@@ -2213,18 +2213,13 @@ var WEAPONS = {
     model: 'pod',
     speed: 0, boost: 0, life: 0, vsLife: 0,
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-    dmg: 0, ammo: 99, cd: 3.6, salvo: 0, flare: 1.0,
-    target: 'none', charges: 3,
-    /* 每拦截一次后隔多久恢复一发充能（秒）—— desc 里写的"每 18 秒"。
-       原来没有这个字段，而恢复逻辑又恒真，等于打完立刻补满；
-       现在由它驱动 spChargeT。 */
-    recharge: 18,
+    /* 没有充能储备：每拦截一次，这个吊舱的发射槽进入 cd 秒冷却，
+       冷却条画在右下角的挂载缩略图里（和导弹同一套 slotCd）。 */
+    dmg: 0, ammo: 99, cd: 18, salvo: 0, flare: 1.0,
+    target: 'none',
     interceptRange: 1200, interceptCone: 35 * Math.PI / 180,
     interceptChance: 0.55, highAltChance: 0.35,
-    desc: `200 kW 级固态激光吊舱。来袭导弹进入 <b>{{interceptRange}} 米</b>且与你的机头夹角小于
-      <b>{{interceptConeDeg}}°</b> 时，每枚弹有 <b>{{interceptPct}}</b> 概率被烧穿导引头、当场失效。
-      充能 {{charges}} 次，每 {{recharge}} 秒恢复一次。
-      <br><span class="rd">18 公里以上，平流层风切变会把光斑抹开，概率降到 {{highAltPct}}。</span>`,
+    desc: '200 kW 级固态激光吊舱。来袭导弹进入近距离、且处在你机头前方的锥形范围内时，有相当大的概率被烧穿导引头、当场失效。没有弹药限制，但每次拦截之后吊舱要冷却 18 秒才能再次出光。<br><span class="rd">高空的平流层风切变会把光斑抹开，概率明显降低。</span>',
     stat: { dmg: 0.0, spd: 0.0, trn: 0.0, rng: 0.0, ecm: 1.0 }
   },
 

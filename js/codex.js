@@ -268,7 +268,7 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <h4>游戏机制对应</h4>
 <p>游戏中定向能吊舱（<span class="am">GUS-2「日光」</span>）实现为一门<b>自动拦截的软杀伤系统</b>：
 当敌方导弹逼近到 <b>{{w.l2.interceptRange}} 米</b>内且你与导弹的夹角小于 <b>{{w.l2.coneDeg}}°</b> 时，
-有 <b>{{w.l2.chancePct}}</b> 概率烧毁其导引头。充能上限 {{w.l2.charges}} 次，每 <b>{{w.l2.recharge}} 秒</b>恢复一次。</p>
+有 <b>{{w.l2.chancePct}}</b> 概率烧毁其导引头。没有充能储备，但每次拦截后吊舱要冷却 <b>{{w.l2.cd}} 秒</b>；冷却条与导弹一样画在右下角的挂载缩略图里。</p>
 <p>注意：在 18 公里以上高度，这个概率下降到 <b>{{w.l2.highPct}}</b>（铁律二）。</p>`
   },
 
@@ -1010,8 +1010,7 @@ var _CX_VALS = {
   'w.l2.coneDeg': function () { return Math.round(_cxW('l2').interceptCone * 180 / Math.PI); },
   'w.l2.chancePct': function () { return _cxPct(_cxW('l2').interceptChance); },
   'w.l2.highPct': function () { return _cxPct(_cxW('l2').highAltChance); },
-  'w.l2.charges': function () { return _cxW('l2').charges; },
-  'w.l2.recharge': function () { return _cxW('l2').recharge; },
+  'w.l2.cd': function () { return _cxW('l2').cd; },
 
   'w.v17.name': function () { return _cxW('v17').name; },
   'w.v17.cnShort': function () { return _cxW('v17').cn.split(' ·')[0]; },
@@ -1125,6 +1124,7 @@ function weaponGuidance(w) {
 
 /** 导引方式描述（图鉴表格用） */
 function _seekerLabel(w) {
+  if (w.kind === 'dew') return '自动拦截';
   var g = weaponGuidance(w);
   var s = g.name;
   if (g.note) return s + ' · ' + g.note;

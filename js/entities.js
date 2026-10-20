@@ -541,8 +541,6 @@ var Ent = (function () {
       suppressed: 0,
       rwrT: 0,            // 被主动雷达照射的剩余告警时间（见 ai.js 的 RWR 扫描）
       rwrSrc: null,       // 正在照我的那一架
-      spCharges: 0,       // DEW 充能数（构造末尾按武器初始化）
-      spChargeT: 0,       // DEW 下一次充能恢复的倒计时
       gunTimer: 0,
 
       // 单位是"组"（一次投放一组诱饵），不是单发
@@ -579,8 +577,6 @@ var Ent = (function () {
       loadout: o.loadout || null
     };
     a.right = M3.cross(a.up, a.fwd);
-    var w0 = WEAPONS[a.special];
-    if (w0 && w0.kind === 'dew') a.spCharges = w0.charges;
     /* NPC 的弹药池与发射槽。玩家那套由 startMission 按机库配置另建
        （那里要按 perPoint 算，和这里的口径不同）。 */
     if (!a.isPlayer) buildNpcMounts(a);
@@ -849,25 +845,6 @@ var Ent = (function () {
     if (a.flareCd > 0) a.flareCd -= dt;
     if (a.gunHeat > 0) a.gunHeat -= dt;
     if (a.gunTimer > 0) a.gunTimer -= dt;
-
-    // DEW 充能恢复
-    var w = WEAPONS[a.special];
-    /* DEW 充能恢复。
-
-       原来这里用的条件是 `a.spCd <= 0`，但 GUS-2 是**自动拦截**、
-       不需要手动发射，spCd 从来没被设过 —— 恒为 0，于是条件恒真，
-       拦掉一枚导弹之后**下一帧就补满**。"充能 3 次、每 18 秒恢复一次"
-       因此形同虚设。
-
-       现在用独立的 spChargeT 计时：打掉一发就开始倒计时，
-       到点才 +1，而且只在没满的时候走动。 */
-    if (w && w.kind === 'dew' && a.spCharges < w.charges) {
-      a.spChargeT -= dt;
-      if (a.spChargeT <= 0) {
-        a.spCharges++;
-        a.spChargeT = w.recharge || 18;
-      }
-    }
 
     // ---- 拖烟（受损） ----
     if (a.hp < a.maxHp * 0.45 && world) {

@@ -101,7 +101,7 @@
      perPoint 为 0 的下游弹只按 w.ammo；槽数 = 挂点数）。
      pods 是任务写定的被动吊舱，机制与外观（mountPlan）都用它。 */
   ammoPool, pods,
-  spActive, spCharges, spChargeT,      // ECM 生效 / DEW 充能
+  spActive,                            // ECM 生效
   /* 认知电子战的闭环（设定 7.3）：ewT 开机时长、ewBurnT 对手完成对抗的
      时刻、ewPower 当前压制强度（唯一出口）、ewWid 用的哪件吊舱、
      suppressed 自己被压制的程度、rwrT/rwrSrc 被主动雷达照射的感知 */

@@ -566,8 +566,7 @@ if (!(Math.random() < chance)) continue;
 以前按"约 1.2 秒窗口"折成每帧概率连续掷，实际累积取决于接近速度
 （迎头快弹的 55% 只剩约 37%）。现在 `chance = 0.55` 就是每枚弹被烧掉的概率。
 
-成功一次消耗一枚充能（`spCharges`），烧毁导弹并播 `laser()` 音效；
-充能由 `spChargeT` 按 `w.recharge`（18 s）逐发恢复，
+成功一次烧毁导弹并播 `laser()` 音效，该吊舱的发射槽冷却 `w.cd`（18 s），
 见 [weapons.md](weapons.md#定向能拦截)。
 
 ---
