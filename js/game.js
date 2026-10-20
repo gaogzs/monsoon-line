@@ -954,7 +954,7 @@ var Game = (function () {
       bits.push('被动 · 不占扳机');
     } else {
       if (n) bits.push(n + ' 个发射槽');
-      var r = missileRange(w);
+      var r = Ent.displayRange(w);          // 与 AI / HUD 同一套真实弹道（entities.js）
       if (r) bits.push('射程 ' + r.toFixed(1) + ' km');
       if (w.kind === 'dew' && w.interceptRange) {
         bits.push('拦截 ' + (w.interceptRange / 1000).toFixed(1) + ' km');
@@ -989,6 +989,7 @@ var Game = (function () {
     v22: '摧毁',
     v25: '攻击',
     v30: '扩散 / 播撒',
+    pgb: '扩散 / 播撒',
     e4: '干扰',
     l2: '光',
     dl4: '远',
@@ -3941,7 +3942,7 @@ var Game = (function () {
     }
 
     var needWeapons = ['k1', 'k2', 'k3', 'k7', 'k11', 'v11', 'v9', 'v17', 'v22', 'v25', 'v30',
-      'e4', 'l2', 'dl4', 'dl6', 'dl9', 'hwm', 'kkv'];
+      'e4', 'l2', 'dl4', 'dl6', 'dl9', 'hwm', 'kkv', 'pgb'];
     for (i = 0; i < needWeapons.length; i++) {
       if (!WEAPONS[needWeapons[i]]) problems.push('缺少武器 ' + needWeapons[i]);
     }

@@ -97,6 +97,7 @@ var HUD = (function () {
     drawLaserStatus(ctx, W, H, p, world);
     drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
     drawConeCue(ctx, W, H, cam, p);
+    drawFootprint(ctx, W, H, cam, p);     // 精确制导炸弹的动态瞄准圈（泪滴形）
     drawFriendlyShots(ctx, W, H, cam, p, world);
     drawIncomingMissiles(ctx, W, H, cam, p, world);
     drawStores(ctx, W, H, p);
@@ -1312,6 +1313,84 @@ var HUD = (function () {
     ctx.restore();
   }
 
+  /** 点在多边形内（射线法）。poly 是 [[x,z], ...] 数组，pt 是 [x,z]。 */
+  function pointInPolygon(pt, poly) {
+    var x = pt[0], z = pt[1], inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var xi = poly[i][0], zi = poly[i][1], xj = poly[j][0], zj = poly[j][1];
+      if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  /* ============================================================
+     精确制导炸弹的动态瞄准圈（泪滴形，5.3 第 3 条）
+
+     拿着带弹翼的精确制导炸弹（ballistic + fin、无 glide，PEJ-14 之类）时，
+     把弹翼能修正到的落点可达区域投影到屏幕上画成泪滴圈：
+       后端（最远）= 自然抛物线落点（画一个 pipper）
+       往前张开 = 弹翼能下压 / 横修到的范围
+     目标（地面）套进圈内且已锁定 = 物理上必中。圈随本机高度、速度、俯仰
+     实时变化：高、快时圈大，低、慢时圈小。
+
+     和空空弹视场圈一样，落点按**机头朝向**投影（M3.project 同一套），
+     不是按屏幕朝向 —— 圈在画面上跟着机头走，而不是跟着镜头走。
+     ============================================================ */
+  function drawFootprint(ctx, W, H, cam, p) {
+    var w = WEAPONS[p.special];
+    if (!w || !w.fin || !w.ballistic) return;
+
+    /* 可达区域每 0.3 s 重算一次（一次要跑十几份弹道），按速度 / 高度变化节流。 */
+    var now = performance.now();
+    var c = p.__fp;
+    if (!c || c.w !== w.id || now - c.at > 300 ||
+        Math.abs((p.speed || 0) - c.spd) > 50 || Math.abs(p.pos.y - c.y) > 300) {
+      c = p.__fp = { w: w.id, at: now, spd: p.speed || 0, y: p.pos.y,
+        fp: Ent.finFootprint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }) };
+    }
+    var fp = c.fp;
+    if (!fp) return;
+
+    /* 投影：natural + 边界点（地面 y=0 → 屏幕）。 */
+    var nat = M3.project(cam, M3.V(fp.natural.x, 0, fp.natural.z));
+    var scr = [];
+    for (var i = 0; i < fp.points.length; i++) {
+      var q = M3.project(cam, M3.V(fp.points[i].x, 0, fp.points[i].z));
+      if (q) scr.push(q);
+    }
+    if (!nat || scr.length < 3) return;
+
+    /* 圈内必中：目标（地面）在世界坐标里落进可达区域多边形，且已锁定。 */
+    var t = p.target && p.target.alive ? p.target : null;
+    var poly = [[fp.natural.x, fp.natural.z]];
+    for (i = 0; i < fp.points.length; i++) poly.push([fp.points[i].x, fp.points[i].z]);
+    var hot = !!(t && t.kind === 'target' && p.locked &&
+      pointInPolygon([t.pos.x, t.pos.z], poly));
+
+    ctx.save();
+    ctx.strokeStyle = hot ? RED : 'rgba(255,176,58,0.55)';
+    ctx.lineWidth = hot ? 2 : 1.4;
+    if (!hot && ctx.setLineDash) ctx.setLineDash([6, 5]);
+    /* 泪滴轮廓：natural → 左 / 前（下压）/ 右边界 → 回到 natural */
+    ctx.beginPath();
+    ctx.moveTo(nat.x, nat.y);
+    for (i = 0; i < scr.length; i++) ctx.lineTo(scr[i].x, scr[i].y);
+    ctx.closePath();
+    if (hot) { ctx.fillStyle = 'rgba(255,80,60,0.10)'; ctx.fill(); }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    /* 自然落点 pipper：一个小圆 + 十字，标"不修正也能落到这里"。 */
+    ctx.beginPath();
+    ctx.arc(nat.x, nat.y, 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(nat.x - 6, nat.y); ctx.lineTo(nat.x + 6, nat.y);
+    ctx.moveTo(nat.x, nat.y - 6); ctx.lineTo(nat.x, nat.y + 6);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /** 发射包线：{ rmax, nez }，非对空弹给 null。
 
      rmax  导弹动力段能追上**按当前航向飞**的目标的距离
@@ -1321,52 +1400,29 @@ var HUD = (function () {
   function computeEnvelope(p, t) {
     var w = WEAPONS[p.special];
     if (!w) return null;
-    /* 对面制导弹（对地 / 对海）：目标几乎跑不掉，包线只看弹飞不飞得到 ——
-       rmax = min(锁定距离, 有效射程)，NEZ 取其 70% 作为"最佳射程"（留出目标移动和发射角的余量） */
-    if ((w.target === 'ground' || w.target === 'ship') && t.kind === 'target' &&
-        w.seeker && w.seeker !== 'none' && !w.unguided) {
-      /* 无动力制导弹（滑翔弹）：射程完全取决于此刻的高度、速度和机头指向，
-         按本机真实状态模拟（Ent.glideReach），每 0.3 s 刷新一次。
-         有动力弹仍按高度分档的 effRange（阶段 5.4 再统一）。 */
-      var reach;
-      if (w.ballistic) {
-        var now = performance.now(), gc = p.__glideEnv;
-        if (!gc || gc.w !== w.id || now - gc.at > 300) {
-          gc = p.__glideEnv = { w: w.id, at: now,
-            r: Ent.glideReach(w, p.pos, p.fwd, (p.speed || 0) + 70) };
-        }
-        reach = gc.r;
-      } else {
-        reach = Ent.effRange(w, p.pos.y);
-      }
-      var rs = Math.min(w.lockDist || 0, reach);
-      return rs > 0 ? { rmax: rs, nez: rs * 0.7 } : null;
+    /* 制导弹才有发射包线：空空弹（对空中目标），以及有导引头的对地 / 对海弹
+       （对海面 / 地面目标）。无制导弹（炸弹、火箭）没有 —— 它们靠 5.5 的落点标记。 */
+    var isAam = w.kind === 'aam' && t.kind === 'air';
+    var isSurf = (w.target === 'ground' || w.target === 'ship') && t.kind === 'target' &&
+      w.seeker && w.seeker !== 'none' && !w.unguided;
+    if (!isAam && !isSurf) return null;
+
+    /* rmax / nez 用真实弹道动态算（Ent.envelopeRange）：把目标高度、相对速度、
+       航向都吃进 stepMissile 的模拟里，nez 按"目标掉头逃逸"（空空）或
+       "目标最大航速"（对面）二分出来。一次要跑十几份弹道，按状态变化 + 0.3 s 节流缓存。 */
+    var now = performance.now();
+    var c = p.__env;
+    var d = M3.dist(p.pos, t.pos);
+    if (!c || c.w !== w.id || now - c.at > 300 ||
+        Math.abs(d - c.d) > 150 || Math.abs((p.speed || 0) - c.spd) > 50 ||
+        Math.abs(p.pos.y - c.y) > 500) {
+      var e = Ent.envelopeRange(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }, t);
+      var lock = w.lockDist || Infinity;
+      var rmax = Math.min(lock, e.rmax);
+      var nez = Math.min(lock, Math.min(e.nez, e.rmax));
+      c = p.__env = { w: w.id, at: now, d: d, spd: p.speed || 0, y: p.pos.y, rmax: rmax, nez: nez };
     }
-    if (w.kind !== 'aam') return null;
-    if (t.kind !== 'air') return null;
-
-    /* 导弹动力段能飞多远 —— 与机库里的 missileRange()（data.js）同一套分段：
-       先从载机速度加速到 speed，再匀速飞完剩下的动力时间。
-       区别是这里的初速用**本机当前速度**：飞得越快，同一枚弹打得越远。 */
-    var powerK = (p.pos.y > 18000 && w.scramjet) ? 0.26 : 1;
-    var life = w.life * powerK;
-    var v0 = Math.min(w.speed, (p.speed || 0) + 70);
-    var tAcc = w.boost ? Math.min(life, Math.max(0, (w.speed - v0) / w.boost)) : 0;
-    var effRange = v0 * tAcc + 0.5 * (w.boost || 0) * tAcc * tAcc +
-      w.speed * Math.max(0, life - tAcc);
-
-    /* 目标沿视线的背离分量：迎头为负（送上门来），尾追为正。 */
-    var tSpd = t.speed || 200;
-    var los = M3.norm(M3.sub(t.pos, p.pos));
-    var away = t.fwd ? M3.dot(t.fwd, los) : 0;
-
-    // 最大射程：目标保持当前航向
-    var rmax = Math.max(400, effRange - tSpd * life * away * 0.8);
-    // NEZ：再扣掉"掉头逃逸"的余量
-    var nez = Math.max(400, effRange - tSpd * life * (0.30 + 0.25 * away));
-    rmax = Math.min(rmax, w.lockDist);
-    nez = Math.min(nez, rmax);
-    return { rmax: rmax, nez: nez };
+    return { rmax: c.rmax, nez: c.nez };
   }
 
   function computeNEZ(p, t) {

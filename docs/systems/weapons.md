@@ -97,14 +97,13 @@ var ROOTS = {
 字面量里按旧语义定的 `0.88 s`，快得离谱；`smoke.js` 会检查这件事
 （对 `fits` 非空的非被动武器逐一核对）。
 
-`missileRange(w)` 估算动力段能送多远（公里）：被动吊舱返回 `null`，
-无助推的返回 `speed × life / 1000`，否则按"载机初速 350 m/s 先加速到
-`speed` 再匀速"积分：
+射程显示（机库挂载卡片、图鉴「射程」列）统一走 `Ent.displayRange(w)`（`entities.js`）：
+它读 `effRange`（真实弹道，与 AI、HUD 同一套），按弹种取一个代表性的平飞发射高度
+（对地 / 对海弹 8 km、空空弹 6 km），返回公里；无制导弹、吊舱、定向能返回 `null`（不显示"射程"）。
 
-```js
-tAcc = min(life, max(0, (speed - 350) / boost));
-rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
-```
+旧入口 `missileRange(w)`（`data.js`）是"动力段能送多远"的解析式（载机初速 350 m/s 先加速到
+`speed` 再匀速），已不再被机库 / 图鉴使用 —— 它算不出滑翔弹、高抛弹、冲压弹随高度变化的射程，
+滑翔弹会被严重低估（GUT-9 按它只有 4.5 km，按真实弹道是 17 km）。
 
 ---
 
@@ -120,7 +119,9 @@ rAcc = 350*tAcc + 0.5*boost*tAcc²;   rCruise = speed * max(0, life - tAcc);
 | `nezer` | `ai.js`（最小发射距离 1400）、`game.js`（锁定 1.5 s） | 冲压弹：NEZ 大但近距无力 |
 | `scramjet` | `entities.js` `effectiveLife`、`hud.js` | 18 km 以上动力段骤减 |
 | `highAltImmune` | `entities.js` | 转弯下限抬到 0.78（仅 SPO-9）；代价是低空推力最多 −45%、滑翔掉速最多 ×1.6（按相对密度插值） |
-| `ballistic` | `entities.js` | 无动力，走自由落体弹道；有导引头的（GUT-9、PEJ-30）由导引转动**速度矢量**（保持速率） |
+| `ballistic` | `entities.js` | 无动力，走自由落体弹道；有导引头的（GUT-9、PEJ-14）由导引转动**速度矢量**（保持速率） |
+| `glide` | `entities.js` `stepMissile` | 升阻比（仅 GUT-9 = 2.5）：垂直于速度、在铅垂面内向上的升力，大小封顶在 g·cosγ（刚好托住重力，不把弹往上拉）。有它弹才滑翔，没有就是纯抛物线 |
+| `fin` | `entities.js` `stepMissile`、`hud.js` `drawFootprint` | 弹翼修正的侧向加速度上限（m/s²，海平面 250 m/s 时，随 ρ·v² 变）。有 `glide` 的弹（GUT-9）往上修只留横向、往下修卸升力；无 `glide` 的（PEJ-14）弹翼全向修（上下左右、只改方向不加能量）。HUD 据此画泪滴形瞄准圈（`Ent.finFootprint`） |
 | `hobs` | `entities.js` `stepMissile` | 出膛后的导引头视场取 max(77°, `lockCone`)，大离轴锁定的目标不会出膛即丢 |
 | `cluster` | `entities.js` `warheadK`、图鉴 `{{cluster}}` | 数值 = 覆盖半径（米）；面杀伤本身改由 `blast = cluster`、`blastCore = blast`、`blastAir: false` 表达（PEJ-9 60、PEJ-30 80） |
 | `penetrator` | `entities.js` `warheadK` | 对加固目标（`HARD_MODELS`）全额伤害；普通战斗部 ×0.6、集束 ×0.2 |
@@ -220,16 +221,18 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 | `v22` | SPO-22 锚 | asm | radar | 920 | 130 | 12 / 45 | 0.55 | 8600 | 260 | 20 / 6 | 22 | 1 |
 | `rkt` | PEJ-6 撒星 | bomb | 无制导 | 620 | 520 | 3 / 3 | — | — | 22 | 14 / 4 | 4 | 28 |
 | `clb` | PEJ-9 碎玉 | bomb | 无制导 | 300 | — | 12 / 24 | — | — | 118 | 60 / 60③ | 14 | 2 |
-| `v30` | PEJ-30 铁蒺藜 | bomb | eo | 280 | — | 12 / 24 | 0.20 | 2400 | 210 | 80 / 80③ | 16 | 1 |
+| `v30` | PEJ-30 铁蒺藜 | bomb | 无制导 | 280 | — | 12 / 24 | — | — | 210 | 80 / 80③ | 16 | 1 |
+| `pgb` | PEJ-14 点穴 | bomb | eo | 300 | — | 12 / 24 | 0.30 | 12000 | 165 | 40 / 10 | 16 | 2 |
 | `vgt` | TUM-7 碎石 | agm | ir | 430 | 120 | 9 / 20 | 0.62 | 7000 | 190 | 30 / 8 | 11 | 0① |
 | `vsr` | BOX-14 坍方 | asm | radar | 560 | 150 | 11 / 24 | 0.55 | 9000 | 260 | 20 / 6 | 15.6 | 0① |
 
 ③ `blastAir: false`：只伤地面，满半径满伤（子母弹）。对地弹都**没有 `fuze`**，只靠触发 / 撞地 / 寿命到期起爆。
 
-`asl` 与 `v30` 是**无动力但有制导**（`ballistic: true`）：扔出去之后
-只剩动能与弹翼 / 末端修正；`rkt` 与 `clb` 是无制导（`unguided`），
-出膛那一刻的指向就是它的一生。四者的字段差异见 `data.js` 里
-「无制导弹药」与 `PEJ-30` 两处注释。
+`asl` 与 `pgb` 是**无动力但有制导**（`ballistic: true`）：`asl` 有升阻比（`glide`）能滑翔、
+有弹翼（`fin`）能末端修正；`pgb` 不加升阻比，弹道就是投放速度决定的抛物线 + 弹翼全向修正
+（`fin`，上下左右都能修、只改方向不加能量），修正范围按投放高度 / 速度约几百米到一两公里，
+HUD 画**泪滴形动态瞄准圈**（目标套进圈内 = 必中）。`rkt` 与 `clb` / `v30` 是无制导（`unguided`），
+出膛那一刻的指向就是它的一生。字段差异见 `data.js` 里「无制导弹药」与 `PEJ-30` / `pgb` 的注释。
 
 ### 吊舱
 

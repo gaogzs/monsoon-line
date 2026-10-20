@@ -2153,6 +2153,22 @@ var WEAPONS = {
     desc: '重型集束炸弹，抛撒子弹药覆盖一大片区域，范围内每个地面目标都吃满额伤害（加固目标大打折扣）。<b>无制导，自由落体</b>：落点完全由投放时的高度、速度和机头指向决定，得从目标上空附近投放。',
     stat: { dmg: 0.90, spd: 0.10, trn: 0.00, rng: 0.20, ecm: 1.0 }
   },
+  pgb: {
+    /* 精确光电制导高爆炸弹（阶段 5.3 第 3 条 · 5.6 的第三种）。
+       无动力、有轴对称弹翼（fin）、光电导引头（eo，热焰弹 / 箔丝都骗不到），
+       ballistic 但**不加升阻比** —— 区别于 GUT-9 滑翔锤：不滑翔，弹道就是
+       投放速度决定的抛物线 + 弹翼修正。弹翼只能横向修和往下压（托不住重力），
+       修正范围几百米到一两公里量级。HUD 画泪滴形动态瞄准圈（5.3 第 3 条），
+       目标套进圈内且锁定 = 物理上必中。 */
+    id: 'pgb', name: 'PEJ-14', cn: '点穴 · PINPOINT', kind: 'bomb',
+    model: 'bomb',
+    speed: 300, life: 12.0, vsLife: 24.0,
+    turn: 0.30, seeker: 'eo', lockCone: 30 * Math.PI / 180, lockDist: 12000,
+    dmg: 165, ammo: 2, cd: 0.4, salvo: 1, flare: 0, blast: 40, blastCore: 10,
+    target: 'ground', ballistic: true, fin: 10,
+    desc: '精确光电制导高爆炸弹。弹翼只能做有限的末端修正，但<b>套进 HUD 的瞄准圈投下去就必中</b>，而且光电成像导引头不吃热焰弹和箔丝。没有发动机，射程全靠投放高度与速度，比滑翔弹短得多；弹道也不滑翔，掉得快、落得快。',
+    stat: { dmg: 0.60, spd: 0.18, trn: 0.18, rng: 0.40, ecm: 1.0 }
+  },
   e4: {
     id: 'e4', name: 'ZUN-4', cn: '回声 · ECHO', kind: 'ecm',
     ecmBonus: 0.12,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
@@ -2441,6 +2457,7 @@ var STORE_ATTR = {
   v22:  { fits: ['heavy'],                 perPoint: 2,  mass: 640 },
   v30:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 295 },
   clb:  { fits: ['heavy', 'belly'],        perPoint: 3,  mass: 350 },
+  pgb:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 280 },
   rkt:  { fits: ['light', 'heavy'],        perPoint: 36, mass: 280 },
   lcm:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 780 },
 
@@ -2513,6 +2530,7 @@ var STORE_LOOK = {
   /* 炸弹 / 火箭 */
   clb:  { len: 3.0, dia: 0.42, fin: 'bomb' },
   v30:  { len: 2.8, dia: 0.40, fin: 'bomb' },
+  pgb:  { len: 3.2, dia: 0.38, fin: 'cruise' },
   rkt:  { len: 2.6, dia: 0.48, fin: 'small', nest: 'tube', cells: 7 }
 };
 
@@ -2603,6 +2621,7 @@ var STORE_ROLE = {
   rkt:  '近距火力压制',
   clb:  '面压制 · 子母弹',
   v30:  '面压制 · 集束',
+  pgb:  '精确光电制导高爆',
 
   /* 吊舱 */
   e4:   '主动电子战',
@@ -2754,7 +2773,7 @@ var STORE_COOLDOWN = {
   /* 对地与反大型 */
   asl: 11, asl2: 16, v25: 18, lcm: 36,
   sat: 19, v22: 22,
-  rkt: 4, clb: 14, v30: 16,
+  rkt: 4, clb: 14, v30: 16, pgb: 16,
 
   /* 吊舱：电子战设备要重新充能，仍然是全场最慢的一档 */
   e4: 50, l2: 36,
@@ -2832,7 +2851,7 @@ var MISSILE_LEAD = {
   v9: 0.52, v11: 0.62, mrm: 0.78, v17: 0.86, arm: 0.72,
   vlar: 0.90, hwm: 0.74, kkv: 0.45,
   asl: 0.65, asl2: 0.70, sat: 0.68,
-  v25: 0.66, v22: 0.74,
+  v25: 0.66, v22: 0.74, pgb: 0.70,
   dl4: 0.74, dl6: 0.48, dl9: 0.80, ss6: 0.80, ssm: 0.70,
   swm: 0.44, hva: 0.80, lcm: 0.62,
   /* 下游与分水 */

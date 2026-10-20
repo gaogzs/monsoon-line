@@ -1330,19 +1330,27 @@ var Ent = (function () {
            "有制导"的炸弹其实全是自由落体。现在把 vel 转到新的 fwd 上、
            保持速率不变：能量仍然只来自投放初速与重力，弹翼只负责改方向。 */
         if (w.ballistic && w.fin) {
-          /* 带弹翼的无动力制导弹（`w.fin`，GUT-9）：弹翼只能产生一个有限的加速度，
-             上限随动压（ρ·v²）走。能横向修、能往下压，往上托只靠升阻比那份升力。 */
+          /* 带弹翼的无动力制导弹（`w.fin`）：弹翼产生受动压（ρ·v²）限制的
+             侧向加速度，只改方向不加能量 —— 能量仍只来自投放初速与重力。
+
+             有 glide（GUT-9 滑翔锤）与无 glide（PEJ-14 精确制导炸弹）在这里分道：
+               · 有 glide：往上托只靠升阻比那份升力（有 g·cosγ 封顶），弹翼不能再
+                 往上修，否则会变成第二份升力把抛物线掰成平飞 —— 往上只留横向分量，
+                 往下修则卸掉升力（glideOff）。
+               · 无 glide：没有升力可卸，弹翼就是全向的（上下左右都能修）。不限制
+                 向上分量，否则弹一下压过头就"上拉不回来"，圈内目标打不中 ——
+                 这恰恰是精确制导炸弹"能精确命中"的来由。 */
           var spv = M3.len(m.vel);
           if (spv > 1) {
             var vh = M3.mul(m.vel, 1 / spv);
             var dv = M3.sub(M3.mul(desired, spv), m.vel);
             var perp = M3.sub(dv, M3.mul(vh, M3.dot(dv, vh)));
-            if (perp.y < 0) m.glideOff = true;
-            else {
-              /* 往上修不归弹翼管：托住重力只能靠升阻比那份升力（有 g·cosγ 封顶），
-                 否则弹翼会变成第二份升力，把抛物线掰成平飞。只留横向分量。 */
-              var lat = M3.cross(vh, M3.V(0, 1, 0)), ll = M3.len(lat);
-              perp = ll > 1e-3 ? M3.mul(lat, M3.dot(perp, lat) / (ll * ll)) : M3.V(0, 0, 0);
+            if (w.glide) {
+              if (perp.y < 0) m.glideOff = true;
+              else {
+                var lat = M3.cross(vh, M3.V(0, 1, 0)), ll = M3.len(lat);
+                perp = ll > 1e-3 ? M3.mul(lat, M3.dot(perp, lat) / (ll * ll)) : M3.V(0, 0, 0);
+              }
             }
             var pl = M3.len(perp);
             if (pl > 1e-3) {
@@ -1510,20 +1518,22 @@ var Ent = (function () {
     return (c[band] = Math.round(r));
   }
 
-  /* 无动力制导弹从**当前投放状态**出发能滑多远（水平距离，米）。
-     HUD 包线用（hud.js computeEnvelope）：和 effRange 同一份弹道代码，
+  /* 从**当前投放 / 发射状态**出发，弹沿发射方向能飞到的最大水平距离（米）。
+     这是 5.4 发射包线的基础：和 effRange 同一份弹道代码（stepMissile），
      但初始位置、速度、方向都取本机此刻的真实值，不按高度分档。
-     假目标在投放方向的水平延长线上 200 km 外的海面，弹一路滑到落地为止。
-     步长 1/30 s（HUD 每 0.3 s 才算一次，精度够用）。 */
-  function glideReach(w, pos, fwd, speed) {
+     假目标放在发射方向水平延长线上 200 km 外、高度 targetY 处，
+     弹一路追到落地 / 寿命结束，量水平位移。
+     步长 1/30 s（HUD 每 0.3 s 才重算一次，精度够用）。 */
+  function maxReach(w, la, targetY) {
+    var fwd = la.fwd, pos = la.pos;
     var hx = fwd.x, hz = fwd.z, hl = Math.sqrt(hx * hx + hz * hz);
     if (hl < 1e-3) { hx = 0; hz = 1; hl = 1; }
     hx /= hl; hz /= hl;
     var far = 200000;
     var dummy = { kind: 'target', alive: true, team: 98, radius: 10,
-      pos: M3.V(pos.x + hx * far, 0, pos.z + hz * far), vel: M3.V(0, 0, 0) };
+      pos: M3.V(pos.x + hx * far, targetY, pos.z + hz * far), vel: M3.V(0, 0, 0) };
     var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
-    var m = makeMissile({ weapon: w.id, team: 98, pos: pos, fwd: fwd, speed: speed, target: dummy });
+    var m = makeMissile({ weapon: w.id, team: 98, pos: pos, fwd: fwd, speed: la.speed, target: dummy });
     m.owner = null;
     var last = M3.clone(m.pos);
     for (var f = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
@@ -1533,6 +1543,205 @@ var Ent = (function () {
     }
     var dx = last.x - pos.x, dz = last.z - pos.z;
     return Math.sqrt(dx * dx + dz * dz);
+  }
+
+  /* 滑翔弹专用入口（向后兼容）：同 maxReach，目标在投放方向的海面上。 */
+  function glideReach(w, pos, fwd, speed) {
+    return maxReach(w, { pos: pos, fwd: fwd, speed: speed }, 0);
+  }
+
+  /* ============================================================
+     5.4 发射包线：从当前发射状态出发，弹**追不追得到**目标
+
+     以前 rmax / NEZ 是解析式（动力段距离 + 目标背离速度的经验系数），
+     目标高度、爬升 / 俯冲的射程损耗、"掉头逃逸"都算不准。现在换成
+     真实弹道：flyTo 用 stepMissile 追一个会动的目标跑一遍，命中 / 够得着
+     就返回 true，再二分出 rmax（目标保持航向）与 nez（目标掉头逃逸）。
+
+     目标和实战用同一份 stepMissile —— 改了弹道、速度、loft，包线自动跟着变。
+     ============================================================ */
+
+  /* 目标逃逸 / 巡航时的最大航速：飞机取 vMax（加力上限），舰船取航速。 */
+  function targetMaxSpeed(tg) {
+    if (tg.phys && tg.phys.vMax) return tg.phys.vMax;
+    if (tg.speed) return tg.speed;
+    return (tg.kind === 'target') ? 12 : 300;
+  }
+
+  /* 单次可达性：从 la 发射 w，追 tg（克隆，不污染原实体），flee 时目标
+     每帧掉头、以最大航速背离弹逃逸。返回是否命中 / 够得着。 */
+  function flyTo(w, la, tg, flee) {
+    var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
+    /* 克隆目标 team 与弹同号（98）：起爆结算时会跳过同队，不触发
+       game.js 注册的 hitTarget（那需要完整的 world）。这里只看"够不够得着"，
+       不结算伤害。 */
+    var t = { kind: tg.kind, alive: true, team: 98, radius: tg.radius || 10,
+      pos: M3.clone(tg.pos), vel: tg.vel ? M3.clone(tg.vel) : M3.V(0, 0, 0) };
+    if (tg.fwd) t.fwd = M3.clone(tg.fwd);
+    var m = makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, target: t, owner: null });
+    var vMax = targetMaxSpeed(tg);
+    var isAir = w.target === 'air';
+    var dt = 1 / 20;      // 包线估算用 1/20 步长（HUD 每 0.3 s 才重算，粗步长换速度，精度够）
+    /* 目标的初始水平距离：弹一旦飞过它一段距离还没命中，就追不上了（滑翔过头 /
+       逃逸甩掉），可以提前退出，不必等它滑到落地或烧完寿命。 */
+    var ox = t.pos.x - m.pos.x, oz = t.pos.z - m.pos.z;
+    var hit = false, minD = Infinity;
+    for (var f = 0; f < EFF_MAX_FRAMES && m.alive; f++) {
+      if (flee) {
+        /* 掉头逃逸：机头**水平**背离弹、保持高度、以最大航速跑。方向每帧重算 ——
+           弹在追，目标永远往背离它的方向逃，这是"甩掉"的最坏情况。
+           （不能用三维背离：那样目标会沿"爬升 / 俯冲"方向逃，爬升掉速反而逃不快。） */
+        var away = M3.sub(t.pos, m.pos);
+        var ah = Math.sqrt(away.x * away.x + away.z * away.z);
+        if (ah > 1) {
+          var dir = M3.V(away.x / ah, 0, away.z / ah);
+          t.fwd = dir; t.vel = M3.mul(dir, vMax);
+          t.pos = M3.add(t.pos, M3.mul(dir, vMax * dt));
+        }
+      } else if (t.vel) {
+        t.pos = M3.add(t.pos, M3.mul(t.vel, dt));   // 保持当前航向 / 航速
+      }
+      stepMissile(m, dt, world);
+      world.particles.length = 0;
+      if (!m.alive) {
+        /* 起爆（命中 / 近炸 / 寿命到 / 落地）。判它是否够得着目标：
+           对空看近炸 / 直接命中距离，对面看落地时是否进了溅射半径。 */
+        if (isAir) {
+          hit = M3.dist(m.pos, t.pos) - Combat.radiusOf(t) < (w.fuze || Combat.CONTACT) + 5;
+        } else {
+          var dx = m.pos.x - t.pos.x, dz = m.pos.z - t.pos.z;
+          hit = Math.sqrt(dx * dx + dz * dz) < Combat.radiusOf(t) + (w.blast || 15);
+        }
+        break;
+      }
+      /* 提前退出：弹距目标已经从最近点拉开 2.5 km —— 追不上了（目标太远、
+         逃逸甩掉，或滑翔过头），后面的弹道只会越来越远。用"弹距目标"而不是
+         "弹距发射点"，是因为尾追时目标也在跑，弹飞过发射方向一段距离是正常的。 */
+      var dd = M3.dist(m.pos, t.pos);
+      if (dd < minD) minD = dd;
+      if (f > 10 && dd > minD + 2500) break;
+    }
+    return hit;
+  }
+
+  /* 找"最远命中距离"。pred(D) 在距离上不是单调的：loft / 滑翔弹需要一段
+     距离俯冲 / 滑翔，太近反而打不中 —— 命中区间是 [近界, rmax] 的一段。
+     所以在区间里先采样定位命中段的右端，再在它和相邻的失手点之间二分，
+     取最远命中距离（rmax）。 */
+  function bisectFar(pred, lo, hi, iters) {
+    iters = iters || 3;
+    if (pred(hi)) return hi;                        // 上界都够得着：rmax = 上界
+    var N = 4, step = (hi - lo) / N, lastHit = -1;
+    for (var i = 0; i <= N; i++) {
+      var d = lo + step * i;
+      if (pred(d)) lastHit = d; else if (lastHit >= 0) break;   // 命中段结束
+    }
+    if (lastHit < 0) return 0;                      // 全程打不中
+    var l = lastHit, r = Math.min(hi, lastHit + step);
+    for (var j = 0; j < iters; j++) {
+      var mid = (l + r) / 2;
+      if (pred(mid)) l = mid; else r = mid;
+    }
+    return l;
+  }
+
+  /* 发射包线：{ rmax, nez }（米，斜距，与 HUD 的 M3.dist 同单位）。la = { pos, fwd, speed }，
+     tg = 目标实体。rmax = 目标保持航向能命中的最远距离，nez = 目标掉头
+     逃逸仍能命中的最远距离。不夹 lockDist（锁不锁得上由 HUD / AI 各自处理）。 */
+  function envelopeRange(w, la, tg) {
+    /* 水平视线方向：目标高度固定 tg.pos.y，只沿水平方向缩放距离 ——
+       否则目标会"穿过地面"（对地弹）或让二分在无意义的斜距上浪费。
+       lo 端俯角过大丢目标由 bisectFar 的采样跳过，不在这里特判。 */
+    var tox = tg.pos.x - la.pos.x, toz = tg.pos.z - la.pos.z;
+    var tdl = Math.sqrt(tox * tox + toz * toz) || 1;
+    var dx = tox / tdl, dz = toz / tdl;
+    var dh = la.pos.y - tg.pos.y;               // 发射高度 − 目标高度（斜距换算用）
+    function at(D) {
+      var nt = { kind: tg.kind, radius: tg.radius || 10,
+        pos: M3.V(la.pos.x + dx * D, tg.pos.y, la.pos.z + dz * D),
+        vel: tg.vel ? M3.clone(tg.vel) : M3.V(0, 0, 0) };
+      if (tg.fwd) nt.fwd = M3.clone(tg.fwd);
+      if (tg.phys) nt.phys = tg.phys;
+      if (tg.speed) nt.speed = tg.speed;
+      return nt;
+    }
+    var hi = maxReach(w, la, tg.pos.y);         // 弹最大水平射程
+    var lo = 400;                               // 最小有效射程（太近俯角过大 / 出膛还追不上）
+    var rmaxFlat = bisectFar(function (D) { return flyTo(w, la, at(D), false); }, lo, hi);
+    var nezFlat = bisectFar(function (D) { return flyTo(w, la, at(D), true); }, lo, rmaxFlat);
+    return {
+      rmax: Math.sqrt(rmaxFlat * rmaxFlat + dh * dh),
+      nez: Math.sqrt(nezFlat * nezFlat + dh * dh)
+    };
+  }
+
+  /* 机库 / 图鉴的"标称射程"（公里）：读 effRange（真实弹道，与 AI、HUD 同一套），
+     按弹种取一个代表性的平飞发射高度 —— 对地 / 对海弹取中高空（滑翔、巡航能发挥），
+     空空弹取中空。无制导弹、吊舱、定向能返回 null（不显示"射程"）。
+     以前这里用 data.js 的 missileRange（速度 × 寿命的解析式），滑翔弹被严重低估。 */
+  function displayRange(w) {
+    if (!w || w.passive) return null;
+    if (w.kind === 'dew') return null;
+    if (w.unguided || !w.seeker || w.seeker === 'none') return null;
+    var alt = (w.target === 'ground' || w.target === 'ship') ? 8000 : 6000;
+    var r = effRange(w, alt);
+    return r > 0 ? r / 1000 : null;
+  }
+
+  /* ============================================================
+     5.3 第 3 条：精确制导炸弹的落点可达区域（泪滴形瞄准圈）
+
+     精确制导炸弹（PEJ-14 之类：ballistic + fin、无 glide）弹翼只能
+     横向修 + 往下压，托不住重力 —— 落点可达区域天然不对称：
+       后端（最远）= 自然抛物线落点，弹翼一步都越不过去；
+       前端（最近）= 弹翼全力下压的落点；
+       左右     = 弹翼全力横修的落点。
+     所以它是一个近窄远宽的泪滴形。HUD 把它投影到屏幕画成圈，
+     "目标套进圈内 = 物理上必中"。计算必须和真实弹道（stepMissile）
+     是同一套，否则圈会骗人。
+     ============================================================ */
+
+  /* 自然落点：弹翼不修（无目标），纯抛物线落地。 */
+  function naturalPoint(w, la) {
+    var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
+    var m = makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, owner: null });
+    for (var f = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
+      stepMissile(m, 1 / 20, world);
+      world.particles.length = 0;
+      if (m.pos.y <= 0) break;
+    }
+    return { x: m.pos.x, z: m.pos.z };
+  }
+
+  /* 沿水平角 φ（0 = 前方，±90° = 左右），二分求"能命中"（flyTo）的最远地面目标
+     水平距离。用真实命中判定，而不是弹翼满偏落点 —— 满偏上修会把抛物线掰成平飞
+     （等于偷偷滑翔），那不是精确制导炸弹的"修正范围"。 */
+  function reachAtAngle(w, la, phi, hi) {
+    var hx = Math.sin(phi), hz = Math.cos(phi);
+    function at(D) {
+      return { kind: 'target', radius: 20,
+        pos: M3.V(la.pos.x + hx * D, 0, la.pos.z + hz * D), vel: M3.V(0, 0, 0), speed: 0 };
+    }
+    return bisectFar(function (D) { return flyTo(w, la, at(D), false); }, 400, hi || maxReach(w, la, 0));
+  }
+
+  /* 可达区域：{ natural, points }。natural = 自然落点（弹翼不修）；
+     points = 沿各水平角 flyTo 二分出的"能命中"最远地面目标 —— 用真实命中判定
+     （flyTo / stepMissile 同一套），所以目标套进圈内就真的打得中。返回 null 表示
+     这枚弹没有弹翼修正（不画圈）。 */
+  function finFootprint(w, la, n) {
+    if (!w || !w.fin) return null;
+    n = n || 12;
+    var pts = [], hi = maxReach(w, la, 0);
+    for (var i = 0; i <= n; i++) {
+      var phi = (i / n - 0.5) * (90 * Math.PI / 180);   // -45°..45°（前方扇区）
+      var D = reachAtAngle(w, la, phi, hi);
+      /* 该方向"能命中"距离 < 最小射程（弹翼横修不到那么侧）：跳过，不画进圈。 */
+      if (D <= 400) continue;
+      var hx = Math.sin(phi), hz = Math.cos(phi);
+      pts.push({ x: la.pos.x + hx * D, z: la.pos.z + hz * D });
+    }
+    return { natural: naturalPoint(w, la), points: pts };
   }
 
   function hitsAt(w, y0, D) {
@@ -2514,7 +2723,7 @@ var Ent = (function () {
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
     wakeSpray: wakeSpray,
-    effRange: effRange, glideReach: glideReach, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
+    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, displayRange: displayRange, naturalPoint: naturalPoint, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
     isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     jamState: jamState, jamShown: jamShown, jamDuty: jamDuty, jamRanges: jamRanges, jamPress: jamPress, jamLockOK: jamLockOK, jamLockK: jamLockK, JAM_BURN_R: JAM_BURN_R, JAM_SURF_K: JAM_SURF_K, JAM_BURN_SURF: JAM_BURN_SURF,
     gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,

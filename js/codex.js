@@ -1095,7 +1095,7 @@ function _rngTxt(w) {
   if (w.kind === 'dew' && w.interceptRange) {
     return '拦截 ' + (w.interceptRange / 1000).toFixed(1) + ' km';
   }
-  var r = missileRange(w);
+  var r = (typeof Ent !== 'undefined' && Ent.displayRange) ? Ent.displayRange(w) : null;
   if (r === null || r === undefined || r <= 0) return '—';
   return r.toFixed(1) + ' km';
 }

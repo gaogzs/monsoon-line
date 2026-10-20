@@ -291,18 +291,26 @@ AI（友军、敌军一样）用同一套门槛：被压制时只能对 `clearR`
 
 机头指向会画一条目标速度矢量线（仅空中目标）。
 
-`inNez` 由 `computeNEZ()` 每帧解算：
+`inNez` 由 `computeNEZ()` 每帧解算，它包一层 `computeEnvelope(p, t)`（阶段 5.4 起）：
 
 ```js
-effRange = w.speed * w.life * powerK;        // 有效动力距离
-escape   = tSpd * (w.life * powerK) * 0.42;  // 目标能跑掉的距离
-nez      = max(400, effRange - escape - closing * 1.1);
-return min(nez, w.lockDist);
+// computeEnvelope：rmax / nez 用真实弹道动态算（Ent.envelopeRange）
+var e = Ent.envelopeRange(w, { pos, fwd, speed: p.speed + 70 }, t);
+rmax = min(w.lockDist, e.rmax);
+nez  = min(w.lockDist, min(e.nez, e.rmax));
 ```
 
-- 只对 `kind === 'aam'` 且空中目标返回非 0
-- 冲压弹在 18 km 以上 `powerK = 0.26`
-- `closing = max(60, p.speed + tSpd * 0.4)`
+- 只对空空弹（对空中目标）和有导引头的对地 / 对海弹（对海面 / 地面目标）返回非 0
+- `Ent.envelopeRange` 用 `stepMissile` 那份真实弹道，从本机当前高度 / 速度 / 俯仰
+  出发，把**目标高度、相对速度、航向**都吃进模拟：`rmax` = 目标保持航向能命中的最远距离，
+  `nez` = 目标立刻**掉头逃逸**（空空，按 `phys.vMax`）或**以最大航速逃逸**（对面，按舰船航速）
+  仍能命中的最远距离。冲压弹的高空推力衰减、滑翔弹的升阻比、高抛弹的攻顶弹道都由弹道代码自然体现。
+- 一次要跑十几份弹道，所以按状态变化（距离 / 高度 / 速度）+ 0.3 s 节流缓存在 `p.__env` 上。
+- 结果单位是**斜距**，与目标框下方的距离读数（`M3.dist`）同口径。
+
+以前这是三套各算各的：空空弹按"动力段距离 + 目标背离速度"的经验公式，
+对地弹按"当前高度平飞发射的有效射程 × 0.7"，机库又用 `missileRange`（速度 × 寿命的解析式）。
+现在 HUD、机库（`Ent.displayRange`）、AI（`Ent.aiReach` → `effRange`）都读同一套真实弹道。
 
 锁定环三态：
 
@@ -327,6 +335,13 @@ return min(nez, w.lockDist);
 - 锁定锥取 `p.lockCone`（`updateLock` 算的、含高空收窄与自身干扰收窄），没有时退回武器的 `lockCone`。
 
 > 以前（v2.0.1 开发中途）有过一套"目标在屏内且锥外才出现、之后留着"的条件，太绕，改成常驻。
+
+**精确制导炸弹的瞄准圈 `drawFootprint`**（5.3 第 3 条，`draw` 里在 `drawConeCue` 之后调用）——拿着带弹翼的精确制导炸弹（`ballistic + fin`、无 `glide`，PEJ-14）时**常驻**：
+
+- 把 `Ent.finFootprint` 算出的落点可达区域投影到屏幕，画成**泪滴形**：后端是自然抛物线落点（画一个小 pipper），往前张开的是弹翼能下压 / 横修修到的范围。
+- 落点按**机头朝向**投影（`M3.project` 同一套，和空空弹视场圈一致），不是按屏幕朝向 —— 圈在画面上跟着机头走。
+- 目标（地面）落进圈内且已锁定（`p.locked`）= 物理上必中，圈转红实线并淡淡填色；否则淡橙虚线。
+- 可达区域用 `Ent.finFootprint`（沿各水平角 `flyTo` 二分"能命中"的最远地面目标），和真实弹道是同一套 —— 圈不骗人。每 0.3 s 按速度 / 高度节流缓存（`p.__fp`）。
 
 **目标在画面外时的锁定提示**（锁定环和双层角框都看不到时）：
 - 目标方位条（`drawTargetBearing`）：锁满时目标标记外套一大一小两套四角框，上方写 `LOCK`。

@@ -143,11 +143,20 @@ node tools/probe-blast.js --flare      投弹时机实验：srm 来袭，3000 / 
 ### 怎么运行
 
 ```bash
-node tools/smoke.js
+node tools/smoke.js                       # 完整跑
+node tools/smoke.js --only 挂载系统        # 只跑「挂载系统」这一段
+node tools/smoke.js --only 挂载系统,干扰与机动   # 只跑这几段（逗号分隔）
+node tools/smoke.js --skip 舰船发射器,近防拦截   # 跳过这几段
+node tools/smoke.js --list                # 列出所有段名
 ```
 
-没有参数、没有环境变量、没有 watch 模式。它读 `index.html`、读 `js/*.js`，
+没有环境变量、没有 watch 模式。它读 `index.html`、读 `js/*.js`，
 在内存里造一个假浏览器，然后从零跑到任务里。
+
+**分段跑**：smoke 的断言分成「前置」+ 16 个可独立跑的段。「前置」（加载脚本 /
+初始化 / 导航 / 更新记录 / 完整流程 / 主循环）是后面所有断言的依赖，**始终执行**；
+其余各段按 `--only` / `--skip` 过滤。改某个子系统时只跑相关段能省掉大半时间，
+大阶段完成后再完整跑一遍（`node tools/smoke.js`）。
 
 ### 输出格式与退出码
 

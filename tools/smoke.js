@@ -40,6 +40,32 @@ function cmpVer(a, b) {
 function ok(msg) { console.log('  \x1b[32mOK\x1b[0m    ' + msg); }
 
 /* ============================================================
+   分段跑：改某个子系统时只跑相关断言，省掉整场跑一遍的时间。
+
+     node tools/smoke.js --only 挂载系统,干扰与机动   // 只跑这几段
+     node tools/smoke.js --skip 舰船发射器,近防拦截    // 跳过这几段
+     node tools/smoke.js --list                        // 列出所有段名
+
+   "前置"（加载脚本 / 初始化 / 导航 / 更新记录 / 完整流程 / 主循环）
+   是后面所有断言的依赖，始终执行；其余各段按 --only / --skip 过滤。
+   ============================================================ */
+const _argv = process.argv.slice(2);
+const _optVal = (k) => { const i = _argv.indexOf(k); return i >= 0 && _argv[i + 1] ? _argv[i + 1] : null; };
+const ONLY = _optVal('--only');
+const SKIP = _optVal('--skip');
+const LIST = _argv.includes('--list');
+const _onlySet = ONLY ? new Set(ONLY.split(',').map(s => s.trim()).filter(Boolean)) : null;
+const _skipSet = SKIP ? new Set(SKIP.split(',').map(s => s.trim()).filter(Boolean)) : null;
+const ALL_SECTIONS = [];
+function section(name, fn) {
+  ALL_SECTIONS.push(name);
+  if (LIST) return;
+  if (_onlySet && !_onlySet.has(name)) { console.log('  [跳过] ' + name); return; }
+  if (_skipSet && _skipSet.has(name)) { console.log('  [跳过] ' + name); return; }
+  fn();
+}
+
+/* ============================================================
    最小 DOM
    ============================================================ */
 const byId = new Map();
@@ -658,12 +684,18 @@ try {
   fail('卡死检测抛出异常 —— ' + e.message + '\n' + e.stack);
 }
 
+/* 共享引用：后面各段（挂载 / 干扰 / 舰艇 / 炮塔……）都要用。
+   放在主循环段之后 —— 分段跑时无论 --only 哪一段，这些引用都已就绪。 */
+const WEAPONS = sandbox.WEAPONS, AIRCRAFT = sandbox.AIRCRAFT;
+const world = sandbox.Game.__world ? sandbox.Game.__world() : null;
+const Ent = sandbox.Ent, M3 = sandbox.M3;
+const me = sandbox.Game.__player();
+
 /* ============================================================
    挂载系统
    ============================================================ */
+section('挂载系统', () => {
 console.log('\n== 挂载系统 ==');
-
-const WEAPONS = sandbox.WEAPONS, AIRCRAFT = sandbox.AIRCRAFT;
 
 // 每种武器都要能算重量与挂载量
 let badStore = 0;
@@ -773,7 +805,6 @@ try {
 }
 
 // 检查世界确实动起来了
-const world = sandbox.Game.__world ? sandbox.Game.__world() : null;
 try {
   if (world) {
     ok('世界状态：飞行器 ' + world.actors.length +
@@ -781,16 +812,15 @@ try {
       ' · 粒子 ' + world.particles.length);
   }
 } catch (e) { /* 调试接口可选 */ }
+});
 
 /* ============================================================
    干扰与导弹机动性
    —— 这两件事直接影响"躲不躲得掉"，必须能客观测出来，
       而不是靠手感争论
    ============================================================ */
+section('干扰与机动', () => {
 console.log('\n== 干扰与机动 ==');
-
-const Ent = sandbox.Ent, M3 = sandbox.M3;
-const me = sandbox.Game.__player();
 
 if (Ent && M3 && me && world) {
   // 红外弹面对干扰弹的失锁率
@@ -4894,12 +4924,14 @@ if (Ent && M3 && me && world) {
 } else {
   fail('拿不到 Ent / world，跳过干扰测试');
 }
+});
 
 /* ============================================================
    舰艇对空：按阵营挑目标
    我方舰艇（team 0）带上舰空弹之后，只能打敌机，永远不朝玩家/僚机打；
    中立（team 2）从不开火；NPC 弹药池不超过 挂点数 × perPoint。
    ============================================================ */
+section('舰艇对空', () => {
 try {
   const W = sandbox.Game.__world();
   const pl = sandbox.Game.__player();
@@ -4966,6 +4998,7 @@ try {
 } catch (e) {
   fail('舰艇对空测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    机炮抗性（gunResist）
@@ -4973,6 +5006,7 @@ try {
    系数本身只对小口径子弹生效；数据从表里一路接到实体上；
    以及"30mm 全命中持续射击多久打沉" 这条手感底线。
    ============================================================ */
+section('机炮抗性', () => {
 console.log('\n机炮抗性');
 try {
   const bad = [];
@@ -5030,6 +5064,7 @@ try {
 } catch (e) {
   fail('机炮抗性测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    范围伤害与近炸引信（Combat，v1.13）
@@ -5037,6 +5072,7 @@ try {
    撞地 / 寿命到期会起爆（不再是哑弹）；子母弹不伤飞机；
    盲飞追诱饵会在诱饵上起爆；以及爆炸特效的尺寸与粒子预算。
    ============================================================ */
+section('范围伤害与近炸', () => {
 console.log('\n范围伤害与近炸');
 try {
   const bad = [];
@@ -5196,12 +5232,14 @@ try {
 } catch (e) {
   fail('范围伤害测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    被压制时的目标可见性与锁定（Ent.jamState）
    压制 ≥ 0.5：烧穿距离外的敌方目标框闪烁，≥ 0.8 消失；
    这两种状态下都不能锁定、不进 F 键候选，已有锁定被强制取消。
    ============================================================ */
+section('压制下的目标与锁定', () => {
 console.log('\n压制下的目标与锁定');
 try {
   const bad = [];
@@ -5288,12 +5326,14 @@ try {
 } catch (e) {
   fail('压制可见性测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    HUD 全屏滤镜（HudFx）：受伤闪红随单次伤害变重、很快退掉；
    受损告警跟着亮；干扰强度取 max(suppressed, ewPower × 0.8)；
    最强也不超过"看得清 UI"的不透明度上限。
    ============================================================ */
+section('HUD 滤镜', () => {
 console.log('\nHUD 滤镜');
 try {
   const bad = [];
@@ -5329,11 +5369,13 @@ try {
 } catch (e) {
   fail('HUD 滤镜测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    航线型单位：到点按水平距离判（航点写在海平面，飞机在高空），
    随队干扰机在玩家一方任何单位进入范围时开机、冷却后再开。
    ============================================================ */
+section('航线与随队干扰机', () => {
 console.log('\n航线与随队干扰机');
 try {
   const bad = [];
@@ -5387,11 +5429,13 @@ try {
 } catch (e) {
   fail('航线 / 干扰机测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    后台模拟框架（tools/lib/sim.js）：同一种子两次跑出逐帧相同的世界，
    换种子则不同。所有 probe 都建在它上面 —— 它要是不确定，探针的数字就没法比。
    ============================================================ */
+section('后台模拟框架', () => {
 console.log('\n后台模拟框架');
 try {
   const SimL = require('./lib/sim');
@@ -5411,10 +5455,12 @@ try {
 } catch (e) {
   fail('后台模拟框架测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    分段航线（route.js）的 strike 段与 AI 射程上限（Ent.aiReach）
    ============================================================ */
+section('分段航线与有效射程', () => {
 console.log('\n分段航线与有效射程');
 try {
   const bad = [];
@@ -5490,11 +5536,13 @@ try {
 } catch (e) {
   fail('分段航线测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    锁定的分量：锁满才把目标交给导弹；玩家锁满才让对方收到照射告警；
    长按 F 取消选择目标
    ============================================================ */
+section('锁定与目标选择', () => {
 console.log('\n锁定与目标选择');
 try {
   const bad = [];
@@ -5553,10 +5601,12 @@ try {
 } catch (e) {
   fail('锁定与目标选择测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    旋转炮塔（2-0IMPL 阶段 3）
    ============================================================ */
+section('旋转炮塔', () => {
 console.log('\n旋转炮塔');
 try {
   const bad = [];
@@ -5633,10 +5683,12 @@ try {
 } catch (e) {
   fail('炮塔测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    舰船发射器：垂发 / 斜置架 / 旋转架（2-0IMPL 4.3）
    ============================================================ */
+section('舰船发射器', () => {
 console.log('\n舰船发射器');
 try {
   const bad = [];
@@ -5755,10 +5807,12 @@ try {
 } catch (e) {
   fail('发射器测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    近防拦截与命中反馈（2-0IMPL 4.7）
    ============================================================ */
+section('近防拦截', () => {
 console.log('\n近防拦截');
 try {
   const bad = [];
@@ -5789,7 +5843,10 @@ try {
       const a = k * 0.5;
       const r = 3500 + k * 1500;
       const p = V3.V(Math.sin(a) * r, 30, Math.cos(a) * r);
-      w.missiles.push(EN.makeMissile({ weapon: 'ssm', team: 1, pos: p, fwd: V3.norm(V3.sub(h.pos, p)), speed: 600, target: h }));
+      /* speed 压到 300：这条只验"拦截机制会触发、会报事件"，不是测饱和。
+         慢弹在近防射界里待得久、单次掷骰概率还封顶（speedK → 1.2），12 枚全漏掉的
+         概率可以忽略 —— 免得前面几段多消耗几个随机数就把这里整个掀翻。 */
+      w.missiles.push(EN.makeMissile({ weapon: 'ssm', team: 1, pos: p, fwd: V3.norm(V3.sub(h.pos, p)), speed: 300, target: h }));
     }
     const all = w.missiles.slice(), evs = [];
     for (let f = 0; f < 60 * 45; f++) {
@@ -5822,10 +5879,12 @@ try {
 } catch (e) {
   fail('近防拦截测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    舰尾水花（2-0IMPL 4.8）
    ============================================================ */
+section('舰尾水花', () => {
 console.log('\n舰尾水花');
 try {
   const bad = [];
@@ -5861,10 +5920,12 @@ try {
 } catch (e) {
   fail('舰尾水花测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    海上平台（2-0IMPL 4.9）
    ============================================================ */
+section('海上平台', () => {
 console.log('\n海上平台');
 try {
   const bad = [];
@@ -5919,10 +5980,15 @@ try {
 } catch (e) {
   fail('海上平台测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
+});
 
 /* ============================================================
    结果
    ============================================================ */
+if (LIST) {
+  console.log('\n可用分段（--only / --skip 用这些名字）：\n  ' + ALL_SECTIONS.join('\n  ') + '\n');
+  process.exit(0);
+}
 console.log('');
 if (problems.length) {
   console.log('\x1b[31m✗ 冒烟测试失败：' + problems.length + ' 项\x1b[0m\n');
