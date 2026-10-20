@@ -150,7 +150,7 @@ function spawnEnemy(w, o) {
     var podList = [];
     for (var pi = 0; pi < o.pods.length; pi++) podList.push({ wid: o.pods[pi], n: 1 });
     var podE = Ent.passiveEffects(podList);
-    a.lockResist = podE.lockResist;
+    Ent.setStealth(a, podE);
     a.armor = podE.armor;
     a.flares += podE.flareBonus;
     a.silentLock = podE.silentLock;

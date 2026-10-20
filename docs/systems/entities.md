@@ -52,6 +52,7 @@
 | `effectiveLife` | `effectiveLife(w, y) → s` | 动力段时长，冲压弹在 18 km 以上缩短（`stepMissile` 与尾迹颜色都用它） |
 | `breakLock` | `breakLock(a, world) → bool` | 投放一组干扰弹（热焰弹 + 箔丝）并尝试欺骗来袭弹 |
 | `openEcm` | `openEcm(actor, wid, threatSkill)` | 电子战吊舱开机（认知电子战闭环的入口） |
+| `setStealth` | `setStealth(a, pe, wids?)` | 匿踪：`stealthValue(机体 stl, 外露挂点数)` 与吊舱 `lockResist` 经 `lockCutOf` 合并，写入 `a.stealth` / `a.lockResist`。`wids` 按挂点组下标对齐；NPC 造机时（`buildNpcMounts`）存入 `a.mountWids`，`spawnEnemy` 的 `pods` 与玩家 `startMission` 再次调用 |
 | `passiveEffects` | `passiveEffects([{wid, n}]) → {lockResist, armor, lockRange, flareBonus, silentLock}` | 汇总被动吊舱效果（`armor` 封顶 0.55）。玩家（`game.js` 同名包装按挂点组展开）与敌机 `pods`（`missions.js`）共用 |
 | `fireGun` | `fireGun(a, world)` | 按射速节流开火，生成子弹 + 炮口火光 |
 | `fireGunFrom` | `fireGunFrom(shooter, w, muzzle, dir, world, opt)` | 生成一发炮弹（机炮和炮塔共用）：带 `gw` / `grav` / `fuze` / `blast`；`w` 写了 fuze / blast 才有近炸与起爆，航空机炮没写 |
@@ -123,7 +124,7 @@
 | `loadoutList` / `ammoPool` / `loadout` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy` 的 `o.loadout`（NPC） | 挂载列表 / 各武器储备 / **逐组**配置（组 id → 弹种）。NPC 的 `ammoPool` / `slotCd` 在 `makeAircraft()` 里就建好了（见 [loadout.md](loadout.md#npc-的挂载)） |
 | `wpIdx` / `spSalvo` | `game.js` | 当前挂载下标；`spSalvo` **写入后无人读取** |
 | `loadFactor` | `game.js` `startMission`（**只有玩家**） | 挂载重量惩罚，`stepAircraft()` 开头读。NPC 虽有实体挂载（`npcFits`）但**不设**它，飞行性能不受挂载影响 |
-| `armor` / `lockResist` / `lockRangeK` / `silentLock` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy`（敌机 `pods`，不设 `lockRangeK`） | 被动吊舱加成。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
+| `armor` / `lockRangeK` / `silentLock` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy`（敌机 `pods`，不设 `lockRangeK`） | 被动吊舱加成（`lockResist` 不再单独写，改由 `Ent.setStealth` 与机体匿踪合并）。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
 | `gLoad` / `brake` / `hiG` | `game.js` `controlPlayer` | 高 G 倍率 / 减速板 / HUD 指示 |
 | `sweep` | `stepAircraft` | 可变后掠翼位置（仅 `ac.variableSweep`） |
 | `ai` | `AI.attach` | 见 [ai.md](ai.md) |

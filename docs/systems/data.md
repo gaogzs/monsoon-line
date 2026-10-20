@@ -121,7 +121,7 @@ phys: { vMax: 480, vMil: 372, vStall: 105, accel: 26, decel: 40,
 |---|---|---|
 | `spd` | 最大速度 | ✅ `× lp.vMax` |
 | `mob` | 机动性 | ✅ `× (lp.pitch + lp.roll + lp.accel) / 3` |
-| `stl` | 低可探测 | ❌ 机型固有 |
+| `stl` | 匿踪 | 机型固有值，每个外露挂点折损 5%（`STEALTH_LOSS_PER_POINT`；`exposedPoints` / `stealthValue`，挂点组上 `expose: 0` = 内埋不折损，0.5 = 只算一半）；缩短敌方锁定距离，与吊舱 `lockResist` 合并成 `lockResist`（`Ent.setStealth`） |
 | `fire` | 火力 | ❌ |
 | `dur` | 生存性 | ❌ |
 | `rng` | 航程 | ❌ |

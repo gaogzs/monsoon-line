@@ -157,7 +157,7 @@ canvas#cv{ position:fixed; inset:0; width:100%; height:100%; display:block; z-in
   margin-top:9px; line-height:1.85; letter-spacing:.4px; }
 
 /* ---- 挂载点编辑器：左列挂载点组，右列该组的可选武器卡片 ---- */
-.hp-stores{ display:grid; grid-template-columns:236px minmax(0,1fr);
+.hp-stores{ display:grid; grid-template-columns:236px minmax(0,1fr) 62px;
   gap:14px; margin-bottom:18px; align-items:start; }
 .hp-groups{ display:flex; flex-direction:column; gap:6px; }
 .hp-row{ padding:9px 11px; border:1px solid var(--line);
@@ -176,6 +176,11 @@ canvas#cv{ position:fixed; inset:0; width:100%; height:100%; display:block; z-in
 
 .hp-picker{ display:grid; grid-template-columns:repeat(auto-fill,minmax(236px,1fr));
   gap:9px; align-content:start; max-height:352px; overflow-y:auto; padding-right:4px; }
+.hp-picker{ position:relative; }
+.hp-nav{ display:flex; flex-direction:column; gap:5px; }
+.hp-nav button{ font-family:var(--mono); font-size:11px; color:var(--txt-d); background:rgba(10,16,22,.6);
+  border:1px solid var(--line); padding:8px 4px; cursor:pointer; line-height:1.3; }
+.hp-nav button:hover{ border-color:var(--line2); color:var(--txt); }
 .pk-head{ grid-column:1/-1; font-family:var(--mono); font-size:11px;
   color:var(--txt-d); letter-spacing:1px; }
 .pk-card{ padding:10px 12px; border:1px solid var(--line); cursor:pointer;
@@ -192,6 +197,18 @@ canvas#cv{ position:fixed; inset:0; width:100%; height:100%; display:block; z-in
   margin-top:4px; letter-spacing:.4px; }
 .pk-d{ font-size:11.5px; color:var(--txt-d); margin-top:5px; line-height:1.62; }
 .pk-d b{ color:var(--txt); }
+.pk-cat{ grid-column:1/-1; font-family:var(--mono); font-size:11px; letter-spacing:1.2px;
+  color:var(--amber); margin-top:6px; padding-bottom:3px; border-bottom:1px solid var(--line); }
+.pk-card.lock{ position:relative; cursor:not-allowed; overflow:hidden; }
+.pk-card.lock:hover{ border-color:var(--line); background:linear-gradient(180deg,#0c141b,#080d12); }
+.pk-lock{ position:absolute; inset:0; background:rgba(4,7,10,.72); }
+.pk-lock svg{ position:absolute; inset:0; width:100%; height:100%; }
+.pk-lock line{ stroke:rgba(214,84,84,.55); stroke-width:1.5; vector-effect:non-scaling-stroke; }
+.pk-lock-t{ position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center; padding:0 14px; gap:3px; }
+.pk-lock-t b{ font-family:var(--mono); font-size:14px; color:#e06a6a; letter-spacing:3px;
+  background:rgba(4,7,10,.85); padding:1px 8px; }
+.pk-lock-t span{ font-size:11px; color:#c9a0a0; background:rgba(4,7,10,.85); padding:1px 6px; }
 .pk-q{ font-family:var(--mono); font-size:10.5px; color:#4a6172;
   margin-top:7px; padding-top:6px; border-top:1px solid rgba(30,44,56,.7); }
 

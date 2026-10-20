@@ -319,6 +319,8 @@ var Ent = (function () {
       }
       setWeapon(a, first);
     }
+    a.mountWids = plan;
+    setStealth(a, null);
   }
 
   /* 挂载物的世界坐标。
@@ -599,6 +601,20 @@ var Ent = (function () {
      ============================================================ */
   var STALL_SINK_MAX = 140;          // 失速下沉速度上限（m/s）
 
+  /** 当前挂载拖累。有 loadModel（玩家）时随弹药池折算：
+      每发弹的拖累 = 该类弹总拖累 / 弹药上限；吊舱等不消耗的部分恒定。 */
+  function curLoadFactor(a) {
+    var m = a.loadModel;
+    if (!m || !m.total || !a.ammoPool) return a.loadFactor || 0;
+    var mass = m.fixed;
+    for (var i = 0; i < m.rounds.length; i++) {
+      var r = m.rounds[i];
+      var left = Math.max(0, Math.min(r.cap, a.ammoPool[r.wid] || 0));
+      mass += r.mass * left / r.cap;
+    }
+    return m.k0 * mass / m.total;
+  }
+
   function stepAircraft(a, dt, world) {
     if (a.gunFlashT > 0) a.gunFlashT -= dt;     // 炮口火光的余辉，见 flashRings
     if (!a.alive) return;
@@ -609,14 +625,15 @@ var Ent = (function () {
     /* 必须放在函数开头：下面的失速判定、姿态旋转、目标速度全都读 p。
        以前这一段在姿态旋转之后，于是 pitch / roll 惩罚从未生效，
        失速判定也用的是未打折的 vStall。 */
-    if (a.loadFactor) {
+    var lf = curLoadFactor(a);
+    if (lf) {
       // 系数来自 loadoutPenalty() —— 和机库面板显示的是同一份，
       // 免得界面上的数字与实际手感对不上
       /* 注意：这里是**整体替换** p，所以每个用到的字段都得列上。
          之前漏了 accel / decel，还写了个根本不存在的 acc ——
          于是下面 `p.accel` 取到 undefined，加减速彻底失去节流，
          推油门的速度变化变成瞬时的。yaw 不受挂载影响，原样带过。 */
-      var lp = loadoutPenalty(a.loadFactor);
+      var lp = loadoutPenalty(lf);
       p = {
         vMax: p.vMax * lp.vMax,
         vMil: p.vMil * lp.vMil,
@@ -1790,7 +1807,8 @@ var Ent = (function () {
       m.decoyTries = (m.decoyTries || 0) + 1;
       var k = Math.pow(0.62, m.decoyTries - 1);
       // 地板：永远留一点希望，但不让"连投"变成必胜
-      chance = Math.max(0.03, chance * k);
+      // （chance 为 0 的 —— 光电 / 激光制导 —— 不设地板，否则"完全免疫"其实有 3% 会被骗）
+      chance = chance > 0 ? Math.max(0.03, chance * k) : 0;
       if (!(Math.random() < chance)) {
         if (!m.spoofed) ineffective++;      // 已经被骗过的弹不再重复报
         continue;
@@ -2216,6 +2234,14 @@ var Ent = (function () {
     a.ecm = Math.min(1, (a.ecmBody || 0) + ((pe && pe.ecm) || 0));
   }
 
+  /* 匿踪：机体匿踪（被外挂折损）+ 吊舱抗锁定 → a.lockResist。
+     wids 缺省沿用上次的（NPC 造机时存在 a.mountWids），玩家由 startMission 传入。 */
+  function setStealth(a, pe, wids) {
+    if (wids) a.mountWids = wids;
+    a.stealth = stealthValue(a.ac, exposedPoints(a.ac, a.mountWids));
+    a.lockResist = lockCutOf(a.stealth, pe && pe.lockResist);
+  }
+
   function passiveEffects(list) {
     var e = { lockResist: 0, armor: 0, lockRange: 1, flareBonus: 0, silentLock: false, ecm: 0 };
     if (!list) return e;
@@ -2388,7 +2414,7 @@ var Ent = (function () {
     /* 关卡里写错的 NPC 挂载（smoke.js 断言它是空的） */
     mountIssues: mountIssues, clearMountIssues: clearMountIssues,
     makeMissile: makeMissile, stepMissile: stepMissile, effectiveLife: effectiveLife,
-    breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects, setEcm: setEcm, ECM_LEAD_K: ECM_LEAD_K,
+    breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects, setEcm: setEcm, setStealth: setStealth, ECM_LEAD_K: ECM_LEAD_K,
     fireGun: fireGun, fireGunFrom: fireGunFrom, shellFuze: shellFuze, detonateShell: detonateShell, gunMuzzle: gunMuzzle, flashRings: flashRings, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
     spawnParticle: spawnParticle, stepParticles: stepParticles, explode: explode,
     damage: damage, kill: kill, killGround: killGround, explode2: explode,

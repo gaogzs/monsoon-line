@@ -535,7 +535,7 @@ var Game = (function () {
        只有受挂载影响的维度会缩水，被吃掉的那一段用暗红标出来，
        右边再把净损失放在括号里。 */
     var stats = [
-      ['最大速度', 'spd'], ['机动性', 'mob'], ['低可探测', 'stl'],
+      ['最大速度', 'spd'], ['机动性', 'mob'], ['匿踪', 'stl'],
       ['火力', 'fire'], ['生存性', 'dur'], ['航程', 'rng'], ['电子对抗', 'ecm']
     ];
     var podEcm = passiveEffects(ac, lo).ecm;
@@ -552,6 +552,21 @@ var Game = (function () {
           (gain > 0.004 ? '<b style="left:' + Math.round(base * 100) + '%;width:' + (gain * 100).toFixed(1) + '%"></b>' : '') +
           '</span><span class="v">' + Math.round(tot * 100) +
           (gain > 0.004 ? '<em class="up">+' + Math.round(gain * 100) + '</em>' : '') +
+          '</span></div>';
+        continue;
+      }
+      if (key === 'stl') {
+        /* 匿踪：外挂折损（暗红）与吊舱抗锁定折算的加成（亮色）都显示 */
+        var stNow = stealthValue(ac, exposedPoints(ac, ac.hardpointGroups.map(function (g) { return lo[g.id]; })));
+        var stTot = Math.min(1, lockCutOf(stNow, passiveEffects(ac, lo).lockResist) / STEALTH_LOCK_CUT);
+        var lo2 = Math.min(stTot, base), dn = Math.max(0, base - stTot), up = Math.max(0, stTot - base);
+        sh += '<div class="stat-row"><span class="l">' + stats[k][0] + '</span>' +
+          '<span class="stat-bar"><i style="width:' + Math.round(lo2 * 100) + '%"></i>' +
+          (up > 0.004 ? '<b style="left:' + Math.round(base * 100) + '%;width:' + (up * 100).toFixed(1) + '%"></b>' : '') +
+          (dn > 0.004 ? '<u style="left:' + Math.round(stTot * 100) + '%;width:' + (dn * 100).toFixed(1) + '%"></u>' : '') +
+          '</span><span class="v">' + Math.round(stTot * 100) +
+          (up > 0.004 ? '<em class="up">+' + Math.round(up * 100) + '</em>' : '') +
+          (dn > 0.004 ? '<em>−' + Math.round(dn * 100) + '</em>' : '') +
           '</span></div>';
         continue;
       }
@@ -611,13 +626,14 @@ var Game = (function () {
         '<b class="warn">加速 −' + pctTxt(1 - lp.accel) + '%</b>' +
         '<b class="warn">俯仰 −' + pctTxt(1 - lp.pitch) + '%</b>' +
         '<b class="warn">滚转 −' + pctTxt(1 - lp.roll) + '%</b>' +
-        '<b>最大速度 −' + pctTxt(1 - lp.vMax) + '%</b>' +
-        '<b>失速 +' + pctTxt(lp.vStall - 1) + '%</b>' +
+        '<b class="warn">最大速度 −' + pctTxt(1 - lp.vMax) + '%</b>' +
+        '<b class="warn">失速 +' + pctTxt(lp.vStall - 1) + '%</b>' +
         '</div>';
     } else {
       sum += '<div class="ld-pen"><span class="l">挂载影响</span><b>无损失</b></div>';
     }
     sum += '</div>';
+    sum += '<div class="ld-note">挂载的拖累会随弹药打出而减轻，吊舱不会消耗，所以不受影响。</div>';
     sum += '<div class="ld-note">编号前缀取自逻辑语词根 —— ' +
       '环带工程是最早把逻辑语用作签字语言的厂商，详见资料库。</div>';
     document.getElementById('acLoadout').innerHTML = sum;
@@ -810,26 +826,89 @@ var Game = (function () {
          fits  —— 挂点类型对不对（物理上挂不挂得住）
          caps  —— 机体能力够不够（火控、供电、散热撑不撑得住）
        第二类是后来补的：只有 fits 的话，制空战斗机也能挂重型巡航导弹。 */
-    var blocked = 0;
-    for (var wid in WEAPONS) {
+    /* 不可用的也列出来（变暗打叉并写明原因），排在各自分类的最后。
+       fits 为空数组的是敌方/单位专用弹，玩家机库里不出现。 */
+    var buckets = {}, blocked = 0, wid;
+    for (wid in WEAPONS) {
       if (!Object.prototype.hasOwnProperty.call(WEAPONS, wid)) continue;
       var w = WEAPONS[wid];
       if (w.kind === 'gun') continue;
-      if (!w.fits || w.fits.indexOf(g.kind) < 0) continue;
-      if (!canCarry(ac, w)) { blocked++; continue; }
-      host.appendChild(makeStoreCard(lo, g, wid));
+      if (!w.fits || !w.fits.length) continue;
+      var why = unavailableReason(ac, g, w);
+      if (why) blocked++;
+      var cat = storeCategory(w);
+      (buckets[cat] = buckets[cat] || { ok: [], no: [] })[why ? 'no' : 'ok'].push({ wid: wid, why: why });
     }
-    if (blocked) {
-      head.textContent += '  ·  ' + blocked + ' 项因机体能力不足不可挂';
+    var nav = document.getElementById('hpNav');
+    if (nav) nav.innerHTML = '';
+    for (i = 0; i < STORE_CATS.length; i++) {
+      var b = buckets[STORE_CATS[i].id];
+      if (!b) continue;
+      var sec = document.createElement('div');
+      sec.className = 'pk-cat';
+      sec.textContent = STORE_CATS[i].label;
+      host.appendChild(sec);
+      if (nav) nav.appendChild(makeNavBtn(host, sec, STORE_CATS[i].short));
+      var all = b.ok.concat(b.no);
+      for (var j = 0; j < all.length; j++) {
+        host.appendChild(makeStoreCard(lo, g, all[j].wid, all[j].why));
+      }
     }
+    if (blocked) head.textContent += '  ·  ' + blocked + ' 项不可用';
+  }
+
+  /* 挂载分类。顺序即显示顺序；分类依据是玩家选它时在想的事
+     （打飞机近的 / 远的，打地面，上吊舱），而不是内部 kind。 */
+  var STORE_CATS = [
+    { id: 'wvr', short: '格斗弹', label: '格斗弹 · 红外近战' },
+    { id: 'bvr', short: '雷达弹', label: '雷达弹 · 中远距' },
+    { id: 'gnd', short: '对地', label: '对地 / 对海武器' },
+    { id: 'pod', short: '吊舱', label: '吊舱 · 电子战与传感' },
+    { id: 'oth', short: '特殊', label: '特殊' }
+  ];
+
+  /** 分类导航按钮：点一下把右栏立刻滚到该分类标题 */
+  function makeNavBtn(host, sec, text) {
+    var btn = document.createElement('button');
+    btn.textContent = text;
+    btn.onclick = function () {
+      host.scrollTop = sec.offsetTop - host.offsetTop;
+      SFX.click();
+    };
+    return btn;
+  }
+
+  function storeCategory(w) {
+    if (w.kind === 'aam') return w.seeker === 'radar' ? 'bvr' : 'wvr';
+    if (w.kind === 'agm' || w.kind === 'asm' || w.kind === 'bomb') return 'gnd';
+    if (w.kind === 'ecm') return 'pod';
+    return 'oth';
+  }
+
+  var NEED_LABEL = { strike: '对地火控与重型挂架', intercept: '高空拦截系统', ew: '电子战供电与散热' };
+
+  /** 不可用的原因；可用返回 null。挂点类型优先，其次机体能力。 */
+  function unavailableReason(ac, g, w) {
+    if (w.fits.indexOf(g.kind) < 0) {
+      var need = w.fits.map(hpKindLabel).join(' / ');
+      return '本组为' + hpKindLabel(g.kind) + '挂点，需' + need + '挂点';
+    }
+    if (!canCarry(ac, w)) {
+      var caps = (ac && ac.caps) || [], miss = [];
+      for (var i = 0; i < w.needs.length; i++) {
+        if (caps.indexOf(w.needs[i]) < 0) miss.push(NEED_LABEL[w.needs[i]] || w.needs[i]);
+      }
+      return '机体缺少' + miss.join('、');
+    }
+    return null;
   }
 
   /** 一张挂载卡片。wid 为 null 表示"空置"。 */
-  function makeStoreCard(lo, g, wid) {
+  function makeStoreCard(lo, g, wid, lockedWhy) {
     var n = g.pts.length;
     var card = document.createElement('div');
     var cur = (lo[g.id] || null) === wid;
-    card.className = 'pk-card' + (cur ? ' on' : '') + (wid ? '' : ' empty');
+    card.className = 'pk-card' + (cur ? ' on' : '') + (wid ? '' : ' empty') + (lockedWhy ? ' lock' : '');
 
     if (!wid) {
       card.innerHTML =
@@ -847,6 +926,17 @@ var Game = (function () {
         '<div class="pk-role">' + (w.role || '—') + '</div>' +
         '<div class="pk-d">' + (w.desc || '') + '</div>' +
         '<div class="pk-q">' + storeStatLine(w, n) + '</div>';
+    }
+
+    if (lockedWhy) {
+      var ov = document.createElement('div');
+      ov.className = 'pk-lock';
+      ov.innerHTML =
+        '<svg viewBox="0 0 100 100" preserveAspectRatio="none">' +
+        '<line x1="0" y1="0" x2="100" y2="100"/><line x1="100" y1="0" x2="0" y2="100"/></svg>' +
+        '<div class="pk-lock-t"><b>不可用</b><span>' + lockedWhy + '</span></div>';
+      card.appendChild(ov);
+      return card;
     }
 
     card.onclick = function () {
@@ -875,6 +965,8 @@ var Game = (function () {
       else if (gd.lead !== null) bits.push('导引 ' + gd.name + ' ' + Math.round(gd.lead * 100) + '%');
       else bits.push('导引 ' + gd.name);
     }
+    if (w.dmg) bits.push('伤害 ' + w.dmg);
+    if (w.blast) bits.push('杀伤范围 ' + w.blast + ' m');
     bits.push(w.mass + ' kg');
     if (w.cd) bits.push('冷却 ' + w.cd.toFixed(1) + 's');
     return bits.join(' · ');
@@ -1516,11 +1608,22 @@ var Game = (function () {
     p.spSalvo = wl.length ? wl[0].salvo : 1;
     // 挂载重量：拖累机动性，空挂架能换回一点
     p.loadFactor = loadK;
+    /* 打出去的弹不再拖累飞机：每枚弹摊到的拖累 = 该类弹的总拖累 / 该类弹的弹药上限，
+       吊舱不消耗，拖累始终保留。entities.js 的 curLoadFactor 每帧按弹药池折算。 */
+    var rounds = [], roundsMass = 0;
+    for (wi = 0; wi < wl.length; wi++) {
+      var rm = wl[wi].ammo * (wl[wi].w.mass || 100);
+      rounds.push({ wid: wl[wi].wid, cap: wl[wi].ammo, mass: rm });
+      roundsMass += rm;
+    }
+    var totalMass = loadoutMass(ac, lo);
+    p.loadModel = { k0: loadK, total: totalMass, fixed: Math.max(0, totalMass - roundsMass), rounds: rounds };
 
     // 被动吊舱的效果（不占扳机，装上就生效）
     var pe = passiveEffects(ac, lo);
     p.armor = pe.armor;              // 全向减伤
-    p.lockResist = pe.lockResist;    // 缩短敌方对我的锁定距离
+    var widsByGroup = (ac.hardpointGroups || []).map(function (g) { return lo[g.id]; });
+    Ent.setStealth(p, pe, widsByGroup);   // 匿踪 + 吊舱抗锁定 → 缩短敌方对我的锁定距离
     p.lockRangeK = pe.lockRange;     // 放大我的锁定距离
     Ent.setEcm(p, pe);               // 机体 ECM + 吊舱叠加
     p.flares += pe.flareBonus;
@@ -2769,6 +2872,9 @@ var Game = (function () {
       sl[slot] = w.cd;
       if (actor.special === wid) actor.spCd = Math.min.apply(null, sl);
       m.alive = false;
+      if (actor.isPlayer) {
+        SysNote.show('定向能拦截：<b>' + w.name + ' 「' + w.cn + '」</b> 烧毁来袭导弹');
+      }
       Ent.spawnParticle(world.particles, m.pos, M3.V(0, 0, 0), 0.4, 3.2, '#7dfaff', { grow: true });
       Ent.explode(world.particles, m.pos, 0.6, 8);
       SFX.laser();
@@ -2855,9 +2961,6 @@ var Game = (function () {
   }
 
   /* B 侧滑软钳：保持深度，把飞机在画面上的坐标软压进 FRAME_SOFT_LIM。
-      if (actor.isPlayer) {
-        SysNote.show('定向能拦截：<b>' + w.name + ' 「' + w.cn + '」</b> 烧毁来袭导弹');
-      }
      静态底座已经保证稳态位置在 FRAME_FILL 以内，所以玩家设的高度/距离不受影响。
      深度不足（视线甩得太快，镜头几乎到了飞机侧面甚至前方）时只能退到最小深度。 */
   function softClampFrame(off, camDir, fr) {

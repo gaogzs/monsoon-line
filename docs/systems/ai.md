@@ -292,7 +292,7 @@ a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
 2. **锁定锥**：`off < cone * 0.85`，`off = Ent.lockOff(a, t, w)`（对面弹只量水平方位），`y > 18000` 时 `cone *= 0.8`（收窄 20%）
 3. **锁定距离**：`dist < Ent.aiReach(w, y) * lockK * resist`（`aiReach = min(lockDist, effRange × 0.9)`，见 [entities.md](entities.md)；以前直接用 `lockDist`，BOX-14 这类标称比飞得远的弹会在射程外放），其中
    `lockK = 1 - min(0.25, max(0, (y - 15000) / 40000))`（越高越难锁），
-   `resist = t.lockResist ? 1 - t.lockResist : 1`（目标的被动吊舱打折）；
+   `resist = t.lockResist ? 1 - t.lockResist : 1`（目标的匿踪与被动吊舱抗锁定合并后的缩短比例，由 `Ent.setStealth` 写入）；
    目标正在主动干扰（`t.ewPower > 0`）**且本弹是雷达制导**时再乘
    `1 - ewPower × ewLockReduce × (1 - s.ewResist)` —— 红外弹不吃雷达干扰
 4. **最小距离**：`dist > (spW.nezer ? 1400 : (对面目标 ? 1200 : 700))`

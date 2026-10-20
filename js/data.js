@@ -44,6 +44,12 @@ var CALLSIGN = {
      vMax/vMil/vStall  m/s      accel/decel  m/s²
      pitch/roll/yaw    rad/s    hp  结构完整度
 
+   stats.stl（匿踪）—— 缩短敌方对这架机的锁定距离（见 stealthValue / lockCutOf）。
+   stats.ecm（电子对抗）—— 削弱瞄准它的导弹的提前量预测。两者各管一件事，不重叠。
+
+   hardpointGroups[].expose —— 该组挂载对匿踪的影响系数，默认 1；
+     0 = 完全内埋（弹舱），挂什么都不影响匿踪；0.5 = 半埋，只算一半。
+
    maker —— 上游公约只有三家主机厂，各自守一条技术路线：
 
      高空试验局   两万米路线：平流层制空 D-14 + 高空高速截击 F-9
@@ -243,11 +249,20 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     caps: ['strike', 'ew'],
     maker: '上游公约 · 环带工程',
     model: 'skua',
-    desc: `上游公约第一种真正意义上的低可探测飞机，
-      正面雷达反射面积大约相当于一只海鸟 —— 名字就是这么来的。
-      <p>代价在载弹量上：为了保住隐身，大部分武器必须塞进内埋弹舱。
-      一旦外挂，它的隐身性能会掉到和普通战机差不多的水平 ——
-      <b>隐身不是一种属性，是一种状态。</b></p>`,
+    desc: `
+<p>上游公约第一种真正意义上的低可探测飞机。正面雷达反射面积大约相当于
+一只<b>海鸟</b> —— 名字就是这么来的。</p>
+<p>无尾菱形翼配上扁平的升力体机身，整架飞机几乎没有垂直面。
+机腹的<b>内埋弹舱</b>是它的核心：弹挂在里面，不增加任何雷达反射，
+开舱投放的那一两秒也不会让对方的锁定距离变长。</p>
+<p>航电与 DB-11 同源，但电子战协处理器的算力<b>全机队最高</b>：
+它不只躲，还会在对方雷达里留下一团不太对的回波。
+代价是结构完整度<b>只有 96</b>，机体为了保形放弃了大部分装甲。</p>
+<p><b>特点：</b>匿踪与电子对抗都是全机队最高，打的是“你先看不见我”。
+弹舱里的东西不折损匿踪，翼下每挂一个点会掉一点 ——
+不多，但挂满之后它就只是一架飞得不错的普通战机。</p>
+<p><b>反过来说：</b>弹舱只塞得下两个挂点，火力有天花板；
+被咬住之后，96 的结构撑不了几下。</p>`,
     stats: { spd: 0.72, mob: 0.66, stl: 0.96, fire: 0.56, dur: 0.50, rng: 0.70, ecm: 0.72 },
     phys: { vMax: 540, vMil: 430, vStall: 118, accel: 26, decel: 36, pitch: 0.66, roll: 2.42, yaw: 0.26, hp: 96 },
     gun: 'k3',
@@ -255,7 +270,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     hardpointGroups: [
       /* 升力体机身很扁（下表面约 -0.75 m），默认的 belly -1.95 / light -1.15
          会让挂载悬在机身下面一米多 —— 贴着机腹 / 翼面挂。 */
-      { id: 'A', label: '内埋弹舱', kind: 'belly', hy: -0.82, pts: [{ x: 1.1, y: -2.2 }, { x: -1.1, y: -2.2 }] },
+      { id: 'A', label: '内埋弹舱', kind: 'belly', expose: 0, hy: -0.82, pts: [{ x: 1.1, y: -2.2 }, { x: -1.1, y: -2.2 }] },
       { id: 'B', label: '翼下挂点', kind: 'light', hy: -0.55, pts: [{ x: 3.6, y: -3.4 }, { x: -3.6, y: -3.4 }] }
     ],
     defaultLoadout: { A: 'lcm', B: 'oep' }
@@ -275,12 +290,20 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     caps: [],                    // 纯格斗机：没有对地火控，也不带电子战设备
     maker: '上游公约 · 北岸航空',
     model: 'albatross',
-    desc: `前掠翼有个老问题：翼尖会先失速，然后机翼会以一种
-      非常壮观的方式自己拧断。这个问题困扰了工程师将近一百年，
-      直到复合材料让机翼能按需要弯曲。
-      <p>信天翁是上游公约第一架量产的前掠翼战斗机。
-      它飞不快，加速也一般，但<b>滚转比这里任何一架都快</b>，
-      低速缠斗时最灵活。</p>`,
+    desc: `
+<p>前掠翼有个老问题：翼尖会先失速，然后机翼会以一种非常壮观的方式
+自己拧断。这个问题困扰了工程师将近<b>一百年</b>，
+直到复合材料让机翼能按需要弯曲。</p>
+<p>信天翁是上游公约第一架量产的前掠翼战斗机。前掠让翼根先于翼尖气流分离，
+失速速度压到了 <b>96 m/s</b>，低速下副翼依然有效 ——
+这是后掠翼机型做不到的。</p>
+<p>它飞不快，极速只有 <b>470 m/s</b>，加速也一般；但滚转率
+<b>2.81 rad/s，全机队最高</b>。翼尖多了一组挂点，
+专门给最轻的格斗弹用。</p>
+<p><b>特点：</b>低速缠斗时最灵活。别在高空、别在高速时和它比转弯 ——
+把它拖进 5 公里以下的慢速圈子里，它才是主人。</p>
+<p><b>反过来说：</b>没有对地火控，也不带电子战设备，没有内埋弹舱，
+挂什么都是挂在外面。它只会打飞机。</p>`,
     stats: { spd: 0.52, mob: 0.90, stl: 0.24, fire: 0.60, dur: 0.62, rng: 0.80, ecm: 0.30 },
     phys: { vMax: 470, vMil: 380, vStall: 96, accel: 24, decel: 42, pitch: 0.74, roll: 2.81, yaw: 0.36, hp: 118 },
     gun: 'k3',
@@ -483,7 +506,7 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
     gun: null,
     maxLoad: 22000,
     hardpointGroups: [
-      { id: 'A', label: '弹舱', kind: 'belly', hy: -2.30, pts: [{ x: 1.6, y: -2.2 }, { x: -1.6, y: -2.2 }] },
+      { id: 'A', label: '弹舱', kind: 'belly', expose: 0, hy: -2.30, pts: [{ x: 1.6, y: -2.2 }, { x: -1.6, y: -2.2 }] },
       { id: 'B', label: '翼下重挂点', kind: 'heavy', pts: [{ x: 6.0, y: -1.5 }, { x: -6.0, y: -1.5 }] }
     ],
     defaultLoadout: {}
@@ -1678,8 +1701,7 @@ var WEAPONS = {
     speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
     turn: 1.75, seeker: 'ir', lockCone: 28 * Math.PI / 180, lockDist: 4200,
     dmg: 30, ammo: 8, cd: 0.11, salvo: 1, flare: 0.38, fuze: 12, blast: 18, blastCore: 2,
-    target: 'air',    desc: `基础短程红外弹。转弯率 {{turn}} rad/s，抗干扰一般，锁定锥 {{coneDeg}}°。
-      一个挂点带 {{perPoint}} 发、装填只要 {{cd}} 秒 —— 它就是用来"多带几发"的。`,
+    target: 'air',    desc: '基础短程红外弹。机动一般、抗干扰一般，胜在便宜量大 —— 一个挂点能带很多发，装填也快，它就是用来“多带几发”的。',
     stat: { dmg: 0.34, spd: 0.50, trn: 0.68, rng: 0.36, ecm: 0.30 }
   },
 
@@ -1694,8 +1716,7 @@ var WEAPONS = {
     speed: 820, boost: 210, life: 5.0, vsLife: 13.0,
     turn: 1.95, seeker: 'ir', lockCone: 30 * Math.PI / 180, lockDist: 4800,
     dmg: 32, ammo: 6, cd: 0.14, salvo: 1, flare: 0.24, fuze: 12, blast: 18, blastCore: 2,
-    target: 'air',    desc: '短哨是基础弹的抗干扰改型：换了双色导引头，flare 从 0.38 降到 {{flare}}，' +
-      '代价是单价上去了、单挂点只能带 {{perPoint}} 发。',
+    target: 'air',    desc: '基础弹的抗干扰改型，换了双色导引头，不容易被热焰弹骗走。代价是单价更高，单个挂点能带的弹数少了一些。',
     stat: { dmg: 0.36, spd: 0.56, trn: 0.72, rng: 0.42, ecm: 0.58 }
   },
 
@@ -1706,8 +1727,7 @@ var WEAPONS = {
     turn: 2.60, seeker: 'ir', lockCone: 88 * Math.PI / 180, lockDist: 3200,
     dmg: 28, ammo: 4, cd: 0.12, salvo: 1, flare: 0.42, fuze: 11, blast: 17, blastCore: 2,
     target: 'air', hobs: true,
-    desc: '环刃的导引头能在 {{coneDeg}}° 离轴角上锁定、出膛后也一直看得见那么宽 —— 机头都不用转过去就能打。' +
-      '转弯率是全家族最高的，但射程和抗干扰都垫底。',
+    desc: '导引头能在 {{coneDeg}}° 离轴角上锁定、出膛后也一直看得见那么宽 —— 机头都不用转过去就能打。转弯能力在格斗弹里很高，但射程短、抗干扰也差。',
     stat: { dmg: 0.32, spd: 0.42, trn: 0.95, rng: 0.24, ecm: 0.24 }
   },
 
@@ -1722,9 +1742,7 @@ var WEAPONS = {
     turn: 2.73, seeker: 'ir', lockCone: 34 * Math.PI / 180, lockDist: 3800,
     dmg: 48, ammo: 10, cd: 0.1, salvo: 1, flare: 0.40, fuze: 0, blast: 0, blastCore: 0,
     target: 'air',
-    desc: '动能杀伤格斗弹。没有破片战斗部，靠直接碰撞杀伤 —— <b>擦肩而过等于没打中</b>，' +
-      '但只要撞上就是固定 {{dmg}} 的伤害。转弯率 {{turn}} rad/s，全家族最高；' +
-      '一个挂点带 {{perPoint}} 发。近距格斗最能发挥它，远距打机动目标很容易落空。',
+    desc: '动能杀伤格斗弹。没有破片战斗部，靠直接碰撞杀伤 —— <b>擦肩而过等于没打中</b>，但只要撞上就是实打实的伤害。机动性是格斗弹里最高的一档，一个挂点能带不少。近距格斗最能发挥它，远距打机动目标很容易落空。',
     stat: { dmg: 0.50, spd: 0.50, trn: 0.98, rng: 0.30, ecm: 0.40 }
   },
 
@@ -1737,9 +1755,7 @@ var WEAPONS = {
     turn: 1.16, seeker: 'radar', lockCone: 36 * Math.PI / 180, lockDist: 8000,
     dmg: 46, ammo: 2, cd: 0.84, salvo: 1, flare: 0.34, fuze: 22, blast: 60, blastCore: 10,
     target: 'air',
-    desc: '重战斗部中距弹。近炸引信 {{fuze}} 米、爆炸半径 {{blast}} 米 —— 不需要打准，' +
-      '在编队中间炸开能同时伤到好几架。代价是比中继慢、转得也钝，' +
-      '打单架机动战斗机不划算；打轰炸机群、巡逻机和密集编队是它的本行。',
+    desc: '重战斗部中距弹。爆炸范围很大，不需要打准，在编队中间炸开能同时伤到好几架。代价是速度偏慢、转得也钝，打单架机动战斗机不划算；打轰炸机群、巡逻机和密集编队是它的本行。',
     stat: { dmg: 0.56, spd: 0.62, trn: 0.40, rng: 0.66, ecm: 0.30 }
   },
 
@@ -1758,11 +1774,7 @@ var WEAPONS = {
        **不会再咬回骗过它的那团箔丝云**（entities.js 的 decoyRecheck），
        而是在锁定锥内重新捕获真目标 —— 包括刚才丢诱饵的那一架。
        （别处也写着"雷达弹不吃箔丝"，同批一起改掉了。） */
-    desc: '主动雷达中距弹。抗干扰是它的强项：干扰弹里的箔丝骗到它的概率只有 {{flareRDPct}}；' +
-      '就算骗中了，它也记得那团箔丝 —— 盲飞过后重新搜索时不会再被同一团诱饵骗走，' +
-      '而是在 {{coneDeg}}° 锁定锥内重新咬住真目标。' +
-      '比干扰弹更可靠的办法是机动 —— 把它的能量耗光。' +
-      '锁定需要时间，打完就得脱离，否则对方会用同样的东西回敬你。',
+    desc: '主动雷达中距弹。抗干扰是它的强项：干扰弹里的箔丝很难骗到它；就算骗中了，它也记得那团箔丝 —— 盲飞过后重新搜索时不会再被同一团诱饵骗走，而是在锁定锥内重新咬住真目标。比干扰弹更可靠的办法是机动 —— 把它的能量耗光。锁定需要时间，打完就得脱离，否则对方会用同样的东西回敬你。',
     stat: { dmg: 0.48, spd: 0.70, trn: 0.52, rng: 0.72, ecm: 0.20 }
   },
 
@@ -1788,13 +1800,7 @@ var WEAPONS = {
        锁定锥 26° —— 打机动的战斗机很吃力，打大目标是最好的一发。
        反辐射只是**在目标恰好开着雷达时**多给一倍。 */
     antiRadar: true,
-    desc: '重型拦截弹。战斗部 52 kg 全场最大，近炸引信 {{fuze}} 米、爆炸半径 {{blast}} 米 ——' +
-      '目标不需要被直接命中，擦着炸开也够它受的。' +
-      '代价写在别处：可用过载只有 1.35，锁定锥 26°，是全场最难咬住人的一枚。' +
-      '打机动的战斗机基本靠对方配合；打轰炸机、巡逻机这类大目标，' +
-      '它一发就够。' +
-      '\n**对正在辐射的空中目标（未被压哑的预警机、开机中的干扰机）伤害翻倍** ——' +
-      '它找的就是那部机载雷达。它是对空弹，打不了地面雷达站。',
+    desc: '重型拦截弹。战斗部在空空弹里最大，爆炸范围也相当可观 —— 目标不需要被直接命中，擦着炸开也够它受的。代价是机动性很低、锁定范围很窄，是最难咬住人的一枚。打机动的战斗机基本靠对方配合；打轰炸机、巡逻机这类大目标，一发就够。<br><b>对正在辐射的空中目标（未被压哑的预警机、开机中的干扰机）伤害翻倍</b> —— 它找的就是那部机载雷达。它是对空弹，打不了地面雷达站。',
     stat: { dmg: 0.62, spd: 0.68, trn: 0.48, rng: 0.80, ecm: 0.18 }
   },
 
@@ -1829,8 +1835,7 @@ var WEAPONS = {
     turn: 0.78, seeker: 'radar', lockCone: 18 * Math.PI / 180, lockDist: 16000,
     dmg: 66, ammo: 1, cd: 1.5, salvo: 1, flare: 0.66, fuze: 27, blast: 49, blastCore: 7,
     target: 'air',
-    desc: '一发就占满一个重挂点。它存在的意义是把预警机和浮空平台' +
-      '从护航圈里拽下来 —— 打战斗机是浪费。',
+    desc: '一发就占满一个重挂点，射程在所有空空弹里最远。它存在的意义是把预警机和浮空平台从护航圈里拽下来 —— 打战斗机是浪费。',
     stat: { dmg: 0.82, spd: 0.78, trn: 0.24, rng: 1.00, ecm: 0.16 }
   },
 
@@ -1841,8 +1846,7 @@ var WEAPONS = {
     turn: 1.70, seeker: 'ir', lockCone: 30 * Math.PI / 180, lockDist: 4000,
     dmg: 24, ammo: 12, cd: 0.28, salvo: 3, flare: 0.40, fuze: 10, blast: 16, blastCore: 2,
     target: 'air',
-    desc: '三联装发射巢：按一下出 {{salvo}} 枚，一个挂点装 {{perPoint}} 枚（{{volleys}} 次齐射）。单发威力最小，' +
-      '但一次齐射能铺开一片 —— 用来逼对方放弃进攻航线比用来击落更有效。',
+    desc: '三联装发射巢：按一下连出三枚，一个挂点装得下好几轮齐射。单发威力最小，但一次齐射能铺开一片 —— 用来逼对方放弃进攻航线比用来击落更有效。',
     stat: { dmg: 0.26, spd: 0.46, trn: 0.64, rng: 0.34, ecm: 0.22 }
   },
 
@@ -1855,9 +1859,7 @@ var WEAPONS = {
     target: 'air', reAcquire: true,
     /* 原文"推力更猛、加速更快"与数据相反（boost 260 < 锥刺的 280）。
        它真正快的是**最高速**（860 > 790）与锁定距离。 */
-    desc: '锥刺的轻量版：极速 {{speed}} m/s、锁定距离 {{lockKm}} km，都比锥刺高，' +
-      '进不可逃逸区比谁都快。代价是战斗部小、转弯率只有 {{turn}} rad/s，' +
-      '动力段短，追不上掉头就跑的目标。',
+    desc: '锥刺的轻量版：极速和锁定距离都比锥刺高，进不可逃逸区比谁都快。代价是战斗部小、转弯能力一般，动力段短，追不上掉头就跑的目标。',
     stat: { dmg: 0.44, spd: 0.62, trn: 0.78, rng: 0.50, ecm: 0.26 }
   },
 
@@ -1879,8 +1881,7 @@ var WEAPONS = {
        （我上一轮按 unguided 删除制导类字段时把它一起删了，那是错的。） */
     flare: 0.55,
     target: 'ground', ballistic: true,
-    desc: '无动力滑翔制导炸弹，红外导引头只找地面热源。轻、便宜、能多带 —— 一个挂点塞得下 {{perPoint}} 枚。' +
-      '没有发动机，射程全靠投放高度与速度换；转弯率只有 {{turn}} rad/s，目标挪远了就打空。',
+    desc: '无动力滑翔制导炸弹，红外导引头只找地面热源。轻、便宜、能多带 —— 一个挂点塞得下不少。没有发动机，射程全靠投放高度与速度换；转弯能力很弱，目标挪远了就打空。',
     stat: { dmg: 0.52, spd: 0.20, trn: 0.30, rng: 0.48, ecm: 0.60 }
   },
 
@@ -1893,8 +1894,7 @@ var WEAPONS = {
     target: 'ground',
     /* 侵彻：对加固目标（HARD_MODELS）不打折，见 entities.js 的 warheadK */
     penetrator: true,
-    desc: '重型侵彻战斗部，专门对付加固目标：对它们<b>全额伤害</b>，' +
-      '而普通战斗部只剩 {{hardPct}}。一发就能解决一座测控站，但一个挂点只带得下 {{perPoint}} 枚。',
+    desc: '重型侵彻战斗部，专门对付加固目标：对它们<b>全额伤害</b>，而普通战斗部会大打折扣。一发就能解决一座测控站，但一个挂点带不了几枚。',
     stat: { dmg: 0.90, spd: 0.36, trn: 0.34, rng: 0.62, ecm: 0.30 }
   },
 
@@ -1956,9 +1956,7 @@ var WEAPONS = {
        半径内所有水面/地面目标都吃满额伤害（combat.js 的 Combat.blast）。
        cluster 字段本身还留着：加固目标的打折（warheadK）和 desc 模板认它。 */
     target: 'ground', cluster: 60, unguided: true, ballistic: true,
-    desc: '子母弹。抛撒覆盖半径 {{cluster}} 米，范围内每个地面目标都吃满额伤害，对分散的软目标效率极高，' +
-      '但打不动加固目标 —— 破片啃不开机堡，只剩 {{hardPct}} 伤害。' +
-      '<b>自由落体，抛撒之后没有任何制导。</b>',
+    desc: '子母弹。抛撒覆盖一大片区域，范围内每个地面目标都吃满额伤害，对分散的软目标效率极高，但打不动加固目标 —— 破片啃不开机堡，伤害大打折扣。<b>自由落体，抛撒之后没有任何制导。</b>',
     stat: { dmg: 0.44, spd: 0.18, trn: 0.26, rng: 0.42, ecm: 0.66 }
   },
 
@@ -1986,9 +1984,7 @@ var WEAPONS = {
     lockResist: 0.30,
     /* 原文"拖曳式诱饵"—— 代码里它只有 lockResist，并不会把来袭弹引开。
        改成如实描述。 */
-    desc: '常开的被动干扰吊舱。敌方对你的锁定距离缩短 {{lockResistPct}}，同时机体电子对抗 +10，来袭导弹的提前量预测变差，且不需要手动开启 ——' +
-      '它不会把已经飞来的导弹引开，那仍然要靠干扰弹和机动；' +
-      '代价是这个挂点永远空着。',
+    desc: '常开的被动干扰吊舱。大幅缩短敌方对你的锁定距离（提升匿踪），同时略微提升机体电子对抗，让来袭导弹的提前量预测变差，且不需要手动开启 —— 它不会把已经飞来的导弹引开，那仍然要靠干扰弹和机动；代价是这个挂点永远空着。',
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.92 }
   },
 
@@ -2001,8 +1997,7 @@ var WEAPONS = {
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0,
     target: 'none', passive: true,
     flareBonus: 40,
-    desc: '额外挂载 40 组干扰弹的储存舱。想要"按住 V 一直丢"的话，' +
-      '这个东西比多带两枚弹有用。',
+    desc: '额外储存一大批干扰弹的储存舱。想要“按住 V 一直丢”的话，这个东西比多带两枚弹有用。',
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.74 }
   },
 
@@ -2017,7 +2012,7 @@ var WEAPONS = {
     /* 被动测距：用光电方式锁定时不辐射，对方的 RWR 收不到告警。
        见 ai.js 里 rwrT 的判定 —— 它决定敌人会不会因为你锁了它而回头咬你。 */
     silentLock: true,
-    desc: '光电瞄准吊舱。你的锁定距离增加 45%，而且被动测距不会被 RWR 发现。',
+    desc: '光电瞄准吊舱。明显增加你的锁定距离，而且被动测距不会被 RWR 发现。',
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0.90, ecm: 0.40 }
   },
 
@@ -2031,8 +2026,7 @@ var WEAPONS = {
     target: 'none', passive: true,
     lockRangeBonus: 0.25, lockResist: 0.15,
     silentLock: true,
-    desc: '红外搜索与跟踪。锁定距离 +25%，同时略降对方对你的锁定距离 ——' +
-      '"你不开雷达，我也不开"，这是高空静默交战的常规配置。',
+    desc: '红外搜索与跟踪。适度增加锁定距离，同时略降对方对你的锁定距离（提升匿踪）—— “你不开雷达，我也不开”，这是高空静默交战的常规配置。',
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0.62, ecm: 0.58 }
   },
 
@@ -2044,8 +2038,7 @@ var WEAPONS = {
     dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0,
     target: 'none', passive: true,
     armorBonus: 0.22,
-    desc: '附加装甲与灭火抑爆组件，全向减伤 22%。' +
-      '它不能让你赢，只能让你活着回来。',
+    desc: '附加装甲与灭火抑爆组件，全向减伤。它不能让你赢，只能让你活着回来。',
     stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.50 }
   },
 
@@ -2057,9 +2050,7 @@ var WEAPONS = {
     speed: 720, boost: 300, life: 3.5, vsLife: 9.0,
     turn: 2.55, seeker: 'ir', lockCone: 32 * Math.PI / 180, lockDist: 3400,
     dmg: 16, ammo: 8, cd: 0.17, salvo: 4, flare: 0.44, fuze: 8, blast: 14, blastCore: 2,
-    target: 'air',    desc: `专打无人机的微型弹。战斗部只有 16 单位，但一个挂点塞得下 {{perPoint}} 发，
-      一次齐射四枚，用来把蜂群从天上扫下来。
-      <b>拿去打有人机是浪费。</b>`,
+    target: 'air',    desc: '专打无人机的微型弹。战斗部很小，但一个挂点塞得下很多发，一次齐射数枚，用来把蜂群从天上扫下来。<b>拿去打有人机是浪费。</b>',
     stat: { dmg: 0.16, spd: 0.44, trn: 0.72, rng: 0.28, ecm: 0.22 }
   },
 
@@ -2069,10 +2060,7 @@ var WEAPONS = {
     speed: 980, boost: 240, life: 8.0, vsLife: 18.0,
     turn: 1.30, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 11000,
     dmg: 62, ammo: 1, cd: 1.2, salvo: 1, flare: 0.70, fuze: 26, blast: 48, blastCore: 7,
-    target: 'air', highAltImmune: true,    desc: `为两万米以上专门设计的拦截弹。舵面比同级大将近一倍，
-      代价是低空阻力大、加速慢。
-      <b>它的过载不随空气变稀而崩塌</b> —— 这是它唯一的长处，
-      也是在那个高度唯一还重要的东西。`,
+    target: 'air', highAltImmune: true,    desc: '为极高空专门设计的拦截弹。舵面比同级大得多，代价是低空阻力大、加速慢。<b>它的过载不随空气变稀而崩塌</b> —— 这是它唯一的长处，也是在那个高度唯一还重要的东西。',
     stat: { dmg: 0.78, spd: 0.84, trn: 0.38, rng: 0.88, ecm: 0.24 }
   },
 
@@ -2098,9 +2086,7 @@ var WEAPONS = {
     turn: 2.45, seeker: 'ir', lockCone: 35 * Math.PI / 180, lockDist: 4600,
     dmg: 56, ammo: 16, cd: 0.23, salvo: 1, flare: 0.35, fuze: 16, blast: 22, blastCore: 2,
     target: 'air', reAcquire: true,
-    desc: `高机动缠斗弹。转弯率 <b>{{turn}} rad/s</b>，全场最高之一；
-      丢失目标后导引头会在 {{coneDeg}}° 视场里重新搜索热源。抗干扰差。
-      <br><span class="am">注意：在高空，它的过载会随动压一起崩塌。</span>`,
+    desc: '高机动缠斗弹。转弯能力是格斗弹里最强的一档；丢失目标后导引头会在 {{coneDeg}}° 视场里重新搜索热源。抗干扰差。<br><span class="am">注意：在高空，它的过载会随动压一起崩塌。</span>',
     stat: { dmg: 0.62, spd: 0.55, trn: 1.0, rng: 0.40, ecm: 0.25 }
   },
   v9: {
@@ -2110,8 +2096,7 @@ var WEAPONS = {
     turn: 1.90, seeker: 'ir', lockCone: 75 * Math.PI / 180, lockDist: 3800,
     dmg: 44, ammo: 44, cd: 0.16, salvo: 2, flare: 0.50, fuze: 13, blast: 19, blastCore: 2,
     target: 'air', hobs: true,
-    desc: `大离轴角格斗弹，锁定锥 <b>±{{coneDeg}}°</b> —— 目标甚至不需要在你前方。
-      一按 {{salvo}} 发齐射、每槽 {{cd}} 秒装填，一个挂点带 {{perPoint}} 发，是狗斗中的弹药倾泻器。`,
+    desc: '大离轴角格斗弹，锁定锥 <b>±{{coneDeg}}°</b> —— 目标甚至不需要在你前方。一按双发齐射，一个挂点带的数量很多，是狗斗中的弹药倾泻器。',
     stat: { dmg: 0.50, spd: 0.60, trn: 0.76, rng: 0.32, ecm: 0.40 }
   },
   v17: {
@@ -2123,11 +2108,7 @@ var WEAPONS = {
     turn: 1.00, seeker: 'radar', lockCone: 24 * Math.PI / 180, lockDist: 12500,
     dmg: 62, ammo: 8, cd: 0.88, salvo: 1, flare: 0.72, fuze: 21, blast: 33, blastCore: 4,
     target: 'air', nezer: true, scramjet: true,
-    desc: `固体燃料冲压发动机远距弹。海平面动力段长达 <b>10 秒</b>、
-      总寿命 30 秒，不可逃逸区是全家族最大的。
-      <br><span class="rd">18 公里以上因空气稀薄缺氧，自动降级为火箭模式 ——
-      动力段从 10 秒掉到 2.4 秒。</span>
-      <b>低空它是最难甩掉的一枚；到了高空，就不再是杀手锏。</b>`,
+    desc: '固体燃料冲压发动机远距弹。低空动力段很长、总寿命也长，不可逃逸区是全家族最大的。<br><span class="rd">高空因空气稀薄缺氧，自动降级为火箭模式 —— 动力段大幅缩短。</span><b>低空它是最难甩掉的一枚；到了高空，就不再是杀手锏。</b>',
     stat: { dmg: 0.68, spd: 1.0, trn: 0.30, rng: 1.0, ecm: 0.80 }
   },
   v22: {
@@ -2150,8 +2131,7 @@ var WEAPONS = {
     target: 'ground',
     /* 攻顶：水平距离 > dive 时瞄准点抬高 alt 米，末段俯冲（entities.js） */
     loft: { alt: 1500, dive: 2800 },
-    desc: `防区外空地导弹，攻顶弹道：先爬到目标上空约 {{loftAlt}} 米，
-      最后 {{loftDiveKm}} km 压头俯冲。`,
+    desc: '防区外空地导弹，攻顶弹道：先爬升到目标上空，最后一段压头俯冲。',
     stat: { dmg: 0.82, spd: 0.52, trn: 0.18, rng: 0.85, ecm: 0.82 }
   },
   v30: {
@@ -2188,10 +2168,7 @@ var WEAPONS = {
     turn: 0.20, seeker: 'eo', lockCone: 60 * Math.PI / 180, lockDist: 2400,
     dmg: 210, ammo: 6, cd: 0.24, salvo: 1, blast: 80, blastCore: 80, blastAir: false,
     target: 'ground', cluster: 80, ballistic: true,
-    desc: `光电制导集束炸弹，抛撒子弹药覆盖半径 <b>{{cluster}} 米</b>，范围内每个地面目标都吃满额伤害
-      （加固目标只剩 {{hardPct}}）。
-      导引头看的是可见光 / 近红外图像，<b>热焰弹和箔丝都骗不到它</b>。
-      代价是没有发动机、转弯率只有 {{turn}} rad/s：得从目标上空 {{lockKm}} km 内投放。`,
+    desc: '光电制导集束炸弹，抛撒子弹药覆盖一大片区域，范围内每个地面目标都吃满额伤害（加固目标大打折扣）。导引头看的是可见光 / 近红外图像，<b>热焰弹和箔丝都骗不到它</b>。代价是没有发动机、转弯能力很弱：得从目标上空近距离投放。',
     stat: { dmg: 0.90, spd: 0.10, trn: 0.08, rng: 0.20, ecm: 1.0 }
   },
   e4: {
@@ -2202,10 +2179,7 @@ var WEAPONS = {
     turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
     dmg: 0, ammo: 99, cd: 5, salvo: 0, flare: 1.0,
     target: 'none', duration: 6.0, lockReduce: 0.40,
-    desc: `认知电子战吊舱。开启后 <b>{{duration}} 秒</b>内敌方<b>雷达</b>对你的锁定距离最多缩短 <b>{{lockReducePct}}</b>
-      （只管锁定距离：已经飞来的导弹不受影响），
-      但你自己的雷达同时被压制。冷却 <b>{{cd}} 秒</b>。
-      <br><span class="am">干扰给的不是免疫，是时间。</span>`,
+    desc: '认知电子战吊舱。开启后的一段时间内，敌方<b>雷达</b>对你的锁定距离大幅缩短（只管锁定距离：已经飞来的导弹不受影响），但你自己的雷达同时被压制。冷却很长。<br><span class="am">干扰给的不是免疫，是时间。</span>',
     stat: { dmg: 0.0, spd: 0.0, trn: 0.0, rng: 0.0, ecm: 1.0 }
   },
   l2: {
@@ -2836,6 +2810,39 @@ function loadoutPenalty(lf) {
     pitch: 1 - 0.18 * lf,
     roll: 1 - 0.12 * lf
   };
+}
+
+/* ============================================================
+   匿踪
+   机体自带的 stats.stl（0..1）= 敌方锁定距离能被缩短的程度；
+   外挂会破坏它：每个外露挂点吃掉 STEALTH_LOSS_PER_POINT（按 expose 折算）。
+   满值 1.0 最多缩短锁定距离 STEALTH_LOCK_CUT，吊舱（lockResist）与它
+   按 1 − (1−a)(1−b) 合并。界面与物理必须用这一份。
+   ============================================================ */
+var STEALTH_LOCK_CUT = 0.5;
+var STEALTH_LOSS_PER_POINT = 0.05;
+
+/** 外露挂点数。wids[i] 对应第 i 个挂点组，空 / 无效 = 没挂东西 */
+function exposedPoints(ac, wids) {
+  var groups = (ac && ac.hardpointGroups) || [], n = 0;
+  for (var i = 0; i < groups.length; i++) {
+    var wid = wids && wids[i];
+    if (!wid || !WEAPONS[wid]) continue;
+    var ex = groups[i].expose === undefined ? 1 : groups[i].expose;
+    n += groups[i].pts.length * ex;
+  }
+  return n;
+}
+
+/** 挂载后的实际匿踪值 0..1 */
+function stealthValue(ac, exposed) {
+  var s = (ac && ac.stats && ac.stats.stl) || 0;
+  return s * Math.max(0, 1 - STEALTH_LOSS_PER_POINT * (exposed || 0));
+}
+
+/** 敌方锁定距离被缩短的比例：机体匿踪 + 吊舱抗锁定 */
+function lockCutOf(stealth, podResist) {
+  return 1 - (1 - stealth * STEALTH_LOCK_CUT) * (1 - (podResist || 0));
 }
 
 var MISSILE_LEAD = {

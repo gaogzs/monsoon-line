@@ -465,14 +465,14 @@ e.lockRange = Math.min(e.lockRange, 1.9);
 
 两条容易忽略的规则：
 
-- `lockResist` **取最大值而不是相加** —— 两件抗锁定吊舱不会叠成因找不到
+- 吊舱内部的 `lockResist` **取最大值而不是相加** —— 两件抗锁定吊舱不会叠成因找不到
 - `armor` / `lockRange` / `flareBonus` **乘该组的点数**（左右各一 = ×2）
 
 在 `startMission()` 里落到玩家实体上：
 
 ```js
 p.armor      = pe.armor;         // 全向减伤
-p.lockResist = pe.lockResist;    // 缩短敌方对我的锁定距离
+Ent.setStealth(p, pe, wids);     // 匿踪 + 吊舱 lockResist 合并 → p.lockResist，缩短敌方对我的锁定距离
 p.lockRangeK = pe.lockRange;     // 放大我的锁定距离（updateLock 里乘）
 p.flares    += pe.flareBonus;    // 基础 80 组 + 加成
 p.silentLock = pe.silentLock;    // 被动测距：不触发敌方 RWR
@@ -495,8 +495,8 @@ p.emcon      = false;            // EMCON-Δ 电磁静默（N 键切换）
 
 **敌机也走同一条路。** 任务脚本可以用 `spawnEnemy(w, {ac, pods: ['vzu']})`
 给 NPC 挂被动吊舱，`missions.js` 把 `pods` 翻成 `[{wid,n:1}]` 交给
-`Ent.passiveEffects()`，再把结果写到 `a.lockResist / a.armor / a.flares /
-a.silentLock` 上。在这条路接通之前，**敌机不存在任何抗锁定能力** ——
+`Ent.passiveEffects()`，再把结果写到 `a.armor / a.flares /
+a.silentLock` 上，`a.lockResist` 走 `Ent.setStealth`（与机体匿踪合并）。在这条路接通之前，**敌机不存在任何抗锁定能力** ——
 他们挂什么吊舱都只是数据表里的一行字（m3 的下游护航机现在挂了迷雾）。
 
 ---
@@ -581,7 +581,8 @@ roll   × (1 − 0.12·lf)
 |---|---|---|
 | 最大速度 | ✅ | `× lp.vMax` |
 | 机动性 | ✅ | `× (lp.pitch + lp.roll + lp.accel) / 3` |
-| 低可探测 / 火力 / 生存性 / 航程 | ❌ | 机型固有值 |
+| 匿踪 | ✅（外挂） | 每个外露挂点 −5%（相对机体值）；`expose` 为 0 的挂点组（内埋弹舱）不折损；条上还会显示吊舱抗锁定折算的加成 |
+| 火力 / 生存性 / 航程 | ❌ | 机型固有值 |
 
 ### 出击配置明细
 

@@ -203,7 +203,7 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 
 ### `startMission(idx)`
 1. `missionIdx = idx`；`mission = MISSIONS[idx]`；`world = newWorld()`；`stats = { startTime: 0, endTime: 0 }`；然后 `Ent.makeAircraft({ type, team: 0, isPlayer: true, y: mission.altStart, fwd: (0,0,1), speed: mission.speedStart })`。
-2. 把机库配置落到飞机上：`p.loadoutList = resolveLoadout(ac, lo)`；`p.ammoPool[wid] = ammo`；`p.slotCd[wid]` **一个挂点一个槽**（长度 = `e.salvo`），储备少于挂架数时多出来的槽填 `Ent.SLOT_EMPTY`（`1e9`，语义是“这个挂架本来就空着”，`stepAircraft` 里永不装填）；`p.loadFactor = loadK`；被动吊舱经 `passiveEffects()` 汇成 `p.armor / p.lockResist / p.lockRangeK / p.flares`；`p.loadout = lo` 留一份给 HUD 画挂载俯视图。
+2. 把机库配置落到飞机上：`p.loadoutList = resolveLoadout(ac, lo)`；`p.ammoPool[wid] = ammo`；`p.slotCd[wid]` **一个挂点一个槽**（长度 = `e.salvo`），储备少于挂架数时多出来的槽填 `Ent.SLOT_EMPTY`（`1e9`，语义是“这个挂架本来就空着”，`stepAircraft` 里永不装填）；`p.loadFactor = loadK`；被动吊舱经 `passiveEffects()` 汇成 `p.armor / p.lockRangeK / p.flares`，`p.lockResist` 由 `Ent.setStealth(p, pe, 各组武器)` 写入（机体匿踪被外挂折损后与吊舱抗锁定合并）；`p.loadModel` 记录每类弹的拖累份额，`Ent.curLoadFactor` 每帧按弹药池折算（弹打出去拖累随之减轻，吊舱恒定）；`p.loadout = lo` 留一份给 HUD 画挂载俯视图。
 3. `p.name = p.label = CALLSIGN.player`；入 `world.actors`；写回闭包 `player`；`mission.spawn(world)` —— 敌机、平台、僚机全由任务脚本自己造。
 4. 初始镜头 `camFwd = p.fwd`、`camUp = (0,1,0)`、`camPos = p.pos + (0, 30, -110)`；`Radio.clear()` → `Radio.play(mission.id, 'start')`；横幅 `banner = { t: 3.4, ... }`。
 5. `hideAll(); state = 'playing'; paused = false;` 摘掉暂停层，`p.target = null`。
