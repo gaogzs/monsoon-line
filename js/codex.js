@@ -307,8 +307,8 @@ HUD 上会显示一个 <span class="am">Q（动压）</span>读数，低于 12 k
 <h4>但在两万米，这一切都要重算</h4>
 <p>冲压发动机在 20 公里高度会遇到一个尴尬的问题：
 那里的空气密度只有海平面的 {{rho.pct20}}，<b>没有足够的氧气供给燃烧</b>。
-所以 {{w.v17.name}} 在 18 公里以上会自动降级为火箭模式，
-动力段从 {{w.v17.life}} 秒掉到 <b>{{w.v17.lifeHigh}} 秒</b>。</p>
+所以 {{w.v17.name}} 的推力随高度连续衰减：约 16 公里以上开始不足，
+动力段从 {{w.v17.life}} 秒一路掉到 20 公里处的 <b>{{w.v17.lifeHigh}} 秒</b>，再往上只剩火箭级的短促推力。</p>
 
 <h4>NEZ 是怎么算出来的</h4>
 <p>锁定框的颜色每帧按双方态势重算：导弹从<b>你当前的速度</b>起加速，
@@ -1017,7 +1017,7 @@ var _CX_VALS = {
   'w.v17.life': function () { return _cxNum(_cxW('v17').life, 0); },
   'w.v17.vsLife': function () { return _cxNum(_cxW('v17').vsLife, 0); },
   'w.v17.turn': function () { return _cxNum(_cxW('v17').turn, 2); },
-  /* 冲压弹高空降级：直接问 entities.js，取 18 km 以上的动力段 */
+  /* 冲压弹高空衰减：直接问 entities.js，取 20 km 处的动力段 */
   'w.v17.lifeHigh': function () {
     return _cxNum(Ent.effectiveLife(_cxW('v17'), 20000), 1);
   },

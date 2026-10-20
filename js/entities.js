@@ -73,6 +73,14 @@ var Ent = (function () {
     return M3.clamp(k, lo, 1.0);
   }
 
+  /* 阻力 / 掉速的密度系数（阶段 5.1）：以中空 7 km 为 1，
+     低空放大、高空缩小，上下限免得两头失控。
+     导弹滑翔掉速（基准 140 m/s²）和转弯掉速（基准 62 m/s²）都乘它。 */
+  var DRAG_REF_Y = 7000, DRAG_K_MIN = 0.4, DRAG_K_MAX = 1.4;
+  function airDragK(y) {
+    return M3.clamp(airDensity(y) / airDensity(DRAG_REF_Y), DRAG_K_MIN, DRAG_K_MAX);
+  }
+
   /** 导弹转弯率的气动缩放 */
   function turnFactor(y) {
     var r = airDensity(y) / RHO0;
@@ -1144,10 +1152,14 @@ var Ent = (function () {
          "低空阻力大、加速慢"的落点。 */
       var rhoR = w.highAltImmune ? Math.min(1, airDensity(m.pos.y) / RHO0) : 0;
       if (powered) {
+        /* 速度上限：低空不再有加成（稠密空气里极速更低不更高），
+           高空略高（最多 +10%，4–16 km 线性爬升） */
         m.speed = Math.min(m.speed + w.boost * (1 - 0.45 * rhoR) * dt,
-          w.speed * (1 + Math.max(0, (12000 - m.pos.y) / 60000)));
+          w.speed * (1 + 0.1 * M3.clamp((m.pos.y - 4000) / 12000, 0, 1)));
       } else {
-        m.speed = Math.max(m.speed - 140 * (1 + 0.6 * rhoR) * dt, 170);
+        /* 滑翔掉速随空气密度：低空快、高空慢（highAltImmune 的低空惩罚
+           已经包含在密度系数里，不再单列 rhoR 项） */
+        m.speed = Math.max(m.speed - 140 * airDragK(m.pos.y) * dt, 170);
       }
     }
 
@@ -1307,7 +1319,7 @@ var Ent = (function () {
            现在它必须为每一次急转付出速度。 */
         var used = Math.min(want, maxTurn) / Math.max(1e-5, dt);   // 实际转弯率 rad/s
         var load = M3.clamp(used / 3.0, 0, 1);
-        if (!w.ballistic) m.speed = Math.max(170, m.speed - load * 62 * dt);
+        if (!w.ballistic) m.speed = Math.max(170, m.speed - load * 62 * airDragK(m.pos.y) * dt);
       }
 
     } else if (!t) {
@@ -1495,12 +1507,21 @@ var Ent = (function () {
     return Math.min(L, effRange(w, alt) * (k === undefined ? AI_RANGE_K : k));
   }
 
-  /** 动力段时长（考虑冲压弹在高空的降级） */
+  /** 动力段时长。冲压弹随空气密度连续变化（阶段 5.1）：
+      10–16 km 效率最好；往上推力逐渐不足，16 km → 26 km 平滑降到 24%；
+      往下推力足但阻力大、烧得更快，海平面只有 80% 的有效燃烧时间。 */
   function effectiveLife(w, y) {
-    if (w.scramjet && y > 18000) {
-      return Math.max(1.2, w.life * 0.24);
+    if (!w.scramjet) return w.life;
+    var k;
+    if (y >= 16000) {
+      var u = M3.clamp((y - 16000) / 10000, 0, 1);
+      k = 1 - 0.76 * u * u * (3 - 2 * u);
+    } else if (y < 10000) {
+      k = 0.8 + 0.2 * M3.clamp(y / 10000, 0, 1);
+    } else {
+      k = 1;
     }
-    return w.life;
+    return Math.max(1.2, w.life * k);
   }
 
   /* ============================================================
@@ -1879,14 +1900,14 @@ var Ent = (function () {
      炮弹的武器数据挂在 b.gw，不挂 b.w：b.w 会让 warheadK 把普通机炮也当成战斗部打折。
      起爆时 Combat.detonate 要读 shot.w，见 detonateShell。 */
   function fireGunFrom(shooter, w, muzzle, dir, world, opt) {
-    var life = (opt && opt.life) || (w.range || 1600) / Math.max(1, w.speed);
+    var life = (opt && opt.life) || Ballistics.life(w);
     var base = shooter.vel || M3.V(0, 0, 0);
     var b = {
       kind: 'bullet', team: shooter.team, alive: true,
       pos: M3.clone(muzzle), prev: M3.clone(muzzle),
       vel: M3.add(M3.mul(dir, w.speed), base),
       dmg: w.dmg, cal: w.cal || 0, life: life, owner: shooter,
-      gw: w, grav: w.gravity === undefined ? 1 : w.gravity,
+      gw: w, grav: w.gravity === undefined ? 1 : w.gravity, drag: w.drag || 0,
       fuze: w.fuze || 0, blast: w.blast || 0
     };
     world.bullets.push(b);
@@ -2030,8 +2051,7 @@ var Ent = (function () {
     // 保留上一帧位置，渲染曳光弹时用它画线段。
     // M3.add 返回新对象，所以这里的引用不会被下一步覆盖。
     b.prev = b.pos;
-    b.vel.y -= G * (b.grav === undefined ? 1 : b.grav) * dt;
-    b.pos = M3.add(b.pos, M3.mul(b.vel, dt));
+    Ballistics.step(b, dt);
     b.steps = (b.steps || 0) + 1;      // 走了几帧：drawTracers 只让第一帧的曳光接回炮口
     b.life -= dt;
     if (b.life <= 0 || b.pos.y <= 0) {
@@ -2400,7 +2420,7 @@ var Ent = (function () {
   }
 
   return {
-    airDensity: airDensity, qOf: qOf, ctrlFactor: ctrlFactor, turnFactor: turnFactor,
+    airDensity: airDensity, airDragK: airDragK, qOf: qOf, ctrlFactor: ctrlFactor, turnFactor: turnFactor,
     makeAircraft: makeAircraft, stepAircraft: stepAircraft,
     /* 挂点适配与 NPC 的挂载分配 —— game.js 的 pushStores 渲染实体挂载时
        要用同一份规则，不能再抄一遍。 */

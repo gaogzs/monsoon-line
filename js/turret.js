@@ -235,12 +235,31 @@ var Turret = (function () {
     if (!isAir(t)) return solveSurface(tu, P0, t, rel);
     var acc = tu.aEst || M3.V(0, 0, 0), AK = 0.15;    // 加速度只信一点点（也是滤过的，本来就迟钝）
     var aim = t.pos, tof = 0;
+    if (g.drag) return solveAirBallistic(tu, P0, t, rel, acc, AK);
     for (var k = 0; k < 2; k++) {
       tof = M3.dist(aim, P0) / v;
       aim = M3.add(t.pos, M3.add(M3.mul(rel, tof), M3.mul(acc, 0.5 * AK * tof * tof)));
     }
     var drop = 0.5 * 9.81 * (g.gravity === undefined ? 1 : g.gravity) * tof * tof;
     return { p: M3.add(aim, M3.V(0, drop, 0)), tof: tof };
+  }
+
+  /* 对空，带阻力的炮弹（阶段 5.2）：tof 迭代四次（目标横穿时少一次就差几十米提前量），每次用 Ballistics.aim 解仰角和真实飞行时间。
+     返回沿解算方向 1 km 处的点（同 solveSurface）；打不到（超出包线）返回 null。 */
+  function solveAirBallistic(tu, P0, t, rel, acc, AK) {
+    var g = tu.gun, aim = t.pos, tof = 0, r = null, hx = 0, hz = 0, D = 0;
+    for (var k = 0; k < 4; k++) {
+      hx = aim.x - P0.x; hz = aim.z - P0.z;
+      D = Math.sqrt(hx * hx + hz * hz);
+      r = Ballistics.aim(g, P0.y, D, aim.y - P0.y, Ballistics.airLife(g) * 1.05, tu.thHint);
+      if (!r) return null;
+      tu.thHint = r.th;
+      tof = r.t;
+      aim = M3.add(t.pos, M3.add(M3.mul(rel, tof), M3.mul(acc, 0.5 * AK * tof * tof)));
+    }
+    if (D < 1) return { p: M3.add(P0, M3.V(0, 1000, 0)), tof: tof };
+    var c = Math.cos(r.th);
+    return { p: M3.add(P0, M3.V(hx / D * c * 1000, Math.sin(r.th) * 1000, hz / D * c * 1000)), tof: tof };
   }
 
   /* 对海面：低伸弹道（4.2）。tanθ = (v² − √(v⁴ − g(g·d² + 2h·v²))) / (g·d)，
@@ -250,6 +269,19 @@ var Turret = (function () {
     var g = tu.gun, v = g.speed, G0 = 9.81 * (g.gravity === undefined ? 1 : g.gravity);
     var aimY = t.pos.y + Math.min(6, (t.radius || 10) * 0.12);
     var tof = 0, th = 0, hx = 0, hz = 0, d = 0;
+    if (g.drag) {
+      /* 带阻力：数值解仰角（Ballistics.aim），tof 迭代三次。超出射程 / 速度耗尽返回 null */
+      for (var kb = 0; kb < 3; kb++) {
+        hx = t.pos.x + rel.x * tof - P0.x; hz = t.pos.z + rel.z * tof - P0.z;
+        d = Math.sqrt(hx * hx + hz * hz);
+        if (d < 1) return null;
+        var rb = Ballistics.aim(g, P0.y, d, aimY - P0.y, Ballistics.life(g), tu.thHint);
+        if (!rb) return null;
+        tu.thHint = th = rb.th; tof = rb.t;
+      }
+      var cb = Math.cos(th);
+      return { p: M3.add(P0, M3.mul(M3.V(hx / d * cb, Math.sin(th), hz / d * cb), 1000)), tof: tof, surface: true };
+    }
     for (var k = 0; k < 3; k++) {
       var ax = t.pos.x + rel.x * tof, az = t.pos.z + rel.z * tof;
       hx = ax - P0.x; hz = az - P0.z;
@@ -275,10 +307,16 @@ var Turret = (function () {
     return cl > 30 ? 1 : 0.4;
   }
 
+  /* 射击包线：对 e 的仰角下，这门炮对空最远能打多远（Ballistics.airReach） */
+  function airReachTo(tu, P0, e) {
+    var d = M3.dist(e.pos, P0);
+    return Ballistics.airReach(tu.gun, d > 1 ? Math.asin(M3.clamp((e.pos.y - P0.y) / d, -1, 1)) : 0);
+  }
+
   function score(tu, host, B, P0, e) {
     var d = M3.dist(e.pos, P0), R = rangeOf(tu);
-    // airRange：对飞机只在这个距离内开火（近防炮 800 m —— 再远打出去的弹只会被躲开）
-    if (isAir(e) && tu.gun.airRange) R = Math.min(R, tu.gun.airRange);
+    // 对飞机只在射击包线内开火：按目标仰角查（平射远、仰射近），近防炮再远打出去的弹只会被躲开
+    if (isAir(e) && tu.gun.airRange) R = Math.min(R, airReachTo(tu, P0, e));
     if (d > R) return -1;
     var a = anglesOf(B, M3.norm(M3.sub(e.pos, P0)));
     if (!inArc(tu, a.yaw, a.pitch)) return -1;
@@ -441,7 +479,7 @@ var Turret = (function () {
 
     /* 4. 开火：炮管指向与解算方向夹角 < fireTol，目标在射界内、冷却好了。转动途中照样能开火 */
     if (!t || !sol || !inArc(tu, wantYaw, wantPitch)) return;
-    if (isAir(t) && t.kind !== 'missile' && g.airRange && M3.dist(t.pos, P0) > g.airRange) return;
+    if (isAir(t) && t.kind !== 'missile' && g.airRange && M3.dist(t.pos, P0) > airReachTo(tu, P0, t)) return;
     var dAim = M3.norm(M3.sub(sol.p, P0));
     var dGun = dirOf(B, tu.yaw, tu.pitch);
     var tol = Math.max(0.006, tu.aim.err * 2.5);

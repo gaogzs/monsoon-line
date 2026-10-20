@@ -1289,6 +1289,8 @@ var SHIPS = [
    炮塔用炮（2-0IMPL 3.4）—— NPC 专用，不进 WEAPONS（也就不进挂载图鉴）。
    字段与机炮相同（rpm / speed / dmg / range / cal / spread），另加：
      gravity              炮弹重力倍率
+     drag                 阻力系数（海平面，1/m）：a = −drag × ρ/ρ0 × |v|·v，见 ballistics.js；
+                          没写就只有重力（航空机炮）
      fuze / blast / blastCore  近炸引信与爆炸半径：写了才有空爆 / 近炸（Ent.fireGunFrom）
      surface              也打海面 / 地面目标（目前只有 50 mm）
    伤害保持原计划（近防炮 4 / 50 mm 12 / 75 mm 30 / 120 mm 80），平衡靠散布、射速和迟钝的提前量：
@@ -1299,13 +1301,13 @@ var SHIPS = [
    口径一律整数公制档，不用 23 / 76 / 127 这种英制换算出来的数。
    ============================================================ */
 var TURRET_GUNS = {
-  ciws20: { name: '近防炮 20mm', cal: 20, rpm: 750, speed: 1100, dmg: 4, range: 1800, airRange: 1200, spread: 0.006 },
-  aa30:   { name: '30mm 遥控炮', cal: 30, rpm: 300, speed: 1000, dmg: 9, range: 2500, spread: 0.005 },
-  tail20: { name: '20mm 尾炮', cal: 20, rpm: 300, speed: 900, dmg: 5, range: 1200, spread: 0.006 },
+  ciws20: { name: '近防炮 20mm', cal: 20, rpm: 750, speed: 1100, dmg: 4, range: 1800, airRange: 1200, spread: 0.006, drag: 2.4e-4 },
+  aa30:   { name: '30mm 遥控炮', cal: 30, rpm: 300, speed: 1000, dmg: 9, range: 2500, spread: 0.005, drag: 2.0e-4 },
+  tail20: { name: '20mm 尾炮', cal: 20, rpm: 300, speed: 900, dmg: 5, range: 1200, spread: 0.006, drag: 2.4e-4 },
   n50:    { name: '50mm 速射炮', cal: 50, rpm: 80, speed: 1050, dmg: 12, range: 4500, airRange: 4000, spread: 0.008, spreadSurface: 0.002,
-            gravity: 1, fuze: 4, blast: 8, blastCore: 1.5, surface: true },
+            gravity: 1, drag: 1.1e-4, fuze: 4, blast: 8, blastCore: 1.5, surface: true },
   n75:    { name: '75mm 两用舰炮', cal: 75, rpm: 24, speed: 900, dmg: 30, range: 8000, airRange: 6000, spread: 0.010, spreadSurface: 0.0025,
-            gravity: 1, fuze: 6, blast: 13, blastCore: 2 },
+            gravity: 1, drag: 0.75e-4, fuze: 6, blast: 13, blastCore: 2 },
   /* 发射架示例（目前没有舰船装）：kind 'launcher' + weapon（WEAPONS 的 id），
      cd 每发间隔、ammo 备弹（0 = 不限）、loft 发射时按距离抬高的比例、air / surface 打什么。
      mounts 里照常写 gun: 'lnchSam'，有实体模型就像炮塔一样转。 */
@@ -1331,7 +1333,7 @@ var TURRET_GUNS = {
   railSsm: { name: '斜置反舰弹发射架', kind: 'launcher', weapon: 'ssm', cd: 3, salvo: true, ammo: 4,
              air: false, surface: true, launchSpeed: 60 },
   n120:   { name: '120mm 主炮', cal: 120, rpm: 8, speed: 800, dmg: 80, range: 14000, airRange: 8000, spread: 0.013, spreadSurface: 0.003,
-            gravity: 1, fuze: 8, blast: 18, blastCore: 3 }
+            gravity: 1, drag: 0.5e-4, fuze: 8, blast: 18, blastCore: 3 }
 };
 
 /* 舰船的炮位（2-0IMPL 3.5）。模型空间：船头 +z、右舷 +x、上 +y，pos 是甲板上的座圈位置。
@@ -2108,7 +2110,7 @@ var WEAPONS = {
     turn: 1.00, seeker: 'radar', lockCone: 24 * Math.PI / 180, lockDist: 12500,
     dmg: 62, ammo: 8, cd: 0.88, salvo: 1, flare: 0.72, fuze: 21, blast: 33, blastCore: 4,
     target: 'air', nezer: true, scramjet: true,
-    desc: '固体燃料冲压发动机远距弹。低空动力段很长、总寿命也长，不可逃逸区是全家族最大的。<br><span class="rd">高空因空气稀薄缺氧，自动降级为火箭模式 —— 动力段大幅缩短。</span><b>低空它是最难甩掉的一枚；到了高空，就不再是杀手锏。</b>',
+    desc: '固体燃料冲压发动机远距弹。低空动力段很长、总寿命也长，不可逃逸区是全家族最大的。<br><span class="rd">推力随空气密度连续变化：中高空（约 10–16 公里）最好，往上越稀薄动力段越短，低空则阻力大、燃料烧得更快。</span><b>中空它是最难甩掉的一枚；到了两万米以上，就不再是杀手锏。</b>',
     stat: { dmg: 0.68, spd: 1.0, trn: 0.30, rng: 1.0, ecm: 0.80 }
   },
   v22: {
