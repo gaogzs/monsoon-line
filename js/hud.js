@@ -1066,9 +1066,16 @@ var HUD = (function () {
     var distTxt = dist < 1000
       ? Math.round(dist) + ' M'
       : (dist / 1000).toFixed(1) + ' KM';
-    var nm = t.label || (t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.name || '僚机'));
-    text(ctx, nm, s.x + c + 6, s.y - c + 8, col, FS, 'left');
-    text(ctx, distTxt, s.x + c + 6, s.y - c + 21, 'rgba(130,170,215,0.60)', FS, 'left');
+    /* 与敌方未锁定框同一格式：第一行机型，第二行呼号（压暗），再下面距离。 */
+    /* 海上单位同敌方：第一行舰级，第二行舰名。 */
+    var acTxt = t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.shipClass || null);
+    var line1 = acTxt || t.label || t.name || '僚机';
+    var line2 = acTxt && t.label ? t.label : null;
+    text(ctx, line1, s.x + c + 6, s.y - c + 8, col, FS, 'left');
+    var ly = s.y - c + 21;
+    if (line2) { text(ctx, line2, s.x + c + 6, ly, 'rgba(185,200,212,0.62)', FS, 'left'); ly += 13; }
+    text(ctx, distTxt, s.x + c + 6, ly, 'rgba(130,170,215,0.60)', FS, 'left');
+    ly += 13;
 
     /* 僚机的当前指令。
 
@@ -1081,7 +1088,7 @@ var HUD = (function () {
       var cmdTxt = t.ai.cmd === 'spread' ? 'SPREAD 散开'
         : (t.ai.cmd === 'cover' ? 'COVER 掩护' : 'FOCUS 集火');
       text(ctx, jammed ? 'LINK LOST 数据链中断' : cmdTxt,
-        s.x + c + 6, s.y - c + 34,
+        s.x + c + 6, ly,
         jammed ? '#ff8b2a' : 'rgba(130,170,215,0.60)', FS, 'left');
     }
   }

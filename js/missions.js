@@ -197,6 +197,9 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
     isDrone: true
   });
   a.name = CALLSIGN['wing' + idx];
+  /* 呼号写进 label：目标框、锁定框都优先读 label，不然会退回到机型名，
+     两架无人僚机在屏幕上分不清谁是 VESPER-2、谁是 VESPER-3。 */
+  a.label = CALLSIGN['wing' + idx];
   AI.attach(a, {
     // role 用 drone 而不是 wingman：无人机没有判断力，
     // 目标永远来自长机的授权，长机活着时也不自主接战。
