@@ -461,7 +461,7 @@ var WD_LIMIT = 1.5;
 | 界面 | 生成器 | 唯一数据源 |
 |---|---|---|
 | 设置（独立页 + 暂停页签） | `buildSettingsInto(container)` | `SET_GROUPS` + `DEFAULTS` |
-| 操作说明（手册页 + 暂停页签） | `buildHelpHTML(forPause)` | `KEYMAP` + `TIPS` |
+| 操作说明（手册页 + 暂停页签） | `buildHelpHTML(forPause)` | `KEYMAP` + `TIPS` + `GUIDE`（实战指南，图标由 `HELP_ICONS` 画） |
 | 机库 | `buildHangar()` → `buildHardpointEditor()` | `AIRCRAFT` + `WEAPONS` + `loadouts` |
 | 战役选择 | `buildCampaignList()` | `CAMPAIGNS[]` + `cleared`（进度） |
 | 简报 | `buildBrief()` + `buildMissionList()` + `drawMap()` | `MISSIONS[missionIdx]` + `CAMPAIGNS[activeCampaign]` |

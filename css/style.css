@@ -400,6 +400,30 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
 .tips b{ color:var(--cy); }
 .tips .red{ color:var(--red); }
 
+/* 实战指南：每节一组卡片，左边是 HUD 上真实样子的小图标，右边是说明 */
+.help-guide{ grid-column:1 / -1; }
+.gd-h{ font-family:var(--mono); font-size:13px; color:var(--amber); letter-spacing:3px;
+  margin:10px 0 12px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+.gd-sec{ margin-bottom:26px; }
+.gd-sec .khelp{ margin-bottom:14px; }
+.gd-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; }
+.gd-card{ display:flex; gap:14px; align-items:flex-start; padding:10px 12px;
+  border:1px solid var(--line); background:#0b141c; }
+.gd-ico{ flex:0 0 auto; width:84px; }
+.gd-ico svg{ display:block; width:100%; height:auto; }
+.gd-txt{ font-size:13px; line-height:1.8; color:#8fa3b2; min-width:0; }
+.gd-txt b{ display:block; font-family:var(--mono); font-size:12.5px; font-weight:normal;
+  color:#dbe8f2; letter-spacing:1px; margin-bottom:2px; }
+@media (max-width:760px){ .gd-grid{ grid-template-columns:1fr; } }
+
+/* 暂停菜单里的实战指南：单栏，图标缩小 */
+.minihelp .gd-sec{ margin-bottom:16px; }
+.minihelp .gd-grid{ grid-template-columns:1fr; gap:8px; }
+.minihelp .gd-card{ padding:8px 10px; gap:10px; }
+.minihelp .gd-ico{ width:60px; }
+.minihelp .gd-txt{ font-size:12px; line-height:1.7; }
+.minihelp .gd-txt b{ font-size:11.5px; }
+
 /* ============================================================
    更新记录
    数据来自 js/changelog.js（由 tools/release.js 从 CHANGELOG.md 生成）。

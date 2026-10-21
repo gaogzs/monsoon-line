@@ -461,6 +461,137 @@ var Game = (function () {
     '注意高度：低于 200 m 触发低高度告警，坠海即任务失败。'
   ];
 
+  /* 实战指南：图标是按 HUD 上的真实样子画的（颜色、虚实、位置与游戏内一致）。
+     HELP_ICONS 的 viewBox 统一是 0 0 56 44；没有 icon 的条目只写文字。 */
+  var HELP_ICONS = (function () {
+    var AMB = '#ffb03a', RD = '#ff4d4d', CYN = '#45d6ff', PALE = '#cfe0ec', GRY = 'rgba(150,170,180,0.55)';
+    function hbr(x0, y0, x1, y1, c, col, sw) {
+      return '<path d="M' + x0 + ' ' + (y0 + c) + 'V' + y0 + 'H' + (x0 + c) +
+        'M' + (x1 - c) + ' ' + y0 + 'H' + x1 + 'V' + (y0 + c) +
+        'M' + x1 + ' ' + (y1 - c) + 'V' + y1 + 'H' + (x1 - c) +
+        'M' + (x0 + c) + ' ' + y1 + 'H' + x0 + 'V' + (y1 - c) +
+        '" fill="none" stroke="' + col + '" stroke-width="' + (sw || 2) + '"/>';
+    }
+    function txt(s, col, y) {
+      return '<text x="28" y="' + (y || 40) + '" text-anchor="middle" font-family="Consolas,monospace" font-weight="bold" font-size="8" fill="' + col + '">' + s + '</text>';
+    }
+    function key(k) {
+      return '<rect x="19" y="8" width="18" height="16" rx="3" fill="#101a23" stroke="#2a3d4c" stroke-width="1.2"/>' +
+        '<text x="28" y="20" text-anchor="middle" font-family="Consolas,monospace" font-weight="bold" font-size="10" fill="' + PALE + '">' + k + '</text>';
+    }
+    return {
+      /* 锁定环：实线 = 在锁，进度往前走 */
+      lockRing: '<circle cx="28" cy="20" r="15" fill="none" stroke="' + AMB + '" stroke-width="2.4" stroke-dasharray="70 24" transform="rotate(-90 28 20)"/>' + hbr(20, 12, 36, 28, 5, AMB),
+      /* 锁定环：虚线 = 锁不上，进度往回掉 */
+      lockDash: '<circle cx="28" cy="20" r="15" fill="none" stroke="rgba(255,176,58,0.45)" stroke-width="2" stroke-dasharray="4 4"/>' + hbr(20, 12, 36, 28, 5, 'rgba(255,176,58,0.45)'),
+      /* LOCK：双层角框 + 字 */
+      lockDouble: hbr(19, 11, 37, 29, 5, AMB, 2) + hbr(23, 15, 33, 25, 3, AMB, 1.4) + txt('LOCK', AMB),
+      /* 框下无字：淡橙框 */
+      rngNone: hbr(20, 12, 36, 28, 5, 'rgba(255,176,58,0.45)'),
+      rngIn: hbr(20, 12, 36, 28, 5, AMB) + txt('IN RNG', AMB),
+      rngNez: hbr(20, 12, 36, 28, 5, RD, 2.4) + txt('NEZ', RD),
+      /* 武器视场：三态并排（灰虚 / 橙虚 / 红实） */
+      cone: '<circle cx="11" cy="20" r="6" fill="none" stroke="' + GRY + '" stroke-width="1.3" stroke-dasharray="3 3"/>' +
+        '<circle cx="28" cy="20" r="6" fill="none" stroke="rgba(255,176,58,0.45)" stroke-width="1.3" stroke-dasharray="3 3"/>' +
+        '<circle cx="45" cy="20" r="6" fill="none" stroke="' + RD + '" stroke-width="1.6"/>',
+      /* 机炮预测圈：实线 = 射程内，虚线 = 射程外 */
+      gunSolid: '<circle cx="28" cy="20" r="9" fill="none" stroke="rgba(255,228,150,0.8)" stroke-width="1.4"/><circle cx="28" cy="20" r="1.6" fill="rgba(255,244,200,0.95)"/>',
+      gunDash: '<circle cx="28" cy="20" r="9" fill="none" stroke="rgba(255,228,150,0.55)" stroke-width="1.4" stroke-dasharray="3 4"/><circle cx="28" cy="20" r="1.6" fill="rgba(255,244,200,0.55)"/>',
+      /* 告警字样 */
+      spike: '<rect x="6" y="12" width="44" height="18" rx="3" fill="none" stroke="' + AMB + '" stroke-width="1.2"/>' + txt('SPIKE', AMB, 25),
+      missile: '<rect x="4" y="12" width="48" height="18" rx="3" fill="none" stroke="' + RD + '" stroke-width="1.2"/>' + txt('MISSILE', RD, 25),
+      /* RWR 环：琥珀环 + 红点（近）+ 琥珀点（远） */
+      rwr: '<circle cx="28" cy="20" r="16" fill="none" stroke="rgba(255,176,58,0.35)" stroke-width="1"/>' +
+        '<circle cx="28" cy="20" r="8.8" fill="none" stroke="rgba(255,176,58,0.25)" stroke-width="1"/>' +
+        '<circle cx="36" cy="10" r="3.2" fill="none" stroke="' + RD + '" stroke-width="2"/>' +
+        '<circle cx="15" cy="27" r="2.4" fill="' + AMB + '"/>',
+      /* 按键 + 热焰火花 */
+      flare: key('V') + '<circle cx="38" cy="12" r="2.2" fill="#ff9a3c"/><circle cx="44" cy="22" r="2.6" fill="#ffcf5c"/><circle cx="36" cy="32" r="2" fill="#ff9a3c"/><circle cx="48" cy="34" r="1.4" fill="' + PALE + '"/>',
+      keyN: key('N'),
+      keyG: key('G'),
+      /* 3/9 线：飞机俯视 + 正横的导弹 */
+      beam: '<path d="M14 6 L20 22 L14 19 L8 22 Z" fill="' + PALE + '"/>' +
+        '<path d="M28 14 L52 14" stroke="' + RD + '" stroke-width="1.6" stroke-dasharray="3 3"/>' +
+        '<path d="M42 14 L50 14 M47 11 L50 14 L47 17" fill="none" stroke="' + RD + '" stroke-width="1.6"/>' +
+        '<path d="M14 22 Q28 30 40 22" fill="none" stroke="' + CYN + '" stroke-width="1" stroke-dasharray="2 2"/>',
+      /* CIWS：圆 + 四向短线 */
+      ciws: '<circle cx="28" cy="20" r="11" fill="none" stroke="' + AMB + '" stroke-width="1.2"/>' +
+        '<path d="M28 12 V16 M28 24 V28 M20 20 H24 M32 20 H36" stroke="' + AMB + '" stroke-width="1.4"/>',
+      /* 低空：地形轮廓（雷达看不见） */
+      lowAlt: '<path d="M6 36 L20 18 L28 28 L34 22 L50 36 Z" fill="none" stroke="' + GRY + '" stroke-width="1.4"/>'
+    };
+  })();
+
+  var GUIDE = [
+    {
+      title: '假如你想攻击敌人',
+      lead: '按 F / Tab 选中目标（屏幕边缘的红箭头指向屏外目标）。把它套进视场圈里，等锁定环走满。',
+      items: [
+        { icon: 'lockRing', name: '锁定环（实线）', text: '目标在视场锥内、并进入锁定距离时，环才开始往前走；走满 = 锁定完成。' },
+        { icon: 'lockDash', name: '锁定环（虚线）', text: '暗色虚线、进度往回掉，说明现在锁不上：目标在锥外或距离外，把机头带过去。' },
+        { icon: 'lockDouble', name: 'LOCK', text: '锁定完成，框变成双层角框，框上方写 LOCK，这时发射才有效。' },
+        { icon: 'rngNone', name: '框下无字', text: '目标在最大射程之外（框为淡橙色）。打出去够不着，先接近。' },
+        { icon: 'rngIn', name: 'IN RNG', text: '在最大射程之内（框为橙色）。能追上，但目标掉头仍可能甩开。' },
+        { icon: 'rngNez', name: 'NEZ', text: '不可逃逸区（框为红色）。目标立刻掉头也甩不掉，这时发射最有价值。' },
+        { icon: 'cone', name: '武器视场圈', text: '拿导引弹时机头周围的圆：灰虚 = 没有目标；橙虚 = 在锥外或距离外；红实 = 能锁。对地弹是地平线上的两道竖线。' },
+        { icon: 'gunSolid', name: '机炮预测圈（实线）', text: '选中目标就出现。圆心是子弹该打到的点，已算上飞行时间、载机速度、重力和阻力。把圆心压到准星上开火；实线 = 目标在机炮射程内。目标机动时圈会跟着动，修正准星即可，不用盯着目标本身。' },
+        { icon: 'gunDash', name: '机炮预测圈（虚线）', text: '目标在机炮有效射程之外（高空按高空射程算）。先机动接近，圈变实线后再开火。' }
+      ]
+    },
+    {
+      title: '假如敌人想攻击你',
+      lead: '敌人在锁你，或你被对空雷达截获时，屏幕上方会出现琥珀色的告警。',
+      items: [
+        { icon: 'spike', name: 'SPIKE', text: '被雷达照射，或被对空雷达截获。飞得越高越容易被截获，低空可以躲开。' },
+        { icon: 'rwr', name: 'RWR 威胁环', text: '环上的点是威胁方向（机头朝上）。红点 = 约 2.6 km 内的近威胁；琥珀点 = 较远的威胁。' },
+        { icon: 'keyN', name: 'N 电磁静默', text: '雷达关机、数据链断开、干扰机停辐射。敌人更难发现你，但你自己的锁定距离也会减半。' },
+        { icon: 'lowAlt', name: '低空突防', text: '贴近地形飞，对空雷达看不到你。但近距离的目视发现仍然有效。' },
+        { name: '僚机掩护', text: '按 3 让僚机掩护。掩护机在你被导弹咬住时会主动撒干扰弹，替你争取脱离时间。' }
+      ]
+    },
+    {
+      title: '假如导弹瞄准你了',
+      lead: '红色闪烁的 MISSILE 会显示距离。立刻做两件事：长按 V 投干扰弹，同时机动。',
+      items: [
+        { icon: 'missile', name: 'MISSILE', text: '来袭导弹。闪烁红字下方是距离。不要等它到近处才动。' },
+        { icon: 'flare', name: 'V 长按投干扰弹', text: '热焰弹和箔丝同时撒出，每 0.45 秒一组。同一枚导弹每被投一次，骗中概率都会下降，所以别连按：投一两组，看它脱没脱锁，没脱就转向。光电与激光制导的导弹不吃干扰弹。' },
+        { icon: 'beam', name: '3 / 9 线机动', text: '把导弹放在正横（机翼两侧），持续桶滚。导弹的导引需要转弯，横向切过去它很难跟上。' },
+        { name: '投弹后立刻转向', text: '被骗的导弹会盲飞约 1.4 秒，然后重新找目标。投完弹马上大角度转向，等它重新捕获时你已经不在原来的位置了。' },
+        { icon: 'keyG', name: 'G 高 G 机动', text: '按住 G 拉出额外过载，把导弹甩在身后，代价是掉速。高空动压低时过载拉不起来，这招会失效。' }
+      ]
+    },
+    {
+      title: '假如防空炮或防空导弹瞄准你了',
+      lead: '防空的威胁主要是雷达截获和导弹发射。近防炮只在近距离生效，远离它就安全。',
+      items: [
+        { icon: 'spike', name: '对空雷达截获', text: '飞得太高会被对空雷达截获，各关的高度阈值不同（多在 1500–2600 m 以上）。低空突防可以躲开。' },
+        { name: '“发射！方位… 距离…”', text: '无线电报出防空导弹的方位和距离。舰载雷达的探测距离约是导弹自身导引头的 1.5 倍，别停在它的探测范围里。' },
+        { icon: 'ciws', name: '近防炮（CIWS）', text: '舰艇的近防炮会在约 1.8 km 内拦截导弹。想打舰，尽量在远处发射制导弹。' },
+        { name: '脱离', text: '降低高度借地形遮蔽，或拉出它的锁定距离，或开 N 静默。被干扰的雷达锁定距离和速度都会打折，这也是一种脱离方式。' }
+      ]
+    }
+  ];
+
+  /** 实战指南的 HTML。forPause=true 用于暂停菜单（单栏、图标缩小） */
+  function buildGuideHTML(forPause) {
+    var out = '', i, j, s, it;
+    for (i = 0; i < GUIDE.length; i++) {
+      s = GUIDE[i];
+      out += '<div class="gd-sec">' +
+        (forPause ? '<h4>' + s.title + '</h4>' : '<h3 class="gd-h">' + s.title + '</h3>') +
+        (s.lead ? '<p class="khelp">' + s.lead + '</p>' : '') +
+        '<div class="gd-grid">';
+      for (j = 0; j < s.items.length; j++) {
+        it = s.items[j];
+        out += '<div class="gd-card">' +
+          (it.icon ? '<div class="gd-ico"><svg viewBox="0 0 56 44" aria-hidden="true">' + HELP_ICONS[it.icon] + '</svg></div>' : '') +
+          '<div class="gd-txt"><b>' + it.name + '</b>' + it.text + '</div></div>';
+      }
+      out += '</div></div>';
+    }
+    return out;
+  }
+
   /** 操作说明。forPause=true 输出单栏（暂停菜单），否则输出双栏（独立手册页） */
   function buildHelpHTML(forPause) {
     var i, rows = '', tips = '';
@@ -472,10 +603,12 @@ var Game = (function () {
     }
     if (forPause) {
       return '<h4>基础操纵</h4><table>' + rows + '</table>' +
-        '<h4>交战要诀</h4><ul class="tips">' + tips + '</ul>';
+        '<h4>交战要诀</h4><ul class="tips">' + tips + '</ul>' +
+        '<h4>实战指南</h4>' + buildGuideHTML(true);
     }
     return '<div class="help-col"><h3>基础操纵</h3><table class="keymap">' + rows + '</table></div>' +
-      '<div class="help-col"><h3>交战要诀</h3><ul class="tips">' + tips + '</ul></div>';
+      '<div class="help-col"><h3>交战要诀</h3><ul class="tips">' + tips + '</ul></div>' +
+      '<div class="help-guide"><h3 class="gd-h">实战指南</h3>' + buildGuideHTML(false) + '</div>';
   }
 
   /* ============================================================
