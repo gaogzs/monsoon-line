@@ -85,13 +85,19 @@ var Route = (function () {
     r.alt = L.alt !== undefined ? L.alt : a.pos.y;
     r.arrive = 0;                              // strike 不靠"到点"结束
 
-    var surf = w.target === 'ground' || w.target === 'ship';
+    var surf = Ent.targetClass(w, t) === 'surface';
     var d = surf ? hdist(t.pos, a.pos) : M3.dist(t.pos, a.pos);
     var reach = Ent.aiReach(w, a.pos.y, L.rangeK === undefined ? 0.8 : L.rangeK);
     if (d > reach) return;
     /* 锁定锥：对面弹只量水平方位（Ent.lockOff）—— 轰炸机保持高度飞，目标在机头下方
        三十多度是常态（4.5 km 高、7 km 远就是 33°），俯冲交给弹自己。 */
     if (Ent.lockOff(a, t, w) > (w.lockCone || 0.6)) return;
+    /* 动态射程（与 AI 同一套）：制导弹还要在真实弹道的 rmax 余量之内才放，
+       静态 aiReach 只是上界。缓存挂在航线状态 r 上，0.2 s 刷新。 */
+    if (w.seeker && w.seeker !== 'none' && !w.unguided) {
+      var env = Ent.envelopeCached(r, world.time || 0, { pos: a.pos, fwd: a.fwd, speed: a.speed + 70 }, w, L.weapon, t, 0.2);
+      if (d > Math.min(w.lockDist || Infinity, env.rmax) * (t.kind === "target" ? 0.8 : 0.9)) return;   // 余量：对空 0.9、对地 0.8
+    }
     Ent.setWeapon(a, L.weapon);
     if (!(a.spAmmo > 0) || a.spCd > 0) return;
     if (world.fireMissile && world.fireMissile(a, t)) {

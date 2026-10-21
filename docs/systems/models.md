@@ -371,3 +371,8 @@ seascorpion cameroceras dunkleosteus daplu skori diklo cross icecore atoll`
 模型名写错要在自检里暴露，而不是等某个任务第一次引用它的时候才炸。
 机型借用的模型（`petrel` `skua` `albatross` `basalt` `sandstone` `spray` `boulder` 等）不在这份清单里，
 由 `preflight` 对每条 `AIRCRAFT[].model` 的单独检查覆盖。
+
+## 本批更新
+
+- **`STORE_LOOK.nose: 'dual'`**（TOR-3「雏矢」）：`addRound` 把头部改成钝圆的导引头罩（前端一段黑色窗口），后面接一段比弹体粗约 18% 的红色战斗部段。其它弹不受影响。
+- KA-7「折翼」的挂点组 B（机腹内埋弹舱）挂的是 CLA-4，几何见 loadout.md。

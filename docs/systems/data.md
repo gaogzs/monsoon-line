@@ -254,7 +254,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `kind` | 见上表 | 决定几乎所有分支 |
 | `ammo` / `cd` / `salvo` | 单点库存基准 / 原始冷却（会被补丁表覆盖）/ 一次扳机打出几发 | — |
 | `prox` | 近炸半径（米） | 命中判定用 |
-| `target` | `air` / `ground` / `ship` / `none` | `updateLock` 分"对空导引头"与"对面投放包线"两套判据 |
+| `target` | `air` / `ground` / `ship` / `none` / `any` | `updateLock` 按**目标类别**（`Ent.targetClass`）分"对空导引头"与"对面投放包线"两套判据。`any`（TOR-3）对空对地都能锁，锁定距离一样，目标是什么就按什么判 |
 | `desc` | 简介（可含 HTML） | 机库卡片、图鉴 |
 | `model` | `MODELS` 的键，**只有挂载物与飞出去的弹读它** | 缺省回退 `MODELS.missile`。吊舱一律写 `'pod'` —— 跟着导弹用 `'missile'` 的话两类挂载在画面上分不出来 |
 | `stat` | `{dmg,spd,trn,rng,ecm}` 0..1 | ⚠️ **当前没有任何代码读取**（grep `.stat` 在 data.js 之外为零），是给未来界面留的 |
@@ -555,3 +555,10 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | `tools/render-ships.js` | 读 `SHIPS`（取模型列表与舰名）与 `MODELS`（取几何）渲染预览图 |
 
 **改数据后必跑 `node tools/smoke.js`**；它会在浏览器之外把整个游戏加载一遍，专门抓"引用不存在的数据"这类静默错误。
+
+## 本批更新
+
+- `target` 新增取值 `'any'`（对空对地通用，锁定距离一致，目标是什么就按什么判；见 `Ent.targetClass`）。
+- `blastAir: false` 只剩子母弹（`clb`、`v30`）。`hbl`、`hbh` 的落点溅射会伤到低空飞机。
+- `defaultLoadout` 对 `npcOnly` 机型按组落位：`makeAircraft` 在没有 `special` 与 `loadout` 时，把 `defaultLoadout` 拷成逐组 `loadout`。`mountPlan` 的第 1 条（逐组）过 `fitsKind` 与 `canCarry`。
+- KA-7 的 `defaultLoadout` 为 `{A:'drm', B:'mrm'}`，B 组是内埋弹舱（`expose: 0`，`hy: -0.12`，紧贴机腹）。

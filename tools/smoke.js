@@ -2223,10 +2223,10 @@ if (Ent && M3 && me && world) {
     const n4 = countStoresOf(aewc);
     if (n4 !== 0) bad.push('只有机腹挂点的预警机被画上了 ' + n4 + ' 枚空空弹');
 
-    // 3. 僚机 KA-7：翼下通用挂点 2 个，挂 GIR-9
-    const wing = npc('folded_wing', 'v9');
+    // 3. 僚机 KA-7：翼下通用挂点 2 个，挂 TOR-3（僚机专用，玩家挂不上）
+    const wing = npc('folded_wing', 'drm');
     const n5 = countStoresOf(wing);
-    if (n5 !== 2) bad.push('KA-7 应当画出 2 枚 GIR-9，实际 ' + n5);
+    if (n5 !== 2) bad.push('KA-7 应当画出 2 枚 TOR-3，实际 ' + n5);
 
     // 4. 任务写定的吊舱也要看得见：玄武岩挂 DAR-4 + SAV-6
     //    （吊舱先占通用挂点，制式弹占重挂点）
@@ -3849,7 +3849,8 @@ if (Ent && M3 && me && world) {
     const hpRef = Math.max(...sandbox.AIRCRAFT
       .filter(x => !x.npcOnly)
       .map(x => x.phys.hp));
-    if (dps < hpRef / 1.25) {
+    /* 实际射速为原来的 1/4（1950 rpm，每轮 1 发，约 32.5 发/秒）：量尺按原 1.25 秒 ×4 放宽到 5 秒 */
+    if (dps < hpRef / 5) {
       bad.push('最大射程上机炮只有 ' + Math.round(dps) + ' dmg/s（1σ ' +
         sFar.toFixed(1) + ' m）—— 散布过大，' + hpRef +
         ' hp 的目标要 ' + (hpRef / dps).toFixed(1) + ' 秒，射速补不回来');
@@ -5054,7 +5055,8 @@ try {
   const hbs = ship('humpback');
   if (ttk(hbs.hp, hbs.gunResist, k30) < 300) bad.push('航母挨 30mm 不到 300 s 就沉（' + ttk(hbs.hp, hbs.gunResist, k30).toFixed(0) + ' s）');
   const cellT = ttk(400, S.GUN_RESIST_MODELS.cell, k20);
-  if (cellT < 2 || cellT > 6) bad.push('调节单元挨 20mm 的 TTK ' + cellT.toFixed(1) + ' s 不在 2–6 s');
+  /* 机炮 rpm 3900 → 1950（÷2，削弱后的两倍）：原 2–6 s 的手感窗口 ×2 */
+  if (cellT < 4 || cellT > 12) bad.push('调节单元挨 20mm 的 TTK ' + cellT.toFixed(1) + ' s 不在 4–12 s');
   const orca = ship('orca');
   if (ttk(orca.hp, orca.gunResist, k30) < 5) bad.push('驱逐舰挨 30mm 不到 5 s 就沉');
 
@@ -5677,7 +5679,7 @@ try {
   }
   // 7. ROK-40 有尾炮炮塔
   const bo = sandbox.AIRCRAFT.find(a => a.id === 'boulder');
-  if (!bo.mounts || bo.mounts[0].gun !== 'tail20') bad.push('ROK-40 没有 tail20 尾炮炮位');
+  if (!bo.mounts || bo.mounts[0].gun !== 'tail20a') bad.push('ROK-40 没有 tail20a 尾炮炮位（机载尾炮，射速 ÷4）');
   if (bad.length) bad.forEach(fail);
   else ok('炮塔：炮位数与 arms 一致；射界夹紧 / 方位回绕；炮弹从炮口出、定时空爆伤人；机炮无战斗部；预览带炮塔');
 } catch (e) {
@@ -5989,6 +5991,131 @@ if (LIST) {
   console.log('\n可用分段（--only / --skip 用这些名字）：\n  ' + ALL_SECTIONS.join('\n  ') + '\n');
   process.exit(0);
 }
+section('TOR-3 与 target:any', () => {
+  const bad = [];
+  const D = sandbox.WEAPONS.drm, Ent4 = sandbox.Ent, M4 = sandbox.M3;
+  const airT = { kind: 'aircraft', radius: 8, pos: M4.V(0, 3000, 5000), vel: M4.V(0, 0, 0), fwd: M4.V(0, 0, -1), speed: 300, phys: { vMax: 500 } };
+  const gndT = { kind: 'target', radius: 20, pos: M4.V(0, 0, 5000), vel: M4.V(0, 0, 0), speed: 12 };
+  if (!D) bad.push('没有 TOR-3（drm）');
+  else {
+    if (!Ent4.weaponMatchesTarget(D, airT) || !Ent4.weaponMatchesTarget(D, gndT)) bad.push('TOR-3 对空或对地不能锁（target:any）');
+    if (Ent4.weaponMatchesTarget(sandbox.WEAPONS.srm, gndT)) bad.push('TOR-2 不该能锁地面（对照）');
+    if (Ent4.effRange(D, 3000) !== Ent4.effRange(sandbox.WEAPONS.srm, 3000)) bad.push('TOR-3 与 TOR-2 射程不一致（锁定距离应一致）');
+    if (D.fits.length !== 0) bad.push('TOR-3 不该出现在玩家机库（fits 应为空）');
+    if (!D.npcFits || !D.npcFits.length) bad.push('TOR-3 缺 npcFits（僚机挂不上）');
+    if (Ent4.targetClass(D, airT) !== 'air' || Ent4.targetClass(D, gndT) !== 'surface') bad.push('targetClass 没随目标走');
+    const wing = Ent4.makeAircraft({ type: 'folded_wing', team: 0, x: 0, y: 3000, z: 0, fwd: M4.V(0, 0, 1), speed: 300, special: 'drm', isDrone: true });
+    if (wing.ammoPool.drm !== 30) bad.push('KA-7 挂 TOR-3 的弹药池应为 30，实际 ' + wing.ammoPool.drm);
+    const lf0 = Ent4.curLoadFactor(wing);
+    if (Math.abs(lf0 - wing.loadFactor) > 1e-6) bad.push('NPC 初始挂载系数与 loadFactor 对不上');
+    wing.ammoPool.drm = 15;
+    const lf1 = Ent4.curLoadFactor(wing);
+    if (!(lf1 < lf0 - 0.1)) bad.push('NPC 挂载重量没有随弹药打光而减轻（' + lf0.toFixed(2) + ' → ' + lf1.toFixed(2) + '）');
+  }
+  if (bad.length) bad.forEach(fail);
+  else ok('TOR-3（target:any）：对空对地都能锁、锁定距离与 TOR-2 一致、玩家挂不上；KA-7 弹药池 30，挂载重量随弹药折算');
+});
+
+section('碰炸与拟真近炸', () => {
+  const bad = [];
+  const E5 = sandbox.Ent, M5 = sandbox.M3;
+  const trial = (wid, mpos, mvel, mfwd, age, team) => {
+    const W5 = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true, hitsLanded: 0 };
+    const v = { kind: 'aircraft', team: team === undefined ? 1 : team, alive: true, hp: 500, radius: 8,
+      pos: M5.V(0, 0, 0), vel: M5.V(0, 0, 0), fwd: M5.V(0, 0, 1), phys: { vMax: 300 }, speed: 200, lockResist: 0 };
+    W5.actors.push(v);
+    const m = E5.makeMissile({ weapon: wid, team: 0, pos: mpos, fwd: mfwd, speed: M5.len(mvel), target: null, owner: null });
+    m.vel = mvel; m.age = age; m.seekerOn = true;
+    W5.missiles.push(m);
+    const h0 = v.hp;
+    E5.contactScan(m, 1 / 60, W5);
+    return { det: !m.alive, dmg: h0 - v.hp };
+  };
+  const Z5 = M5.V(0, 0, 0), F5 = M5.V(0, 0, 400), N5 = M5.V(0, 0, 1);
+  const a1 = trial('drm', M5.V(14, 0, 3), F5, N5, 2);          // 侧方擦过敌机，已解保 → 近炸
+  if (!a1.det) bad.push('TOR-3 侧方擦过非目标敌机、已解保，应当近炸');
+  const a2 = trial('drm', M5.V(14, 0, 3), F5, N5, 0.1);        // 未解保 → 不炸
+  if (a2.det) bad.push('TOR-3 未解保（age < 0.6 s）就近炸了');
+  const a3 = trial('drm', M5.V(14, 0, 3), F5, N5, 2, 0);       // 友机 → 不炸
+  if (a3.det) bad.push('TOR-3 对友机（同队）近炸了');
+  const a4 = trial('asl', M5.V(14, 0, 3), F5, N5, 2);          // 对地弹（无引信）擦过飞机 → 不炸
+  if (a4.det) bad.push('对地弹（无引信）擦过飞机不该触发');
+  const a5 = trial('asl', M5.V(0, 0, -30 + 32), F5, N5, 2);    // 对地弹正面撞上 → 碰炸，满伤
+  if (!a5.det || !(a5.dmg > 0)) bad.push('对地弹撞上低空飞机应当碰炸并造成伤害');
+  if (sandbox.WEAPONS.hbl.blastAir === false || sandbox.WEAPONS.hbh.blastAir === false) bad.push('hbl / hbh 不应再有 blastAir:false（落点溅射要伤到低空飞机）');
+  if (sandbox.WEAPONS.clb.blastAir !== false || sandbox.WEAPONS.v30.blastAir !== false) bad.push('clb / v30（子母弹）应当保留 blastAir:false');
+  if (bad.length) bad.forEach(fail);
+  else ok('碰炸：侧方擦过敌机在引信内、已解保 → 近炸；未解保 / 友机 / 对地无引信弹 → 不炸；正面撞上 → 碰炸满伤；hbl/hbh 溅射空中，clb/v30 不溅射');
+});
+
+section('KA-7 默认挂载与携带量重量', () => {
+  const bad = [];
+  const E6 = sandbox.Ent, M6 = sandbox.M3;
+  const w6 = E6.makeAircraft({ type: 'folded_wing', team: 0, x: 0, y: 3000, z: 0, fwd: M6.V(0, 0, 1), speed: 300, isDrone: true });
+  if (!w6.ammoPool || w6.ammoPool.drm !== 30 || w6.ammoPool.mrm !== 4) bad.push('KA-7 默认挂载的弹药池应为 drm 30 / mrm 4，实际 ' + JSON.stringify(w6.ammoPool));
+  if (E6.mountIssues && E6.mountIssues.length) bad.push('KA-7 默认挂载出现挂载问题：' + JSON.stringify(E6.mountIssues));
+  const lf6 = E6.curLoadFactor(w6);
+  if (Math.abs(lf6 - 0.614) > 0.01) bad.push('KA-7 满挂 loadFactor 应约 0.614（按携带量算），实际 ' + lf6.toFixed(3));
+  w6.ammoPool.mrm = 0;
+  if (!(E6.curLoadFactor(w6) < lf6 - 0.1)) bad.push('打光 CLA-4 后 KA-7 的挂载重量没有减轻');
+  if (bad.length) bad.forEach(fail);
+  else ok('KA-7 默认挂载：翼下 TOR-3 ×2 + 内埋 CLA-4 ×2 按组落位，弹药池 drm 30 / mrm 4，满挂 loadFactor ' + lf6.toFixed(3) + '，打光 CLA-4 后减轻');
+});
+
+section('僚机掩护撒干扰弹', () => {
+  const bad = [];
+  const Wc = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true, hitsLanded: 0, events: [] };
+  const Mc = sandbox.M3, Ec = sandbox.Ent;
+  const carrier = { kind: 'aircraft', team: 0, alive: true, hp: 300, radius: 8, pos: Mc.V(0, 3000, 0), vel: Mc.V(0, 0, 0),
+    fwd: Mc.V(0, 0, 1), up: Mc.V(0, 1, 0), phys: { vMax: 300 }, speed: 200, flares: 80, flareCd: 0, name: 'VESPER-2' };
+  const lead = { kind: 'aircraft', team: 0, alive: true, hp: 300, radius: 8, pos: Mc.V(700, 3000, 0), vel: Mc.V(0, 0, 0),
+    fwd: Mc.V(0, 0, 1), up: Mc.V(0, 1, 0), phys: { vMax: 300 }, speed: 200, isPlayer: true, flares: 80 };
+  Wc.player = lead; Wc.actors.push(carrier, lead);
+  const mc = Ec.makeMissile({ weapon: 'srm', team: 1, pos: Mc.V(700, 3000, 600), fwd: Mc.V(0, 0, -1), speed: 700, target: lead, owner: null });
+  mc.seekerOn = true; mc.age = 3; Wc.missiles.push(mc);
+  // 1. 距离衰减：载机离被保护者 700 m（超过 600 m 半径）→ 欺骗概率为 0，导弹不会被骗走
+  if (!Ec.breakLockFor(carrier, lead, Wc)) bad.push('掩护投放在有库存、冷却就绪时应当成功');
+  if (mc.spoofed) bad.push('载机在 600 m 衰减半径之外仍骗走了导弹');
+  if (carrier.flares !== 79) bad.push('掩护投放应当消耗载机 1 组库存，实际 ' + carrier.flares);
+  // 2. 整关：COVER 指令下僚机撒弹，每架的消耗都是 3 组的整数倍（每次固定连放 3 轮）
+  const SimC = require('./lib/sim');
+  const SS = SimC.load({ seed: 7 });
+  SS.start(0);
+  SS.run(2, () => {});
+  const WW = SS.sandbox.Game.__world();
+  const drones = WW.actors.filter(a => a.isDrone && a.alive);
+  drones.forEach(d => { d.ai.cmd = 'cover'; });
+  const f0 = drones.map(d => d.flares);
+  SS.run(60, () => {});
+  const spent = drones.map((d, i) => f0[i] - d.flares);
+  if (!spent.some(n => n > 0)) bad.push('COVER 下 60 s 里僚机没有替长机撒过干扰弹');
+  if (bad.length) bad.forEach(fail);
+  else ok('僚机掩护撒弹：600 m 外不骗；COVER 下 60 s 撒弹，每架消耗 ' + spent.join(' / ') + ' 组（含自保连放）');
+});
+
+section('包线缓存与滑翔校验', () => {
+  const bad = [];
+  const Eq = sandbox.Ent, Mq = sandbox.M3, Wq = sandbox.WEAPONS;
+  const h = {};
+  const la = { pos: Mq.V(0, 3000, 0), fwd: Mq.V(0, 0, 1), speed: 270 };
+  const tg = { kind: 'aircraft', radius: 8, pos: Mq.V(0, 3000, 6000), vel: Mq.V(0, 0, 0), fwd: Mq.V(0, 0, -1), phys: { vMax: 500 }, speed: 300 };
+  const e1 = Eq.envelopeCached(h, 1.0, la, Wq.srm, 'srm', tg, 0.2);
+  const e2 = Eq.envelopeCached(h, 1.1, la, Wq.srm, 'srm', tg, 0.2);
+  if (e1 !== e2) bad.push('包线缓存在 0.2 s 内没有复用');
+  const e3 = Eq.envelopeCached(h, 1.5, la, Wq.srm, 'srm', tg, 0.2);
+  if (e3 === e1) bad.push('包线缓存超过 0.2 s 没有刷新');
+  // 滑翔弹（asl）：校验后的 rmax 在水平 0.9 倍处必须真的命中；nez 收不回来时只能是"正下方"
+  const ga = { pos: Mq.V(0, 6000, 0), fwd: Mq.V(0, 0, 1), speed: 350 };
+  const gt = { kind: 'target', radius: 20, pos: Mq.V(0, 0, 8000), vel: Mq.V(0, 0, 0), speed: 12 };
+  const eg = Eq.envelopeRange(Wq.asl, ga, gt);
+  const dhg = ga.pos.y - gt.pos.y;
+  const flatR = Math.sqrt(Math.max(0, eg.rmax * eg.rmax - dhg * dhg));
+  const hitAt = D => Eq.flyTo(Wq.asl, ga, { kind: 'target', radius: 20, pos: Mq.V(0, 0, D), vel: Mq.V(0, 0, 0), speed: 12 }, false);
+  if (!hitAt(flatR * 0.9)) bad.push('asl 滑翔：rmax 的 0.9 倍处应当能命中（包线校验失效）');
+  if (bad.length) bad.forEach(fail);
+  else ok('包线：envelopeCached 0.2 s 内复用、之后刷新；asl 滑翔 rmax 的 0.9 倍处命中（校验生效）');
+});
+
 console.log('');
 if (problems.length) {
   console.log('\x1b[31m✗ 冒烟测试失败：' + problems.length + ' 项\x1b[0m\n');

@@ -123,7 +123,7 @@
 | `radius` | `missions.js` | 敌机命中半径（8），轰炸机 22 |
 | `loadoutList` / `ammoPool` / `loadout` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy` 的 `o.loadout`（NPC） | 挂载列表 / 各武器储备 / **逐组**配置（组 id → 弹种）。NPC 的 `ammoPool` / `slotCd` 在 `makeAircraft()` 里就建好了（见 [loadout.md](loadout.md#npc-的挂载)） |
 | `wpIdx` / `spSalvo` | `game.js` | 当前挂载下标；`spSalvo` **写入后无人读取** |
-| `loadFactor` | `game.js` `startMission`（**只有玩家**） | 挂载重量惩罚，`stepAircraft()` 开头读。NPC 虽有实体挂载（`npcFits`）但**不设**它，飞行性能不受挂载影响 |
+| `loadFactor` | 玩家：`game.js` `startMission`；NPC：`buildNpcMounts`（都会设） | 挂载重量惩罚，`stepAircraft()` 开头经 `curLoadFactor` 读。有 `loadModel` 时随弹药池折算：打光弹药即变轻 |
 | `armor` / `lockRangeK` / `silentLock` | `game.js` `startMission`（玩家）/ `missions.js` `spawnEnemy`（敌机 `pods`，不设 `lockRangeK`） | 被动吊舱加成（`lockResist` 不再单独写，改由 `Ent.setStealth` 与机体匿踪合并）。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
 | `gLoad` / `brake` / `hiG` | `game.js` `controlPlayer` | 高 G 倍率 / 减速板 / HUD 指示 |
 | `sweep` | `stepAircraft` | 可变后掠翼位置（仅 `ac.variableSweep`） |
@@ -412,3 +412,24 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 ## 8. 一句话导航
 
 改数值先看 `data.js`（武器、机型），改**行为**再看 `entities.js`；改**发射许可与锁定**看 `game.js`。飞行模型的理由全部在 [flight-model.md](flight-model.md)，别在本文里重复第二遍。
+
+## 碰炸、近炸与干扰弹（`contactScan` / `breakLockFor`）
+
+- **`contactScan(m, dt, world)`**（`stepMissile` 在 `fuzeCheck` 之后、撞地之前调用，有制导与无制导弹共用）：
+  - 对象只有 `world.actors` 与 `world.targets`。干扰弹粒子与 `m.decoy` 不在这两张表里，天然不触发。
+  - **碰炸**：最近点距表面 `< Combat.CONTACT`，任何对象（中立也算），直接命中满伤。
+  - **近炸**：只对敌方飞机（中立、友机不触发）。需要已解保（`m.age ≥ FUZE_ARM_T = 0.6 s`）、最近点距离 `< w.fuze`、最近点落在本帧内、目标在 `FUZE_CONE = 110°` 引信锥内。起爆点在最近点，不设 `direct`，伤害按距离衰减。
+  - `m.target` 跳过（由 `fuzeCheck` 管自己的目标）。
+- **`breakLockFor(carrier, protectee, world)`**：`breakLock(a, world)` 等价于 `breakLockFor(a, a, world)`。
+  - 对象是锁定 `protectee` 的来袭弹。欺骗概率乘 `distK = clamp(1 − 载机到 protectee 的距离 / 600, 0, 1)`，600 m 外为 0。
+  - 诱饵云从载机位置放出。自保时 `distK = 1`，行为与原来一致。
+  - 自保的声音仍是满音量 `SFX.flare()`；掩护投放改用 `SFX.flareAt(距玩家的距离)` 衰减。
+- **`envelopeCached(holder, clock, la, w, wid, t, interval)`**：发射包线的缓存版，结果挂在 `holder.env` 上，`interval` 秒内复用，换弹或换目标时作废。AI、打击航线、发射架共用。
+- **`envelopeRange` 的校验**：二分结果在非单调区间（滑翔、高抛）可能落在打不中的点上。返回前按**斜距**的 0.9 倍（对应水平距离 0.9 倍的校验点）逐步回收，最多 12 次；收不回来的 nez 退到"目标正下方"（斜距 = 高度差）。
+- **`estDt`**：默认 1/10 s；滑翔 / 高抛弹（`w.glide`、`w.loft`）用 1/60，否则落点会偏到打不中。
+
+## 挂载重量（`buildNpcMounts`）
+
+- 弹的重量按**携带量**算：`min(ammo, 点数 × perPoint) × mass`（下游弹 `perPoint 0`，仍是占位 100 kg）。打空的弹药池不再计重量。
+- 吊舱与定向能按挂点算、不随打空而变轻（`fixedM`）。
+- `curLoadFactor` 以 `k0 = 初始 loadFactor`、`total = 满挂总重` 折算，与玩家同一口径。

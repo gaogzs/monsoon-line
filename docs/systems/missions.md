@@ -221,7 +221,7 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
 **没有交战规则锁定。** 单元附近什么武器都能打，后果只有误伤扣分（`friendlyLoss`）；
 文字上只剩一句"谨慎使用重型武器"。
 
-`spawnWingman` 写死的部分：机型 `folded_wing`、阵营 0、`isDrone: true`、`special: 'v9'`、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
+`spawnWingman` 写死的部分：机型 `folded_wing`、阵营 0、`isDrone: true`、不再指定 `special`（挂载由 KA-7 的 `defaultLoadout` 按组落位：翼下 TOR-3 ×2、机腹弹舱 CLA-4 ×2）、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
 
 ### 2.3 台词（`data.js`）
 

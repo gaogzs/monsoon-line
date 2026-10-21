@@ -526,3 +526,11 @@ var queue = [], timer = 0, box = null, live = [];
 9. **`launch()` 兼容两种冷却形态**：`slotCd[wid]` 存在就走槽数组，不存在才退回 `actor.spCd`。AI 靠的就是后一条 —— 别把那个 `else if (actor.spCd > 0)` 删掉，否则 AI 会变成无冷却连射。
 10. **底部 `window.addEventListener('load', ...)` 必须最后加载**：`Game.init()` 第一件事就是 `preflight()` 检查所有全局模块，前面任何一个 `<script>` 没跑完都会报“核心模块 X 未加载”。**已知未释放**：`finish()` 之后 `world / player` 仍被闭包与 `debrief` 的渲染路径引用，只有 `#btnAbort` 会置空。
 11. **加关之后忘了写进 `CAMPAIGNS[].missions`**：关卡本身能跑、能通过 `preflight` 的字段检查，只是在选关界面永远列不出来。`preflight()` 现在会报“没有归属任何战役”，但触发它的前提是新关确实被加进了 `MISSIONS`。同一关被两个战役引用也会报。
+
+## 本批更新
+
+- **命中检测**：`scanShot` 只处理子弹与舰炮弹。导弹与无制导弹的碰炸统一在 `Ent.contactScan`（`stepMissile` 里调用）。
+- **锁定**：`updateLock` 按目标类别分支（`Ent.targetClass`）。`target: 'any'` 对地面目标不乘 1.35、不做俯角判据，锁定距离与对空一样。
+- **目标切换**：`wantAir` 认 `'any'`；`targetMismatch` 对 `'any'` 直接交给 `weaponMatchesTarget`。
+- **事件**：`combatEvents` 消化 `{type:'wingflare'}`，僚机掩护撒弹时发电台"干扰弹，掩护长机。"，8 s 限频。
+- **开机自检**：默认挂载的合法性用 `Ent.fitsKind(w, kind, !ac.npcOnly)`，`npcOnly` 机型按 `npcFits` 判。

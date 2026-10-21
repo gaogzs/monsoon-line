@@ -518,3 +518,19 @@ M3 播撒机 0.25、护航 0.58–0.72、
 | 编队槽位 | `missions.js` `spawnWingman()` 的调用参数 |
 | 各机技能 | `missions.js` 各关 `spawn()` 里的 `skill` |
 | 导弹最小发射距离 | `update()` 里 `spW.nezer ? 1400 : (对面目标 ? 1200 : 700)` |
+
+## 发射包线闸门（动态射程）
+
+- 静态 `aiReach` 只是上界。通过上界后，再用真实弹道的 `rmax` / `nez`（`Ent.envelopeCached`，0.1 s 刷新）卡一次。
+- 制导弹才卡；炸弹和火箭靠它们自己的落点标记。
+- 高 skill（≥ 0.6）要求进 `nez`（目标掉头逃逸也能打中），低 skill 进 `rmax`。
+- **保守余量按目标类别分开**：空中目标 `AI_RANGE_MARGIN_AIR = 0.9`，地面 / 海面 `AI_RANGE_MARGIN_SURF = 0.8`（移动慢的地面目标打偏更丢人，对地多留余量）。
+
+## 僚机掩护撒干扰弹（COVER）
+
+- 仅 `s.cmd === 'cover'` 时生效。有导弹锁定长机（`world.player`）、且距长机 `< 3600 m` 时，僚机对**每枚弹**掷一次骰（概率 0.6，记在 `m.coverRolled[僚机名]` 上）。
+- 中了就固定连放 3 轮（`s.flareBurst = 3`，`s.flareFor = 长机`），不管骗没骗中；之后由 `breakLockFor(僚机, 长机)` 逐组投放。
+- 投放时推入 `world.events` 的 `{type:'wingflare'}`，`game.js` 据此发电台（8 s 限频）。
+- 自保的 evade 连放优先；两者共用同一个库存，所以一次 60 s 的统计里消耗可能不是 3 的倍数。
+- `s.envClock` 在 `update` 开头按 `dt` 累计，是包线缓存的时钟。
+- 僚机速度包线：`vMil` / `vStall` 乘 `loadoutPenalty(Ent.curLoadFactor(a))`（挂载越重、AI 估的可用速度越保守）。

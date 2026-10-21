@@ -1844,7 +1844,7 @@ var Game = (function () {
        之间循环 —— 否则会出现"锁到一个浮台、切到对空弹打不出去，
        还要再按好几下才转回飞机"。地上和天上的东西本来就该分开选。 */
     var w = WEAPONS[player.special];
-    var wantAir = !w || w.target === 'air';
+    var wantAir = !w || w.target === 'air' || w.target === 'any';
 
     var air = [], surf = [];
     for (var i = 0; i < world.actors.length; i++) {
@@ -1969,7 +1969,7 @@ var Game = (function () {
   function targetMismatch(w, t) {
     if (!w || !t) return null;
     /* 不锁目标的武器（吊舱 / 定向能）不参与这条判断 —— 它们本来就不选目标 */
-    if (w.target !== 'air' && w.target !== 'ground' && w.target !== 'ship') return null;
+    if (w.target !== 'air' && w.target !== 'ground' && w.target !== 'ship' && w.target !== 'any') return null;
     /* 真正的判据只有一处：Ent.weaponMatchesTarget —— AI 的选弹读的是同一个
        函数。两边各写一套的话，玩家会被提示"换对地弹"、而 AI 拿格斗弹去打
        海面平台，这类不一致不会报错，只会让行为看起来"有点笨"。 */
@@ -2562,10 +2562,15 @@ var Game = (function () {
        稍微偏一点就"丢锁" —— 而对地武器本来就不是那么用的。 */
     var ok = false;
     player.lockCone = cone;
-    if (w.target === 'air') {
+    if (Ent.targetClass(w, t) === 'air') {      // 对空对地通用（any）随目标类别走
       player.lockInCone = off < cone;
       player.lockInRange = dist < lockDist;
       ok = dist < lockDist && off < cone;
+    } else if (w.target === 'any') {
+      /* 对地一侧的 any 弹（TOR-3）：锁距离与对空一样，不乘 1.35，也不做俯角判据 */
+      player.lockInCone = Ent.lockOff(player, t, w) < cone;
+      player.lockInRange = dist < lockDist;
+      ok = dist < lockDist && player.lockInCone;
     } else {
       /* 投放包线：水平距离够近，并且目标在机头下方。
          dir 是指向目标的世界方向，dir.y 直接就是它的高低 ——
@@ -2610,16 +2615,7 @@ var Game = (function () {
     var i;
 
     for (i = 0; i < world.bullets.length; i++) scanShot(world.bullets[i], dt);
-
-    /* 无制导弹也走这里。
-
-       它们没有导引头、不会自己找目标 —— 出膛之后唯一能"命中"的方式
-       就是撞上去。所以必须和子弹一样做线段-球相交，
-       否则炸弹扔到浮台头顶会直接穿过去，一点血都不掉。 */
-    for (i = 0; i < world.missiles.length; i++) {
-      var mm = world.missiles[i];
-      if (mm.alive && mm.w && mm.w.unguided) scanShot(mm, dt);
-    }
+    /* 导弹与无制导弹的碰炸统一在 Ent.contactScan（stepMissile 里调），这里只剩子弹。 */
   }
 
   /* 一发弹体（子弹或无制导弹）的命中检测。逻辑完全一样：
@@ -2640,11 +2636,6 @@ var Game = (function () {
           if (b.owner && b.owner.isPlayer) {
             world.hitsLanded++;
             if (b.kind === 'bullet') world.gunHits++;
-          }
-          /* 无制导弹撞上飞机：就地起爆，直接命中的那架满伤，旁边的吃溅射 */
-          if (b.kind === 'missile') {
-            Combat.detonate(b, world, M3.add(prev, M3.mul(dir, t)), a);
-            break;
           }
           /* 带战斗部的炮弹（舰炮）同样起爆；航空机炮没有 blast，走下面的直接命中 */
           if (b.blast > 0) {
@@ -2673,13 +2664,6 @@ var Game = (function () {
           if (b.owner && b.owner.isPlayer) {
             world.hitsLanded++;
             if (b.kind === 'bullet') world.gunHits++;
-          }
-          /* 无制导弹（火箭 / 炸弹 / 子母弹）撞上设施 = 就地起爆（Combat.detonate）：
-             直接命中的满伤，爆炸半径内的其他目标按距离衰减。 */
-          if (b.kind === 'missile') {
-            Combat.detonate(b, world, M3.add(prev, M3.mul(dir, t2)), tg);
-            SFX.hit();
-            break;
           }
           if (b.blast > 0) {
             Ent.detonateShell(b, world, M3.add(prev, M3.mul(dir, t2)), tg);
@@ -3693,7 +3677,14 @@ var Game = (function () {
     for (var i = 0; i < ev.length; i++) {
       var e = ev[i];
       if (e.type === 'hit') hit = true;
-      else if (e.type === 'intercept') {
+      else if (e.type === 'wingflare') {
+        // 僚机替长机撒干扰弹：8 s 内同一架只报一次
+        var fk = e.unit + 'flareT';
+        if (world.time - (world.flags2[fk] || -99) > 8) {
+          world.flags2[fk] = world.time;
+          Radio.raw({ who: e.unit, cls: 'ally', tx: '干扰弹，掩护长机。', gap: 0.4 });
+        }
+      } else if (e.type === 'intercept') {
         var m = e.m;
         if (m.owner && m.owner.isPlayer) {
           hits.push({ txt: 'INTERCEPTED', t: 1.1, col: HUD.AMBER });
@@ -3928,7 +3919,8 @@ var Game = (function () {
         for (j = 0; j < grps.length; j++) if (grps[j].id === dk) dg = grps[j];
         if (!dg) { problems.push('机型 ' + ac.id + ' 的默认配置引用了不存在的组 ' + dk); continue; }
         if (!WEAPONS[dw]) { problems.push('机型 ' + ac.id + ' 的默认配置引用了不存在的武器 ' + dw); continue; }
-        if (!WEAPONS[dw].fits || WEAPONS[dw].fits.indexOf(dg.kind) < 0) {
+        /* 僚机（npcOnly）的挂点按 npcFits 判：TOR-3 这类只有 NPC 能挂的弹不该被玩家的 fits 挡掉 */
+        if (!Ent.fitsKind(WEAPONS[dw], dg.kind, !ac.npcOnly)) {
           problems.push('机型 ' + ac.id + ' 的默认配置把 ' + WEAPONS[dw].name +
             ' 挂到了挂不下的 ' + dg.label);
         }

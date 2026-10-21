@@ -195,7 +195,7 @@ function canCarry(ac, w) {
 | F-9 海燕 | `intercept` |
 | D-21 贼鸥 | `strike` `ew` |
 | D-33 信天翁 | （无）—— 纯格斗机 |
-| KA-7 折翼 | （无，且 `npcOnly`） |
+| KA-7 折翼 | （无，且 `npcOnly`；默认挂载见下文 KA-7 一节） |
 
 > `SPO-8` 追云**不在** `STORE_NEEDS` 里。它原来被标成"反辐射弹"、要求
 > `strike`（对地火控），于是只有攻击机和多用途机能挂 —— 而它其实是一枚
@@ -537,9 +537,10 @@ roll   × (1 − 0.12·lf)
 面板上写着"俯仰 −18%"，手感上却只有速度那几项。现在放在函数最前面，
 失速判定、姿态旋转、目标速度读的都是打过折的 `p`。
 
-**`loadFactor` 只有玩家设**（`game.js` `startMission`）。NPC 虽然有
-实体挂载（见 [§ NPC 的挂载](#npc-的挂载)），但不设这个字段，
-所以重量惩罚只作用于玩家 —— NPC 的挂载只影响外观、弹药与选弹，不影响手感。
+**玩家和 NPC 都吃挂载重量惩罚。** 玩家的 `loadFactor` 由 `game.js` 按机库配置设定；
+NPC 的由 `buildNpcMounts` 按实体挂载算（`entities.js`），口径相同：`loadFactor = min(1, 挂载总重 / maxLoad)`。
+两边随弹药消耗都会减轻：`curLoadFactor` 按弹药池的剩余比例折算（吊舱不随打空而变轻）。
+NPC 的满挂重量取 `挂点数 × perPoint × mass`；没有重量表的下游弹按占位值 `perPoint 1 × mass 100` 算。
 
 这是"空置挂架换机动性"的实现方式，也是半拟真感的来源之一 ——
 满载出击真的会飞得笨。
@@ -718,3 +719,11 @@ cd[wid] = slots.map(剩余 => 1 - clamp(剩余 / w.cd, 0, 1));
 | 选装卡片 | `game.js` `buildHpPicker()` / `makeStoreCard()` / `storeStatLine()` |
 | 俯视缩略图 | `planform.js` `paint()` / `drawStore()` / `groupStore()` |
 | 战斗挂载状态图 | `hud.js` `drawStores()` |
+
+## KA-7 默认挂载（本批）
+
+- 翼下 A 组（`light`，2 点）：TOR-3「雏矢」×2（`drm`，僚机专用，只有 `npcFits`）。
+- 机腹 B 组（`belly`，2 点，`expose: 0`）：CLA-4「中继」×2（`mrm`，中距雷达弹）。名义内埋，实际紧贴机腹（`hy: -0.12`）。
+- 远近切换不需要下令：近处由 TOR-3 负责，远处的空中目标由 CLA-4 负责（`chooseWeapon` 取够得着的里面射程最短的）。
+- `maxLoad` 4200；满挂 `loadFactor` ≈ 0.614；打光 CLA-4 后降到约 0.43。
+- 挂载重量按携带量算：`mrm` 的 `ammo` 是 4，只算 4 × 195 kg，不是 2 × 6 × 195 kg。

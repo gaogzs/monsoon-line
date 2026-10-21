@@ -405,6 +405,33 @@ var PLANFORM = (function () {
       return;
     }
     var tail = lk.fin === 'strake' ? 1.6 : 1.3;
+    if (lk.nose === 'dual') {
+      // 头部改装：钝头 + 战斗部段外凸一圈 + 一道接缝（与 models.js 的 addRound 同一个轮廓）
+      g.beginPath();
+      g.moveTo(x - D * 0.3, y - L / 2);
+      g.lineTo(x + D * 0.3, y - L / 2);
+      g.lineTo(x + D * 0.5, y - L * 0.40);
+      g.lineTo(x + D * 0.6, y - L * 0.30);
+      g.lineTo(x + D * 0.6, y - L * 0.14);
+      g.lineTo(x + D / 2, y - L * 0.10);
+      g.lineTo(x + D / 2, y + L * 0.36);
+      g.lineTo(x + D * tail, y + L / 2);
+      g.lineTo(x - D * tail, y + L / 2);
+      g.lineTo(x - D / 2, y + L * 0.36);
+      g.lineTo(x - D / 2, y - L * 0.10);
+      g.lineTo(x - D * 0.6, y - L * 0.14);
+      g.lineTo(x - D * 0.6, y - L * 0.30);
+      g.lineTo(x - D * 0.5, y - L * 0.40);
+      g.closePath();
+      g.stroke();
+      g.beginPath(); g.moveTo(x - D * 0.6, y - L * 0.14); g.lineTo(x + D * 0.6, y - L * 0.14); g.stroke();   // 战斗部接缝
+      if (lk.fin === 'strake') {
+        g.beginPath(); g.moveTo(x - D / 2, y + L * 0.02); g.lineTo(x - D * 1.05, y + L * 0.14); g.stroke();
+        g.beginPath(); g.moveTo(x + D / 2, y + L * 0.02); g.lineTo(x + D * 1.05, y + L * 0.14); g.stroke();
+      }
+      if (lk.boost) { g.beginPath(); g.moveTo(x - D * 0.8, y + L * 0.28); g.lineTo(x + D * 0.8, y + L * 0.28); g.stroke(); }
+      return;
+    }
     g.beginPath();
     g.moveTo(x, y - L / 2);
     g.lineTo(x + D / 2, y - L * 0.32);

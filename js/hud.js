@@ -86,6 +86,7 @@ var HUD = (function () {
       ctx.globalAlpha = M3.clamp(S.hudOpacity / 100, 0.15, 1);
     }
 
+    drawConeCue(ctx, W, H, cam, p);       // 视场圈最底层：其它 UI 都叠在它上面
     drawCompass(ctx, W, H, p, world, S);
     drawPitchLadder(ctx, W, H, cam, p, S);
     drawBoresight(ctx, W, H, p);
@@ -96,7 +97,6 @@ var HUD = (function () {
     drawTargets(ctx, W, H, cam, p, world);
     drawLaserStatus(ctx, W, H, p, world);
     drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
-    drawConeCue(ctx, W, H, cam, p);
     drawCcip(ctx, W, H, cam, p);          // 无制导炸弹 / 火箭的预计落点（CCIP）
     drawFootprint(ctx, W, H, cam, p);     // 精确制导炸弹的动态瞄准圈（泪滴形）
     drawFriendlyShots(ctx, W, H, cam, p, world);
@@ -1295,7 +1295,7 @@ var HUD = (function () {
     ctx.strokeStyle = hot ? RED : (t ? 'rgba(255,176,58,0.42)' : 'rgba(150,170,180,0.22)');
     ctx.lineWidth = hot ? 1.6 : 1.4;
     if (!hot && ctx.setLineDash) ctx.setLineDash([6, 6]);
-    if (w.target === 'air') {
+    if (Ent.targetClass(w, t) === 'air') {      // 对空对地通用（any）随当前目标走；无目标默认圆
       var bs = M3.project(cam, M3.add(p.pos, M3.mul(p.fwd, 2000)));
       var r = cam.focal * Math.tan(Math.min(1.45, cone));
       if (bs && r < Math.max(W, H)) {
@@ -1489,7 +1489,7 @@ var HUD = (function () {
     /* 制导弹才有发射包线：空空弹（对空中目标），以及有导引头的对地 / 对海弹
        （对海面 / 地面目标）。无制导弹（炸弹、火箭）没有 —— 它们靠 5.5 的落点标记。 */
     var isAam = w.kind === 'aam' && t.kind === 'air';
-    var isSurf = (w.target === 'ground' || w.target === 'ship') && t.kind === 'target' &&
+    var isSurf = (w.target === 'ground' || w.target === 'ship' || w.target === 'any') && t.kind === 'target' &&
       w.seeker && w.seeker !== 'none' && !w.unguided;
     if (!isAam && !isSurf) return null;
 

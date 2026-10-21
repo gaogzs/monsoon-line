@@ -111,3 +111,9 @@
 
 - 游戏里：`Turret.push(host, Renderer.pushModel)` 推两件，底座随方位转，炮身随方位和俯仰转。
 - 预览：`MODELS.composeTurrets(base, mounts)` 按零位把实体炮塔合进船体网格，结果会缓存。用到它的有单位详情页、`render-ships.js` 和 `render-units.js`。smoke 断言合并后的面数。
+
+## 发射架的动态射程（`launcherInEnvelope`）
+
+- 发射架（`kind: 'launcher'`）开火前，制导弹还要过 `Ent.envelopeCached` 的包线闸门：`d ≤ min(lockDist, rmax) × 余量`（空中 0.9，地面 / 海面 0.8）。
+- 缓存挂在炮位 `tu` 上，0.2 s 刷新；发射速度取 `gun.launchSpeed`（缺省 140）。
+- 只改开火判定，不改目标选择（`pickTargetFor`、`samReach` 仍是静态射程，用于决定"谁会被盯上"）。

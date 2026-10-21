@@ -1724,9 +1724,18 @@ var MODELS = (function () {
     var noseZ = z1 - L * (bomb ? 0.28 : 0.16);
     var tailZ = z0 + L * (bomb ? 0.12 : 0);
     var bodyCol = bomb ? C.green2 : C.white;
-    // 弹体 + 头锥（炸弹是圆钝头、导弹是尖头）
-    b.tube(V(ox, oy, tailZ), V(ox, oy, noseZ), bomb ? r * 0.7 : r, r, 6, bodyCol, null);
-    b.tube(V(ox, oy, noseZ), V(ox, oy, z1), r, bomb ? r * 0.35 : r * 0.12, 6, bodyCol, C.metal);
+    // 头部改装（TOR-3 的 nose:'dual'）：战斗部段比弹体粗一圈、醒目的红色，前面接钝圆的导引头罩
+    if (lk.nose === 'dual') {
+      var wbL = L * 0.22;
+      b.tube(V(ox, oy, tailZ), V(ox, oy, noseZ - wbL), r, r, 6, bodyCol, null);
+      b.tube(V(ox, oy, noseZ - wbL), V(ox, oy, noseZ), r * 1.18, r * 1.18, 6, C.red, C.darker);
+      b.tube(V(ox, oy, noseZ), V(ox, oy, z1), r * 1.18, r * 0.55, 6, bodyCol, C.metal);
+      b.tube(V(ox, oy, z1 - L * 0.04), V(ox, oy, z1), r * 0.55, r * 0.42, 6, C.black, null);   // 导引头窗口
+    } else {
+      // 弹体 + 头锥（炸弹是圆钝头、导弹是尖头）
+      b.tube(V(ox, oy, tailZ), V(ox, oy, noseZ), bomb ? r * 0.7 : r, r, 6, bodyCol, null);
+      b.tube(V(ox, oy, noseZ), V(ox, oy, z1), r, bomb ? r * 0.35 : r * 0.12, 6, bodyCol, C.metal);
+    }
     if (bomb) b.tube(V(ox, oy, z0), V(ox, oy, tailZ), r * 0.35, r * 0.7, 6, C.darker, null);
     // 助推段：尾部一圈深色加粗
     if (lk.boost) b.tube(V(ox, oy, z0), V(ox, oy, z0 + L * 0.22), r * 1.12, r * 1.12, 6, C.grey2, C.darker);

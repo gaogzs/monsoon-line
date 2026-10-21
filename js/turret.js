@@ -213,6 +213,17 @@ var Turret = (function () {
     return done ? null : o;
   }
   function isLauncher(tu) { return tu.gun.kind === 'launcher'; }
+  /* 发射架的动态射程闸门（与 AI、打击航线同一套）：静态 rangeOf 只是上界，
+     制导弹还要在真实弹道 rmax 的 0.9（空）/ 0.8（面）之内才放。缓存挂在炮位上，0.2 s 刷新。 */
+  function launcherInEnvelope(tu, world, P0, t) {
+    var lw = WEAPONS[tu.gun.weapon];
+    if (!lw || !lw.seeker || lw.seeker === 'none' || lw.unguided) return true;
+    var fwd = M3.norm(M3.sub(t.pos, P0));
+    var env = Ent.envelopeCached(tu, world.time || 0, { pos: P0, fwd: fwd, speed: tu.gun.launchSpeed || 140 },
+      lw, tu.gun.weapon, t, 0.2);
+    var cap = Math.min(lw.lockDist || Infinity, env.rmax);
+    return M3.dist(t.pos, P0) <= cap * (t.kind === 'target' ? 0.8 : 0.9);
+  }
   function rangeOf(tu) {
     var g = tu.gun;
     if (g.range) return g.range;
@@ -498,7 +509,11 @@ var Turret = (function () {
       }
     }
     if (tu.cd > 0) return;
-    if (isLauncher(tu)) { launch(tu, host, world, P0, dGun, t); return; }
+    if (isLauncher(tu)) {
+      if (!launcherInEnvelope(tu, world, P0, t)) return;     // 制导弹：真实弹道的包线之外不放
+      launch(tu, host, world, P0, dGun, t);
+      return;
+    }
     var rps = g.rpm / 60, n = 0;
     // 对空 / 对海面两套散布：大口径对空散得很开，打舰船另算（spreadSurface，缺省同 spread）
     var spr = (!isAir(t) && g.spreadSurface !== undefined) ? g.spreadSurface : g.spread;

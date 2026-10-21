@@ -318,3 +318,8 @@ for (const e of dyn) {
 | `css/style.css` | `.cx-table` `.cx-title` `.cx-sub` `.cx-text` `.cx-note` `.cx-cat` `.cx-item` `.cx-fly`，以及 `<span class="am">` / `cy` / `rd` 三个强调色 |
 | `tools/smoke.js` | 断言动态条目可生成且 ≥200 字符；导航按钮 `data-go="codex"` → `scr-codex` |
 | `docs/world/SETTING.md` | 同源散文，但**没有代码绑定**，参数可能已漂移 |
+
+## 本批更新
+
+- 非机载表（表 2）收录 TOR-3「雏矢」（`fits: []`，玩家挂不上）。
+- 僚机指令段补充：默认挂载（翼下 TOR-3、机腹 CLA-4）与掩护（3）指令下的干扰弹。

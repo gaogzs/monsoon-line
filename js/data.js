@@ -346,18 +346,29 @@ G-6 是全上游公约<b>唯一能扛住一发防空导弹破片</b>的机型。
       等于用一个人的编制换三个发射架。</b>
       代价是它没有判断力：长机被打掉，它就只会原地盘旋。</p>
       <p>不带座舱、弹射座椅和生命维持，飞翼外形又专门为高速巡航修过一遍 ——
-      所以它比任何一架有人机都快：<b>长机开加力往前冲，它也跟得上。</b></p>`,
-    stats: { spd: 0.96, mob: 0.76, stl: 0.32, fire: 0.42, dur: 0.28, rng: 0.38, ecm: 0.20 },
+      所以它比任何一架有人机都快：<b>长机开加力往前冲，它也跟得上。</b></p>
+      <p>翼下挂的是专为它改的 <b>TOR-3「雏矢」</b>：基础 TOR-2 的弹体，换了战斗部和双模式导引头，
+      <b>对空、对地用同一个锁定距离</b>，长机指向哪里它就咬向哪里。两个挂点合计三十发，
+      比同定位的基础弹多一半 —— 代价是玩家的机库里没有它，只有无人僚机挂得上。</p>
+      <p><b>默认挂载</b>：翼下两个挂点各一枚 TOR-3，近处的狗斗和对地由它负责；
+      机身中线两侧的弹舱里各一枚 <b>CLA-4「中继」</b>中距雷达弹，名义上是内埋，
+      实际紧贴着机腹挂着，为的是远处的空中目标。两者的射程不同，远近由它们自己切换，
+      不需要僚机额外下令。</p>`,
+    stats: { spd: 0.96, mob: 0.76, stl: 0.32, fire: 0.62, dur: 0.28, rng: 0.62, ecm: 0.20 },
     /* 极速要压过最快的有人机（petrel 620）：跟不上长机的僚机替长机挡不了弹 */
     phys: { vMax: 660, vMil: 540, vStall: 96, accel: 34, decel: 44, pitch: 0.78, roll: 2.65, yaw: 0.40, hp: 58 },
     /* 没有机炮：它是"发射架"，自己看不见东西，目标参数全靠长机喂 ——
        机炮要的是自己对准、自己判断开火时机，这两样它都没有。 */
     gun: null,
-    maxLoad: 1200,
+    maxLoad: 4200,
     hardpointGroups: [
-      { id: 'A', label: '翼下挂点', kind: 'light', pts: [{ x: 2.0, y: -0.5 }, { x: -2.0, y: -0.5 }] }
+      { id: 'A', label: '翼下挂点', kind: 'light', pts: [{ x: 2.0, y: -0.5 }, { x: -2.0, y: -0.5 }] },
+      /* 机身中线两侧的内埋弹舱：expose 0，不拉低匿踪。名义上在机身内，实际紧贴机腹挂着，hy 压到机腹下沿 */
+      { id: 'B', label: '内埋弹舱', kind: 'belly', expose: 0, hy: -0.12, pts: [{ x: 0.55, y: -0.6 }, { x: -0.55, y: -0.6 }] }
     ],
-    defaultLoadout: {}
+    /* 僚机默认挂载：翼下 TOR-3（僚机专用，只有 npcFits）+ 内埋 CLA-4 中继（远距空战）。
+       由 NPC 的逐组 loadout 落位，玩家的机库过滤不到它（npcOnly）。 */
+    defaultLoadout: { A: 'drm', B: 'mrm' }
   },
 
   /* ============================================================
@@ -1307,6 +1318,8 @@ var TURRET_GUNS = {
   ciws20: { name: '近防炮 20mm', cal: 20, rpm: 750, speed: 1100, dmg: 4, range: 1800, airRange: 1200, spread: 0.006, drag: 2.4e-4 },
   aa30:   { name: '30mm 遥控炮', cal: 30, rpm: 300, speed: 1000, dmg: 9, range: 2500, spread: 0.005, drag: 2.0e-4 },
   tail20: { name: '20mm 尾炮', cal: 20, rpm: 300, speed: 900, dmg: 5, range: 1200, spread: 0.006, drag: 2.4e-4 },
+  /* ROK-40 的机载尾炮：与舰载 tail20 分开，射速降到 1/4（同机炮 rpm÷4 的规矩，见 k3 等） */
+  tail20a: { name: '20mm 尾炮', cal: 20, rpm: 150, speed: 900, dmg: 5, range: 1200, spread: 0.006, drag: 2.4e-4 },
   n50:    { name: '50mm 速射炮', cal: 50, rpm: 80, speed: 1050, dmg: 12, range: 4500, airRange: 4000, spread: 0.008, spreadSurface: 0.002,
             gravity: 1, drag: 1.1e-4, fuze: 4, blast: 8, blastCore: 1.5, surface: true },
   n75:    { name: '75mm 两用舰炮', cal: 75, rpm: 24, speed: 900, dmg: 30, range: 8000, airRange: 6000, spread: 0.010, spreadSurface: 0.0025,
@@ -1490,7 +1503,7 @@ var SHIP_MOUNTS = {
   /* ROK-40 的尾炮：没有实体，从尾锥射出，管后半球。它本身没有前射机炮（gun: null） */
   for (i = 0; i < AIRCRAFT.length; i++) {
     if (AIRCRAFT[i].id === 'boulder') {
-      AIRCRAFT[i].mounts = [_m('tail', 'tail20', [0, 0.4, -22.2], Math.PI,
+      AIRCRAFT[i].mounts = [_m('tail', 'tail20a', [0, 0.4, -22.2], Math.PI,
         { yawMin: -1.5, yawMax: 1.5, pitchMin: -0.9, pitchMax: 0.9 }, null, 'aa')];
     }
   }
@@ -1639,7 +1652,7 @@ var WEAPONS = {
        那一片不是靠单发精度打中的，是靠射速填满的：
        完整算式与"射速兜底"的余量表见
        docs/systems/weapons.md「机炮散布」。 */
-    cal: 20, rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
+    cal: 20, rpm: 1950, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
     range: 1600, highRange: 2600,
     /* "翻倍"不准确：range 1600 → highRange 2600，实际 1.63 倍。
        现在这句话和数值已经对上了 —— fireGun 会真的按射程算子弹寿命。 */
@@ -1649,7 +1662,7 @@ var WEAPONS = {
   k7: {
     name: 'CEL-7', cn: '30mm 四管转膛炮', kind: 'gun',
     /* 口径大、弹重 → 炮口跳动更大，散布比 CEL-3 再大一档。 */
-    cal: 30, rpm: 3900, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
+    cal: 30, rpm: 1950, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
     range: 2000, highRange: 3100,
     desc: 'G-6 专用。一发足以打穿巡逻艇的上层建筑。'
   },
@@ -1671,7 +1684,7 @@ var WEAPONS = {
 
   k1: {
     name: 'CEL-1', cn: '20mm 六管转膛炮 · 外销型', kind: 'gun',
-    cal: 20, rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
+    cal: 20, rpm: 1950, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
     range: 1600, highRange: 2600,
     desc: '上游二十年前的外销型，和 CEL-3 是同一张图纸 ——' +
       '只是当年卖出去的那一批零件公差更松、炮管寿命更短。' +
@@ -1679,7 +1692,7 @@ var WEAPONS = {
   },
   k2: {
     name: 'CEL-2', cn: '20mm 六管转膛炮 · 库存批', kind: 'gun',
-    cal: 20, rpm: 3900, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
+    cal: 20, rpm: 1950, speed: 1100, dmg: 7, spread: 0.0032, ammo: 6000,
     range: 1600, highRange: 2600,
     desc: '调节场管理局不造武器。这门炮是从上游的退役库存里整批买来的，' +
       '机匣上还留着上一任使用方的序列号 —— 它唯一的作用是让勤务机' +
@@ -1688,7 +1701,7 @@ var WEAPONS = {
   k11: {
     name: 'CEL-11', cn: '30mm 四管转膛炮 · 下游型', kind: 'gun',
     /* 与 k7 同参数：口径、散布、射程都照抄，改的只是归属与来历。 */
-    cal: 30, rpm: 3900, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
+    cal: 30, rpm: 1950, speed: 1020, dmg: 17, spread: 0.0036, ammo: 14000,
     range: 2000, highRange: 3100,
     desc: '下游同盟的制式机炮 —— 他们只有这一门。和上游的 CEL-7 口径相同、' +
       '路数不同：下游不关心炮管寿命，只关心弹箱能塞多大，' +
@@ -2175,7 +2188,7 @@ var WEAPONS = {
     id: 'hbl', name: 'PEJ-4', cn: '飞蝗 · LOCUST', kind: 'bomb',
     model: 'bomb',
     speed: 300, life: 12.0, vsLife: 24.0,
-    dmg: 70, ammo: 8, cd: 0.3, salvo: 1, blast: 24, blastCore: 6, blastAir: false,
+    dmg: 70, ammo: 8, cd: 0.3, salvo: 1, blast: 24, blastCore: 6,
     target: 'ground', unguided: true, ballistic: true,
     desc: '轻型高爆炸弹。当量小，但一个挂点带得多、装填快，适合多枚连投收拾小艇和分散目标。<b>无制导，自由落体</b>：靠 HUD 的预计落点标记瞄准。',
     stat: { dmg: 0.30, spd: 0.18, trn: 0.00, rng: 0.40, ecm: 1.0 }
@@ -2185,7 +2198,7 @@ var WEAPONS = {
     id: 'hbh', name: 'PEJ-22', cn: '镇岳 · BULWARK', kind: 'bomb',
     model: 'bomb',
     speed: 280, life: 12.0, vsLife: 24.0,
-    dmg: 420, ammo: 1, cd: 0.5, salvo: 1, blast: 110, blastCore: 45, blastAir: false,
+    dmg: 420, ammo: 1, cd: 0.5, salvo: 1, blast: 110, blastCore: 45,
     target: 'ground', unguided: true, ballistic: true,
     desc: '重型高爆炸弹。单枚当量极大，一发就能重创一艘护卫舰或炸平一片密集目标，但携带量少、装填慢。<b>无制导，自由落体</b>：得从目标上空附近投放，靠预计落点标记瞄准。',
     stat: { dmg: 1.00, spd: 0.10, trn: 0.00, rng: 0.20, ecm: 1.0 }
@@ -2404,6 +2417,23 @@ var WEAPONS = {
       '飞进来的敌机会先收到它的告警。'
   },
 
+  /* ---------- 上游：无人僚机专用（玩家挂不上） ----------
+     TOR-2 的弹体与导引头改装：战斗部加大、导引头罩换成双模式。
+     对空对地同一个锁定距离（target:'any'）。携弹量比同定位的 TOR-2 多约一半。 */
+  drm: {
+    id: 'drm', name: 'TOR-3', cn: '雏矢 · FLEDGLING', kind: 'aam',
+    model: 'missile',
+    speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
+    turn: 1.75, seeker: 'ir', lockCone: 28 * Math.PI / 180, lockDist: 4200,
+    dmg: 30, ammo: 30, cd: 0.11, salvo: 1, flare: 0.38, fuze: 12, blast: 18, blastCore: 2,
+    target: 'any',
+    fits: [], perPoint: 15, mass: 60,
+    npcFits: ['light', 'heavy'],
+    desc: 'TOR-2 的战斗部与导引头改装版，只给无人僚机挂。对空对地用同一个锁定距离：' +
+      '长机给的目标在天上还是在地上，它都咬得住。携弹量比基础弹多约一半。玩家的机库里挂不上它。',
+    stat: { dmg: 0.34, spd: 0.50, trn: 0.68, rng: 0.36, ecm: 0.30 }
+  },
+
   /* ---------- 舰对舰：反舰导弹（2-0IMPL 4.3） ----------
      只给舰船发射器用。出管先助推 boostT 秒（垂发竖直、斜发架按架子角度），
      之后有限转率转平、爬到 loft 高度巡航，末段俯冲 —— 见 stepMissile 的 launchT 分支。 */
@@ -2510,6 +2540,7 @@ var STORE_ATTR = {
    fin：  'strake' 长边条翼（格斗） / 'small' 小弹翼（中远）
           / 'cruise' 平直弹翼（巡航弹）/ 'bomb' 炸弹尾翼
    boost：尾部助推段（超远程 / 反舰）
+   nose： 'dual' 头部改装（TOR-3）：导引头罩 + 后面一段加粗的战斗部，飞行中与挂架上都画这个样子
    rack： 一个挂架上**看得见**的弹数 —— 只给单次齐射多发的武器（= salvo），
           单发武器哪怕一个挂点装好几发也画成一枚（perPoint 是弹库，不是外观）
    rdia： 巢式武器离架后单发的直径（dia 是整个巢）；MODELS.round 用它
@@ -2519,6 +2550,7 @@ var STORE_ATTR = {
 var STORE_LOOK = {
   /* 格斗 */
   srm:  { len: 2.7, dia: 0.13, fin: 'strake' },
+  drm:  { len: 2.7, dia: 0.13, fin: 'strake', nose: 'dual' },
   trm:  { len: 2.9, dia: 0.13, fin: 'strake' },
   hos:  { len: 2.6, dia: 0.14, fin: 'strake' },
   otr:  { len: 2.8, dia: 0.14, fin: 'small' },
@@ -2665,6 +2697,7 @@ var STORE_ROLE = {
   dl6:  '格斗',
   dl9:  '要地防空',
   ss6:  '舰载防空（上游）',
+  drm:  '僚机专用 · 对空对地',
   ssm:  '舰对舰 · 反舰',
   vzu:  '被动 · 抗锁定（下游）',
   vgt:  '对地攻击（下游）',
@@ -2809,7 +2842,9 @@ var STORE_COOLDOWN = {
   /* 下游 */
   dl4: 6.8, dl6: 4.4, dl9: 14,
   /* 上游舰载 */
-  ss6: 15
+  ss6: 15,
+  /* 上游僚机专用（同 TOR-2 的槽冷却） */
+  drm: 4.8
 };
 
 (function () {
@@ -2880,7 +2915,7 @@ var MISSILE_LEAD = {
   vlar: 0.90, hwm: 0.74, kkv: 0.45,
   asl: 0.65, asl2: 0.70, sat: 0.68,
   v25: 0.66, v22: 0.74, pgb: 0.70,
-  dl4: 0.74, dl6: 0.48, dl9: 0.80, ss6: 0.80, ssm: 0.70,
+  dl4: 0.74, dl6: 0.48, dl9: 0.80, ss6: 0.80, ssm: 0.70, drm: 0.38,
   swm: 0.44, hva: 0.80, lcm: 0.62,
   /* 下游与分水 */
   vgt: 0.58, vsr: 0.70, vbn: 0.66, otr: 0.32

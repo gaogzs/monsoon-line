@@ -631,7 +631,7 @@ node tools/render-mounts.js
 | `mount-sandstone-vbn` | 储备 2 发 < 挂点 4 个时，多出来的挂点出厂就是空的 |
 | `mount-lodestone-vsc` | 只有机腹挂点的干扰机把吊舱挂在机腹 |
 | `mount-pelican-dl6` | 适配表拦住"预警机挂格斗弹"（一件都不该有） |
-| `mount-folded_wing-v9` | 僚机 |
+| `mount-folded_wing-default` | 僚机（默认挂载：TOR-3 ×2 + CLA-4 ×2） |
 | `mount-lodestone-vsc-belly` · `mount-spray-vbn-vzu-belly` · `mount-schist-dl6-belly` | 同一批配置从**下**往上看（机腹挂载只有这个角度看得见） |
 
 ### 实现要点与限制
@@ -792,3 +792,9 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 ### probe-ccip
 
 无制导弹落点标记探针：多种高度 / 速度 / 俯冲角下，目标放在 `Ent.naturalPoint` 上投放必中、挪出半径外不中；并核对 PEJ-4 / PEJ-22 的定位数值。
+
+## 本批更新
+
+- **smoke 分段**：新增的断言都包在 `section(...)` 里，可以用 `--only` / `--skip` 单独跑：`TOR-3 与 target:any`、`碰炸与拟真近炸`、`KA-7 默认挂载与携带量重量`、`僚机掩护撒干扰弹`、`包线缓存与滑翔校验`。
+- **render-mounts**：`folded_wing-default`（僚机默认挂载，4 件）与 `frigatebird-drm`（TOR-3 对照）。
+- **probe-envelope**：滑翔弹 nez 一项在"水平 0 距离"时（高空投放、目标逃逸追不上）标注为"无逃逸包线"，不做命中断言。

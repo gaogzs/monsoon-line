@@ -707,3 +707,9 @@ ctx.strokeText(t, x, y);
 ## 机炮提前量准星（真实弹道）
 
 `drawLeadReticle` 读 `Ent.gunLead`：用 `Ballistics.step`（与 `fireGunFrom` 同一套：载机速度叠加、重力、阻力）迭代反解机头方向，按线段取最近接近点避免量化误差。预测点 = 机头沿解算方向在目标距离处的点。以前是“目标位置 + 速度 × 距离/初速”，漏掉载机速度与重力下坠。探针 `tools/probe-gunlead.js`（新解算 36/36 命中，旧估算 9/36）。AI 的 `leadTo` 还是旧的直线估算（带 0.85 的保守系数），未改。
+
+## 本批更新
+
+- **视场圈（`drawConeCue`）画在最底层**：在指南针、俯仰梯、目标框等之前绘制，其它 UI 都叠在它上面。
+- `computeEnvelope` 的 `isSurf` 认 `target: 'any'`（TOR-3 打地面目标时也有包线，之前 `aam` 打地面返回 null）。
+- 锁定框的颜色与判据按**当前目标的类别**（`Ent.targetClass`），不是按武器的 `target` 字段。

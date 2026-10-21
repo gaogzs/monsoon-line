@@ -80,7 +80,7 @@ var AI = (function () {
       if (!(a.ammoPool[wid] > 0)) continue;
       var w = WEAPONS[wid];
       if (!w || !w.seeker || w.seeker === 'none') continue;
-      if (w.target !== 'ground' && w.target !== 'ship') continue;
+      if (w.target !== 'ground' && w.target !== 'ship' && w.target !== 'any') continue;
       // 够不够得着按"有效射程"（Ent.aiReach），不按导引头的锁定距离
       var rw = Ent.aiReach(w, a.pos.y);
       if (rw > reach) reach = rw;
@@ -599,6 +599,7 @@ var AI = (function () {
     if (s.modeT > 0) s.modeT -= dt;
     if (s.evadeT > 0) s.evadeT -= dt;
     if (s.shootT > 0) s.shootT -= dt;
+    s.envClock = (s.envClock || 0) + dt;      // 发射包线缓存的时钟（见 aiEnvelope）
     if (s.burstT > 0) s.burstT -= dt;
     if (s.flareT > 0) s.flareT -= dt;
 
@@ -731,9 +732,32 @@ var AI = (function () {
       if (a.flares <= 0) {
         s.flareBurst = 0;
         s.flareT = 1.8;
-      } else if (a.flareCd <= 0 && Ent.breakLock(a, world)) {
+        s.flareFor = null;
+      } else if (a.flareCd <= 0 && (s.flareFor ? Ent.breakLockFor(a, s.flareFor, world) : Ent.breakLock(a, world))) {
         s.flareBurst--;
-        if (s.flareBurst === 0) s.flareT = 1.8;
+        if (s.flareBurst === 0) { s.flareT = 1.8; s.flareFor = null; }
+      }
+    }
+
+    /* 掩护撒干扰弹（仅 COVER 指令下）：有导弹正锁定长机、进入 3600 m 的告警距离时，
+       每架僚机对每枚来袭弹只掷一次骰（概率 0.6）；中了就固定连放 3 轮，不管骗没骗中。
+       替长机挡的是**锁定长机的弹**，不是自己的。 */
+    if (s.role === 'drone' && s.cmd === 'cover' && !s.flareBurst && a.flares > 0 &&
+        a.flareCd <= 0 && world.player && world.player.alive) {
+      var lead = world.player, rk = a.name || 'drone';
+      for (var mi = 0; mi < world.missiles.length; mi++) {
+        var lm = world.missiles[mi];
+        if (!lm.alive || lm.target !== lead || lm.team === a.team) continue;
+        if (M3.dist(lm.pos, lead.pos) >= 3600) continue;
+        lm.coverRolled = lm.coverRolled || {};
+        if (lm.coverRolled[rk]) continue;
+        lm.coverRolled[rk] = true;
+        if (Math.random() < 0.6) {
+          s.flareBurst = 3;
+          s.flareFor = lead;
+          world.events.push({ type: 'wingflare', unit: a.name });
+          break;
+        }
       }
     }
 
@@ -792,7 +816,7 @@ var AI = (function () {
         var gap = M3.dist(wpD, a.pos);
         var err = ahead > -100 ? gap : -gap;
         var vWant = (dLead2.speed || 0) + M3.clamp(err * 0.25, -120, 260);
-        var vMil = (a.phys && a.phys.vMil) || 400;
+        var vMil = (a.phys && a.phys.vMil) * loadoutPenalty(Ent.curLoadFactor(a)).vMil || 400;
         ab = vWant > vMil * 0.98;
         throttle = M3.clamp(vWant / vMil, 0.25, 1);
         if (ab) throttle = 1;
@@ -967,7 +991,7 @@ var AI = (function () {
         /* 射程取 min(锁定距离, 有效射程 × 0.9)（Ent.aiReach）：以前只看 lockDist，
            BOX-14、SPO-6 这类弹会在"锁得上但飞不到"的距离上开火。 */
         /* 对面弹按"本机高出目标多少"查射程（目标不在海平面时，不能拿海拔当投放高度） */
-        var reachAlt = (spW.target === 'ground' || spW.target === 'ship') && t.kind === 'target'
+        var reachAlt = Ent.targetClass(spW, t) === 'surface' && spW.target !== 'air' && t.kind === 'target'
           ? Math.max(0, a.pos.y - t.pos.y) : a.pos.y;
         var okDist = dist < Ent.aiReach(spW, reachAlt) * lockK * resist * jamK && Ent.jamLockOK(a, t);
         /* 离轴角按武器分：对空弹三维夹角，对面弹只看水平方位（Ent.lockOff）—— 世界垂直方向不算 */
@@ -976,7 +1000,15 @@ var AI = (function () {
            贴得太近，滑翔弹/炸弹的引信来不及开。 */
         var minR = spW.nezer ? 1400 : (t.kind === 'target' ? 1200 : 700);
         /* 锁定本身也更难：玩家那边是锁定速度变慢，AI 没有锁定进度条，折成开火意愿 */
-        if (okDist && okAng && dist > minR && Math.random() < (0.35 + s.skill * 0.45) * jamK) {
+        /* 动态射程：只对制导弹卡（炸弹、火箭靠它们自己的落点标记）。便宜的闸门先过，
+           才去算包线。高 skill 要求进 nez（目标掉头逃也能打中），低 skill 进 rmax。 */
+        var envOK = true;
+        if (okDist && okAng && dist > minR && spW.seeker && spW.seeker !== 'none' && !spW.unguided && !spW.passive) {
+          var env = aiEnvelope(a, s, spW, pick, t);
+          var lim = Math.min(spW.lockDist || Infinity, s.skill >= 0.6 ? env.nez : env.rmax);
+          envOK = dist < lim * (t.kind === "target" ? AI_RANGE_MARGIN_SURF : AI_RANGE_MARGIN_AIR);
+        }
+        if (okDist && okAng && envOK && dist > minR && Math.random() < (0.35 + s.skill * 0.45) * jamK) {
           if (world.fireMissile) world.fireMissile(a, t);
           s.shootT = M3.rnd(2.6, 5.2) * (1.6 - s.skill * 0.6);
         }
@@ -987,6 +1019,15 @@ var AI = (function () {
   /* ============================================================
      追击
      ============================================================ */
+  /* 发射包线（动态射程）：静态 aiReach 只是上界，过了上界再用真实弹道的 rmax / nez 卡一次。
+     每架 AI 自己存一份，0.1 s 刷新；换弹、换目标时作废。步长 1/5（误差约射程的 5%，
+     余量（对空 0.9、对地 0.8）吃掉这部分）。 */
+  // 发射包线的保守余量：对空 0.9，对地 0.8（移动慢的地面目标打偏更丢人，对地多留余量）
+  var AI_RANGE_MARGIN_AIR = 0.9, AI_RANGE_MARGIN_SURF = 0.8, AI_ENV_T = 0.1;
+  function aiEnvelope(a, s, w, wid, t) {
+    return Ent.envelopeCached(s, s.envClock, { pos: a.pos, fwd: a.fwd, speed: a.speed + 70 }, w, wid, t, AI_ENV_T);
+  }
+
   function leadTo(a, t) {
     var toT = M3.sub(t.pos, a.pos);
     var dist = M3.len(toT);
@@ -1014,7 +1055,7 @@ var AI = (function () {
       desired = M3.norm(M3.V(desired.x, 0.35, desired.z));
     }
     // 防止陷入纯垂直爬升（会失速）
-    if (a.fwd.y > 0.82 && a.speed < a.phys.vStall * 1.5) {
+    if (a.fwd.y > 0.82 && a.speed < a.phys.vStall * loadoutPenalty(Ent.curLoadFactor(a)).vStall * 1.5) {
       desired = M3.norm(M3.V(a.fwd.x, -0.3, a.fwd.z));
       ab = true; throttle = 1;
     }

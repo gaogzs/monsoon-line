@@ -153,7 +153,15 @@ var Ent = (function () {
     var surface = (t.kind === 'target');
     if (w.target === 'air') return !surface;
     if (w.target === 'ground' || w.target === 'ship') return surface;
+    if (w.target === 'any') return true;     // 对空对地通用（TOR-3）：锁距离两边一样
     return false;
+  }
+
+  /* 这件武器打这个目标时，按哪一类物理处理（'air' 或 'surface'）。
+     'any' 随目标走：对面目标按对面，其余按空中。其它取值不变。 */
+  function targetClass(w, t) {
+    if (w && w.target === 'any') return (t && t.kind === 'target') ? 'surface' : 'air';
+    return (w && (w.target === 'ground' || w.target === 'ship')) ? 'surface' : 'air';
   }
 
   /* AI 开火前挑一件武器 —— "换武器"的全部就是这一次挑选。
@@ -298,17 +306,32 @@ var Ent = (function () {
     var groups = (a.ac && a.ac.hardpointGroups) || [];
     var plan = mountPlan(a);
     var pts = {}, gi, k, mass = 0;
+    /* 重量分两块：吊舱（不随打空而变轻）进 fixed；弹按武器分进 massBy，随弹药池折算（见 curLoadFactor） */
+    var fixedM = 0, massBy = {};
 
     for (gi = 0; gi < groups.length; gi++) {
       var wid = plan[gi];
       if (!wid) continue;
       var w = WEAPONS[wid];
-      // 挂载重量：与 game.js 的 loadoutMass 同一条公式（吊舱也算重量）
-      if (w) mass += groups[gi].pts.length * (w.perPoint || 1) * (w.mass || 100);
-      /* 吊舱与定向能不是打出去的东西，不占发射槽（渲染那边也一直挂着） */
-      if (!w || w.kind === 'gun' || w.kind === 'ecm' || w.kind === 'dew') continue;
+      /* 吊舱与定向能不是打出去的东西，不占发射槽（渲染那边也一直挂着）。
+         它们的重量按挂点算、不随打空而变。打出去的弹按携带量算（见下）。 */
+      if (!w || w.kind === 'gun' || w.kind === 'ecm' || w.kind === 'dew') {
+        if (w) fixedM += groups[gi].pts.length * (w.perPoint || 1) * (w.mass || 100);
+        continue;
+      }
       pts[wid] = (pts[wid] || 0) + groups[gi].pts.length;
     }
+    /* 弹的重量按**实际携带量**算：min(ammo, 点数 × perPoint) 发 × 单件重量。
+       以前按 点数 × perPoint 算，CLA-4 这种 ammo 远小于挂点容量的弹会被算成 2340 kg，实际只带 4 发（780 kg）。
+       下游弹 perPoint 为 0，仍按挂点数 × 占位 100 kg。 */
+    for (k in pts) {
+      if (!Object.prototype.hasOwnProperty.call(pts, k)) continue;
+      var kw = WEAPONS[k], carried = kw.perPoint > 0
+        ? Math.min(kw.ammo || 0, pts[k] * kw.perPoint) : pts[k];
+      massBy[k] = carried * (kw.mass || 100);
+    }
+    for (k in massBy) mass += massBy[k];
+    mass += fixedM;
 
     /* NPC 也吃挂载重量惩罚。以前只有玩家设 loadFactor，
        满挂的敌机飞起来和空挂一样。 */
@@ -344,6 +367,17 @@ var Ent = (function () {
       }
       setWeapon(a, first);
     }
+    /* NPC 的挂载拖累随弹药池折算，与玩家同一套：k0 = 初始挂载系数，total = 满挂总重，
+       弹打出去、弹药池变小，总重跟着减轻（curLoadFactor）。
+       储备为 0 的武器没有弹可打，它的重量算固定（不然打光前后对不上）。 */
+    var rounds = [];
+    for (k in pts) {
+      if (!Object.prototype.hasOwnProperty.call(pts, k)) continue;
+      var cap = a.ammoPool ? (a.ammoPool[k] || 0) : 0;
+      if (cap > 0) rounds.push({ wid: k, cap: cap, mass: massBy[k] || 0 });
+      else fixedM += massBy[k] || 0;
+    }
+    a.loadModel = { k0: a.loadFactor, total: mass, fixed: fixedM, rounds: rounds };
     a.mountWids = plan;
     setStealth(a, null);
   }
@@ -601,7 +635,8 @@ var Ent = (function () {
 
       /* 任务写死的**逐组**挂载（spawnEnemy 的 o.loadout），形状与玩家的
          机库配置一样：{ 组id: 武器id }。玩家那份由 startMission 覆盖。 */
-      loadout: o.loadout || null
+      loadout: o.loadout || (!o.special && !o.isPlayer && ac.npcOnly && ac.defaultLoadout
+        ? Object.assign({}, ac.defaultLoadout) : null)
     };
     a.right = M3.cross(a.up, a.fwd);
     /* NPC 的弹药池与发射槽。玩家那套由 startMission 按机库配置另建
@@ -1058,7 +1093,7 @@ var Ent = (function () {
     /* 对地 / 对海的红外弹（GUT-9、TUM-7）找的是**地面热源**，不是飞机。
        以前这里一律扫 world.actors —— 一枚滑翔锤丢了地面目标之后，
        会转头去追天上路过的敌机。现在对面弹只在 world.targets 里挑。 */
-    if (w.target !== 'air') {
+    if (w.target !== 'air') {     // 'any' 先看地面，没有再回落到下面的空中扫描
       var tl = world.targets || [];
       for (var j = 0; j < tl.length; j++) {
         var g = tl[j];
@@ -1072,7 +1107,8 @@ var Ent = (function () {
         var sg = (0.6 + (g.radius || 10) / 30) * (1 - og / cone) / (1 + dg / 1500);
         if (sg > bs) { bs = sg; best = g; }
       }
-      return best;
+      /* 对空对地通用（any）：地面热源没有就回落到空中，见下面 */
+      if (w.target !== 'any' || best) return best;
     }
     var taken = m.salvo ? m.salvo.claimed : null;
     var best2 = null, bs2 = 0;
@@ -1457,6 +1493,8 @@ var Ent = (function () {
     /* 近炸 / 撞上：按本帧的相对运动做线段最近点（见 fuzeCheck）。
        无制导弹不走这里 —— 它们的命中靠 game.js 的 scanShot。 */
     if (t && m.seekerOn && !w.unguided && world && fuzeCheck(m, t, world)) return;
+    /* 碰炸与拟真近炸：所有弹通用（见 contactScan），对象不包括干扰弹粒子 */
+    if (world && contactScan(m, dt, world)) return;
 
     var gy = groundY(m.pos.x, m.pos.z);
     if (m.pos.y <= gy) {
@@ -1594,7 +1632,7 @@ var Ent = (function () {
 
   /* 单次可达性：从 la 发射 w，追 tg（克隆，不污染原实体），flee 时目标
      每帧掉头、以最大航速背离弹逃逸。返回是否命中 / 够得着。 */
-  function flyTo(w, la, tg, flee) {
+  function flyTo(w, la, tg, flee, dtFix) {
     var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
     /* 克隆目标 team 与弹同号（98）：起爆结算时会跳过同队，不触发
        game.js 注册的 hitTarget（那需要完整的 world）。这里只看"够不够得着"，
@@ -1604,14 +1642,14 @@ var Ent = (function () {
     if (tg.fwd) t.fwd = M3.clone(tg.fwd);
     var m = makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, target: t, owner: null });
     var vMax = targetMaxSpeed(tg);
-    var isAir = w.target === 'air';
+    var isAir = targetClass(w, tg) === 'air';
     var dt = 1 / 10, simT = 0;      // 包线 / 瞄准圈估算步长（见 estDt；近炸按线段最近点，不漏判）
     /* 目标的初始水平距离：弹一旦飞过它一段距离还没命中，就追不上了（滑翔过头 /
        逃逸甩掉），可以提前退出，不必等它滑到落地或烧完寿命。 */
     var ox = t.pos.x - m.pos.x, oz = t.pos.z - m.pos.z;
     var hit = false, minD = Infinity;
     for (var f = 0; f < EFF_MAX_FRAMES && m.alive; f++) {
-      dt = estDt(w, simT); simT += dt;
+      dt = dtFix || estDt(w, simT); simT += dt;
       if (flee) {
         /* 掉头逃逸：机头**水平**背离弹、保持高度、以最大航速跑。方向每帧重算 ——
            弹在追，目标永远往背离它的方向逃，这是"甩掉"的最坏情况。
@@ -1673,7 +1711,7 @@ var Ent = (function () {
   /* 发射包线：{ rmax, nez }（米，斜距，与 HUD 的 M3.dist 同单位）。la = { pos, fwd, speed }，
      tg = 目标实体。rmax = 目标保持航向能命中的最远距离，nez = 目标掉头
      逃逸仍能命中的最远距离。不夹 lockDist（锁不锁得上由 HUD / AI 各自处理）。 */
-  function envelopeRange(w, la, tg) {
+  function envelopeRange(w, la, tg, dtFix) {
     /* 水平视线方向：目标高度固定 tg.pos.y，只沿水平方向缩放距离 ——
        否则目标会"穿过地面"（对地弹）或让二分在无意义的斜距上浪费。
        lo 端俯角过大丢目标由 bisectFar 的采样跳过，不在这里特判。 */
@@ -1692,12 +1730,31 @@ var Ent = (function () {
     }
     var hi = maxReach(w, la, tg.pos.y);         // 弹最大水平射程
     var lo = 400;                               // 最小有效射程（太近俯角过大 / 出膛还追不上）
-    var rmaxFlat = bisectFar(function (D) { return flyTo(w, la, at(D), false); }, lo, hi);
-    var nezFlat = bisectFar(function (D) { return flyTo(w, la, at(D), true); }, lo, rmaxFlat);
+    var rmaxFlat = bisectFar(function (D) { return flyTo(w, la, at(D), false, dtFix); }, lo, hi);
+    var nezFlat = bisectFar(function (D) { return flyTo(w, la, at(D), true, dtFix); }, lo, rmaxFlat);
+    /* 校验：二分在非单调区间（滑翔 / 高抛）可能落在一个打不中的点上。
+       0.9 倍处若已经打不中，就逐步往回收，保证调用方取 0.9× 时确实命中。 */
+    /* 对外的距离是斜距（见上面的 rmax / nez 返回值），校验也按斜距来：
+       斜距 S 对应的水平距离 = sqrt(S² − dh²)。 */
+    var flatOf = function (S) { var v = S * S - dh * dh; return v > 0 ? Math.sqrt(v) : 0; };
+    var rmS = Math.sqrt(rmaxFlat * rmaxFlat + dh * dh), nzS = Math.sqrt(nezFlat * nezFlat + dh * dh), q;
+    for (q = 0; q < 12 && rmS > 0 && !flyTo(w, la, at(0.9 * flatOf(rmS)), false, dtFix); q++) rmS *= 0.9;
+    for (q = 0; q < 12 && nzS > 0 && !flyTo(w, la, at(0.9 * flatOf(nzS)), true, dtFix); q++) nzS *= 0.9;
+    /* 收不回来（滑翔弹从高空投放，逃逸的目标追不上）：nez 只剩"目标正下方"这一点，即斜距 = 高度差 */
+    if (!flyTo(w, la, at(0.9 * flatOf(nzS)), true, dtFix)) nzS = Math.max(nzS, dh);
     return {
-      rmax: Math.sqrt(rmaxFlat * rmaxFlat + dh * dh),
-      nez: Math.sqrt(nezFlat * nezFlat + dh * dh)
+      rmax: rmS,
+      nez: nzS
     };
+  }
+
+  /* 发射包线的缓存版（AI、打击航线共用）：结果挂在 holder 上，interval 秒内复用；
+     换弹、换目标时作废。步长 1/5（实测误差约射程的 5%，由调用方的余量吃掉）。 */
+  function envelopeCached(holder, clock, la, w, wid, t, interval) {
+    var c = holder.env;
+    if (c && c.wid === wid && c.tgt === t && clock - c.t < interval) return c;
+    var e = envelopeRange(w, la, t, 1 / 5);
+    return (holder.env = { t: clock, wid: wid, tgt: t, rmax: e.rmax, nez: e.nez });
   }
 
   /* 机库 / 图鉴的"标称射程"（公里）：读 effRange（真实弹道，与 AI、HUD 同一套），
@@ -1729,7 +1786,12 @@ var Ent = (function () {
   /* 估算用的步长：包线 / 瞄准圈 / 落点标记都是"每隔一会儿才算一次"的粗估，
      取 1/10；但火箭的动力段只有零点几秒，粗步长会把推力积分漏掉几百米（实测 PEJ-6
      在 1/10 下落点差 250 m），所以动力段内细到 1/60，之后再放粗。 */
-  function estDt(w, t) { return (w.burn && t < w.burn + 0.1) ? 1 / 60 : 1 / 60; }
+  /* 滑翔 / 高抛弹（w.glide、w.loft）的落点对步长敏感：1/10 会让 asl 的 rmax 偏到打不中，
+     所以它们仍用 1/60；其余弹道用 1/10 足够。 */
+  function estDt(w, t) {
+    if (w.burn && t < w.burn + 0.1) return 1 / 60;
+    return (w.glide || w.loft) ? 1 / 60 : 1 / 10;
+  }
 
   /* 自然落点：弹翼不修（无目标），纯抛物线落地。 */
   function naturalPoint(w, la, planeY) {
@@ -1802,7 +1864,7 @@ var Ent = (function () {
      地面 / 海面目标在机头下方几十度是常态；俯冲是弹自己的事。 */
   function lockOff(a, t, w) {
     var to = M3.sub(t.pos, a.pos);
-    if (w && (w.target === 'ground' || w.target === 'ship')) {
+    if (w && targetClass(w, t) === 'surface') {
       var hx = to.x, hz = to.z, fx = a.fwd.x, fz = a.fwd.z;
       var hl = Math.sqrt(hx * hx + hz * hz), fl = Math.sqrt(fx * fx + fz * fz);
       if (hl < 1 || fl < 1e-3) return 0;          // 正上方 / 机头垂直：方位无从谈起，不拦
@@ -2019,6 +2081,62 @@ var Ent = (function () {
     return false;
   }
 
+  /* 碰炸与拟真近炸（所有弹通用：有制导与无制导都走这里）。
+
+     对象只有 world.actors（飞机）与 world.targets（设施、舰船）。干扰弹的热焰 / 箔丝是粒子，
+     诱饵云是挂在弹上的 m.decoy，都不在这两张表里，所以它们天然不会触发。
+
+       碰炸  最近点距对象表面 < CONTACT，任何对象（敌我以外、中立也算）：满伤，直接命中。
+       近炸  只对敌方飞机（中立与友机不触发）；需要：已解保（age ≥ FUZE_ARM_T）、
+             最近点距离 < w.fuze、最近点落在本帧内、目标在引信锥内（不含正后方）。
+             起爆点在最近点，不设 direct：伤害按 Combat.blast 的距离衰减。
+
+     m.target 由 fuzeCheck 先管（它的近炸是对"自己的目标"的），这里跳过它。
+     返回 true 表示本弹已经起爆。 */
+  var FUZE_ARM_T = 0.6, FUZE_CONE = 110 * Math.PI / 180;
+  function contactScan(m, dt, world) {
+    if (!world || !m.alive) return false;
+    var fz = m.w.fuze || 0;
+    var lists = [world.actors || [], world.targets || []];
+    for (var li = 0; li < lists.length; li++) {
+      var L = lists[li];
+      for (var i = 0; i < L.length; i++) {
+        var e = L[i];
+        if (!e.alive || e === m.owner || e === m.target || e.team === m.team) continue;
+        var rel1 = M3.sub(m.pos, e.pos);
+        var d = M3.mul(M3.sub(m.vel, e.vel || M3.V(0, 0, 0)), dt);
+        var rel0 = M3.sub(rel1, d);
+        var dd = M3.dot(d, d);
+        var s = dd > 1e-9 ? M3.clamp(-M3.dot(rel0, d) / dd, 0, 1) : 1;
+        var cp = M3.add(rel0, M3.mul(d, s));
+        var r = Combat.radiusOf(e);
+        var gap = M3.len(cp) - r;
+        /* 粗筛：离得远到不可能在本帧碰上 / 近炸，就不做后面的运算 */
+        if (M3.len(rel1) > M3.len(d) + r + Math.max(Combat.CONTACT, fz) + 20) continue;
+        var hit = false;
+        if (gap < Combat.CONTACT) {
+          hit = true;                                   // 碰炸：任何对象
+        } else if (fz > 0 && li === 0 && e.team !== 2 && m.age >= FUZE_ARM_T &&
+                   gap < fz && s < 1) {
+          /* 近炸：只看飞机，且要在引信锥内（弹头朝向目标那一侧，不含正后方） */
+          var len = M3.len(cp);
+          if (len > 1e-6) {
+            var toE = M3.mul(cp, -1 / len);             // 弹 → 目标的方向
+            hit = M3.angleBetween(m.fwd, toE) <= FUZE_CONE;
+          }
+        }
+        if (!hit) continue;
+        var at = M3.add(e.pos, cp);
+        if (gap < Combat.CONTACT) Combat.detonate(m, world, at, e);
+        else Combat.detonate(m, world, at, null);
+        if (m.owner && m.owner.isPlayer) world.hitsLanded = (world.hitsLanded || 0) + 1;
+        if (!world.silent && typeof SFX !== 'undefined' && SFX.hit) SFX.hit();
+        return true;
+      }
+    }
+    return false;
+  }
+
   /* 盲飞期内追的那团诱饵云：外推位置 p + v × (age − t0)。
      云熄灭了、或者盲飞期已经结束（重新搜索 / 咬回真目标）就不再追。 */
   var DECOY_R = 4;
@@ -2045,7 +2163,12 @@ var Ent = (function () {
   }
 
   /** 干扰弹：尝试把追踪本机的红外弹骗走 */
-  function breakLock(a, world) {
+  function breakLock(a, world) { return breakLockFor(a, a, world); }
+
+  /* 干扰弹的通用版：载机 a 投放，保护的是 protectee（a 自己，或编队里的长机）。
+     对象是锁定 protectee 的来袭弹；欺骗概率按载机与 protectee 的距离衰减（600 m 外为 0），
+     诱饵云从载机位置放出。自保时距离因子为 1，行为与原来完全一致。 */
+  function breakLockFor(a, protectee, world) {
     if (a.flares <= 0 || a.flareCd > 0) return false;
     a.flares--;                      // 单位是"组"，一次投放一组诱饵
     /* 投放节奏。
@@ -2059,7 +2182,9 @@ var Ent = (function () {
        0.45 s 的间隔给出一段可感知的"投放—观察—再投"的循环，
        而下面的抗欺骗机制保证这不会退化成"连点必脱锁"。 */
     a.flareCd = 0.45;
-    SFX.flare();
+    /* 自保按原来的满音量；掩护投放按载机离玩家的距离衰减 */
+    if (protectee === a) SFX.flare();
+    else if (world.player) SFX.flareAt(M3.dist(a.pos, world.player.pos));
 
     var i;
     /* 热焰弹：橙黄色，烧得亮、掉得快。
@@ -2069,12 +2194,13 @@ var Ent = (function () {
        于是整团火被机速带着往前、直接糊在镜头上。
        现在继承的机速比例降到 0.22，再沿机体下方抛出去 ——
        视觉上就是真正"投"下去的一组火球。 */
-    for (i = 0; i < 6; i++) {
+    /* 颜色与数量按"鲜艳的橙色"调：热焰是主体，箔丝只是退到背景的淡白丝。 */
+    for (i = 0; i < 10; i++) {
       var dir = randUnit();
       var v = M3.add(M3.mul(a.vel, 0.22), M3.mul(dir, M3.rnd(26, 62)));
       v = M3.add(v, M3.mul(a.up, -M3.rnd(42, 78)));
       spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -6)), v,
-        M3.rnd(1.1, 1.9), 0.85, '#ffd070', { grow: true, drag: 0.5, grav: 0.6 });
+        M3.rnd(1.3, 2.1), 1.1, '#ff8a1f', { grow: true, drag: 0.5, grav: 0.6 });
     }
     /* 箔丝（chaff）：淡白色的金属丝云，散得更开、下落更慢、停留更久。
        现代干扰弹是热焰弹与箔丝一起投放的 —— 前者骗红外，后者骗雷达，
@@ -2082,18 +2208,20 @@ var Ent = (function () {
 
        尺寸比热焰弹小得多：它是丝，不是火球。上一轮把热焰弹从 2.2 缩到
        0.85 时漏掉了这里（1.25），结果丝团看着比火球还大。 */
-    for (i = 0; i < 14; i++) {
+    for (i = 0; i < 6; i++) {
       var cd2 = randUnit();
       var v2 = M3.add(M3.mul(a.vel, 0.28), M3.mul(cd2, M3.rnd(14, 44)));
       v2 = M3.add(v2, M3.mul(a.up, -M3.rnd(24, 48)));
       spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -5.5)), v2,
-        M3.rnd(2.0, 3.2), 0.42, '#e6eef4', { drag: 1.15, grav: 0.10 });
+        M3.rnd(2.2, 3.4), 0.34, '#ffe2c4', { drag: 1.15, grav: 0.10, alpha: 0.6 });
     }
 
     var broke = 0, ineffective = 0;
+    var distK = protectee === a ? 1 :
+      Math.max(0, Math.min(1, 1 - M3.dist(a.pos, protectee.pos) / 600));
     for (i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
-      if (!m.alive || m.target !== a) continue;
+      if (!m.alive || m.target !== protectee) continue;
 
       /* 干扰弹是**热焰弹 + 箔丝**一起投放的：
          前者骗红外导引头，后者骗雷达导引头 —— 两种都能被干扰。
@@ -2143,7 +2271,7 @@ var Ent = (function () {
       var k = Math.pow(0.62, m.decoyTries - 1);
       // 地板：永远留一点希望，但不让"连投"变成必胜
       // （chance 为 0 的 —— 光电 / 激光制导 —— 不设地板，否则"完全免疫"其实有 3% 会被骗）
-      chance = chance > 0 ? Math.max(0.03, chance * k) : 0;
+      chance = (chance > 0 ? Math.max(0.03, chance * k) : 0) * distK;
       if (!(Math.random() < chance)) {
         if (!m.spoofed) ineffective++;      // 已经被骗过的弹不再重复报
         continue;
@@ -2777,19 +2905,19 @@ var Ent = (function () {
     forEachStoreSlot: forEachStoreSlot, storeForSlot: storeForSlot,
     /* 选弹与"当前触发武器" —— game.js 的 syncWeapon（玩家换弹）与 ai.js
        的开火选弹都走 setWeapon，判据同源。 */
-    chooseWeapon: chooseWeapon, setWeapon: setWeapon,
+    chooseWeapon: chooseWeapon, setWeapon: setWeapon, targetClass: targetClass, curLoadFactor: curLoadFactor, contactScan: contactScan,
     weaponMatchesTarget: weaponMatchesTarget,
     /* 关卡里写错的 NPC 挂载（smoke.js 断言它是空的） */
     mountIssues: mountIssues, clearMountIssues: clearMountIssues,
     makeMissile: makeMissile, stepMissile: stepMissile, effectiveLife: effectiveLife,
-    breakLock: breakLock, openEcm: openEcm, passiveEffects: passiveEffects, setEcm: setEcm, setStealth: setStealth, ECM_LEAD_K: ECM_LEAD_K,
+    breakLock: breakLock, breakLockFor: breakLockFor, openEcm: openEcm, passiveEffects: passiveEffects, setEcm: setEcm, setStealth: setStealth, ECM_LEAD_K: ECM_LEAD_K,
     fireGun: fireGun, fireGunFrom: fireGunFrom, shellFuze: shellFuze, detonateShell: detonateShell, gunMuzzle: gunMuzzle, flashRings: flashRings, stepBullet: stepBullet, SLOT_EMPTY: SLOT_EMPTY,
     spawnParticle: spawnParticle, stepParticles: stepParticles, explode: explode,
     damage: damage, kill: kill, killGround: killGround, explode2: explode,
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
     wakeSpray: wakeSpray,
-    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, displayRange: displayRange, naturalPoint: naturalPoint, gunLead: gunLead, groundY: groundY, terrainY: terrainY, isLand: isLand, agl: agl, SEA_Y: SEA_Y, setTerrain: setTerrain, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
+    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, envelopeCached: envelopeCached, displayRange: displayRange, naturalPoint: naturalPoint, gunLead: gunLead, groundY: groundY, terrainY: terrainY, isLand: isLand, agl: agl, SEA_Y: SEA_Y, setTerrain: setTerrain, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
     isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     jamState: jamState, jamShown: jamShown, jamDuty: jamDuty, jamRanges: jamRanges, jamPress: jamPress, jamLockOK: jamLockOK, jamLockK: jamLockK, JAM_BURN_R: JAM_BURN_R, JAM_SURF_K: JAM_SURF_K, JAM_BURN_SURF: JAM_BURN_SURF,
     gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,

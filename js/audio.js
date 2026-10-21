@@ -113,7 +113,7 @@ var SFX = (function () {
     gunSrc = ctx.createBufferSource();
     gunSrc.buffer = noiseBuf; gunSrc.loop = true;
 
-    gunLfo = ctx.createOscillator(); gunLfo.type = 'square'; gunLfo.frequency.value = 64;
+    gunLfo = ctx.createOscillator(); gunLfo.type = 'square'; gunLfo.frequency.value = 32.5;   // 机炮 1950 rpm ≈ 32.5 发/秒（削弱后的两倍）
     /* LFO 深度**必须从 0 开始**。
 
        AudioParam 的最终值 = 基础值 + 所有连入信号之和，所以 gunG.gain = 0
@@ -308,7 +308,7 @@ var SFX = (function () {
 
     /* 别人开炮，按距离衰减 —— 这是"敌人到底有没有在打我"的主要线索。
 
-       必须做**采样节流**：机炮每秒六十多发，每帧都触发会瞬间堆几十个
+       必须做**采样节流**：机炮每秒三十来发（1950 rpm），每帧都触发会瞬间堆几十个
        burst，既爆音又吃 CPU。近处 60 ms 一次，越远越稀。
        远处的炮声还要更闷：高频先被空气吃掉。 */
     gunShotAt: function (dist) {
@@ -374,6 +374,15 @@ var SFX = (function () {
 
     /** 干扰弹 */
     flare: function () { burst(0.14, 3000, 2600, 0.35, 'highpass'); },
+
+    /** 僚机替长机撒的干扰弹：按它离玩家的距离衰减（2600 m 外听不见） */
+    flareAt: function (dist) {
+      if (!ready || muted) return;
+      var att = 1 - dist / 2600;
+      if (att <= 0) return;
+      att = att * att;
+      burst(0.14, 3000, 2600, 0.35 * att, 'highpass');
+    },
 
     /** UI 点击 */
     click: function () { beep(0.07, 880, 0.045, 'square'); },

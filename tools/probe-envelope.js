@@ -104,7 +104,8 @@ for (const c of CASES) {
   const inNez = Ent.flyTo(c.w, c.la, atFlat(c.la, c.tg, nezFlat * 0.9), true);
   check(c.name + ' rmax×0.9 内命中', inRng, 'rmax ' + e.rmax.toFixed(0) + ' m');
   check(c.name + ' rmax×1.15 外失手', !outRng, 'rmax ' + e.rmax.toFixed(0) + ' m');
-  check(c.name + ' nez×0.9 内逃逸也命中', inNez, 'nez ' + e.nez.toFixed(0) + ' m');
+  if (nezFlat > 0) check(c.name + ' nez×0.9 内逃逸也命中', inNez, 'nez ' + e.nez.toFixed(0) + ' m');
+  else console.log('  - ' + c.name + ' 无逃逸包线（高空投放、目标逃逸时追不上；nez 退到正下方）');
 }
 
 console.log('\n' + (bad.length

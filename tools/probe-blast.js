@@ -158,7 +158,7 @@ if (FLARE) {
 
 const ids = Object.keys(WEAPONS).filter(id => {
   const w = WEAPONS[id];
-  return w.kind === 'aam' && w.target === 'air' && w.dmg > 0 && (!ONLY || id === ONLY);
+  return w.kind === 'aam' && (w.target === 'air' || w.target === 'any') && w.dmg > 0 && (!ONLY || id === ONLY);
 });
 const out = {};
 for (const id of ids) {

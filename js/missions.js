@@ -193,7 +193,7 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
     z: w.player.pos.z + slotZ,
     fwd: M3.clone(w.player.fwd),
     speed: w.player.speed,
-    special: 'v9',
+    // 挂载不在这里指定：KA-7 的 defaultLoadout（翼下 TOR-3 + 内埋 CLA-4）由 makeAircraft 按组落位
     isDrone: true
   });
   a.name = CALLSIGN['wing' + idx];

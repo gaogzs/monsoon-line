@@ -312,3 +312,7 @@ node tools/render-planform.js     # 输出到 tools/preview/*.png
 >
 > `clip()` 没有实现；预览永远不传 `cd`，所以 `paint()` 里那条裁剪分支
 > 不会被走到，不会报错。
+
+## 本批更新
+
+- `drawRound` 对 `nose: 'dual'` 的弹画钝头 + 外凸的战斗部段 + 一道接缝线，与 `models.js` 的 `addRound` 轮廓一致。
