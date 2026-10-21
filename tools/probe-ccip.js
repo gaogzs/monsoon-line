@@ -83,6 +83,10 @@ for (const id of IDS) {
   /* AI 射程按"高出目标多少"查：同一海拔，目标在高地上时可用高度低，射程不会更远 */
   const w = W.asl;
   const rSea = Ent.aiReach(w, 6000), rHill = Ent.aiReach(w, 6000 - PLAT);
+  delete w.__eff; Ent.setTerrain(null); const base = Math.round(Ent.effRange(W.asl, 6000)); delete w.__eff;
+  Ent.setTerrain((x, z) => 900 + (z > 3000 ? 2000 : 0));    // 乱来的地形不该影响抽象射程
+  check('effRange 与地形函数无关', Math.round(Ent.effRange(W.asl, 6000)) === base, base + '');
+  Ent.setTerrain(() => PLAT);
   check('AI 射程：目标在高地（本机高出的少）射程不更远', rHill <= rSea, rHill + ' ≤ ' + rSea);
 }
 Ent.setTerrain(null);

@@ -1506,8 +1506,15 @@ var Ent = (function () {
      ============================================================ */
   // 步数上限 5 分钟：不按寿命自爆的滑翔弹从高空投放要飞一分多钟
   var EFF_BAND = 2000, EFF_LAUNCH_V = 250, EFF_MAX_FRAMES = 60 * 300;
+  /* effRange 是"平地、离地高度 alt"下的抽象射程（按高度分档缓存）：模拟里的坐标是虚构的，
+     不能读真实地形 —— 否则弹会撞上不存在的山，缓存也跟着地形变。所以模拟期间临时把地形关掉，
+     调用方按"本机高出目标多少"传 alt。 */
   function effRange(w, alt) {
     if (!w || !w.vsLife) return w ? (w.lockDist || 0) : 0;
+    var saved = terrainFn; terrainFn = null;
+    try { return effRangeFlat(w, alt); } finally { terrainFn = saved; }
+  }
+  function effRangeFlat(w, alt) {
     var band = Math.max(0, Math.round((alt || 0) / EFF_BAND));
     var c = w.__eff || (w.__eff = {});
     if (c[band] !== undefined) return c[band];
