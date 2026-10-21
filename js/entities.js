@@ -2244,6 +2244,39 @@ var Ent = (function () {
     return false;
   }
 
+  /* 机炮提前量：用真实弹道（Ballistics.step，与 fireGunFrom 同一套：载机速度叠加、重力、
+     阻力）反解"机头该指向哪"。HUD 预测点和 AI 都应该读这个，而不是 距离 / 初速 的直线估算
+     （那会漏掉载机速度、重力下坠和阻力）。
+     迭代：猜方向 → 模拟弹到目标的最近接近点 → 按脱靶量修正方向（几次就收敛）。
+     返回 { dir, tof, miss }；tof = 弹到最近接近点的时间。 */
+  function gunLead(gw, P, base, tPos, tVel, maxT) {
+    var speed = gw.speed, grav = gw.gravity === undefined ? 1 : gw.gravity;
+    var to = M3.sub(tPos, P), d0 = M3.len(to) || 1;
+    var tof = d0 / speed, dir = M3.norm(to), miss = Infinity;
+    var tMax = maxT || Math.min(8, d0 / speed * 2 + 0.5);
+    for (var it = 0; it < 12; it++) {
+      var b = { pos: M3.clone(P), vel: M3.add(M3.mul(dir, speed), base), grav: grav, drag: gw.drag || 0 };
+      var dt = 1 / 60, best = Infinity, bestT = 0, bestMiss = null, prevRel = M3.sub(tPos, P);
+      for (var t = 0; t < tMax; t += dt) {
+        Ballistics.step(b, dt);
+        var rel = M3.sub(M3.add(tPos, M3.mul(tVel, t + dt)), b.pos);
+        /* 一帧里弹相对目标走 20 m 以上：只比采样点会有量化误差，按线段取最近点 */
+        var seg = M3.sub(rel, prevRel), sl = M3.dot(seg, seg);
+        var u = sl > 1e-9 ? M3.clamp(-M3.dot(prevRel, seg) / sl, 0, 1) : 0;
+        var cm = M3.add(prevRel, M3.mul(seg, u)), dd = M3.len(cm);
+        if (dd < best) { best = dd; bestT = t + dt * u; bestMiss = cm; }
+        else if (dd > best + 50) break;           // 已经飞过最近点
+        prevRel = rel;
+      }
+      miss = best; tof = bestT;
+      if (best < 0.5 || !bestMiss) break;
+      /* 脱靶量 → 方向修正：把"目标未来点 − 弹到点"折成角度，叠到瞄准点上 */
+      var aimPt = M3.add(M3.add(P, M3.mul(dir, d0)), bestMiss);
+      dir = M3.norm(M3.sub(aimPt, P));
+    }
+    return { dir: dir, tof: tof, miss: miss };
+  }
+
   function fireGun(a, world) {
     if (!a.alive || a.gunAmmo <= 0) return;
     var w = WEAPONS[a.gun];
@@ -2749,7 +2782,7 @@ var Ent = (function () {
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
     wakeSpray: wakeSpray,
-    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, displayRange: displayRange, naturalPoint: naturalPoint, groundY: groundY, terrainY: terrainY, isLand: isLand, agl: agl, SEA_Y: SEA_Y, setTerrain: setTerrain, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
+    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, displayRange: displayRange, naturalPoint: naturalPoint, gunLead: gunLead, groundY: groundY, terrainY: terrainY, isLand: isLand, agl: agl, SEA_Y: SEA_Y, setTerrain: setTerrain, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
     isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     jamState: jamState, jamShown: jamShown, jamDuty: jamDuty, jamRanges: jamRanges, jamPress: jamPress, jamLockOK: jamLockOK, jamLockK: jamLockK, JAM_BURN_R: JAM_BURN_R, JAM_SURF_K: JAM_SURF_K, JAM_BURN_SURF: JAM_BURN_SURF,
     gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,

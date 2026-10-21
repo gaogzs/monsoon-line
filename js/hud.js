@@ -909,9 +909,11 @@ var HUD = (function () {
     var gunRange = (p.pos.y > 18000 ? gunW.highRange : gunW.range) * 0.95;
     var inRange = dist <= gunRange;
 
+    /* 真实弹道求解：载机速度叠加、重力下坠、阻力都算进去（Ent.gunLead，与实弹同一套）。
+       预测点 = 机头沿解算方向在目标距离处的点。 */
     var tv = t.vel || M3.V(0, 0, 0);
-    var tGo = dist / gunW.speed;
-    var aim = M3.add(t.pos, M3.mul(tv, tGo));
+    var lead = Ent.gunLead(gunW, p.pos, p.vel || M3.V(0, 0, 0), t.pos, tv);
+    var aim = M3.add(p.pos, M3.mul(lead.dir, dist));
 
     var s = M3.project(cam, aim);
     if (!s) return;
