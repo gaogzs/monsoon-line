@@ -1562,7 +1562,7 @@ var Ent = (function () {
     var last = M3.clone(m.pos);
     for (var f = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
       last = M3.clone(m.pos);
-      stepMissile(m, 1 / 30, world);
+      stepMissile(m, 1 / 10, world);
       world.particles.length = 0;
     }
     var dx = last.x - pos.x, dz = last.z - pos.z;
@@ -1605,12 +1605,13 @@ var Ent = (function () {
     var m = makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, target: t, owner: null });
     var vMax = targetMaxSpeed(tg);
     var isAir = w.target === 'air';
-    var dt = 1 / 20;      // 包线估算用 1/20 步长（HUD 每 0.3 s 才重算，粗步长换速度，精度够）
+    var dt = 1 / 10, simT = 0;      // 包线 / 瞄准圈估算步长（见 estDt；近炸按线段最近点，不漏判）
     /* 目标的初始水平距离：弹一旦飞过它一段距离还没命中，就追不上了（滑翔过头 /
        逃逸甩掉），可以提前退出，不必等它滑到落地或烧完寿命。 */
     var ox = t.pos.x - m.pos.x, oz = t.pos.z - m.pos.z;
     var hit = false, minD = Infinity;
     for (var f = 0; f < EFF_MAX_FRAMES && m.alive; f++) {
+      dt = estDt(w, simT); simT += dt;
       if (flee) {
         /* 掉头逃逸：机头**水平**背离弹、保持高度、以最大航速跑。方向每帧重算 ——
            弹在追，目标永远往背离它的方向逃，这是"甩掉"的最坏情况。
@@ -1725,12 +1726,18 @@ var Ent = (function () {
      是同一套，否则圈会骗人。
      ============================================================ */
 
+  /* 估算用的步长：包线 / 瞄准圈 / 落点标记都是"每隔一会儿才算一次"的粗估，
+     取 1/10；但火箭的动力段只有零点几秒，粗步长会把推力积分漏掉几百米（实测 PEJ-6
+     在 1/10 下落点差 250 m），所以动力段内细到 1/60，之后再放粗。 */
+  function estDt(w, t) { return (w.burn && t < w.burn + 0.1) ? 1 / 60 : 1 / 60; }
+
   /* 自然落点：弹翼不修（无目标），纯抛物线落地。 */
   function naturalPoint(w, la, planeY) {
     var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
     var m = makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, owner: null });
-    for (var f = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
-      stepMissile(m, 1 / 20, world);
+    for (var f = 0, tt = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
+      var edt = estDt(w, tt); tt += edt;
+      stepMissile(m, edt, world);
       world.particles.length = 0;
       /* planeY：HUD 指定目标所在高度时按这个平面截；否则按落点处的地面高度 */
       if (m.pos.y <= (planeY != null ? planeY : groundY(m.pos.x, m.pos.z))) break;
