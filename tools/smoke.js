@@ -40,7 +40,7 @@ function cmpVer(a, b) {
 function ok(msg) { console.log('  \x1b[32mOK\x1b[0m    ' + msg); }
 
 /* ============================================================
-   分段跑：改某个子系统时只跑相关断言，省掉整场跑一遍的时间。
+   分段跑：改某个子系统时只跑相关断言，省掉整场跑一遍的时间。跑全场花费的时间非常久。
 
      node tools/smoke.js --only 挂载系统,干扰与机动   // 只跑这几段
      node tools/smoke.js --skip 舰船发射器,近防拦截    // 跳过这几段
@@ -564,6 +564,28 @@ try {
     stepCount.set(a, (stepCount.get(a) || 0) + 1);
     return origStepAircraft(a, dt, w);
   };
+
+  /* 呼号分队：同一关内敌机呼号不重复；固定设施的 label 不带「序号 / 方位字母」。
+     （sk1 的批次是运行时才投放的，这里只查开局编成。） */
+  {
+    let dupBad = 0, numBad = 0;
+    for (let mi = 0; mi < sandbox.MISSIONS.length; mi++) {
+      try { sandbox.Game.startMission(mi); } catch (e) { continue; }
+      const W2 = sandbox.Game.__world();
+      const seenCs = new Set();
+      for (const a of W2.actors) {
+        if (a.team !== 1 || !a.label || a.isPlayer) continue;
+        if (seenCs.has(a.label)) { fail('任务 ' + sandbox.MISSIONS[mi].id + ' 呼号重复：' + a.label); dupBad++; }
+        seenCs.add(a.label);
+      }
+      for (const t of W2.targets) {
+        if (t.platform && /\s[0-9A-Z]$/.test(t.label || '')) {
+          fail('任务 ' + sandbox.MISSIONS[mi].id + ' 固定设施带序号：' + t.label); numBad++;
+        }
+      }
+    }
+    if (!dupBad && !numBad) ok('呼号分队：各关敌机呼号不重复，固定设施无序号后缀');
+  }
 
   // 全部任务都跑一遍 —— 有些问题只在特定任务的 AI 编成下出现
   for (const mi of sandbox.MISSIONS.map((_, i) => i)) {

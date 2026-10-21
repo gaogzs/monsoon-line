@@ -2638,13 +2638,80 @@ var CS_DOWNSTREAM = [
   { cn: '浅滩', en: 'SHALLOWFORD' },
   { cn: '飞沙', en: 'DRIFTSAND' },
   { cn: '赤土', en: 'REDCLAY' },
-  { cn: '远雷', en: 'FARTHUNDER' }
+  { cn: '远雷', en: 'FARTHUNDER' },
+  { cn: '羊坝', en: 'SHEEPDAM' },
+  { cn: '瓦渡', en: 'TILEFORD' },
+  { cn: '盐垸', en: 'SALTHOLM' },
+  { cn: '渡口', en: 'FERRYHEAD' },
+  { cn: '窑头', en: 'KILNHEAD' },
+  { cn: '碾坊', en: 'MILLHOUSE' },
+  { cn: '坝尾', en: 'DAMTAIL' },
+  { cn: '堰下', en: 'WEIRFOOT' },
+  { cn: '垸子', en: 'DYKEHOLD' },
+  { cn: '井台', en: 'WELLHEAD' },
+  { cn: '荒滩', en: 'WASTEFORD' },
+  { cn: '石窑', en: 'STONEKILN' },
+  { cn: '烟墩', en: 'BEACONMOUND' },
+  { cn: '桑园', en: 'MULBERRYGROVE' },
+  { cn: '柳沟', en: 'WILLOWGULLY' },
+  { cn: '黑渠', en: 'BLACKDITCH' },
+  { cn: '白坡', en: 'PALESLOPE' },
+  { cn: '空庄', en: 'EMPTYHAMLET' },
+  { cn: '旧驿', en: 'OLDPOST' },
+  { cn: '断坝', en: 'BROKENDAM' },
+  { cn: '苇荡', en: 'REEDMARSH' },
+  { cn: '泥湾', en: 'MUDBAY' },
+  { cn: '枯柳', en: 'DEADWILLOW' },
+  { cn: '烧窑', en: 'BURNTKILN' },
+  { cn: '旧渡', en: 'OLDFERRY' },
+  { cn: '沙井', en: 'SANDWELL' },
+  { cn: '鸦岗', en: 'CROWRIDGE' },
+  { cn: '荒庄', en: 'WASTEHAMLET' },
+  { cn: '矮墩', en: 'SHORTMOUND' },
+  { cn: '石坎', en: 'STONELEDGE' },
+  { cn: '落坡', en: 'FALLENSLOPE' },
+  { cn: '盐井', en: 'SALTWELL' },
+  { cn: '黄坎', en: 'YELLOWLEDGE' },
+  { cn: '裂村', en: 'SPLITHAMLET' },
+  { cn: '枯堤', en: 'DRYLEVEE' },
+  { cn: '淤坝', en: 'SILTDAM' },
+  { cn: '龟背', en: 'TORTOISEBACK' },
+  { cn: '寒泉', en: 'COLDSPRING' },
+  { cn: '牛栏', en: 'OXPEN' },
+  { cn: '麦垛', en: 'STRAWSTACK' },
+  { cn: '碱坑', en: 'ALKALIPIT' },
+  { cn: '河湾', en: 'RIVERBEND' },
+  { cn: '潮沟', en: 'SALTGULLY' },
+  { cn: '落石', en: 'FALLINGSTONE' },
+  { cn: '沙嘴', en: 'SANDSPIT' },
+  { cn: '蒿坪', en: 'MUGWORTFLAT' },
+  { cn: '皂角', en: 'LOCUSTPOD' },
+  { cn: '炭窑', en: 'CHARCOALKILN' },
+  { cn: '旱垭', en: 'DRYPASS' },
+  { cn: '空塬', en: 'EMPTYMESA' },
+  { cn: '晒场', en: 'DRYINGYARD' },
+  { cn: '穷店', en: 'BAREMARKET' },
+  { cn: '荒驿', en: 'DESERTPOST' },
+  { cn: '塌桥', en: 'FALLENBRIDGE' },
+  { cn: '苦溪', en: 'BITTERCREEK' },
+  { cn: '沉碾', en: 'SUNKENMILL' },
+  { cn: '弃堰', en: 'ABANDONEDWEIR' }
 ];
 
-/** 取第 i 个下游呼号，格式为 "旱沟 DRYGULLY" */
+/* 特种机与固定名字占用的词，池里不再发给小队 */
+var CS_RESERVED = ['冬港', '苦井', '旱湾', '碱滩', '石英'];
+
+/** 取第 i 个下游呼号（单机、无编号），格式为 "旱沟 DRYGULLY" */
 function downstreamCallsign(i) {
   var c = CS_DOWNSTREAM[i % CS_DOWNSTREAM.length];
   return c.cn + ' ' + c.en;
+}
+
+/** 小队呼号：sq 是小队词在池中的下标，n 是队内编号。
+    同一小队的成员共用一个词，只有编号不同，格式为 "旱沟 DRYGULLY-2" */
+function squadCallsign(sq, n) {
+  var c = CS_DOWNSTREAM[sq % CS_DOWNSTREAM.length];
+  return c.cn + ' ' + c.en + '-' + n;
 }
 
 /* ============================================================
@@ -3135,8 +3202,8 @@ var VOICES = {
     ],
     ambush: [
       { who: 'VESPER-3', cls: 'ally', tx: '<b>右转脱离！右转脱离！</b>', gap: 0.9 },
-      { who: '旱沟', cls: 'enemy', tx: '这里是旱沟。目标发现我们了。', gap: 1.1 },
-      { who: '石桥', cls: 'enemy', tx: '那就别躲了。全体，攻击。', gap: 0.9 }
+      { who: '旱沟 DRYGULLY-1', cls: 'enemy', tx: '这里是旱沟。目标发现我们了。', gap: 1.1 },
+      { who: '石桥 STONEBRIDGE-1', cls: 'enemy', tx: '那就别躲了。全体，攻击。', gap: 0.9 }
     ],
     /* 基地挨炸 —— "有东西从北边过来了"那句话的兑现 */
     baseHit: [

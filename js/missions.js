@@ -512,7 +512,7 @@ MISSIONS.push({
         special: 'dl6',
         skill: 0.32,
         behavior: 'recon',
-        callsign: downstreamCallsign(i)
+        callsign: squadCallsign(30, i + 1)
       });
       e.recon = true;
       e.flee = false;
@@ -530,7 +530,7 @@ MISSIONS.push({
         skill: 0.40,
         behavior: 'escort',
         escort: true,
-        callsign: downstreamCallsign(5 + i),
+        callsign: squadCallsign(31 + i, 1),
         wave: 1
       });
     }
@@ -549,7 +549,7 @@ MISSIONS.push({
         special: 'dl6', loadout: { A: 'dl6' },
         pods: ['vzu'],
         skill: 0.62,
-        callsign: downstreamCallsign(7 + i),
+        callsign: squadCallsign(31 + i, 2),
         wave: 2
       });
     }
@@ -717,7 +717,7 @@ MISSIONS.push({
     for (var i = 0; i < relays.length; i++) {
       var r = relays[i];
       var t = spawnTarget(w, {
-        ttype: 'air', model: 'relay', label: '中继平台 ' + (i + 1),
+        ttype: 'air', model: 'relay', label: '中继平台',
         x: r.x, y: r.y, z: r.z, hp: 260, radius: 30,
         drift: 9, value: 250, big: true
       });
@@ -726,8 +726,8 @@ MISSIONS.push({
 
     // 两座地面测控平台
     var sites = [
-      { x: -6000, z: 4000, label: '测控平台 西' },
-      { x: 6200, z: 6600, label: '测控平台 东' }
+      { x: -6000, z: 4000, label: '测控平台' },
+      { x: 6200, z: 6600, label: '测控平台' }
     ];
     for (i = 0; i < sites.length; i++) {
       spawnTarget(w, {
@@ -744,7 +744,7 @@ MISSIONS.push({
     ];
     for (i = 0; i < sams.length; i++) {
       spawnTarget(w, {
-        ttype: 'ground', model: 'sam', label: '防空浮台 ' + (i + 1),
+        ttype: 'ground', model: 'sam', label: '防空浮台',
         x: sams[i].x, y: 0, z: sams[i].z,
         hp: 90, radius: 5, ground: true,
         fireCd: M3.rnd(3, 8), weapon: 'dl9', value: 150
@@ -791,7 +791,7 @@ MISSIONS.push({
         x: br.x, y: 4300, z: -14000,
         fwd: M3.V(0, 0, 1), speed: 250,
         special: null, skill: 0.30,        // 弹舱里的东西由 onArrive 结算，不走导弹
-        callsign: downstreamCallsign(17 + i)
+        callsign: squadCallsign(4, i + 1)
       });
       // 弹舱里的东西不是武器，投弹由 bombTheBase 直接结算 —— 所以这里是 goto + call，不是 strike
       bmb.route = Route.plan([
@@ -893,7 +893,10 @@ MISSIONS.push({
       /* 三架 GAL-31 打头、两架 ROK-27 跟进、第四架 GAL-31 在高空看着。
          高峰军工制造局的重型截击机专为这种场合造的：
          从高空俯冲下来打一轮中距弹，然后脱离再爬升。 */
-      for (k = 0; k < 6; k++) {
+      /* 伏击六架拆成四队，每队内机型不同：旱沟 / 石桥 各一基一中，空井、灰塘单机 */
+    var ambCs = [squadCallsign(0, 1), squadCallsign(1, 1), downstreamCallsign(2),
+      squadCallsign(0, 2), squadCallsign(1, 2), downstreamCallsign(3)];
+    for (k = 0; k < 6; k++) {
         var isHeavy = (k < 3);
         var isHigh = (k === 5);
         var e = spawnEnemy(w, {
@@ -903,7 +906,7 @@ MISSIONS.push({
           special: (isHigh || isHeavy) ? 'dl4' : 'dl6',
           loadout: (isHigh || isHeavy) ? { A: 'dl4', B: 'vbn' } : null,
           skill: k === 0 ? 0.72 : 0.5,
-          callsign: downstreamCallsign(5 + k)
+          callsign: ambCs[k]
         });
         e.wave = 2;
       }
@@ -1032,7 +1035,7 @@ MISSIONS.push({
         fwd: M3.V(0, 0, -1), speed: 210,
         special: null, skill: 0.25,
         behavior: 'recon',
-        callsign: downstreamCallsign(9 + i)
+        callsign: i < 4 ? squadCallsign(5, i + 1) : squadCallsign(6, i - 3)
       });
       s.recon = true;
       s.model = 'sower';
@@ -1090,6 +1093,8 @@ MISSIONS.push({
        摆在 19 800、浪花摆在 12 000，进场第一帧就被升限段往下压。
        吊舱必须挂在**有 light 或 belly 组**的机型上：SAV-6 的
        npcFits 是 ['light','belly']，ROK-27 挂在 B 组外侧。 */
+    var escCs = [squadCallsign(7, 1), squadCallsign(8, 1), squadCallsign(7, 2),
+      squadCallsign(8, 2), downstreamCallsign(9)];
     var escorts = [
       { ac: 'basalt', x: -6000, y: 18400, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.62 },
       { ac: 'basalt', x: 6000, y: 18800, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.66 },
@@ -1111,7 +1116,7 @@ MISSIONS.push({
            编队里永远有一架带干扰吊舱。SAV-6「迷雾」的锁抗让玩家
            更难锁定带它的那一架：想安静地咬它，就得先处理那台吊舱。 */
         pods: es.pod,
-        skill: es.sk, callsign: downstreamCallsign(15 + i)
+        skill: es.sk, callsign: escCs[i]
       });
     }
 
@@ -1294,7 +1299,7 @@ MISSIONS.push({
     ];
     for (var i = 0; i < radars.length; i++) {
       spawnTarget(w, {
-        ttype: 'ground', model: 'radar', label: '雷达浮台 ' + (i + 1),
+        ttype: 'ground', model: 'radar', label: '雷达浮台',
         x: radars[i].x, y: 0, z: radars[i].z,
         hp: 220, radius: 10, ground: true, value: 200
       });
@@ -1324,7 +1329,7 @@ MISSIONS.push({
       fwd: M3.V(0, 0, -1), speed: 380,
       special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
       skill: 0.68,
-      callsign: downstreamCallsign(21)
+      callsign: squadCallsign(10, 1)
     });
     spawnEnemy(w, {
       ac: 'schist', team: 1,
@@ -1332,7 +1337,7 @@ MISSIONS.push({
       fwd: M3.V(0, 0, -1), speed: 380,
       special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
       skill: 0.62,
-      callsign: downstreamCallsign(23)
+      callsign: downstreamCallsign(11)
     });
     spawnEnemy(w, {
       ac: 'sandstone',
@@ -1340,7 +1345,7 @@ MISSIONS.push({
       fwd: M3.V(0, 0, -1), speed: 340,
       special: 'vgt', loadout: { A: 'vgt', B: 'vbn' },
       skill: 0.64,
-      callsign: downstreamCallsign(22)
+      callsign: squadCallsign(10, 2)
     });
 
     /* 三条不属于任何交战方的船。
@@ -1462,9 +1467,9 @@ MISSIONS.push({
     <span class="am">先把干扰机打掉，否则你的雷达光点会一直丢</span>`,
   map: [
     { x: 0, z: -16000, type: 'start', label: '进入点' },
-    { x: -9000, z: 12000, type: 'sam', label: '雷达站 1' },
-    { x: 9000, z: 12000, type: 'sam', label: '雷达站 2' },
-    { x: 0, z: 22000, type: 'sam', label: '雷达站 3' },
+    { x: -9000, z: 12000, type: 'sam', label: '雷达站' },
+    { x: 9000, z: 12000, type: 'sam', label: '雷达站' },
+    { x: 0, z: 22000, type: 'sam', label: '雷达站' },
     { x: -4000, z: 8000, type: 'relay', label: '准绳 SKORI' }
   ],
 
@@ -1484,7 +1489,7 @@ MISSIONS.push({
     ];
     for (var i = 0; i < radars.length; i++) {
       spawnTarget(w, {
-        ttype: 'ground', model: 'radar', label: '对空雷达站 ' + (i + 1),
+        ttype: 'ground', model: 'radar', label: '对空雷达站',
         x: radars[i].x, y: 0, z: radars[i].z,
         hp: 260, radius: 12, ground: true, value: 220
       });
@@ -1494,7 +1499,7 @@ MISSIONS.push({
     var sams = [{ x: -5000, z: 6000 }, { x: 5000, z: 9000 }];
     for (i = 0; i < sams.length; i++) {
       spawnTarget(w, {
-        ttype: 'ground', model: 'sam', label: '远程防空 ' + (i + 1),
+        ttype: 'ground', model: 'sam', label: '远程防空',
         x: sams[i].x, y: 0, z: sams[i].z,
         hp: 110, radius: 6, ground: true,
         fireCd: M3.rnd(2, 6), weapon: 'dl9', value: 180
@@ -1537,7 +1542,7 @@ MISSIONS.push({
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'dl6',
         loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
-        skill: 0.58, callsign: downstreamCallsign(23 + i)
+        skill: 0.58, callsign: i === 2 ? downstreamCallsign(13) : squadCallsign(12, i + 1)
       });
     }
 
@@ -1553,7 +1558,7 @@ MISSIONS.push({
       x: 12000, y: 12000, z: 34000,
       fwd: M3.V(-1, 0, 0), speed: 250,
       special: 'vsr', loadout: { B: 'vsr' },
-      skill: 0.4, callsign: downstreamCallsign(24)
+      skill: 0.4, callsign: downstreamCallsign(14)
     });
     cruise.bigTarget = true;
     cruise.route = Route.plan([
@@ -1737,7 +1742,7 @@ MISSIONS.push({
         special: 'dl4',
         loadout: { A: 'dl4', B: 'vbn' },
         skill: i === 0 ? 0.88 : 0.72,
-        callsign: downstreamCallsign(27 + i)
+        callsign: squadCallsign(15 + i, 1)
       });
       vet.veteran = true;
     }
@@ -1752,7 +1757,7 @@ MISSIONS.push({
         special: 'dl6',
         loadout: (i % 2) ? null : { A: 'dl4', B: 'dl6' },
         pods: (i % 2) ? ['vzu'] : null,
-        skill: 0.6, callsign: downstreamCallsign(31 + i)
+        skill: 0.6, callsign: squadCallsign(15 + i, 2)
       });
     }
 
@@ -1962,7 +1967,7 @@ function m8Wave2(w) {
       fwd: M3.V(-1, 0, 0), speed: bomber ? 250 : 300,
       special: 'vsr', loadout: bomber ? { B: 'vsr' } : { A: 'vsr', B: 'dl6' },
       skill: bomber ? 0.3 : 0.6,
-      callsign: downstreamCallsign(60 + i)
+      callsign: bomber ? squadCallsign(40, i + 1) : squadCallsign(41 + i, 1)
     });
     if (bomber) e.bigTarget = true; else e.striker = true;
     e.route = Route.plan([
@@ -1974,7 +1979,7 @@ function m8Wave2(w) {
     spawnEnemy(w, {
       ac: 'basalt', x: 28000, y: 8000, z: -2000 + i * 5000,
       fwd: M3.V(-1, 0, 0), special: 'dl4', loadout: { A: 'dl4', B: 'vbn' },
-      skill: 0.62, callsign: downstreamCallsign(64 + i)
+      skill: 0.62, callsign: squadCallsign(43 + i, 2)
     });
   }
 }
@@ -2077,7 +2082,7 @@ MISSIONS.push({
         fwd: M3.V(0, 0, -1),
         special: isSledge ? 'vsr' : 'vgt',
         loadout: isSledge ? { A: 'vsr', B: 'dl6' } : { A: 'vgt', B: 'vbn' },
-        skill: 0.6, callsign: downstreamCallsign(40 + i)
+        skill: 0.6, callsign: isSledge ? squadCallsign(45, 6) : squadCallsign(45, i + 1)
       });
       st.striker = true;
     }
@@ -2096,7 +2101,7 @@ MISSIONS.push({
         fwd: M3.V(0, 0, -1), speed: 250,
         special: 'vsr', loadout: { B: 'vsr' },
         skill: 0.3,
-        callsign: downstreamCallsign(46 + i)
+        callsign: squadCallsign(46, i + 1)
       });
       bmb.bigTarget = true;
       /* 以前：飞到固定点（离舰队约 9 km）就放 —— BOX-14 实际只飞得到 8.2 km，
@@ -2117,7 +2122,7 @@ MISSIONS.push({
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'vbn',
         loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
-        skill: 0.62, callsign: downstreamCallsign(48 + i)
+        skill: 0.62, callsign: heavy ? squadCallsign(47 + i, 1) : squadCallsign(45 + i, 2)
       });
     }
 
@@ -2328,14 +2333,14 @@ MISSIONS.push({
       fwd: M3.V(0, 0, -1),
       special: 'dl6', loadout: { A: 'dl6' },
       pods: ['vzu'],
-      skill: 0.7, callsign: downstreamCallsign(52)
+      skill: 0.7, callsign: squadCallsign(49, 1)
     });
     spawnEnemy(w, {
       ac: 'schist',
       x: 3000, y: 8500, z: 22000,
       fwd: M3.V(0, 0, -1),
       special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
-      skill: 0.72, callsign: downstreamCallsign(53)
+      skill: 0.72, callsign: downstreamCallsign(50)
     });
 
     /* 一架 VAC-14「砂岩」在低空压着登陆船团的头顶。
@@ -2346,7 +2351,7 @@ MISSIONS.push({
       x: 6000, y: 2800, z: 26000,
       fwd: M3.V(0, 0, -1),
       special: 'vgt', loadout: { A: 'vgt', B: 'vbn' },
-      skill: 0.62, callsign: downstreamCallsign(54)
+      skill: 0.62, callsign: squadCallsign(49, 2)
     });
 
     w.objective = '打断登陆船团';
@@ -2489,7 +2494,7 @@ MISSIONS.push({
         loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
         pods: heavy ? null : ['vzu'],
         skill: 0.68 + (i > 3 ? 0.08 : 0),
-        callsign: downstreamCallsign(56 + i)
+        callsign: squadCallsign(51 + Math.floor(i / 2), (i % 2) + 1)
       });
     }
 
@@ -2576,6 +2581,28 @@ MISSIONS.push({
    会让目标数抖动，也会让冒烟测试不可复现。
    ============================================================ */
 /* 第四周的下游机型 → 制式挂载（全是下游弹） */
+/* 一批次内的呼号分队：每队机型各不相同（最多 4 架），队内编号从 1 起；
+   单机直接用单词。base 是这一批用的小队词在池中的起始下标。 */
+function batchCallsigns(list, base) {
+  var squads = [], i, j, m, s;
+  for (i = 0; i < list.length; i++) {
+    m = list[i]; s = null;
+    for (j = 0; j < squads.length; j++) {
+      if (squads[j].members.length < 4 && squads[j].types.indexOf(m.ac) < 0) { s = squads[j]; break; }
+    }
+    if (!s) { s = { idx: base + squads.length, members: [], types: [] }; squads.push(s); }
+    s.members.push(m); s.types.push(m.ac);
+  }
+  for (i = 0; i < squads.length; i++) {
+    s = squads[i];
+    for (j = 0; j < s.members.length; j++) {
+      s.members[j].cs = s.members.length === 1
+        ? downstreamCallsign(s.idx)
+        : squadCallsign(s.idx, j + 1);
+    }
+  }
+}
+
 var SK_FITS = {
   schist:   { sp: 'dl6', lo: { A: 'dl4', B: 'dl6' } },
   basalt: { sp: 'dl4', lo: { A: 'dl4', B: 'vbn' } },
@@ -2674,6 +2701,7 @@ MISSIONS.push({
           off: M3.rnd(-2500, 2500)
         });
       }
+      batchCallsigns(spec, 60 + b * 8);
       queue.push({ list: spec, bearing: brg, spawnT: 0, spawned: false });
     }
     w.skQueue = queue;
@@ -2731,7 +2759,7 @@ MISSIONS.push({
           fwd: fwd, speed: M3.rnd(280, 380),
           special: SK_FITS[e.ac].sp, loadout: SK_FITS[e.ac].lo,
           skill: e.skill,
-          callsign: downstreamCallsign(60 + w.skBatch * 8 + i)
+          callsign: e.cs
         });
         foe.wave = w.skBatch + 1;
       }
@@ -2812,9 +2840,9 @@ MISSIONS.push({
     <span class="am">先打编队长「苇川号」（居中那条菊石）：它沉了，剩下的船会掉头</span>`,
   map: [
     { x: 0, z: -9000, type: 'start', dir: 0, label: '进入点' },
-    { x: 0, z: 0, type: 'base', label: '防波堤 A' },
+    { x: 0, z: 0, type: 'base', label: '防波堤' },
     { x: -3200, z: 1600, type: 'base', label: '浅滩站' },
-    { x: 3200, z: 1600, type: 'base', label: '防波堤 B' },
+    { x: 3200, z: 1600, type: 'base', label: '防波堤' },
     { x: 0, z: 12000, type: 'enemy', label: '炮击编队' },
     { x: 8000, z: 30000, type: 'site', label: '石英 QUARTZ' }
   ],
@@ -2831,9 +2859,9 @@ MISSIONS.push({
     w.guarded = [
       /* 血量比 PLATFORMS 的默认值低：这三座是满载油罐的补给平台，挨炮比空平台脆 ——
          也让"玩家不管就 3–4 分钟失守"成立 */
-      spawnPlatform(w, { platform: 'breakwater', x: 0, z: 0, team: 0, label: '防波堤 A', hp: 800 }),
+      spawnPlatform(w, { platform: 'breakwater', x: 0, z: 0, team: 0, label: '防波堤', hp: 800 }),
       spawnPlatform(w, { platform: 'shoal', x: -3200, z: 1600, team: 0, label: '浅滩站', hp: 650 }),
-      spawnPlatform(w, { platform: 'breakwater', x: 3200, z: 1600, yaw: Math.PI, team: 0, label: '防波堤 B', hp: 800 })
+      spawnPlatform(w, { platform: 'breakwater', x: 3200, z: 1600, yaw: Math.PI, team: 0, label: '防波堤', hp: 800 })
     ];
     var full = 0;
     for (var g = 0; g < w.guarded.length; g++) full += w.guarded[g].maxHp;
@@ -2867,7 +2895,7 @@ MISSIONS.push({
         x: -9000 + i * 6000, y: heavy ? 9000 : 5000, z: 24000,
         fwd: M3.V(0, 0, -1), special: heavy ? 'dl4' : 'vbn',
         loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
-        skill: 0.6, callsign: downstreamCallsign(70 + i)
+        skill: 0.6, callsign: heavy ? squadCallsign(54 + i, 1) : squadCallsign(52 + i, 2)
       });
     }
     spawnAewc(w, {
@@ -3060,7 +3088,7 @@ MISSIONS.push({
         x: -6000 + i * 4000, y: striker ? 3000 : 9000, z: 22000,
         fwd: M3.V(0, 0, -1), special: striker ? 'vgt' : 'dl4',
         loadout: striker ? { A: 'vgt', B: 'vbn' } : { A: 'dl4', B: 'vbn' },
-        skill: 0.6, callsign: downstreamCallsign(80 + i)
+        skill: 0.6, callsign: striker ? squadCallsign(54 + i, 2) : squadCallsign(56 + i, 1)
       });
       if (striker) e.striker = true;
     }
