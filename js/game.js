@@ -2836,7 +2836,7 @@ var Game = (function () {
       if (source && source.kind === 'target' && tg.big && tg.ttype !== 'air') {
         var mine = tg.team === 0;
         Radio.raw({ who: 'SEXTANT', cls: 'cmd',
-          tx: mine ? ('<b>' + shipName(tg) + ' 被敌舰击沉。</b>') : (shipName(tg) + ' 被我方舰炮击沉。'), gap: 1.0 });
+          tx: mine ? ('<b>' + shipName(tg) + ' 被敌舰击沉。</b>') : (shipName(tg) + ' 被我方击沉。'), gap: 1.0 });
       }
       if (tg.model === 'cell') {
         /* 处罚已在上面的 penal 记过一次 —— 这里以前又加了一次，打掉一个单元算两次。
