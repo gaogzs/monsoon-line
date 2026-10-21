@@ -2696,7 +2696,7 @@ var Game = (function () {
       /* 没撞上：带近炸引信的炮弹看看有没有擦着敌机 */
       if (b.alive && b.fuze > 0) Ent.shellFuze(b, world);
       /* 子弹落地就没了（带战斗部的炮弹在 stepBullet 里落水起爆）；无制导弹落地的起爆在 stepMissile 里 */
-      if (b.alive && b.pos.y <= 0 && b.kind !== 'missile') b.alive = false;
+      if (b.alive && b.pos.y <= Ent.groundY(b.pos.x, b.pos.z) && b.kind !== 'missile') b.alive = false;
   }
 
   /* 导弹 / 炸弹的起爆（Combat.blast）打设施也走这里 ——

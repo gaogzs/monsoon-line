@@ -964,7 +964,10 @@ var AI = (function () {
         var jamK = Ent.jamLockK(a);
         /* 射程取 min(锁定距离, 有效射程 × 0.9)（Ent.aiReach）：以前只看 lockDist，
            BOX-14、SPO-6 这类弹会在"锁得上但飞不到"的距离上开火。 */
-        var okDist = dist < Ent.aiReach(spW, a.pos.y) * lockK * resist * jamK && Ent.jamLockOK(a, t);
+        /* 对面弹按"本机高出目标多少"查射程（目标不在海平面时，不能拿海拔当投放高度） */
+        var reachAlt = (spW.target === 'ground' || spW.target === 'ship') && t.kind === 'target'
+          ? Math.max(0, a.pos.y - t.pos.y) : a.pos.y;
+        var okDist = dist < Ent.aiReach(spW, reachAlt) * lockK * resist * jamK && Ent.jamLockOK(a, t);
         /* 离轴角按武器分：对空弹三维夹角，对面弹只看水平方位（Ent.lockOff）—— 世界垂直方向不算 */
         var okAng = Ent.lockOff(a, t, spW) < cone * 0.85;
         /* 最小发射距离。对面目标给得比空中小目标保守一点：

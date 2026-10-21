@@ -76,6 +76,12 @@ var Ent = (function () {
   /* 阻力 / 掉速的密度系数（阶段 5.1）：以中空 7 km 为 1，
      低空放大、高空缩小，上下限免得两头失控。
      导弹滑翔掉速（基准 140 m/s²）和转弯掉速（基准 62 m/s²）都乘它。 */
+  /* 地面高度钩子：现在只有海面（0），将来加陆地时由地形模块 Ent.setTerrain(fn(x,z)) 注入。
+     落地判定、预计落点、瞄准圈、AI 射程都读它，不再写死 y = 0。 */
+  var terrainFn = null;
+  function groundY(x, z) { return terrainFn ? terrainFn(x, z) : 0; }
+  function setTerrain(fn) { terrainFn = fn || null; }
+
   var BOMB_DRAG = 0.00006;    // 无动力弹 / 火箭的阻力系数：a = BOMB_DRAG × ρ × v²
   var FIN_BLEED = 0.3;        // 弹翼修正的诱导阻力：每 1 m/s 侧向速度改变耗掉 0.3 m/s 速率
   var DRAG_REF_Y = 7000, DRAG_K_MIN = 0.4, DRAG_K_MAX = 1.4;
@@ -1442,9 +1448,10 @@ var Ent = (function () {
        无制导弹不走这里 —— 它们的命中靠 game.js 的 scanShot。 */
     if (t && m.seekerOn && !w.unguided && world && fuzeCheck(m, t, world)) return;
 
-    if (m.pos.y <= 0) {
+    var gy = groundY(m.pos.x, m.pos.z);
+    if (m.pos.y <= gy) {
       /* 撞地 / 落水：就地起爆。子母弹落地就是抛撒完成，按覆盖半径结算一片。 */
-      if (world) { m.pos.y = 0; Combat.detonate(m, world, null, null, { ground: true }); }
+      if (world) { m.pos.y = gy; Combat.detonate(m, world, null, null, { ground: true }); }
       else m.alive = false;
       return;
     }
@@ -1702,46 +1709,47 @@ var Ent = (function () {
      ============================================================ */
 
   /* 自然落点：弹翼不修（无目标），纯抛物线落地。 */
-  function naturalPoint(w, la) {
+  function naturalPoint(w, la, planeY) {
     var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
     var m = makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, owner: null });
     for (var f = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
       stepMissile(m, 1 / 20, world);
       world.particles.length = 0;
-      if (m.pos.y <= 0) break;
+      /* planeY：HUD 指定目标所在高度时按这个平面截；否则按落点处的地面高度 */
+      if (m.pos.y <= (planeY != null ? planeY : groundY(m.pos.x, m.pos.z))) break;
     }
-    return { x: m.pos.x, z: m.pos.z };
+    return { x: m.pos.x, y: Math.max(m.pos.y, planeY != null ? planeY : groundY(m.pos.x, m.pos.z)), z: m.pos.z };
   }
 
   /* 沿水平角 φ（0 = 前方，±90° = 左右），二分求"能命中"（flyTo）的最远地面目标
      水平距离。用真实命中判定，而不是弹翼满偏落点 —— 满偏上修会把抛物线掰成平飞
      （等于偷偷滑翔），那不是精确制导炸弹的"修正范围"。 */
-  function reachAtAngle(w, la, phi, hi) {
+  function reachAtAngle(w, la, phi, hi, ty) {
     var hx = Math.sin(phi), hz = Math.cos(phi);
     function at(D) {
       return { kind: 'target', radius: 20,
-        pos: M3.V(la.pos.x + hx * D, 0, la.pos.z + hz * D), vel: M3.V(0, 0, 0), speed: 0 };
+        pos: M3.V(la.pos.x + hx * D, ty || 0, la.pos.z + hz * D), vel: M3.V(0, 0, 0), speed: 0 };
     }
-    return bisectFar(function (D) { return flyTo(w, la, at(D), false); }, 400, hi || maxReach(w, la, 0));
+    return bisectFar(function (D) { return flyTo(w, la, at(D), false); }, 400, hi || maxReach(w, la, ty || 0));
   }
 
   /* 可达区域：{ natural, points }。natural = 自然落点（弹翼不修）；
      points = 沿各水平角 flyTo 二分出的"能命中"最远地面目标 —— 用真实命中判定
      （flyTo / stepMissile 同一套），所以目标套进圈内就真的打得中。返回 null 表示
      这枚弹没有弹翼修正（不画圈）。 */
-  function finFootprint(w, la, n) {
+  function finFootprint(w, la, n, ty) {
     if (!w || !w.fin) return null;
     n = n || 12;
-    var pts = [], hi = maxReach(w, la, 0);
+    var pts = [], hi = maxReach(w, la, ty || 0);
     for (var i = 0; i <= n; i++) {
       var phi = (i / n - 0.5) * (90 * Math.PI / 180);   // -45°..45°（前方扇区）
-      var D = reachAtAngle(w, la, phi, hi);
+      var D = reachAtAngle(w, la, phi, hi, ty);
       /* 该方向"能命中"距离 < 最小射程（弹翼横修不到那么侧）：跳过，不画进圈。 */
       if (D <= 400) continue;
       var hx = Math.sin(phi), hz = Math.cos(phi);
       pts.push({ x: la.pos.x + hx * D, z: la.pos.z + hz * D });
     }
-    return { natural: naturalPoint(w, la), points: pts };
+    return { natural: naturalPoint(w, la, ty), points: pts };
   }
 
   function hitsAt(w, y0, D) {
@@ -2336,11 +2344,12 @@ var Ent = (function () {
     Ballistics.step(b, dt);
     b.steps = (b.steps || 0) + 1;      // 走了几帧：drawTracers 只让第一帧的曳光接回炮口
     b.life -= dt;
-    if (b.life <= 0 || b.pos.y <= 0) {
+    var bgy = groundY(b.pos.x, b.pos.z);
+    if (b.life <= 0 || b.pos.y <= bgy) {
       /* 带战斗部的炮弹：落水就地起爆，寿命到点在空中自毁（对空射击时天上一团团的烟） */
       if (b.blast > 0 && world) {
-        var gnd = b.pos.y <= 0;
-        if (gnd) b.pos.y = 0;
+        var gnd = b.pos.y <= bgy;
+        if (gnd) b.pos.y = bgy;
         detonateShell(b, world, null, null, { ground: gnd });
       } else b.alive = false;
     }
@@ -2723,7 +2732,7 @@ var Ent = (function () {
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
     wakeSpray: wakeSpray,
-    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, displayRange: displayRange, naturalPoint: naturalPoint, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
+    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, displayRange: displayRange, naturalPoint: naturalPoint, groundY: groundY, setTerrain: setTerrain, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
     isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     jamState: jamState, jamShown: jamShown, jamDuty: jamDuty, jamRanges: jamRanges, jamPress: jamPress, jamLockOK: jamLockOK, jamLockK: jamLockK, JAM_BURN_R: JAM_BURN_R, JAM_SURF_K: JAM_SURF_K, JAM_BURN_SURF: JAM_BURN_SURF,
     gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,

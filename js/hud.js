@@ -1337,10 +1337,13 @@ var HUD = (function () {
     if (!w || !w.unguided || (w.target !== 'ground' && w.target !== 'ship')) return;
 
     var now = performance.now();
+    /* 有选中的面目标：按它所在高度截弹道（陆地上的高地也准）；没有就按落点处地面高度 */
+    var tsel = p.target && p.target.alive && p.target.kind === 'target' ? p.target : null;
+    var plane = tsel ? tsel.pos.y : null;
     var c = p.__ccip;
-    if (!c || c.w !== w.id || now - c.at > 100) {
-      c = p.__ccip = { w: w.id, at: now,
-        pt: Ent.naturalPoint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }) };
+    if (!c || c.w !== w.id || c.plane !== plane || now - c.at > 100) {
+      c = p.__ccip = { w: w.id, at: now, plane: plane,
+        pt: Ent.naturalPoint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }, plane) };
     }
     var pt = c.pt;
     var R = w.cluster || w.blast || 0;
@@ -1349,7 +1352,7 @@ var HUD = (function () {
       Math.hypot(t.pos.x - pt.x, t.pos.z - pt.z) <= Math.max(R, 15) + (t.radius || 0));
     var col = hot ? RED : 'rgba(255,176,58,0.85)';
 
-    var q = M3.project(cam, M3.V(pt.x, 0, pt.z));
+    var q = M3.project(cam, M3.V(pt.x, pt.y, pt.z));
     ctx.save();
     ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = hot ? 2 : 1.4;
     if (!q || q.x < 0 || q.x > W || q.y < 0 || q.y > H) {
@@ -1388,7 +1391,7 @@ var HUD = (function () {
       var ok = true;
       for (var i = 0; i <= 24; i++) {
         var a = i / 24 * Math.PI * 2;
-        var r = M3.project(cam, M3.V(pt.x + Math.sin(a) * R, 0, pt.z + Math.cos(a) * R));
+        var r = M3.project(cam, M3.V(pt.x + Math.sin(a) * R, pt.y, pt.z + Math.cos(a) * R));
         if (!r) { ok = false; break; }
         if (i === 0) ctx.moveTo(r.x, r.y); else ctx.lineTo(r.x, r.y);
       }
@@ -1420,20 +1423,21 @@ var HUD = (function () {
 
     /* 可达区域每 0.3 s 重算一次（一次要跑十几份弹道），按速度 / 高度变化节流。 */
     var now = performance.now();
+    var ft = p.target && p.target.alive && p.target.kind === 'target' ? p.target.pos.y : 0;
     var c = p.__fp;
-    if (!c || c.w !== w.id || now - c.at > 300 ||
+    if (!c || c.w !== w.id || c.ty !== ft || now - c.at > 300 ||
         Math.abs((p.speed || 0) - c.spd) > 50 || Math.abs(p.pos.y - c.y) > 300) {
-      c = p.__fp = { w: w.id, at: now, spd: p.speed || 0, y: p.pos.y,
-        fp: Ent.finFootprint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }) };
+      c = p.__fp = { w: w.id, ty: ft, at: now, spd: p.speed || 0, y: p.pos.y,
+        fp: Ent.finFootprint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }, undefined, ft) };
     }
     var fp = c.fp;
     if (!fp) return;
 
     /* 投影：natural + 边界点（地面 y=0 → 屏幕）。 */
-    var nat = M3.project(cam, M3.V(fp.natural.x, 0, fp.natural.z));
+    var nat = M3.project(cam, M3.V(fp.natural.x, fp.natural.y, fp.natural.z));
     var scr = [];
     for (var i = 0; i < fp.points.length; i++) {
-      var q = M3.project(cam, M3.V(fp.points[i].x, 0, fp.points[i].z));
+      var q = M3.project(cam, M3.V(fp.points[i].x, ft, fp.points[i].z));
       if (q) scr.push(q);
     }
     if (!nat || scr.length < 3) return;

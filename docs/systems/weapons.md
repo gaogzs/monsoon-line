@@ -668,3 +668,7 @@ if (!(Math.random() < chance)) continue;
 | 爆炸特效与预算 | `combat.js` `blastFx` / `BLAST_FX` |
 | 干扰弹冷却与粒子数 | `entities.js` `breakLock()` |
 | 定向能拦截窗口折算（1.2 s） | `game.js` `updateDEW()` |
+
+## 地形高度钩子（为陆地做准备）
+
+`Ent.groundY(x, z)` 返回该处地面高度（现为 0 = 海面），`Ent.setTerrain(fn)` 注入地形函数。导弹 / 炸弹 / 炮弹的落地判定、`naturalPoint`（HUD 预计落点，可传目标所在高度截弹道）、`finFootprint`（瞄准圈，可传目标高度）、AI 对面弹射程（按“本机高出目标多少”查 `aiReach`）都读它，不再写死 y = 0。`probe-ccip` 用 600 m 平台验证。注意 `effRange` 按高度分档缓存，地形变化后要清 `w.__eff`。
