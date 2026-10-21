@@ -97,6 +97,7 @@ var HUD = (function () {
     drawLaserStatus(ctx, W, H, p, world);
     drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
     drawConeCue(ctx, W, H, cam, p);
+    drawCcip(ctx, W, H, cam, p);          // 无制导炸弹 / 火箭的预计落点（CCIP）
     drawFootprint(ctx, W, H, cam, p);     // 精确制导炸弹的动态瞄准圈（泪滴形）
     drawFriendlyShots(ctx, W, H, cam, p, world);
     drawIncomingMissiles(ctx, W, H, cam, p, world);
@@ -1321,6 +1322,83 @@ var HUD = (function () {
       if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) inside = !inside;
     }
     return inside;
+  }
+
+  /* ============================================================
+     无制导炸弹 / 火箭的预计落点（CCIP，5.5）
+
+     用 Ent.naturalPoint（stepMissile 同一套积分：重力、阻力、火箭推力）
+     从本机当前状态前推到落海 / 落地，得到落点；落点和真实弹道是同一套计算。
+     投影到屏幕画 pipper + 落点线；子母弹 / 高爆弹再画爆炸半径的地面椭圆；
+     落点在屏外时在屏幕边缘给方向提示；锁定 / 选中的地面目标落进半径内就变红。
+     ============================================================ */
+  function drawCcip(ctx, W, H, cam, p) {
+    var w = WEAPONS[p.special];
+    if (!w || !w.unguided || (w.target !== 'ground' && w.target !== 'ship')) return;
+
+    var now = performance.now();
+    var c = p.__ccip;
+    if (!c || c.w !== w.id || now - c.at > 100) {
+      c = p.__ccip = { w: w.id, at: now,
+        pt: Ent.naturalPoint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }) };
+    }
+    var pt = c.pt;
+    var R = w.cluster || w.blast || 0;
+    var t = p.target && p.target.alive ? p.target : null;
+    var hot = !!(t && t.kind === 'target' &&
+      Math.hypot(t.pos.x - pt.x, t.pos.z - pt.z) <= Math.max(R, 15) + (t.radius || 0));
+    var col = hot ? RED : 'rgba(255,176,58,0.85)';
+
+    var q = M3.project(cam, M3.V(pt.x, 0, pt.z));
+    ctx.save();
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = hot ? 2 : 1.4;
+    if (!q || q.x < 0 || q.x > W || q.y < 0 || q.y > H) {
+      /* 落点在屏外：从屏幕中心朝落点方向，在安全矩形边缘画箭头 */
+      var dx = 0, dy = -1;
+      if (q) { dx = q.x - W / 2; dy = q.y - H / 2; }
+      else {
+        var fx = pt.x - p.pos.x, fz = pt.z - p.pos.z;
+        dy = (fx * p.fwd.x + fz * p.fwd.z) >= 0 ? -1 : 1;
+      }
+      var dl = Math.sqrt(dx * dx + dy * dy) || 1; dx /= dl; dy /= dl;
+      var e = edgePoint(W / 2, H / 2, dx, dy, offscreenRect(W, H, p));
+      var ang = Math.atan2(dy, dx), sz = U(9);
+      ctx.translate(e.x, e.y); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(sz, 0); ctx.lineTo(-sz, -sz * 0.7); ctx.lineTo(-sz, sz * 0.7);
+      ctx.closePath(); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    /* 落点线：机头基准点（屏幕中心）→ pipper */
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.moveTo(W / 2, H / 2); ctx.lineTo(q.x, q.y); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(q.x, q.y, 4, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(q.x - 9, q.y); ctx.lineTo(q.x - 4, q.y);
+    ctx.moveTo(q.x + 4, q.y); ctx.lineTo(q.x + 9, q.y);
+    ctx.moveTo(q.x, q.y - 9); ctx.lineTo(q.x, q.y - 4);
+    ctx.moveTo(q.x, q.y + 4); ctx.lineTo(q.x, q.y + 9);
+    ctx.stroke();
+
+    /* 爆炸 / 抛撒半径：地面圆投影成椭圆 */
+    if (R > 0) {
+      ctx.beginPath();
+      var ok = true;
+      for (var i = 0; i <= 24; i++) {
+        var a = i / 24 * Math.PI * 2;
+        var r = M3.project(cam, M3.V(pt.x + Math.sin(a) * R, 0, pt.z + Math.cos(a) * R));
+        if (!r) { ok = false; break; }
+        if (i === 0) ctx.moveTo(r.x, r.y); else ctx.lineTo(r.x, r.y);
+      }
+      if (ok) {
+        if (!hot && ctx.setLineDash) ctx.setLineDash([5, 4]);
+        if (hot) { ctx.fillStyle = 'rgba(255,80,60,0.10)'; ctx.fill(); }
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   /* ============================================================

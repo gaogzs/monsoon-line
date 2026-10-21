@@ -698,3 +698,8 @@ ctx.strokeText(t, x, y);
 - `JAMMED 电磁干扰`：受扰期间常驻，不闪，颜色压暗（`rgba(255,176,58,0.62)`）。
 
 `HUD.draw` 收到的 dt 恒为 0，所以 `HudFx` 自己用 `performance.now()` 算帧间隔。换了玩家对象（新一局）会自动清零。
+
+
+## 无制导落点标记（CCIP，5.5）
+
+`drawCcip`：当前武器是无制导对地弹（炸弹 / 火箭）时，每 0.1 s 用 `Ent.naturalPoint`（与 `stepMissile` 同一套积分）前推到落地，画 pipper + 落点线；有 `cluster` / `blast` 的画爆炸半径地面椭圆；落点在屏外时在安全矩形边缘画方向箭头；锁定 / 选中的地面目标落进半径内变红。不与精确制导炸弹的泪滴圈同时出现。探针 `tools/probe-ccip.js`。

@@ -2169,6 +2169,27 @@ var WEAPONS = {
     desc: '精确光电制导高爆炸弹。弹翼只能做有限的末端修正，但<b>套进 HUD 的瞄准圈投下去就必中</b>，而且光电成像导引头不吃热焰弹和箔丝。没有发动机，射程全靠投放高度与速度，比滑翔弹短得多；弹道也不滑翔，掉得快、落得快。',
     stat: { dmg: 0.60, spd: 0.18, trn: 0.18, rng: 0.40, ecm: 1.0 }
   },
+  hbl: {
+    /* 轻型高爆炸弹（阶段 5.6）：无动力 / 无制导，普通高爆战斗部。
+       多带多投，打小目标和分散目标；落点中心起爆，按 Combat.blast 距离衰减。 */
+    id: 'hbl', name: 'PEJ-4', cn: '飞蝗 · LOCUST', kind: 'bomb',
+    model: 'bomb',
+    speed: 300, life: 12.0, vsLife: 24.0,
+    dmg: 70, ammo: 8, cd: 0.3, salvo: 1, blast: 24, blastCore: 6, blastAir: false,
+    target: 'ground', unguided: true, ballistic: true,
+    desc: '轻型高爆炸弹。当量小，但一个挂点带得多、装填快，适合多枚连投收拾小艇和分散目标。<b>无制导，自由落体</b>：靠 HUD 的预计落点标记瞄准。',
+    stat: { dmg: 0.30, spd: 0.18, trn: 0.00, rng: 0.40, ecm: 1.0 }
+  },
+  hbh: {
+    /* 重型高爆炸弹（阶段 5.6）：一发重创护卫舰级目标，只能挂重挂点。 */
+    id: 'hbh', name: 'PEJ-22', cn: '镇岳 · BULWARK', kind: 'bomb',
+    model: 'bomb',
+    speed: 280, life: 12.0, vsLife: 24.0,
+    dmg: 420, ammo: 1, cd: 0.5, salvo: 1, blast: 110, blastCore: 45, blastAir: false,
+    target: 'ground', unguided: true, ballistic: true,
+    desc: '重型高爆炸弹。单枚当量极大，一发就能重创一艘护卫舰或炸平一片密集目标，但携带量少、装填慢。<b>无制导，自由落体</b>：得从目标上空附近投放，靠预计落点标记瞄准。',
+    stat: { dmg: 1.00, spd: 0.10, trn: 0.00, rng: 0.20, ecm: 1.0 }
+  },
   e4: {
     id: 'e4', name: 'ZUN-4', cn: '回声 · ECHO', kind: 'ecm',
     ecmBonus: 0.12,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
@@ -2458,6 +2479,8 @@ var STORE_ATTR = {
   v30:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 295 },
   clb:  { fits: ['heavy', 'belly'],        perPoint: 3,  mass: 350 },
   pgb:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 280 },
+  hbl:  { fits: ['light', 'heavy', 'belly'], perPoint: 4, mass: 120 },
+  hbh:  { fits: ['heavy'],                 perPoint: 1,  mass: 900 },
   rkt:  { fits: ['light', 'heavy'],        perPoint: 36, mass: 280 },
   lcm:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 780 },
 
@@ -2531,6 +2554,8 @@ var STORE_LOOK = {
   clb:  { len: 3.0, dia: 0.42, fin: 'bomb' },
   v30:  { len: 2.8, dia: 0.40, fin: 'bomb' },
   pgb:  { len: 3.2, dia: 0.38, fin: 'cruise' },
+  hbl:  { len: 2.0, dia: 0.30, fin: 'bomb' },
+  hbh:  { len: 3.4, dia: 0.60, fin: 'bomb' },
   rkt:  { len: 2.6, dia: 0.48, fin: 'small', nest: 'tube', cells: 7 }
 };
 
@@ -2622,6 +2647,8 @@ var STORE_ROLE = {
   clb:  '面压制 · 子母弹',
   v30:  '面压制 · 集束',
   pgb:  '精确光电制导高爆',
+  hbl:  '轻型高爆 · 多投',
+  hbh:  '重型高爆 · 单发重创',
 
   /* 吊舱 */
   e4:   '主动电子战',
@@ -2773,7 +2800,7 @@ var STORE_COOLDOWN = {
   /* 对地与反大型 */
   asl: 11, asl2: 16, v25: 18, lcm: 36,
   sat: 19, v22: 22,
-  rkt: 4, clb: 14, v30: 16, pgb: 16,
+  rkt: 4, clb: 14, v30: 16, pgb: 16, hbl: 5, hbh: 24,
 
   /* 吊舱：电子战设备要重新充能，仍然是全场最慢的一档 */
   e4: 50, l2: 36,
