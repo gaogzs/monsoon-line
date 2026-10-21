@@ -2765,7 +2765,7 @@ var Game = (function () {
         /* 自己被压制：锁定距离打折、只锁"看得清"的距离以内（与 AI 同一套，Ent.jamLockOK） */
         if (d <= samReach(t, w) * (1 - (player.lockResist || 0)) * Ent.jamLockK(t) && Ent.jamLockOK(t, player)) {
           // 低空突防可以躲开对空雷达；但贴得太近仍会被目视发现
-          var lowExposed = t.ground && player.pos.y < (world.dangerAltitude || 1500) && d < 5200;
+          var lowExposed = t.ground && Ent.agl(player) < (world.dangerAltitude || 1500) && d < 5200;
           if (world.detected || lowExposed) return player;
         }
       }

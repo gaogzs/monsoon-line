@@ -79,7 +79,16 @@ var Ent = (function () {
   /* 地面高度钩子：现在只有海面（0），将来加陆地时由地形模块 Ent.setTerrain(fn(x,z)) 注入。
      落地判定、预计落点、瞄准圈、AI 射程都读它，不再写死 y = 0。 */
   var terrainFn = null;
-  function groundY(x, z) { return terrainFn ? terrainFn(x, z) : 0; }
+  /* 两种"地面"分开看：
+       海平面  SEA_Y = 0：水面。舰船、水柱、尾迹、落水都认它，永远是 0。
+       地形高度 terrainY(x,z)：陆地。只有地形函数返回 > 海平面的地方才是陆地。
+     groundY = max(海平面, 地形)：弹丸落地、撞地保护、离地高度（agl）读这一个；
+     需要区分"落水 / 落地"的（水柱、舰船、浮空平台）用 isLand。 */
+  var SEA_Y = 0;
+  function terrainY(x, z) { return terrainFn ? terrainFn(x, z) : SEA_Y; }
+  function groundY(x, z) { var h = terrainY(x, z); return h > SEA_Y ? h : SEA_Y; }
+  function isLand(x, z) { return terrainY(x, z) > SEA_Y; }
+  function agl(e) { return e.pos.y - groundY(e.pos.x, e.pos.z); }   // 离地（海面）高度
   function setTerrain(fn) { terrainFn = fn || null; }
 
   var BOMB_DRAG = 0.00006;    // 无动力弹 / 火箭的阻力系数：a = BOMB_DRAG × ρ × v²
@@ -813,8 +822,9 @@ var Ent = (function () {
       B = M3.orthonormalize(a.fwd, M3.V(0, 1, 0));
       a.fwd = B.fwd; a.up = B.up; a.right = B.right;
     }
-    if (a.pos.y <= 2) {
-      a.pos.y = 2;
+    var aGy = groundY(a.pos.x, a.pos.z);
+    if (a.pos.y <= aGy + 2) {
+      a.pos.y = aGy + 2;
       kill(a, world, true);
       return;
     }
@@ -2732,7 +2742,7 @@ var Ent = (function () {
     detonate: detonate,
     /* 战斗部：面杀伤、加固判定、设施伤害的回调（game.js 注册 hitTarget） */
     wakeSpray: wakeSpray,
-    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, displayRange: displayRange, naturalPoint: naturalPoint, groundY: groundY, setTerrain: setTerrain, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
+    effRange: effRange, glideReach: glideReach, maxReach: maxReach, flyTo: flyTo, envelopeRange: envelopeRange, displayRange: displayRange, naturalPoint: naturalPoint, groundY: groundY, terrainY: terrainY, isLand: isLand, agl: agl, SEA_Y: SEA_Y, setTerrain: setTerrain, finFootprint: finFootprint, aiReach: aiReach, AI_RANGE_K: AI_RANGE_K, lockOff: lockOff,
     isHard: isHard, warheadK: warheadK, hitAny: hitAny, isRadiating: isRadiating,
     jamState: jamState, jamShown: jamShown, jamDuty: jamDuty, jamRanges: jamRanges, jamPress: jamPress, jamLockOK: jamLockOK, jamLockK: jamLockK, JAM_BURN_R: JAM_BURN_R, JAM_SURF_K: JAM_SURF_K, JAM_BURN_SURF: JAM_BURN_SURF,
     gunResistK: gunResistK, SMALL_CAL: SMALL_CAL,

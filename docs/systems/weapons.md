@@ -672,3 +672,5 @@ if (!(Math.random() < chance)) continue;
 ## 地形高度钩子（为陆地做准备）
 
 `Ent.groundY(x, z)` 返回该处地面高度（现为 0 = 海面），`Ent.setTerrain(fn)` 注入地形函数。导弹 / 炸弹 / 炮弹的落地判定、`naturalPoint`（HUD 预计落点，可传目标所在高度截弹道）、`finFootprint`（瞄准圈，可传目标高度）、AI 对面弹射程（按“本机高出目标多少”查 `aiReach`）都读它，不再写死 y = 0。`probe-ccip` 用 600 m 平台验证。注意 `effRange` 按高度分档缓存，地形变化后要清 `w.__eff`。
+
+两种“地面”分开：海平面 `Ent.SEA_Y`（恒为 0，舰船 / 水柱 / 落水）与地形高度 `Ent.terrainY`；`Ent.groundY` = 两者取高，`Ent.isLand` 判陆地，`Ent.agl(e)` 是离地高度。AI 的撞地保护 / 航线高度、近地告警、目视低空判定（`dangerAltitude`）、坠毁判定、水柱特效都读它们；炮塔对面解算本来就按目标高度差算仰角（`probe-ccip` 有高地用例）。巢式武器的 `look.rdia` 是离架后单发直径（`MODELS.round` 用）。

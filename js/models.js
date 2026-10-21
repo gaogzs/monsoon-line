@@ -1766,6 +1766,8 @@ var MODELS = (function () {
     if (!w) return M.missile;
     if (ROUND_CACHE[w.id]) return ROUND_CACHE[w.id];
     var lk = w.look || DEFAULT_LOOK, b = new MB();
+    // 巢式武器：dia 是整个巢，离架后的单发按 rdia（没写就退回 dia）
+    if (lk.rdia) { var lk2 = {}; for (var kk in lk) lk2[kk] = lk[kk]; lk2.dia = lk.rdia; lk = lk2; }
     addRound(b, lk, 0, 0, 0);
     return (ROUND_CACHE[w.id] = done(b, { span: lk.dia * 6, len: lk.len }));
   }

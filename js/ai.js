@@ -494,9 +494,11 @@ var AI = (function () {
     var desired = dist > 1 ? M3.mul(to, 1 / dist) : M3.norm(M3.V(a.fwd.x, 0, a.fwd.z));
 
     // 巡航高度保持 —— 航线给了高度，它只负责回到那上面
-    if (a.pos.y < r.alt - 150 && desired.y < 0.10) {
+    // （航线高度 r.alt 按离地高度算：飞过高地时跟着抬起来）
+    var aglA = Ent.agl(a);
+    if (aglA < r.alt - 150 && desired.y < 0.10) {
       desired = M3.norm(M3.V(desired.x, 0.34, desired.z));
-    } else if (a.pos.y > r.alt + 150 && desired.y > -0.10) {
+    } else if (aglA > r.alt + 150 && desired.y > -0.10) {
       desired = M3.norm(M3.V(desired.x, -0.28, desired.z));
     }
 
@@ -507,7 +509,7 @@ var AI = (function () {
     a.ab = false;
 
     // 撞地保护（它很笨，别让它一头扎进海里）
-    if (a.pos.y < 500 && a.fwd.y < 0) {
+    if (aglA < 500 && a.fwd.y < 0) {
       steerTo(a, M3.norm(M3.V(a.fwd.x, 0.4, a.fwd.z)), ctrl, a);
     }
 
@@ -866,7 +868,7 @@ var AI = (function () {
     }
 
     // 硬性保护：撞地前强行拉起
-    if (a.pos.y < 420 && a.fwd.y < 0.05) {
+    if (Ent.agl(a) < 420 && a.fwd.y < 0.05) {
       desired = M3.norm(M3.V(a.fwd.x, 0.5, a.fwd.z));
       steerTo(a, desired, ctrl, a);
       throttle = 1; ab = true;
@@ -1004,7 +1006,7 @@ var AI = (function () {
     else throttle = 0.82;
 
     // 高度管理：太低就抬起来
-    if (a.pos.y < 900 && a.fwd.y < 0) {
+    if (Ent.agl(a) < 900 && a.fwd.y < 0) {
       desired = M3.norm(M3.V(desired.x, Math.max(desired.y, 0.25), desired.z));
     }
     // 高空：避免过度爬升损失动压

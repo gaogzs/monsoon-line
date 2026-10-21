@@ -147,7 +147,7 @@ var Turret = (function () {
     // 受控发射器（cued）：打不打已经由 updateTargets 按同一条规矩判过了
     if (!world || host.team !== 1 || tu.m.role === 'ciws' || tu.gun.cued) return true;
     if (world.detected) return true;
-    return e.pos.y < (world.dangerAltitude || 1500) && M3.dist(e.pos, host.pos) < VISUAL_R;
+    return Ent.agl(e) < (world.dangerAltitude || 1500) && M3.dist(e.pos, host.pos) < VISUAL_R;
   }
 
   /* ---------- 近防炮拦截导弹（2-0IMPL 4.7，混合方案）----------

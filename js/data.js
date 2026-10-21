@@ -2512,6 +2512,7 @@ var STORE_ATTR = {
    boost：尾部助推段（超远程 / 反舰）
    rack： 一个挂架上**看得见**的弹数 —— 只给单次齐射多发的武器（= salvo），
           单发武器哪怕一个挂点装好几发也画成一枚（perPoint 是弹库，不是外观）
+   rdia： 巢式武器离架后单发的直径（dia 是整个巢）；MODELS.round 用它
    nest： 'tube' 圆筒火箭巢 / 'box' 方形发射巢；cells 是管口数
    3D（MODELS.store / MODELS.round）与识别图（PLANFORM.drawStore）读同一份。
    ============================================================ */
@@ -2556,7 +2557,7 @@ var STORE_LOOK = {
   pgb:  { len: 3.2, dia: 0.38, fin: 'cruise' },
   hbl:  { len: 2.0, dia: 0.30, fin: 'bomb' },
   hbh:  { len: 3.4, dia: 0.60, fin: 'bomb' },
-  rkt:  { len: 2.6, dia: 0.48, fin: 'small', nest: 'tube', cells: 7 }
+  rkt:  { len: 2.6, dia: 0.48, fin: 'small', nest: 'tube', cells: 7, rdia: 0.12 }
 };
 
 (function () {

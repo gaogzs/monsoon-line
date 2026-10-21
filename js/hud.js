@@ -1760,7 +1760,7 @@ var HUD = (function () {
          被对空雷达截获（DETECTED）并进 SPIKE：同一件事，只是照射源不同 */
       list.push({ id: 'lit', txt: th.lit ? '▲ SPIKE  雷达照射' : '▲ SPIKE  对空雷达截获', col: AMBER, font: BIG, on: true, h: U(34) });
     }
-    if (p.pos.y < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: 'TERRAIN  低高度告警', col: RED, font: F1, on: bl, h: U(30) });
+    if (Ent.agl(p) < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: 'TERRAIN  低高度告警', col: RED, font: F1, on: bl, h: U(30) });
     if (p.stall) list.push({ id: 'stall', txt: 'STALL  失速', col: RED, font: F1, on: bl, h: U(30) });
     if (p.pos.y > 18000 && p.q < 12) list.push({ id: 'lowq', txt: 'LOW Q  动压不足', col: AMBER, font: F2, on: bl, h: U(30) });
     /* 电子战的两个状态：受扰与静默。

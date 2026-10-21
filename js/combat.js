@@ -248,7 +248,7 @@ var Combat = (function () {
     }
 
     /* 落水：一根竖直水柱，高度约 0.6 × blast */
-    if (hemi && pos.y <= 1.5) {
+    if (hemi && pos.y <= Ent.groundY(pos.x, pos.z) + 1.5 && !Ent.isLand(pos.x, pos.z)) {
       var h = 0.6 * s.blast, vUp = Math.sqrt(2 * 9.8 * h);
       for (var c = 0; c < 12; c++) {
         Ent.spawnParticle(list, M3.V(pos.x + M3.rnd(-2, 2), 0.5, pos.z + M3.rnd(-2, 2)),

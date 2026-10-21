@@ -87,6 +87,30 @@ for (const id of IDS) {
 }
 Ent.setTerrain(null);
 
+/* 海平面与地形高度分开：海里 groundY = 0 / 非陆地；高地 groundY = 地形、isLand；离地高度读 groundY */
+console.log('\n== 海平面 / 地形高度分离 ==\n');
+{
+  Ent.setTerrain((x) => x > 1000 ? 400 : -50);      // x>1000 是 400 m 高地，其余是海（地形函数给负值也不低于海平面）
+  const sea = { pos: M3.V(0, 300, 0) }, hill = { pos: M3.V(2000, 700, 0) };
+  check('海面：groundY = 0、非陆地', Ent.groundY(0, 0) === 0 && !Ent.isLand(0, 0));
+  check('高地：groundY = 400、是陆地', Ent.groundY(2000, 0) === 400 && Ent.isLand(2000, 0));
+  check('离地高度：海上 300、高地上 300', Ent.agl(sea) === 300 && Ent.agl(hill) === 300);
+  Ent.setTerrain(null);
+}
+{
+  /* 炮塔对面解算：目标高度进入仰角（P0 → 目标的高度差），弹按 tof 飞到目标高度附近 */
+  const gun = { speed: 800, gravity: 1 };
+  const tu = { gun };
+  const P0 = M3.V(0, 20, 0);
+  const aim = (ty) => G.Turret.solveSurface(tu, P0, { pos: M3.V(0, ty, 8000), vel: M3.V(0, 0, 0), radius: 20 }, M3.V(0, 0, 0));
+  const lo = aim(0), hi = aim(500);
+  const el = (r) => Math.asin(r.p.y - P0.y) / 1;   // p 在 1 km 处，y 差 / 1000 = sinθ
+  const th = (r) => Math.asin((r.p.y - P0.y) / 1000);
+  check('炮塔：目标在 500 m 高地上，仰角更大', th(hi) > th(lo), th(lo).toFixed(4) + ' → ' + th(hi).toFixed(4));
+  const yAt = (r) => 20 + 800 * Math.sin(th(r)) * r.tof - 0.5 * 9.81 * r.tof * r.tof;
+  check('炮塔：弹到 tof 时的高度 ≈ 目标高度（高地）', Math.abs(yAt(hi) - 506) < 30, yAt(hi).toFixed(0) + ' vs 506');
+}
+
 console.log('\n== 高爆弹数值 ==\n');
 check('PEJ-22 blast 大于 PEJ-4', W.hbh.blast > W.hbl.blast);
 check('PEJ-22 携带量少于 PEJ-4', W.hbh.perPoint < W.hbl.perPoint && W.hbh.cd > W.hbl.cd);
