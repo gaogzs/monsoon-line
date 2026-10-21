@@ -2478,9 +2478,9 @@ var STORE_ATTR = {
   v22:  { fits: ['heavy'],                 perPoint: 2,  mass: 640 },
   v30:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 295 },
   clb:  { fits: ['heavy', 'belly'],        perPoint: 3,  mass: 350 },
-  pgb:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 280 },
-  hbl:  { fits: ['light', 'heavy', 'belly'], perPoint: 4, mass: 120 },
-  hbh:  { fits: ['heavy'],                 perPoint: 1,  mass: 900 },
+  pgb:  { fits: ['heavy', 'belly'],        perPoint: 6,  mass: 280 },
+  hbl:  { fits: ['light', 'heavy', 'belly'], perPoint: 12, mass: 120 },
+  hbh:  { fits: ['heavy'],                 perPoint: 3,  mass: 900 },
   rkt:  { fits: ['light', 'heavy'],        perPoint: 36, mass: 280 },
   lcm:  { fits: ['heavy', 'belly'],        perPoint: 2,  mass: 780 },
 
