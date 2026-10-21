@@ -3745,6 +3745,7 @@ var Game = (function () {
     var kb = a.killedBy;
     if (!kb || kb.isPlayer) return 'player';
     if (kb.kind === 'target') return kb.team === 0 ? 'ship' : 'other';
+    if (kb.isDrone && kb.team === 0) return 'player';   // 玩家的无人僚机：记入玩家战果
     if (kb.team === 0) return 'wing';
     return 'other';             // 敌方误伤自己人：谁的功也不算
   }

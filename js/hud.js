@@ -283,7 +283,9 @@ var HUD = (function () {
     /* 大数字和刻度同一单位（m/s）。以前大数字是没标单位的 km/h，和刻度对不上，
        看着像速度读数和指针不一致 */
     text(ctx, p.speed.toFixed(0), x - 46, cy + 5, '#eaf4fb', FB, 'right');
-    text(ctx, (p.speed * 3.6).toFixed(0) + ' KM/H · ' + (p.speed * 1.9438).toFixed(0) + ' KT', x - 46, cy + 21, DIM, FS, 'right');
+    text(ctx, (p.speed * 3.6).toFixed(0) + ' KM/H', x - 46, cy + 21, DIM, FS, 'right');
+    text(ctx, (p.speed * 1.9438).toFixed(0) + ' KT', x - 46, cy + 35, DIM, FS, 'right');
+    text(ctx, 'M ' + (p.speed / 340.3).toFixed(2), x - 46, cy + 49, DIM, FS, 'right');
 
     /* 引擎出力带与 FCS 舵量表不在这里 —— 它们挪到了雷达右侧，
        见 drawEnginePanel()。 */
