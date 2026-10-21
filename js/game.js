@@ -1397,6 +1397,7 @@ var Game = (function () {
      单发（n ≤ 1）不做任何偏移。 */
   var SALVO_FAN = 1.8 * Math.PI / 180;      // 制导弹：相邻两发的出膛夹角
   var SALVO_FAN_UG = 0.2 * Math.PI / 180;   // 无制导弹：管子基本平行
+  var SALVO_DISK_UG = 0.45 * Math.PI / 180; // 无制导弹：随机散布圆盘的角半径
   var SALVO_VER = 0.4;                      // 上下交错量，相对 FAN
   var SALVO_NEST = 0.8;                     // 巢内两发的横向间距（米）
 
@@ -1407,6 +1408,16 @@ var Game = (function () {
     for (var q = 0; q < n; q++) {
       if (n <= 1) {
         out.push({ fwd: base.fwd, off: M3.V(0, 0, 0) });
+        continue;
+      }
+      if (wp && wp.unguided) {
+        /* 无制导弹：指向与出膛点都在圆盘内均匀随机（半径取 sqrt 才是面均匀），
+           落点撒成一个圆，而不是两排整齐的长方形。 */
+        var ra = Math.sqrt(M3.rnd(0, 1)) * SALVO_DISK_UG, th = M3.rnd(0, 1) * Math.PI * 2;
+        var f2 = M3.rotAxis(base.fwd, base.up, ra * Math.cos(th));
+        f2 = M3.norm(M3.rotAxis(f2, base.right, ra * Math.sin(th)));
+        var rb = Math.sqrt(M3.rnd(0, 1)) * SALVO_NEST * 1.5, tb = M3.rnd(0, 1) * Math.PI * 2;
+        out.push({ fwd: f2, off: M3.add(M3.mul(base.right, rb * Math.cos(tb)), M3.mul(base.up, rb * Math.sin(tb))) });
         continue;
       }
       var k = q - (n - 1) / 2;                       // 以中线为 0 左右对称
@@ -2400,7 +2411,7 @@ var Game = (function () {
 
       a.aewcT = (a.aewcT === undefined ? 3 : a.aewcT) - dt;
       if (a.aewcT > 0) continue;
-      a.aewcT = 9 + Math.random() * 4;
+      a.aewcT = 9 + M3.rnd(0, 1) * 4;
 
       if (a.team === player.team) aewcReportAlly(a);
       else aewcReportEnemy(a);
@@ -2826,9 +2837,9 @@ var Game = (function () {
       var p = M3.V(t.pos.x + M3.rnd(-R, R), top + M3.rnd(0, 3), t.pos.z + M3.rnd(-R, R));
       Ent.spawnParticle(world.particles, p, M3.V(M3.rnd(-1, 1), M3.rnd(3, 6), M3.rnd(-1, 1)),
         M3.rnd(3, 5), M3.rnd(4, 7), '#2e2b28', { grow: true, drag: 0.4, alpha: 0.6 });
-      if (t.wreckT < WRECK_FIRE_T && Math.random() < 1 - t.wreckT / WRECK_FIRE_T) {
+      if (t.wreckT < WRECK_FIRE_T && M3.rnd(0, 1) < 1 - t.wreckT / WRECK_FIRE_T) {
         Ent.spawnParticle(world.particles, p, M3.V(0, M3.rnd(2, 5), 0),
-          M3.rnd(0.4, 0.8), M3.rnd(2, 3.5), Math.random() < 0.5 ? '#ff9a3c' : '#ffcf5c', { grow: true, drag: 1 });
+          M3.rnd(0.4, 0.8), M3.rnd(2, 3.5), M3.rnd(0, 1) < 0.5 ? '#ff9a3c' : '#ffcf5c', { grow: true, drag: 1 });
       }
     }
   }
@@ -2882,7 +2893,7 @@ var Game = (function () {
       var rollKey = actor.id !== undefined ? actor.id : actor;
       if (m.dewRolled === rollKey) continue;
       m.dewRolled = rollKey;
-      if (!(Math.random() < chance)) continue;
+      if (!(M3.rnd(0, 1) < chance)) continue;
       // 拦截成功
       sl[slot] = w.cd;
       if (actor.special === wid) actor.spCd = Math.min.apply(null, sl);
