@@ -2189,10 +2189,6 @@ MISSIONS.push({
     }
     if (sunk && !w.flags.shipLost) {
       w.flags.shipLost = true;
-      if (sunk.label) w.radio.raw({
-        who: 'SEXTANT', cls: 'cmd',
-        tx: '<b>' + shipName(sunk) + ' 沉了。</b>', gap: 1.0
-      });
       w.radio.play('m8', 'shipLost');
     }
   },
