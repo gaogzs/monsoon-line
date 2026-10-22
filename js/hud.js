@@ -1857,8 +1857,9 @@ var HUD = (function () {
 
   /* ============================================================
      本方射弹
-     玩家和友军打出去的导弹 / 炸弹套蓝色菱形（和来袭导弹的红菱形同形），
-     方便追踪落点 —— 尤其是没有尾迹的无动力炸弹。火箭（`burn`）一次一大把、
+     玩家自己打出去的导弹 / 炸弹套蓝色菱形（和来袭导弹的红菱形同形），
+     方便追踪落点 —— 尤其是没有尾迹的无动力炸弹。僚机和其他友军的弹不标。
+     火箭（`burn`）一次一大把、
      飞行时间短，不标。离本机 FRIENDLY_SHOT_MIN 米以内不画，免得刚离架就套框。
      只画屏幕内的，不给屏外箭头：边缘已经够挤了。
      ============================================================ */
@@ -1869,7 +1870,7 @@ var HUD = (function () {
     ctx.lineWidth = 1.4;
     for (var i = 0; i < world.missiles.length; i++) {
       var m = world.missiles[i];
-      if (!m.alive || m.team !== p.team || m.w.burn) continue;
+      if (!m.alive || m.owner !== p || m.w.burn) continue;
       if (M3.dist(m.pos, p.pos) < FRIENDLY_SHOT_MIN) continue;
       var s = M3.project(cam, m.pos);
       if (!s || s.x < 16 || s.x > W - 16 || s.y < 16 || s.y > H - 16) continue;
