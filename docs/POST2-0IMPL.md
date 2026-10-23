@@ -715,7 +715,7 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 > **本批的代码位置约定**（v3.0.0 之后）：AI 在 `js/engine/ai/`（`AI` 命名空间，私有状态 `AI.$`，公开接口只在 `zz-api.js`）；实体在 `js/engine/entities/`（`Ent`）；Game 的世界侧在 `js/engine/game/`，输入在 `js/ui/input.js`；HUD 在 `js/ui/hud/`；`Radio` 是 `js/ui/radio.js` 里的独立全局。引用位置一律写"模块 + 函数名"。
 >
 > **新文件的加载顺序**（`tools/build/gen-index.js`：层内 `_` 开头最先、`zz` 开头最后，其余先按**目录路径**再按文件名字母序）：
-> - `AI` 新文件放 `js/engine/ai/`，只通过 `$` 互相调用，**文件顶层只许做 `$.xxx = …` 赋值，不许调用别的文件的 `$` 函数**（字母序在后面的文件此刻还没加载）；要对外暴露的函数在 `zz-api.js` 里加一行 `AI.xxx = $.xxx`，同时在 `docs/systems/modules.md` 的接口表里补上。`ai/` 下新建子目录（如 `maneuvers/`）的文件排在 `ai/` 下所有平铺文件之后、`zz-api.js` 之前，仍然安全。
+> - `AI` 新文件放 `js/engine/ai/`，只通过 `$` 互相调用，**文件顶层只许做 `$.xxx = …` 赋值，不许调用别的文件的 `$` 函数**（字母序在后面的文件此刻还没加载）；要对外暴露的函数在 `zz-api.js` 里加一行 `AI.xxx = $.xxx`，同时在 `docs/systems/modules.md` 的接口表里补上。机动库**平铺**在 `ai/` 里，文件名统一用 `man-<名字>.js` 前缀（不建子目录，`modules.md` 的 `AI` 文件清单保持平铺）。
 > - `Chatter`、`FovWatch` 是新的独立全局模块（不属于任何已有命名空间，不要放进 `AI` / `Ent` 的目录），放 `js/engine/chatter.js`、`js/engine/fovwatch.js`。引擎层根目录的平铺文件（`loadout.js`、`turret.js` …）排在 `engine/ai/`、`engine/entities/`、`engine/game/` **之前**加载，所以这两个文件**不许在加载时**引用 `AI` / `Ent` / `Game` / `Radio`（`Radio` 在 `ui` 层，更靠后），只在函数体内用。
 > - 所有玩家可见文字走 `T('键')`，不写中文字面量（`text-census` 只许缩小）。
 
@@ -725,7 +725,7 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 
 1. **感知**：来袭导弹、RWR、目标列表、友军位置、弹药状态。
 2. **决策**：输出一个 `plan = { mode, target, goal }`。模式扩充为 `pursue / evade / extend / standoff / closeIn / retreat / support / escort`。
-3. **机动**：把现有的 `pursue()`、规避等变成可替换的"机动库"（`js/engine/ai/maneuvers/*.js`，属 `AI` 命名空间：高位 / 低位 yo-yo、剪刀、桶滚、分离转弯、凹口机动…），每个机动是一个小文件，按技能挑选。
+3. **机动**：把现有的 `pursue()`、规避等变成可替换的"机动库"（`js/engine/ai/man-*.js`，平铺在 `ai/` 里，属 `AI` 命名空间：高位 / 低位 yo-yo、剪刀、桶滚、分离转弯、凹口机动…），每个机动是一个小文件，按位格与技能挑选。
 
 模式切换点今天散在 `brain.js` 的 `update` 里（编号注释"1. 威胁规避优先级最高 / 2. 血量过低脱离 / 3. 选择目标 / 4. 分派行为"几段），要统一收进决策层，才能让新战术只加一个文件。
 
@@ -739,10 +739,10 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 
 ### 5.1 AI 飞行员技能值
 
-- 现有 `ai.skill`（0–1，`attach` 缺省 0.6，`spawnEnemy` 缺省 0.55）保留为总量，新增只读派生项 `aggr`（攻击欲望）与 `flair`（动作花样）。可选 `ace` 把三项整体上调（机型级的写 `data/aircraft/<id>.js` 的 `tags: ['ace']`；关卡里 `spawnEnemy({ ace: true })` 的是实例级，见"待核对"）。
+- **位格 `rank`（枚举，已定）**：每个 NPC 飞机都标注 `rookie / pawn / elite / ace` 四者之一，表达它的位格。`rank` 是**枚举字段，不是标签**（不进 `Tags`）：值表 `RANKS` 放在 `js/data/rules.js`，实体上是 `a.rank`；来源优先级：`spawnEnemy({ rank })` 的实参 → 机型数据 `data/aircraft/<id>.js` 的默认 `rank`（如战略制空支援机默认 `elite`）→ 缺省 `pawn`。`probe-missions` 与 smoke 断言：每一关里生成的每架 NPC 飞机的 `rank` 都在 `RANKS` 里，缺失即报错（逼着每个新关、新单位写位格）。
 - **把魔数提成参数表**（`AI.SKILL`，放 `js/engine/ai/` 下新文件，如 `skill.js`，经 `$.SKILL` 共享）：重选目标间隔（`brain.js` 选目标段的 `retargetT = 0.35 + (1 − skill) × 0.9`）、机炮锥（开火段的 `gunCone = 0.028 + (1 − skill) × 0.02`）、射击意愿 `0.35 + 0.45·skill` 与射击间隔 `shootT × (1.6 − 0.6·skill)`（开火段）、包线选择（`skill ≥ 0.6` 用 `env.nez`，否则 `env.rmax`）、抗电子战（`ewResist` 增长 `0.18 + 0.30·skill`）、**提前量折扣 0.85**（`tactics.js` 的 `leadTo`，现在与技能无关）。`Game` 侧另有一处读 `ai.skill`：`game/launch.js` 的 `vsSkill`（电子战对抗强度）——不改，只在 `AI.SKILL` 的说明里注明。
 - 新增依赖技能的项：规避动作选择（低技能只会硬拉，高技能会按来袭导弹类型选凹口 / 桶滚 / 抛干扰弹时机）、汇合方式（低技能直接追尾，高技能利用 yo-yo 转入内侧）、被咬尾时的反应、干扰弹投放时机。
-- 技能档（起步）：新手 0.35、普通 0.55、老手 0.72、王牌 0.9。关卡 `spawnEnemy({ skill })` 照旧；`ace:true` 同时给呼号和专属无线电。
+- **位格与技能值**：`rank` 给出缺省 `skill` 与行为门槛（起步）：`rookie` 0.35、`pawn` 0.55、`elite` 0.72、`ace` 0.9。`ai.skill`（0–1，保留为总量）缺省取自 `rank`，关卡 `spawnEnemy({ skill })` 仍可微调；新增只读派生项 `aggr`（攻击欲望）与 `flair`（动作花样）。`ace` 同时给呼号与专属无线电。原来各关写的 `skill` 数值（0.25–0.98）在批次 8 逐关映射到位格。
 - **约束**：AI 始终通过 `AI.steerTo`（`steer.js`）驱动，受同样的控制权限限制，"更华丽"靠机动选择与时机，不靠开挂。
 - 全局难度选项（提案 P3）**未采纳**，本批不做。技能值已经集中成 `AI.SKILL` 参数表，以后要加难度只需平移这张表，不会留债。
 
@@ -788,7 +788,7 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 | 两个条件同时满足 | 取较大者，不叠加 |
 | 无人僚机（`a.tags.unmanned`） | **不独立撤离**：继续跟长机；长机进入 `retreat` 时它们也跟着飞 |
 | 带 `noRetreat` 标签（自杀式 / 任务绑定） | 不撤离 |
-| `ace` | 概率 × 0.5 |
+| `rank === 'ace'` | 概率 × 0.5；`elite` × 0.75（起步） |
 
 - 一次判定为"否"之后不会自动重试；只有**新的状态变化事件**才会再次登记评估。所以不存在"每秒都在掷骰、迟早掷中"的累积效应，概率就是这一次的真实概率，调参也直观。
 - **与 Chatter 的联动**：评估结果为"撤离"时触发 `rtb`；弹药首次跌到 25% 以下时触发 `bingoAmmo`（同样由弹药事件驱动，各只触发一次）。
@@ -850,10 +850,10 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 - **不新增 `seeker` 值**。保留 `seeker:'radar'`（现有 `seeker === 'radar'` 的判断点——AI 开火段、`brain.js` 的 RWR、`entities/warhead.js`、`ui/input.js` 的 `launchCall`、`ui/screens/hardpoints.js` 的分类等——全部不用改），加标签 `sarh`：`js/core/tags.js` 里 `Tags.declare('sarh', { owner: 'entities', doc: T('core.tags.doc_N') })`（文本进 `core/tags.json`），数据里 `tags: ['sarh']`，机制代码读 `w.tags.sarh`；同时更新 `docs/systems/tags.md` 的清单。
 - **引导判定（仅限锁定时）**：半主动弹**只在发射机对该目标持有有效锁定时**才受引导——光把目标套进视场圈不够。每帧检查"发射机存活、`发射机.lockHeldOn === m.target`（见下）、发射机没有静默（`emcon`）"。通过则正常制导；不通过则 `m.illumLost = true`——导弹停止转向、沿当前航向飞，但**保留目标引用**，所以发射机**重新锁定同一目标后恢复引导**（激光导引头已经是这个行为）。
   - **"锁定成立"的判据**（直接复用现有锁定逻辑，不另写一份）：
-    - **玩家发射机**：`p.target === m.target` 且 `p.locked`（`Game` 的 `updateLock`，`js/engine/game/lock.js`）。`updateLock` 里 `locked` 在这些条件**全部**成立时为真：`Ent.jamState(p, t) === 'clear'`（否则直接清 `p.target`）、武器与目标类别匹配（`targetMismatch`）、`dist < lockDist`（已含 `emcon` 减半、`jamLockK`、目标 `lockResist`、干扰机 `ewPower` 的折减）、目标在锁定锥内（`lockInCone`，圈 = `p.lockCone`，高空 × 0.78）、且 `lockProgress ≥ 1`。**任一条件不成立当帧 `locked` 立刻置假**，`lockProgress` 再以 2.2/s 衰减，所以丢锁后重新锁定要重走进度（雷达档约 1.1 s 满，从衰减后的值起算）。因此玩家**不能在发射后切目标 / 按 Tab 走**而保持引导：`p.target` 一变，旧弹的 `lockHeldOn` 立刻不等于其目标。
+    - **玩家发射机**：`p.target === m.target` 且 `p.locked` **且当前武器 `p.special` 就是这枚弹的武器 id**（`Game` 的 `updateLock`，`js/engine/game/lock.js`）。**切换武器算作丢锁**（已定）：只有当前武器本身是该半主动弹、并且完成了锁定，才能保持引导——发射后切去 SRM / 机炮，旧弹立刻丢照射；切回同一种半主动弹后需要重走锁定进度（`lockProgress ≥ 1`）才恢复。`updateLock` 里 `locked` 在这些条件**全部**成立时为真：`Ent.jamState(p, t) === 'clear'`（否则直接清 `p.target`）、武器与目标类别匹配（`targetMismatch`）、`dist < lockDist`（已含 `emcon` 减半、`jamLockK`、目标 `lockResist`、干扰机 `ewPower` 的折减）、目标在锁定锥内（`lockInCone`，圈 = `p.lockCone`，高空 × 0.78）、且 `lockProgress ≥ 1`。**任一条件不成立当帧 `locked` 立刻置假**，`lockProgress` 再以 2.2/s 衰减，所以丢锁后重新锁定要重走进度（雷达档约 1.1 s 满，从衰减后的值起算）。因此玩家**不能在发射后切目标 / 按 Tab 走**而保持引导：`p.target` 一变，旧弹的 `lockHeldOn` 立刻不等于其目标。
     - **AI 发射机**：`ai.target === m.target`，且当帧满足该 AI 的开火 / 锁定条件——`Ent.jamState(a, t) === 'clear'` 与 `Ent.jamLockOK(a, t)`、`Ent.lockOff(a, t, spW) < lockCone × 0.85`（`brain.js` 开火段的 `okAng`，AI 开火门限）、`dist < Ent.aiReach(…) × lockK × resist × jamK`（`okDist`）、未 `emcon`。AI 没有锁定进度条，所以条件成立即视为锁定。**照射保持用比开火略宽的迟滞**（进圈 0.85、出圈 1.0 倍锥，由 `FovWatch` 的 `hyst` 提供），避免在边界上抖动。
-  - **统一出口**：每个射手有一个字段 `lockHeldOn`（目标引用或 `null`）：玩家由 `updateLock` 在每次判定末尾写（`locked ? p.target : null`）；AI 由 `brain.js` 的 `update` 在开火判定处写。`missile.js` 的半主动分支只读 `m.owner.lockHeldOn === m.target`，**不去重算锥与距离**。
-  - **丢锁的原因一览**（全部落到同一个 `illumLost`）：目标出锥、被地形 / 目标自身遮挡（批次 9 的 LOS）、被压制出 `clear`（`jamState` 变 `flicker / hidden`）、发射机 `emcon` 或死亡、**切换目标**。
+  - **统一出口**：每个射手有一个字段 `lockHeldOn`（目标引用或 `null`）：玩家由 `updateLock` 在每次判定末尾写（`locked && 当前武器是半主动弹 ? p.target : null`，同时记下是哪种武器）；AI 由 `brain.js` 的 `update` 在开火判定处写。`missile.js` 的半主动分支只读 `m.owner.lockHeldOn === m.target`，**不去重算锥与距离**。
+  - **丢锁的原因一览**（全部落到同一个 `illumLost`）：目标出锥、被地形 / 目标自身遮挡（批次 9 的 LOS）、被压制出 `clear`（`jamState` 变 `flicker / hidden`）、发射机 `emcon` 或死亡、**切换目标**、**切换武器**（当前武器不再是该弹的武器）。
 - **锁定事件驱动（`FovWatch`）**：见下方"视场与锁定事件化"一节；这里的"每帧检查"替换为订阅 `onLock / onLockLost`。
 - **宽限**：丢照射超过 `illumGrace`（起步 2.5 s）后永久失去引导，转 `target = null`，与现有导引头丢失处理对齐。宽限内重新锁定同一目标则清零计时、恢复引导。
 - **起爆**：近炸判据已经要求 `t && m.seekerOn`（`entities/missile.js`），保持。
@@ -925,13 +925,13 @@ FovWatch.lock(observer, target) / FovWatch.unlock(observer, target)         // �
 - **诱饵与侧击**：敌方成对时，高技能的一架（诱饵）正面吸引玩家的注意与导弹，另一架绕到侧后方切入。决策层加 `bait / flank` 两个子角色，由 Director 在成对单位里分配；只在 `skill ≥ 0.6` 的成对单位上启用。诱饵受到威胁（来袭导弹、被锁）时立即放弃角色转入规避，保证它不是自杀。
 - **低空突防**：对舰 / 对地攻击机（`caps:'strike'`）在距目标防空圈（舰船 / SAM 的 `interceptRange`）外保持贴海面（`agl` 起步 60 m），进入发射包线前才爬升投射，投射后立即回到低空脱离。与批次 9 的地形遮挡配合：有地形时优先沿山谷。验证：对舰攻击机在有 SAM 的关卡里被击落的时间点分布，应从"接近途中"后移到"爬升瞬间"。**注意跳过 5.0 的近地保护与升限覆盖。**
 - **撤向防空伞**：`retreat` 的目标不再只有"出界口 / 整备点"，增加第三个候选——**己方防空伞**（我方舰船 / SAM 站的 `interceptRange` 内、且比追击者更靠近它）。被追击且存在这样的位置时，优先撤向它，把玩家引进火力网。玩家侧的反制是看"对手是否正朝己方 SAM 飞"。
-- **假撤退诱敌**：`ace` / 高技能单位在 hp 尚可时有小概率（`FAKE_RETREAT_P`，起步 0.08，按"状态变化触发"的同一套延迟判定）进入伪装撤离：沿撤离航向飞 8–15 s，拉开与玩家的距离，若玩家追来则急转回头迎击（带一次先机发射）。与真撤离共用 `retreat` 状态，只是多一个 `fake:true` 标志与一个"回头"出口。真 / 假撤离在玩家眼里不可区分，**这是卖点**。因此 `mission.retreat='off'` 的关卡里假撤退同样可用——它不移除单位。
+- **假撤退诱敌**：`ace` / `elite` 位格（或高技能）单位在 hp 尚可时有小概率（`FAKE_RETREAT_P`，起步 0.08，按"状态变化触发"的同一套延迟判定）进入伪装撤离：沿撤离航向飞 8–15 s，拉开与玩家的距离，若玩家追来则急转回头迎击（带一次先机发射）。与真撤离共用 `retreat` 状态，只是多一个 `fake:true` 标志与一个"回头"出口。真 / 假撤离在玩家眼里不可区分，**这是卖点**。因此 `mission.retreat='off'` 的关卡里假撤退同样可用——它不移除单位。
 
 - **高技巧 AI 的加力使用**：
   - **现状**：加力不只在 `pursue()` 里——`a.ab` 的写入点：战斗 AI 统一在 `brain.js` 的 `update` 末尾 `a.ab = ab`，`ab` 的来源有：`tactics.js` 的 `pursue()`（`dist > 2600` 开；`dist < 800` 油门 0.55；另有"`fwd.y > 0.82` 且速度 < `1.5 × vStall` 强制开"）、`tactics.js` 的 `evade()`（油门恒 1，`ab = dist < 2600`）、`brain.js` 的 `extend` 分支（恒开）、无人僚机编队跟随（`role === 'drone'` 分支，`ab = vWant > 0.98 × vMil`）、（死代码）`wingman` 分支（`ab = dist to slot > 900`）、近地保护（`agl < 420`，油门 1 加力）；航线单位在 `updateRoute` 里 `a.ab = false`。**技能值完全不参与油门与加力**；`skill` 现在只在 `brain.js` 的 `update` 里使用：抗电子战（`ewResist`）、重选目标间隔、机炮锥、包线选择（`skill ≥ 0.6`）、射击意愿与间隔，外加 `game/launch.js` 的 `vsSkill`（电子战对抗）。任务里敌机技能从 0.25 到 0.98 都有，所以 `ace ≥ 0.75` 只会命中少数单位。
   - **没有燃油，也没有加力燃油**（`js/engine/entities/` 里搜不到），所以**不引入燃油与 `AB_FUEL`**：用"能量门限 + 冷却"限制加力，不做油耗模型。
   - **改为按战术用途决定**（各用途的触发都走 5.4 的状态变化 + 延迟判定，不逐帧）：
-    - **拉开距离 / 摆脱**：被导弹锁定或被咬尾、能量尚可时，`ace` 档开加力拉开，并在导弹 TTI 足够时作为 5.8 的 PSM 之外的第一选择；
+    - **拉开距离 / 摆脱**：被导弹锁定或被咬尾、能量尚可时，`ace` / `elite` 位格开加力拉开，并在导弹 TTI 足够时作为 5.8 的 PSM 之外的第一选择；
     - **切入 / 收敛**：攻击前从远距向目标收敛时，在能量高于角点速度时开加力，到达开火包线前收回；
     - **回头反击**：假撤退回头迎击时短时加力，缩短回转的时间窗；
     - **保能量**：狗斗中能量低于 `AB_MIN_E`（角点能量附近）立即停止加力，避免把自己拖进失速。`AB_MIN_E` 的"能量"是 3.3 里新增的 `E = ½v² + g·h`。
@@ -972,9 +972,9 @@ FovWatch.lock(observer, target) / FovWatch.unlock(observer, target)         // �
 
 ### 5.8 过失速机动（AI 侧）
 
-**复用**：AI 直接调用批次 3.3 的 `Ent.stepPSM`（新文件 `js/engine/entities/psm.js`，属 `Ent`，在 `entities/zz-api.js` 暴露）与同一套控制律（`AI.steerTo`（`steer.js`）本来就是玩家与 AI 共用的），只替换"目标方向"的来源。接入点在 5.0 说明的"4. 分派行为"链（`brain.js` 的 `update`）里新加 `s.mode === 'psm'` 分支，**并显式跳过 `vertRecover`、`clampCeiling` 与近地保护三道覆盖**（见 5.0）；机动库（`js/engine/ai/maneuvers/`）是批次 5 本身要建的东西，不是已有的。AI 与玩家一样走 `AI.update → Ent.stepAircraft` 的统一管线（`engine/game/update.js` 的 `update`），PSM 分支在 `stepAircraft` 之前判定。
+**复用**：AI 直接调用批次 3.3 的 `Ent.stepPSM`（新文件 `js/engine/entities/psm.js`，属 `Ent`，在 `entities/zz-api.js` 暴露）与同一套控制律（`AI.steerTo`（`steer.js`）本来就是玩家与 AI 共用的），只替换"目标方向"的来源。接入点在 5.0 说明的"4. 分派行为"链（`brain.js` 的 `update`）里新加 `s.mode === 'psm'` 分支，**并显式跳过 `vertRecover`、`clampCeiling` 与近地保护三道覆盖**（见 5.0）；机动库（`js/engine/ai/man-*.js`，平铺）是批次 5 本身要建的东西，不是已有的。AI 与玩家一样走 `AI.update → Ent.stepAircraft` 的统一管线（`engine/game/update.js` 的 `update`），PSM 分支在 `stepAircraft` 之前判定。
 
-**适用**：`skill ≥ PSM_AI_SKILL`（起步 0.75，即 ace 档）。普通与新手 AI 不使用，避免全场都在失速。
+**适用**：位格 `rank === 'ace'`（对应 `skill ≥ PSM_AI_SKILL`，起步 0.75）。普通与新手 AI 不使用，避免全场都在失速。
 
 **两个用途**：
 - **反击（咬尾时）**：AI 被敌机咬住（攻击者位于 AI 机尾 ±60° 内，距离 < 3 km），且规避不成立（5.7 的规避评估给出"无逃逸角"或"能量不足"），则 PSM 指向攻击者；收敛后按 5.1 的开火门限开火。这是"回头反击"的具体实现，也是 5.7 假撤退回头迎击的执行手段。
@@ -1001,7 +1001,7 @@ FovWatch.lock(observer, target) / FovWatch.unlock(observer, target)         // �
 **验证**：
 - `tools/test/probes/probe-psm.js` 增加 AI 场景（该探针由批次 3.3 建立）：ace 对普通 1v1，统计 ace 的 PSM 触发率、摆脱锁定成功率（导弹失效比例；半主动弹按"发射机丢锁"计）、反击后的开火命中率；普通 AI 的 PSM 触发数断言为 0；
 - TTI 门限：来袭导弹过近时断言不触发；
-- smoke：`PSM_AI_SKILL` 门限断言，非 ace 不进入 `psm` 机动。
+- smoke：`PSM_AI_SKILL` 门限断言，非 `ace` 位格不进入 `psm` 机动。
 
 ### 5.9 验证
 
@@ -1016,13 +1016,13 @@ FovWatch.lock(observer, target) / FovWatch.unlock(observer, target)         // �
 
 ### 5.10 文档与发版
 
-`docs/systems/ai.md` 重写（三层结构、模式表、机动库、技能表）、`weapons.md`（半主动、标签）、`entities.md`、`missions.md`（`mission.retreat`）、`tags.md`（`sarh`、`noRetreat`、`ace` 等新标签清单）、`modules.md`（`AI` 新文件与公开接口、`Chatter`、`FovWatch`）、`hud.md`、`tools.md`（新探针）、`text.md`（`radio.*`、`fail.*` 键）。发 v3.4。
+`docs/systems/ai.md` 重写（三层结构、模式表、机动库、技能表）、`weapons.md`（半主动、标签）、`entities.md`、`missions.md`（`mission.retreat`）、`tags.md`（`sarh`、`noRetreat` 等新标签清单）、`data.md` 与 `ai.md`（位格 `rank` 枚举）、`modules.md`（`AI` 新文件与公开接口、`Chatter`、`FovWatch`）、`hud.md`、`tools.md`（新探针）、`text.md`（`radio.*`、`fail.*` 键）。发 v3.4。
 
 ---
 
 ## 批次 6 · v3.5 新单位
 
-> 本批新增的机制标签（`droneCarrier`、`resupply`、`vtol`、`noPSM`、`elite`、`ewfield` 等）一律在 `js/core/tags.js` 里 `Tags.declare`（写明 `owner` 与 `doc`，`doc` 走 `T('core.tags.doc_N')`），数据里用了没声明的标签注册时直接抛错；运行时读 `x.tags.名字`。
+> 本批新增的机制标签（`droneCarrier`、`resupply`、`vtol`、`noPSM`、`ewfield` 等；`elite` / `ace` 是位格 `rank`，不是标签）一律在 `js/core/tags.js` 里 `Tags.declare`（写明 `owner` 与 `doc`，`doc` 走 `T('core.tags.doc_N')`），数据里用了没声明的标签注册时直接抛错；运行时读 `x.tags.名字`。
 > 新增单位的通用清单（下文各节只写差异）：**数据文件**（`js/data/{aircraft,ships,platforms,targets,weapons}/<id>.js`，`Registry.xxx({id, order, …})`）+ **模型文件**（`js/models/<类>/<id>.js`，`Registry.model({id, order, settle?, build})`）+ **文本 JSON**（`locales/zh-CN/text/**`，代码里 `T('键')`）+ **跑 `tools/build/gen-pages.js`** + **更新 `js/boot/main.js` preflight 的 `needModels / needWeapons`** + **smoke 的 `arms` 文本检查**；有人机俯视图加 `js/render/planform/planes.js`，资料库条目加 `js/ui/codex/entries/<id>.js`。
 
 ### 6.1 前置：长机泛化与无人机
@@ -1139,7 +1139,7 @@ droneCarrier: {
 
 ### 6.4 下游战略制空支援机（精英）
 
-- NPC 专用机型（`js/data/aircraft/<id>.js`，`npcOnly: true`）：流线体、高速、大型；`npcFits` 挂**大量中远程导弹**（含半主动弹，来自批次 5）；`ewPower / ewFieldR` 给**大范围电子战**；`hp` 高、`ace` 级技能；标签 `elite`、`ewfield`（`tags.js` 声明）。
+- NPC 专用机型（`js/data/aircraft/<id>.js`，`npcOnly: true`）：流线体、高速、大型；`npcFits` 挂**大量中远程导弹**（含半主动弹，来自批次 5）；`ewPower / ewFieldR` 给**大范围电子战**；`hp` 高、默认位格 `rank: 'elite'`（关卡可按需提到 `ace`）；标签 `ewfield`（`tags.js` 声明）。
 - **行为** `support`（AI 角色，写在 `js/engine/ai/tactics.js` 或 `brain.js` 的角色分支里，复用批次 5 的外围游走）：以友方战斗机的质心为锚点，保持在其后方 `D_support`（起步 12–18 km）游走；每 25–40 s 对**不同目标**一次发射多发（N=3–4）对空弹；被威胁接近时脱离。
 - 受干扰影响：被压制时发射间隔拉长、锁定距离折半（现有 `jamLockOK` 逻辑），玩家主动干扰对它有意义。
 - 模型（`js/models/aircraft/<id>.js`）/ 资料库条目 / 文本 JSON / 呼号（下游：村庄名 + 小队词，`js/data/callsigns/air.js` 的 `CS_DOWNSTREAM`）。
@@ -1371,7 +1371,7 @@ terrain: {
 
 ### 9.6 AI 与环境配合（可选，与批次 5 衔接）
 
-- 利用山谷 / 街道峡谷遮蔽接近的战术：新文件 `js/engine/ai/maneuvers/terrain-mask.js`（属 `AI` 命名空间，经 `ai/zz-api.js` 暴露），按技能启用（批次 5 的"低空突防""撤向防空伞"遇到地形时会用）。
+- 利用山谷 / 街道峡谷遮蔽接近的战术：新文件 `js/engine/ai/man-terrain-mask.js`（属 `AI` 命名空间，经 `ai/zz-api.js` 暴露），按技能启用（批次 5 的"低空突防""撤向防空伞"遇到地形时会用）。
 - 舰船的航线、水面单位的出生都受"必须在水里"约束（9.1）。
 
 ### 9.7 开发用试验场景
@@ -1495,6 +1495,9 @@ terrain: {
 | — | 半主动弹的引导 | 仅限锁定时：Fox 1 只在发射机对目标持有**有效锁定**时受引导，套进视场圈不够 |
 | — | 2.4 的范围 | 扩大为所有战斗机各 +1 对挂点（为以后扮演下游的战役做平衡准备） |
 | — | HUD 罗盘 | 跟镜头方位，而不是机头（机头航向另存 `p.heading`，见 `docs/systems/hud.md`） |
+| — | 发射后切换武器 | 算作丢锁：半主动弹只有在当前武器本身是它、且完成锁定时才保持引导 |
+| — | NPC 位格 | 枚举 `rank ∈ rookie / pawn / elite / ace`，每个 NPC 飞机都标注其一；是枚举字段不是标签；缺省 `pawn`，机型可给默认值 |
+| — | AI 机动库目录 | 暂时平铺：`js/engine/ai/man-<名字>.js`，不建子目录 |
 
 ### 待定
 
@@ -1545,9 +1548,9 @@ W.4 原文只有标题；以上验证步骤是按新工具补的，是否沿用"
 
 ### 批次 5
 
-1. **玩家半主动弹在"切换武器"后是否继续算锁定**：`updateLock` 里的 `locked` 是对**当前武器**（`p.special`）的锥 / 距离计算的；发射半主动弹后切去 SRM / 机炮，`lockCone` 与 `lockDist` 换成新武器的，`locked` 的含义随之改变。5.6 写的"`lockHeldOn = locked ? p.target : null`"在这种情况下需要决定：(a) 照射锁定独立按**该弹的武器参数**重算（建议，需要在 `updateLock` 里为在途 `sarh` 弹单独算一遍锥 / 距离 / `jamState`），或 (b) 切武器即视为丢锁（简单但惩罚过重）。落地时拍板，并补进 `probe-sarh` 场景。
-2. **`ace` / `noRetreat` / `elite` 是机型级标签还是实例字段**：`tags.md` 约定标签随机型 / 设施定义（`data/aircraft/<id>.js`），而 `skill`、`escort`（`ai.escort`）、`aewc`、`striker` 等是关卡脚本给实例设置的字段。`ace:true`、`noRetreat`（"自杀式 / 任务绑定"）看起来更像实例级。若走实例字段则**不进 `Tags`**（避免"声明了没人用"的 smoke 断言失败）；若走标签则要有至少一个机型 / 设施数据项用到它。`elite` 在原文中未出现，沿用任务说明里的提法，需确认是否真要新增。
-3. **机动库放不放子目录**：本段写 `js/engine/ai/maneuvers/<name>.js`（`gen-index.js` 递归扫描，子目录文件排在 `ai/` 平铺文件之后、`zz-api.js` 之前，可用）；但 `modules.md` 的 `AI` 文件清单目前全是平铺的，是否接受子目录需确认（备选：`ai/man-<name>.js` 平铺）。
+~~1. 半主动弹发射后切换武器~~ **已定**：切换武器算作丢锁，只有当前武器本身是该半主动弹且完成锁定才保持引导（5.6）。
+~~2. `ace` / `elite` 是标签还是实例字段~~ **已定**：`rookie / pawn / elite / ace` 是 NPC 飞机的位格枚举 `rank`，每个 NPC 都标注其中之一，不进 `Tags`（5.1）。`noRetreat` 仍是机型 / 设施标签，等第一个自杀式 / 任务绑定单位出现时再 `Tags.declare`（现在没有数据用它，不能提前声明，否则 smoke 的"声明了必须有人用"会失败）。
+~~3. 机动库放不放子目录~~ **已定**：暂时平铺，`ai/man-<名字>.js`。
 4. **`Radio` 的 DOM 依赖与 smoke**：5.5 的队列验证在 smoke 里怎么跑（`tools/lib/sim.js` 是否提供 DOM 桩、`Radio` 在无 DOM 时 `push` 直接 `return`）没有逐项核实；可能需要把队列逻辑抽成纯函数。
 5. **`Radio.update` 在暂停时是否推进**：原文说"进行中且未暂停时每帧调用"。当前代码里 `Radio.update(dt)` 在 `engine/game/update.js` 的 `update(dt)` 开头，调用方（`ui/frame.js` / `boot/main.js` 的主循环）是否在暂停时跳过 `update` 本段没有再核，原样沿用原文的说法。
 6. **`Ent.fireGunFrom`**（`entities/guns.js`）是否也会扣 `gunAmmo`（炮塔 / 机载炮的另一入口）：只确认了 `Ent.fireGun` 里 `a.gunAmmo -= n`；5.4 的"弹药事件"挂点是否要覆盖 `fireGunFrom`，落地时再查。
