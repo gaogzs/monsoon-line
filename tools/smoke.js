@@ -24,8 +24,7 @@ const htmlSrc = fs.readFileSync(HTML_PATH, 'utf8');
 
 /* 加载顺序直接从 index.html 里读，不手工维护 ——
    手工维护过一次就漏掉了新加的模块，测试反而先炸。 */
-const ORDER = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/script>/g)]
-  .map(m => m[1]);
+const ORDER = require('./lib/scripts').loadOrder();   // 如 'js/data.js'（含子目录与连字符）
 
 const problems = [];
 function fail(msg) { problems.push(msg); console.log('  \x1b[31mFAIL\x1b[0m  ' + msg); }
@@ -279,13 +278,18 @@ const ctx = vm.createContext(sandbox);
 console.log('\n== 加载脚本 ==');
 let loadError = null;
 for (const name of ORDER) {
-  const file = path.join(ROOT, 'js', name + '.js');
+  const file = path.join(ROOT, name);
   try {
     vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
   } catch (e) {
-    loadError = name + '.js: ' + e.message;
+    loadError = name + ': ' + e.message;
     break;
   }
+}
+/* index.html 的 <script> 块由 tools/gen-index.js 生成；忘了跑会在这里炸，而不是在玩家屏幕上白屏 */
+{
+  const GI = require('./gen-index.js');
+  if (GI.build(htmlSrc) !== htmlSrc) fail('index.html 的 <script> 块与 js/ 目录不一致 —— 跑一下 node tools/gen-index.js');
 }
 if (loadError) {
   fail('脚本加载失败 —— ' + loadError);
@@ -341,11 +345,11 @@ const NAV_EXPECT = {
 };
 
 // 每一个 data-go 都必须有对应的处理分支（早先兜底 else 会把未知值吞掉）
-const handled = new Set([...fs.readFileSync(path.join(ROOT, 'js/game.js'), 'utf8')
-  .matchAll(/go === '([a-z]+)'/g)].map(m => m[1]));
+const handled = new Set(ORDER.filter(f => !/\/(locales|changelog)/.test(f))
+  .flatMap(f => [...fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(/go === '([a-z]+)'/g)].map(m => m[1])));
 
 for (const g of Object.keys(NAV_EXPECT)) {
-  if (!handled.has(g)) fail("game.js 没有处理 data-go=\"" + g + '"');
+  if (!handled.has(g)) fail("没有任何脚本处理 data-go=\"" + g + '"');
 }
 
 for (const [go, want] of Object.entries(NAV_EXPECT)) {
@@ -363,7 +367,7 @@ for (const [go, want] of Object.entries(NAV_EXPECT)) {
         · CHANGELOG.md 改了但忘了跑 tools/release.js，
           于是游戏里显示的还是上一版的日志（页面照常能开，没人看得出来）
         · 版本号逆序或重复，玩家按"最新在上"读会读错
-        · js/version.js 的版本号与日志顶部那条对不上
+        · js/core/version.js 的版本号与日志顶部那条对不上
    ============================================================ */
 console.log('\n== 更新记录 ==');
 {
@@ -373,7 +377,7 @@ console.log('\n== 更新记录 ==');
   const inGame = sandbox.CHANGELOG;
 
   if (!inGame || !inGame.releases || !inGame.releases.length) {
-    fail('js/changelog.js 没有提供 CHANGELOG.releases');
+    fail('js/core/changelog.js 没有提供 CHANGELOG.releases');
   } else {
     /* 生成物必须与 CHANGELOG.md 同源 —— 忘了跑 release.js 就会在这里炸。
 
@@ -382,9 +386,9 @@ console.log('\n== 更新记录 ==');
     const a = JSON.stringify(inGame.releases);
     const b = JSON.stringify(release.generateChangelogJs(fromMd).releases);
     if (a !== b) {
-      fail('js/changelog.js 与 CHANGELOG.md 不同步 —— 跑一下 node tools/release.js');
+      fail('js/core/changelog.js 与 CHANGELOG.md 不同步 —— 跑一下 node tools/release.js');
     } else {
-      ok('js/changelog.js 与 CHANGELOG.md 同源（' + fromMd.length + ' 个版本）');
+      ok('js/core/changelog.js 与 CHANGELOG.md 同源（' + fromMd.length + ' 个版本）');
     }
 
     // 版本号格式 + 严格递减 + 与 current 一致
@@ -412,7 +416,7 @@ console.log('\n== 更新记录 ==');
       fail('CHANGELOG.current=' + inGame.current +
         ' 与顶部版本 ' + inGame.releases[0].version + ' 不一致');
     } else if (sandbox.BUILD_STAMP && sandbox.BUILD_STAMP.version !== inGame.current) {
-      fail('js/version.js 的版本号 ' + sandbox.BUILD_STAMP.version +
+      fail('js/core/version.js 的版本号 ' + sandbox.BUILD_STAMP.version +
         ' 与更新日志顶部的 ' + inGame.current + ' 不一致');
     } else {
       ok('当前版本 ' + inGame.current + '：更新日志、version.js、CHANGELOG.current 三处一致');
@@ -738,7 +742,7 @@ if (!badStore) ok('全部武器都有挂载属性');
   let bad = 0;
   for (const k in WEAPONS) {
     const w = WEAPONS[k];
-    if (w.kind === 'gun' || w.passive) continue;
+    if (w.kind === 'gun' || w.tags.passive) continue;
     if (w.kind === 'ecm' || w.kind === 'dew') continue;
     if (!w.speed || !w.life) {
       fail('武器 ' + k + '（' + w.name + '）缺少飞行参数：speed=' +
@@ -749,20 +753,62 @@ if (!badStore) ok('全部武器都有挂载属性');
   if (!bad) ok('全部可发射武器都有 speed / life');
 }
 
-// 冷却时间表要覆盖所有可发射武器 ——
-// 漏掉的话那件武器会保留 data.js 里写的原始 cd，
-// 而那个值可能是按旧语义（一次齐射打光）定的，会快得离谱
+// 机制标签（js/core/tags.js）：数据里用到的标签都已声明（注册时就会抛错），
+// 声明过的标签也都得有人用 —— 没人用的标签是死声明，要么删要么标 reserved: true
 {
-  const tbl = sandbox.STORE_COOLDOWN || {};
+  const T = sandbox.Tags, declared = T.declared();
+  const used = {};
+  for (const tbl of ['AIRCRAFT', 'SHIPS', 'PLATFORMS']) for (const d of sandbox[tbl]) for (const k in d.tags || {}) used[k] = true;
+  for (const tbl of ['WEAPONS', 'TURRET_GUNS', 'TARGETS']) for (const id in sandbox[tbl]) for (const k in sandbox[tbl][id].tags || {}) used[k] = true;
+  const unused = Object.keys(declared).filter(k => !used[k] && !declared[k].reserved);
+  const bad = Object.keys(used).filter(k => !declared[k]);
+  if (bad.length) fail('数据里用了没声明的标签：' + bad.join('、'));
+  if (unused.length) fail('声明了但没有任何数据在用的标签：' + unused.join('、'));
+  if (!bad.length && !unused.length) ok('机制标签：' + Object.keys(declared).length + ' 个都已声明且有人用');
+}
+
+// 文本层（docs/POST2-0IMPL.md 1.9）：
+//   · locales.gen.js 与 JSON 一致，脚本里静态写出的 T('键') 都存在
+//   · 脚本里的中文字符串不许超出允许清单（tools/baseline/text-census.json，只许缩小）
+//   · 运行到这里为止没有取过缺失的键
+{
+  const r = require('./check-locales.js').collect();
+  r.errors.forEach(e => fail(e));
+  const over = require('./text-census.js').overAllowance();
+  over.forEach(e => fail('脚本里出现了允许清单之外的中文字符串（该走 T() 了）：' + e));
+  const miss = sandbox.Text.missing;
+  if (miss.length) fail('运行时取了不存在的文本键：' + miss.slice(0, 5).join('、'));
+  if (!r.errors.length && !over.length && !miss.length) ok('文本层：' + r.keyCount + ' 条文本，生成物同步，无缺键，中文字符串没有超出允许清单');
+}
+
+// 命名空间的私有状态 $：只许本命名空间自己的文件碰（docs/POST2-0IMPL.md 1.7）
+{
+  const NS = ['Ent', 'AI', 'HUD', 'Game', 'PLANFORM', 'RenderEnv'];
+  const bad = [];
+  for (const f of ORDER) {
+    const src2 = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    const own = (/^\(function \((\w+)\) \{/m.exec(src2) || [])[1];
+    const re = /\b(\w+)\.\$\b/g;
+    let m;
+    while ((m = re.exec(src2))) if (NS.indexOf(m[1]) >= 0 && m[1] !== own && !/^\s*(\/\/|\*|\/\*)/.test(src2.slice(src2.lastIndexOf('\n', m.index) + 1, m.index))) bad.push(f + ' 读了 ' + m[1] + '.$');
+  }
+  if (bad.length) fail('跨命名空间碰了别人的私有状态：' + bad.slice(0, 5).join('；'));
+  else ok('私有状态 $ 没有被别的命名空间碰过');
+}
+
+// 每件可发射武器都要写**槽冷却** cd（秒，"打完一槽要等多久才能再用"）——
+// 漏写或写成旧语义的 0.1 级数值（一次齐射打光）会快得离谱。
+// （原来 cd 在独立的 STORE_COOLDOWN 表里，批次 1.4 并进了各武器文件）
+{
   const missing = [];
   for (const k in WEAPONS) {
     const w = WEAPONS[k];
-    if (w.kind === 'gun' || w.passive) continue;
+    if (w.kind === 'gun' || w.tags.passive) continue;
     if (!w.fits || !w.fits.length) continue;
-    if (!(k in tbl)) missing.push(k + '(' + w.name + ')');
+    if (!(w.cd >= 1)) missing.push(k + '(' + w.name + ')');
   }
-  if (missing.length) fail('这些武器没写进 STORE_COOLDOWN：' + missing.join('、'));
-  else ok('冷却时间表覆盖全部可发射武器');
+  if (missing.length) fail('这些武器没写合理的槽冷却 cd（应 ≥ 1 秒）：' + missing.join('、'));
+  else ok('槽冷却 cd 覆盖全部可发射武器');
 }
 
 // 有制导方式的武器都该有导引品质（lead）
@@ -771,10 +817,10 @@ if (!badStore) ok('全部武器都有挂载属性');
   let bad = 0;
   for (const k in WEAPONS) {
     const w = WEAPONS[k];
-    if (w.kind === 'gun' || w.passive) continue;
+    if (w.kind === 'gun' || w.tags.passive) continue;
     /* 无制导弹没有导引头，也就不该有导引品质 —— 它们的 seeker 字段
        已经整个删掉了，所以要按 unguided 判断，不能只看 seeker === 'none'。 */
-    if (w.unguided || w.seeker === 'none') continue;
+    if (w.tags.unguided || w.seeker === 'none') continue;
     if (w.lead === undefined) { fail('武器 ' + k + ' 有导引方式但没有导引品质 lead'); bad++; }
   }
   if (!bad) ok('全部制导武器都有导引品质字段');
@@ -919,7 +965,7 @@ if (Ent && M3 && me && world) {
       bad.push('红外弹 ' + (irRate * 100).toFixed(0) + '%，预期 ' + (wantIR * 100).toFixed(0) + '%');
     }
     if (wantRD === undefined) {
-      bad.push('CLA-4 没有 flareRD —— 雷达弹应当有箔丝概率（见 data.js 的 FLARE_RD）');
+      bad.push('CLA-4 没有 flareRD —— 雷达弹应当有箔丝概率（武器文件里的 flareRD 字段）');
     } else if (Math.abs(rdRate - wantRD) > 0.045) {
       bad.push('雷达弹 ' + (rdRate * 100).toFixed(0) + '%，预期 ' + (wantRD * 100).toFixed(0) + '%');
     }
@@ -2036,7 +2082,7 @@ if (Ent && M3 && me && world) {
     outer:
     for (const k in W2) {
       const w = W2[k];
-      if (w.kind === 'gun' || w.passive) continue;
+      if (w.kind === 'gun' || w.tags.passive) continue;
       const fits = AC.hardpointGroups.filter(g => w.fits && w.fits.indexOf(g.kind) >= 0);
       const uniq = [];
       for (const g of fits) if (!uniq.some(u => u.kind === g.kind)) uniq.push(g);
@@ -2641,7 +2687,7 @@ if (Ent && M3 && me && world) {
          `detonate()` 的翻倍），所以这条断言反过来了：以前要求"不许标，
          因为没人读"，现在要求"必须标" —— 世界里已经有预警机和
          "雷达开机状态"了。行为本身由上面的反辐射用例覆盖。 */
-      if (!arm.antiRadar) {
+      if (!arm.tags.antiRadar) {
         bad.push('SPO-8 没有 antiRadar —— 世界里已经有预警机与雷达开机状态，' +
           '这条语义应当落地');
       }
@@ -3039,11 +3085,11 @@ if (Ent && M3 && me && world) {
       if (left.length) {
         bad.push(w.name + ' 还留着制导/干扰类字段：' + left.join(', '));
       }
-      if (!w.unguided) bad.push(w.name + ' 没有 unguided 标记');
+      if (!w.tags.unguided) bad.push(w.name + ' 没有 unguided 标记');
     });
 
     // 火箭是有发动机的，不能连推进一起删掉
-    if (W4.rkt.ballistic) {
+    if (W4.rkt.tags.ballistic) {
       bad.push('PEJ-6 是火箭巢，被当成无动力炸弹了（多删了发动机）');
     }
     if (!W4.rkt.boost) {
@@ -3053,7 +3099,7 @@ if (Ent && M3 && me && world) {
     // PEJ-30（5.3 起无制导集束弹）：没有发动机，也没有任何导引字段
     {
       const w = W4.v30;
-      if (!w.unguided) bad.push('PEJ-30 是无制导集束弹，必须有 unguided');
+      if (!w.tags.unguided) bad.push('PEJ-30 是无制导集束弹，必须有 unguided');
       if (w.boost !== undefined) bad.push('PEJ-30 无动力，不该有 boost');
       ['seeker', 'turn', 'lead', 'flare', 'lockCone', 'lockDist', 'fin'].forEach(k => {
         if (w[k] !== undefined) bad.push('PEJ-30 无制导，不该有 ' + k);
@@ -3143,7 +3189,7 @@ if (Ent && M3 && me && world) {
     }
 
     // 和 SPO-9 的分工：一个低空强、一个高空专用，两个特性都不能丢
-    if (W9.hva && !W9.hva.highAltImmune) {
+    if (W9.hva && !W9.hva.tags.highAltImmune) {
       bad.push('SPO-9 丢了 highAltImmune —— 那是它和 CLA-17 唯一的分工依据');
     }
     if (v17 && !v17.scramjet) {
@@ -3185,8 +3231,8 @@ if (Ent && M3 && me && world) {
     CASES.forEach(([id, powered, guided, what]) => {
       const w = W7[id];
       if (!w) { bad.push('找不到 ' + id); return; }
-      const hasEngine = !w.ballistic;
-      const hasSeeker = !w.unguided;
+      const hasEngine = !w.tags.ballistic;
+      const hasSeeker = !w.tags.unguided;
       if (hasEngine !== powered) {
         bad.push(w.name + '（' + what + '）发动机标记不对：' +
           (hasEngine ? '有' : '无') + '，应该是' + (powered ? '有' : '无'));
@@ -3730,7 +3776,7 @@ if (Ent && M3 && me && world) {
        唯一一个加成失效的，而且完全静默。 */
     for (const k in W11) {
       const w = W11[k];
-      if (!w.passive) continue;
+      if (!w.tags.passive) continue;
       if (w.passiveEffect) {
         bad.push(w.name + ' 的加成包在 passiveEffect 里了 —— ' +
           'passiveEffects() 读的是顶层字段，写成嵌套会静默失效');
@@ -3756,14 +3802,14 @@ if (Ent && M3 && me && world) {
         type: 'frigatebird', team: 0, isPlayer: true, x: 0, y: y, z: 0,
         fwd: M3m.V(0, 0, 1), speed: 300
       });
-      a.gun = 'k3';
+      a.gun = 'cel3';
       a.gunAmmo = 100;
       a.gunTimer = 0;
       const wd = { particles: [], bullets: [], actors: [], targets: [], missiles: [] };
       E12.fireGun(a, wd);
       return wd.bullets.length ? wd.bullets[0].life : 0;
     }
-    const g = W12.k3;
+    const g = W12.cel3;
     const lifeLo = shootAt(5000), lifeHi = shootAt(20000);
     const rangeLo = lifeLo * g.speed, rangeHi = lifeHi * g.speed;
 
@@ -3795,7 +3841,7 @@ if (Ent && M3 && me && world) {
   {
     const E14 = sandbox.Ent, M3b = sandbox.M3, W16 = sandbox.WEAPONS;
     const bad = [];
-    const g = W16.k3;
+    const g = W16.cel3;
 
     /* 载机速度置零：子弹会继承机速（vel 里加了 a.vel），不清零的话
        量到的横向偏移里混着载机本身的速度，量到的就不是散布。
@@ -3807,7 +3853,7 @@ if (Ent && M3 && me && world) {
         fwd: M3b.V(0, 0, 1), speed: 0
       });
       a.vel = M3b.V(0, 0, 0);
-      a.gun = 'k3';
+      a.gun = 'cel3';
       a.gunAmmo = 1e9;
       a.gunTimer = 0;
       const base = M3b.add(a.pos, M3b.mul(a.fwd, 6));
@@ -4080,7 +4126,7 @@ if (Ent && M3 && me && world) {
     const ids = Object.keys(W13);
     for (const k of ids) {
       const w = W13[k];
-      if (w.kind === 'gun' || w.passive || w.kind === 'dew') continue;
+      if (w.kind === 'gun' || w.tags.passive || w.kind === 'dew') continue;
       try {
         G13.startMission(0);
         const pl = G13.__player();
@@ -5035,7 +5081,7 @@ try {
   const bad = [];
   const S = sandbox;
   const ship = (m) => S.SHIPS.find(s => s.model === m || s.id === m);
-  const k30 = WEAPONS.k7, k20 = WEAPONS.k3;
+  const k30 = WEAPONS.cel7, k20 = WEAPONS.cel3;
   const dps = (w) => w.dmg * w.rpm / 60;
 
   // 1) 系数：小口径子弹吃抗性，导弹 / 大口径不吃
@@ -5045,7 +5091,7 @@ try {
   if (!near(Ent.gunResistK(tg, { kind: 'bullet', cal: 75 }), 1)) bad.push('75mm 炮弹不该吃机炮抗性');
   if (!near(Ent.gunResistK(tg, { kind: 'missile', cal: 0 }), 1)) bad.push('导弹不该吃机炮抗性');
   if (!near(Ent.gunResistK(Ent.makeTarget({ gunResist: 5 }), { kind: 'bullet', cal: 20 }), 0.001)) bad.push('抗性应封顶 0.999');
-  for (const id of ['k1', 'k2', 'k3', 'k7', 'k11']) {
+  for (const id of ['cel1', 'cel2', 'cel3', 'cel7', 'cel11']) {
     if (!(WEAPONS[id].cal > 0 && WEAPONS[id].cal <= Ent.SMALL_CAL)) bad.push(id + ' 缺 cal 或不是小口径');
   }
 
@@ -5055,7 +5101,7 @@ try {
   W.targets = []; W.actors = []; W.bullets = [];
   const hb = S.spawnShip(W, { model: ship('humpback').model, x: 0, z: 0, team: 1 });
   if (hb.gunResist !== ship('humpback').gunResist) bad.push('spawnShip 没把 SHIPS[].gunResist 接上');
-  if (Ent.makeTarget({ model: 'cell' }).gunResist !== S.GUN_RESIST_MODELS.cell) bad.push('调节单元没取到模型默认抗性');
+  if (Ent.makeTarget({ model: 'cell' }).gunResist !== S.TARGETS.cell.gunResist) bad.push('调节单元没取到模型默认抗性');
   const bomber = Ent.makeAircraft({ type: 'boulder', team: 1, pos: M3.V(0, 3000, 0) });
   if (!(bomber.gunResist > 0)) bad.push('ROK-40 没有机炮抗性');
   for (const ac of AIRCRAFT) {
@@ -5076,7 +5122,7 @@ try {
   const ttk = (hp, r, w) => hp / (dps(w) * (1 - (r || 0)));
   const hbs = ship('humpback');
   if (ttk(hbs.hp, hbs.gunResist, k30) < 300) bad.push('航母挨 30mm 不到 300 s 就沉（' + ttk(hbs.hp, hbs.gunResist, k30).toFixed(0) + ' s）');
-  const cellT = ttk(400, S.GUN_RESIST_MODELS.cell, k20);
+  const cellT = ttk(400, S.TARGETS.cell.gunResist, k20);
   /* 机炮 rpm 3900 → 1950（÷2，削弱后的两倍）：原 2–6 s 的手感窗口 ×2 */
   if (cellT < 4 || cellT > 12) bad.push('调节单元挨 20mm 的 TTK ' + cellT.toFixed(1) + ' s 不在 4–12 s');
   const orca = ship('orca');
@@ -5688,7 +5734,7 @@ try {
     if (!(foe.hp < hp0)) bad.push('75 mm 连打 20 s，空爆一次也没有伤到正对着打的静止目标');
   }
   // 5. 航空机炮不带战斗部：只有直接命中
-  const k1 = sandbox.WEAPONS.k1;
+  const k1 = sandbox.WEAPONS.cel1;
   const b1 = EN.fireGunFrom({ team: 0, vel: V3.V(0, 0, 0) }, k1, V3.V(0, 1000, 0), V3.V(0, 0, 1), { bullets: [] });
   if (b1.blast || b1.fuze) bad.push('航空机炮的子弹带上了近炸 / 爆炸半径');
   // 6. 预览网格带炮塔：面数 = 船体 + 各实体炮塔两件
@@ -5804,7 +5850,8 @@ try {
   }
 
   // 受控舰空弹：垂发当场竖直出管、弹种用关卡给的；旋转架先转到位再打
-  const SHL = sandbox.SHIP_LAUNCHERS;
+  const SHL = {};   // 舰船发射器现在写在各舰文件的 launchers 字段里
+  for (const sh of sandbox.SHIPS) if (sh.launchers) SHL[sh.id] = sh.launchers;
   const hv = EN.makeTarget({ team: 1, model: 'spermwhale', x: 0, y: 0, z: 0, hp: 1e9, radius: 40, big: true });
   TU.attach(hv, null, SHL.spermwhale);
   const air = { kind: 'aircraft', team: 0, alive: true, hp: 1e9, pos: V3.V(-5000, 3000, 2000), vel: V3.V(0, 0, 0) };
@@ -5835,6 +5882,11 @@ try {
 
 /* ============================================================
    近防拦截与命中反馈（2-0IMPL 4.7）
+
+   已知会概率失败：「12 枚来袭一枚都没拦下」依赖随机数，而 smoke 全程共用
+   一条种子随机序列，前面各段多抽或少抽几个随机数（例如多加载一个脚本）就会
+   改变这里的结果。单独跑（--only 近防拦截）通常通过，完整跑偶尔失败。
+   遇到时先单独重跑这一段；单独也稳定失败才是真回归。
    ============================================================ */
 section('近防拦截', () => {
 console.log('\n近防拦截');
@@ -6105,7 +6157,7 @@ section('僚机掩护撒干扰弹', () => {
   SS.start(0);
   SS.run(2, () => {});
   const WW = SS.sandbox.Game.__world();
-  const drones = WW.actors.filter(a => a.isDrone && a.alive);
+  const drones = WW.actors.filter(a => a.tags && a.tags.unmanned && a.alive);
   drones.forEach(d => { d.ai.cmd = 'cover'; });
   const f0 = drones.map(d => d.flares);
   SS.run(60, () => {});

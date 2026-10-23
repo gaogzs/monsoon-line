@@ -1,0 +1,12 @@
+{
+ "total": 27,
+ "files": {
+  "js/core/text.js": 8,
+  "js/core/registry.js": 9,
+  "js/data/callsigns/naval.js": 4,
+  "js/engine/entities/mounts.js": 1,
+  "js/engine/game/update.js": 2,
+  "js/render/render-gl.js": 1,
+  "js/boot/main.js": 2
+ }
+}

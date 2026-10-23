@@ -1,5 +1,5 @@
 /* ============================================================
-   stamp-version.js —— 只刷新 js/version.js 的时间戳
+   stamp-version.js —— 只刷新 js/core/version.js 的时间戳
 
    用途：主菜单左上角显示这个时间，用来确认"这一版到底部署了没有"。
    浏览器缓存、Pages 重建延迟、推送失败 —— 这些都不好肉眼判断，
@@ -31,7 +31,7 @@ const stamp = release.writeStamp(version ? version.version : '');
 if (!stamp) {
   console.log('  读不到 git 记录（可能不在仓库里），跳过');
 } else {
-  console.log('  js/version.js 已更新');
+  console.log('  js/core/version.js 已更新');
   console.log('    版本  ' + (stamp.version || '—'));
   console.log('    时间  ' + stamp.local);
   console.log('    提交  ' + stamp.hash + '  ' + stamp.subject);

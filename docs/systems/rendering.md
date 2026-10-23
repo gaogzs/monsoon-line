@@ -1,6 +1,6 @@
 # 渲染管线
 
-代码：`js/render.js`（2D 层 + 画家算法兜底） · `js/render-gl.js`（模型的 WebGL2 渲染，v2.0.0 起） · `js/render-env.js`（WebGL 环境层：天空 / 海面 / 云 / 粒子，v2.1.0 起） · `js/shading.js`（着色规则，唯一一份） · 相机与投影数学在 `js/math3d.js`
+代码：`js/render/render.js`（2D 层 + 画家算法兜底） · `js/render/render-gl.js`（模型的 WebGL2 渲染，v2.0.0 起） · `js/render/env/`（WebGL 环境层：天空 / 海面 / 云 / 粒子，v2.1.0 起） · `js/core/shading.js`（着色规则，唯一一份） · 相机与投影数学在 `js/core/math3d.js`
 
 > **v2.0.0 起模型改走 WebGL2**（docs/2-0IMPL.md 阶段 2.5）。**v2.1.0 起天空、海面、云、粒子也进了 WebGL**（2.5.9，见下面"WebGL 环境层"），
 > 与模型共用一个深度缓冲。曳光、HUD 仍是 Canvas 2D。下文"天空与太阳""云""地面""粒子"几节描述的是 **2D 回退**的画法。
@@ -28,7 +28,7 @@
 
 | 来源 | 值 | 效果 |
 |---|---|---|
-| 设置 显示→渲染 | `renderMode` 0 = 自动（WebGL） / 1 = 兼容（2D） | `game.js` 的 `applyRenderMode()` → `setMode('auto' \| '2d')` |
+| 设置 显示→渲染 | `renderMode` 0 = 自动（WebGL） / 1 = 兼容（2D） | `Game` 的 `applyRenderMode()` → `setMode('auto' \| '2d')` |
 | URL `?render=2d` | — | 强制 2D，**覆盖设置**（排查用） |
 | 拿不到 WebGL2 | — | `begin()` 里 `RenderGL.begin()` 失败 → 本帧走画家算法（工具脚本、老显卡） |
 
@@ -43,7 +43,7 @@
 ## WebGL 环境层（v2.1.0）
 
 只有主画面那个实例（`RenderGL` 默认实例 = `create({ env: true })`）画环境；3D 预览不画。
-`render-env.js` 编译失败时 `RenderGL.envReady()` 为 false，环境整层退回 2D，模型照旧走 GL。
+`js/render/env/` 编译失败时 `RenderGL.envReady()` 为 false，环境整层退回 2D，模型照旧走 GL。
 
 | 项 | 做法 |
 |---|---|
@@ -52,7 +52,7 @@
 | 天空 | 按"高于视地平线的角度 ÷ 竖直视场"取 `SKY.stops`（与 2D 渐变同一组色），太阳光晕按角距离取 2D 同一组色标 |
 | 海面 | 底色按低于地平线的角度取 `SEA.stops`；40–320 m 四层程序波浪法线（按像素在海面上的覆盖宽度淡出，防闪）；1.3 / 5 km 两层大块明暗（高空时的速度感）；菲涅耳反射天空 + 太阳闪烁带；低空才看得见的白浪；`hazeDist` 指数雾融到地平线 |
 | 深度 | 所有环境着色器都写与模型相同的对数深度（`gl_FragDepth`），天空写 1 |
-| 云团（封存） | `render-env.js` 的 `BLOBS = false`：柔边贴片和低多边形实体云的代码都保留，但不画。现在天上只有平面云（远景云层 + 高空云片），远景云层也不再按距离淡入 |
+| 云团（封存） | `js/render/env/` 的 `BLOBS = false`：柔边贴片和低多边形实体云的代码都保留，但不画。现在天上只有平面云（远景云层 + 高空云片），远景云层也不再按距离淡入 |
 | 云 | 仍用 `render.js` 的 `CLOUD_LAYERS` / `cloudSeeds` 与 6400 m 平铺（5×5 格），10 km 以上不画云团。**实体云**：每朵 1–3 个随机低多边形团块（细分二十面体压扁、顶点随机扰动、底部压平），三遍画：① 背面 +视深 / 正面 −视深加进 R32F 得到穿过的厚度（先与场景深度取 min）② 最近正面的平涂颜色 ③ 合成 α = 1 − e^(−厚度×密度)。边缘不做淡出。拿不到 `EXT_color_buffer_float` + `EXT_float_blend` 时退回柔边贴片 |
 | 软粒子 | 不透明模型 + 海面画完后，把深度 blit 到一张深度纹理；云贴片读它，靠近机身 / 海面时淡出，不出现硬切边 |
 | 远景云层 | `DECKS`：2.1 km、5.2 km 两层低质量噪声云片，与高空云片同一个着色器。按水平距离 10→16 km 淡入，接上云团的淡出 —— 高空往下看四面都有低层云，不会只有脚下一块 |
@@ -227,7 +227,7 @@ color = mix(baseColor, (150,176,196), fog)
 
 ### `pushModel` 的模型与 `opts`
 
-`model`（来自 `js/models.js`）形如：
+`model`（来自 `js/models/`）形如：
 
 ```js
 { v: [[x,y,z], ...],                   // 机体坐标顶点：机头 +z、右翼 +x、上 +y
@@ -275,7 +275,7 @@ pushModel() × N        ← 只收集，不绘制（GL 路径转给 RenderGL.pus
 Renderer.drawParticles(world.particles)   ← 2D：直接画；GL 环境层：只收集
 Renderer.flush()       ← 2D：排序 + 绘制全部面；GL：渲染离屏画布并 drawImage
 
-drawTracers()          ← game.js 自己的曳光弹，画在一切之上
+drawTracers()          ← Game 自己的曳光弹，画在一切之上
 Renderer.end()                            ← ctx.restore()
 
 HUD.draw(world, player, 0, S)             ← 在 restore 之后，所以 HUD 不跟着抖
@@ -392,7 +392,7 @@ y0 = clamp(hy, -2, H + 2)
 
 ## 粒子
 
-粒子对象由 `js/entities.js` 的 `spawnParticle()` 创建，字段与渲染器约定一致：
+粒子对象由 `Ent` 的 `spawnParticle()` 创建，字段与渲染器约定一致：
 
 ```js
 { pos, vel, life, life0, size, color, alive, grow, alpha, drag, grav }
@@ -410,7 +410,7 @@ alpha = clamp(lifeK, 0, 1) * p.alpha
 `grow` 的粒子随时间**变小**（`1.6 - lifeK`），是"膨胀后消散"的近似。
 半径 `< 1.4 px` 时用 `fillRect` 画方点（比 `arc` 便宜），否则画圆，屏幕外按 `±3r` 剔除。
 
-数量上限 **900**，由调用方 `game.js` 的 `compact()` 维护：`out.length > 900` 时
+数量上限 **900**，由调用方 `Game` 的 `compact()` 维护：`out.length > 900` 时
 `splice(0, out.length - 900)` 裁掉**最旧**的（数组是追加顺序，队首最老）。渲染器自己不设上限。
 粒子的运动（`life` 递减、`vel` 积分、`drag` 指数衰减、`grav` 只作用于 y）在
 `Ent.stepParticles()` 里，不在渲染器。
@@ -455,5 +455,5 @@ alpha = clamp(lifeK, 0, 1) * p.alpha
 | 面剔除阈值 | `pushModel()` 里的 `area < 1.6` |
 | 描边补缝条件 | `flush()` 里的 `f.n <= 4 && f.d < 900` |
 | 抖动上限 | `addShake()` 里的 `26` |
-| 粒子数量上限 | `game.js` 的 `compact()` 里的 `900` |
+| 粒子数量上限 | `Game` 的 `compact()` 里的 `900` |
 | 单个模型的顶点上限 | `render.js` 的 `MAXV = 2048` |

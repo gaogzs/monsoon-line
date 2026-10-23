@@ -1,6 +1,6 @@
 # 飞行模型与大气
 
-代码：`js/entities.js` · 数据：`js/data.js` 的 `phys` 字段
+代码：`Ent` · 数据：`js/data/` 的 `phys` 字段
 
 ---
 
@@ -44,7 +44,7 @@ return 0.0132;                                           // 32 km 以上取常�
 | 23 000 m | 0.05428 | 4.4% | 2.44 kPa |
 | 32 000 m | 0.01320 | 1.1% | 0.59 kPa |
 
-`20 000 m → 0.088` 是设定集反复引用的锚点，也是 `entities.js` 文件头的注释。
+`20 000 m → 0.088` 是设定集反复引用的锚点，也是 `Ent` 文件头的注释。
 
 > **实现注记（已修复）**：等温层的尺度常数曾写成 `62188.6`，大了十倍，
 > 于是 11–20 km 几乎是常数（18 km 仍是 0.325），到 `y = 20000`
@@ -75,7 +75,7 @@ ctrl = clamp(k, lo, 1.0);
 ```
 
 即"到满权限动压时给 1.0，低于此线性衰减，最低保底 `ctrlFloor`"。
-**两个端点都能被机型覆盖**（见 `data.js`），这是高空机之间唯一的差别所在。
+**两个端点都能被机型覆盖**（见 `js/data/`），这是高空机之间唯一的差别所在。
 
 ### 为什么需要可覆盖的两个端点
 
@@ -102,7 +102,7 @@ F-9 海燕慢 54 m/s，在 20 公里上操控反而不如它。设定和数值�
 **旗鱼的 0.34 是有设定依据的**：它的第三涵道在稀薄空气里仍给得出控制力矩
 （原文只提了推力，这里才落到物理上）。代价是结构 92、失速速度 122。
 
-HUD 上的 `Q` 表显示 kPa，`q < 12 kPa` 时告警（`hud.js` 的
+HUD 上的 `Q` 表显示 kPa，`q < 12 kPa` 时告警（`HUD` 的
 `LOW Q 动压不足`，条件是 `pos.y > 18000 && p.q < 12`）；
 12 kPa 对应常规机型的 `ctrl ≈ 12/22 ≈ 0.55`。
 
@@ -154,7 +154,7 @@ dYaw   = p.yaw   * ctrl * dt;
   1/3 会让俯冲攻击这个基本战术变得过于笨重。
 - **滚转有下限**：`ctrl` 衰减时滚转只能掉到 `0.28` 倍、
   且满权限下还有 1.8 倍增益 —— 高空滚得动是游戏性要求。
-- **高 G 只放大玩家**：`gLoad` 由 `game.js` 的 `controlPlayer()` 设置
+- **高 G 只放大玩家**：`gLoad` 由 `Game` 的 `controlPlayer()` 设置
   （按 G 键，`HIG_MAX`），AI 不设，所以 `gl = 1`。俯仰放大得比滚转多。
 
 应用到基向量（`rotAxis` 用右手定则，所以符号是负的）：
@@ -231,7 +231,7 @@ a.gNow += (n - a.gNow) * min(1, dt / 0.15);         // 0.15 s 平滑
 条的范围 −3…+12，超过 9G 或低于 −2G 变琥珀色。
 - 最终速度被钳在 `[0.42·vStall, 1.12·vMax]`，所以俯冲不会无限加速、
   失速也不会掉成零。
-- 加力（`a.ab`）与减速板（`a.brake`）由 `game.js` 按油门轴
+- 加力（`a.ab`）与减速板（`a.brake`）由 `Game` 按油门轴
   `player.throttle > 1.0` / `< 0.04` 单独设定，飞行模型不自己判断。
 
 ---
@@ -247,7 +247,7 @@ a.sweep = clamp((a.speed - 170) / 250, 0, 1);   // 0 = 展开，1 = 后掠
 渲染时 `pushModel()` 按 `opts.sweep` 在**展开位**与**后掠位**两套顶点之间
 插值（模型数据里的 `morph.map / spread / swept`）。
 
-机翼角度与翼尖位置在 `js/models.js`：
+机翼角度与翼尖位置在 `js/models/`：
 
 ```js
 sweepPt(20, 2.2, 1.6)   // 展开位，翼尖 (7.4, -1.3)
@@ -266,7 +266,7 @@ sweepPt(62, 1.7, 1.1)   // 后掠位，翼尖 (4.3, -4.8)
 翼尖位移 `|(7.4,-1.3) − (4.3,-4.8)| ≈ 4.7 m`（模型元数据 `span: 15.2`）。
 
 > 上一版本这里写的是"翼展 15.6 m → 10.1 m、翼尖位移 5.0 m、
-> 中间位 45°"，在 `models.js` 里找不到出处；现按 `sweepPt`
+> 中间位 45°"，在 `js/models/` 里找不到出处；现按 `sweepPt`
 > 的实际参数改。中间位的翼展是**顶点线性插值**的结果，
 > 把它读成某个固定后掠角是不对的。
 
@@ -276,7 +276,7 @@ sweepPt(62, 1.7, 1.1)   // 后掠位，翼尖 (4.3, -4.8)
 
 **为什么做成真变形而不是删掉这个设定**：变后掠是 DB-11 唯一的辨识特征，
 而顶点插值成本很低 —— 只在 `pushModel` 的顶点循环里加一次线性插值。
-俯视识别图（`planform.js`）另用 `sweepAlt` 虚线标出展开位。
+俯视识别图（`js/render/planform/`）另用 `sweepAlt` 虚线标出展开位。
 
 **加新机型时**：只有带 `morph` 数据的模型才响应 `opts.sweep`，
 其他机型传什么都不影响。
@@ -290,7 +290,7 @@ sweepPt(62, 1.7, 1.1)   // 后掠位，翼尖 (4.3, -4.8)
 
 ```js
 if (a.loadFactor) {
-  var lp = loadoutPenalty(a.loadFactor);      // data.js 里唯一一份系数
+  var lp = loadoutPenalty(a.loadFactor);      // js/data/ 里唯一一份系数
   p = {
     vMax:   p.vMax   * lp.vMax,
     vMil:   p.vMil   * lp.vMil,
@@ -311,8 +311,8 @@ if (a.loadFactor) {
 以前它在姿态旋转之后，于是 pitch / roll 惩罚从未生效，
 失速判定也用的是未打折的 `vStall`；机库面板上的数字和手感对不上。
 
-**玩家和 NPC 都有 `loadFactor`**：玩家由 `game.js` 按机库配置设定；
-NPC 由 `entities.js` 的 `buildNpcMounts()` 按 `mountPlan()` 推出的实体挂载算，
+**玩家和 NPC 都有 `loadFactor`**：玩家由 `Game` 按机库配置设定；
+NPC 由 `Ent` 的 `buildNpcMounts()` 按 `mountPlan()` 推出的实体挂载算，
 质量公式和 `loadoutMass()` 一致（`挂点数 × (perPoint||1) × (mass||100)`，
 吊舱也算重量），除以 `ac.maxLoad || 5000`。
 
@@ -401,7 +401,7 @@ aim  = target.pos + target.vel * tGo * lead;
 desired = normalize(aim - m.pos);
 ```
 
-`lead` 是**这枚弹聪不聪明**的唯一参数，数据在 `data.js` 的 `MISSILE_LEAD`：
+`lead` 是**这枚弹聪不聪明**的唯一参数，数据在 `js/data/` 的 `MISSILE_LEAD`：
 
 | 武器 | lead | 行为 |
 |---|---|---|
@@ -484,7 +484,7 @@ else            { m.lostTime = 0; ...绕轴转向... }
 
 即目标偏出 **±77°**（`hobs` 弹取 max(77°, 锁定锥)，TOR-6 / GIR-9）持续 **0.5 秒** → 丢失。
 
-雷达弹的 `reAcquire`（CLA-4 等，见 `entities.js` 注释）：丢失目标后
+雷达弹的 `reAcquire`（CLA-4 等，见 `Ent` 注释）：丢失目标后
 搜索 **2.6 km** 内、锁定锥内最近的敌机重新锁定。红外弹不看这个字段，走 `irAcquire()`
 自主寻的（对地红外弹只在 `world.targets` 里找）。两条路**共用盲飞计时 `m.reLockT`**：被诱饵骗走后的这段时间里
 谁都不能重锁，过了之后欺骗源也**可以**被重新咬住。
@@ -554,7 +554,7 @@ b.life -= dt;                      // life = gunRange / w.speed
 
 ## 定向能拦截
 
-在 `game.js` 的 `updateDEW(dt, actor)`。**每枚来袭弹只判一次**：
+在 `Game` 的 `updateDEW(dt, actor)`。**每枚来袭弹只判一次**：
 
 ```js
 chance = (actor.pos.y > 18000 && w.highAltChance) ? w.highAltChance : w.interceptChance;
@@ -575,20 +575,20 @@ if (!(Math.random() < chance)) continue;
 
 | 想改什么 | 在哪 |
 |---|---|
-| 大气模型 | `entities.js` `airDensity()` |
-| 操纵面权限阈值（22 kPa / 0.13） | `ctrlFactor()`；机型覆盖看 `data.js` 的 `ctrlFull` / `ctrlFloor` |
+| 大气模型 | `Ent` `airDensity()` |
+| 操纵面权限阈值（22 kPa / 0.13） | `ctrlFactor()`；机型覆盖看 `js/data/` 的 `ctrlFull` / `ctrlFloor` |
 | 满权限滚转倍率与下限（1.8 / 0.28） | `stepAircraft()` 的 `dRoll` |
 | 推杆权限（0.5） | `stepAircraft()` 的 `PITCH_DOWN_K` |
 | 高 G 倍率上限（2.3） | `stepAircraft()` 的 `gl` 钳制 |
 | 导弹过载衰减下限（0.34 / 0.78） | `turnFactor()`、`highAltImmune` 分支 |
 | 导弹转弯掉速（62 / 170 下限） | `stepMissile()` 的能量消耗段 |
-| 飞机转弯掉速（0.20） | `entities.js` 顶部 `TURN_BLEED` |
-| 推力渐弱区间（1.0） | `entities.js` 顶部 `THRUST_TAPER` |
+| 飞机转弯掉速（0.20） | `Ent` 顶部 `TURN_BLEED` |
+| 推力渐弱区间（1.0） | `Ent` 顶部 `THRUST_TAPER` |
 | 高空推力衰减曲线（ρ 比的 0.75 次幂） | `stepAircraft()` 里 `y > 11000` 那段 |
-| 实时过载（G 表） | `stepAircraft()` 末尾的 `a.gNow`；HUD 在 `hud.js` 动压框右侧 |
+| 实时过载（G 表） | `stepAircraft()` 末尾的 `a.gNow`；HUD 在 `HUD` 动压框右侧 |
 | 速度钳位（0.42·vStall – 1.12·vMax） | `stepAircraft()` 的最后一行 |
 | 硬天花板（23 000 m） | `stepAircraft()` 的 `pos.y > 23000` |
-| 机型性能 | `data.js` 的 `phys` 字段 |
+| 机型性能 | `js/data/` 的 `phys` 字段 |
 | 失速惩罚（×0.34、低头 0.55） | `stepAircraft()` 的失速段 |
-| 导弹提前量折扣 | `data.js` 的 `MISSILE_LEAD`（缺省 0.6） |
-| 可变后掠翼曲线与角度 | `stepAircraft()` 的 `sweep`、`models.js` 的 `sweepPt()` |
+| 导弹提前量折扣 | `js/data/` 的 `MISSILE_LEAD`（缺省 0.6） |
+| 可变后掠翼曲线与角度 | `stepAircraft()` 的 `sweep`、`js/models/` 的 `sweepPt()` |

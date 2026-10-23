@@ -1,0 +1,76 @@
+{
+  "ui": {
+    "screens": {
+      "hangar": {
+        "setHangarMode": {
+          "textContent": {
+            "s1": "返回简报",
+            "s2": "返回主菜单"
+          }
+        },
+        "buildHangar": {
+          "textContent": {
+            "s1": "  「",
+            "s2": "」"
+          },
+          "stats": {
+            "i0": {
+              "i0": {
+                "s1": "最大速度"
+              }
+            },
+            "i1": {
+              "i0": {
+                "s1": "机动性"
+              }
+            },
+            "i2": {
+              "i0": {
+                "s1": "匿踪"
+              }
+            },
+            "i3": {
+              "i0": {
+                "s1": "火力"
+              }
+            },
+            "i4": {
+              "i0": {
+                "s1": "生存性"
+              }
+            },
+            "i5": {
+              "i0": {
+                "s1": "航程"
+              }
+            },
+            "i6": {
+              "i0": {
+                "s1": "电子对抗"
+              }
+            }
+          },
+          "sum": {
+            "s1": "<div class=\"ld-head\">出击配置</div>"
+          },
+          "s1": "</span><span class=\"s\">机炮</span></div>",
+          "s2": "<span class=\"s\">齐射 ",
+          "s3": "<div class=\"ld-row empty\"><span class=\"n\">无挂载</span></div>",
+          "s4": "<div class=\"ld-row\"><span class=\"n\">干扰弹</span><span class=\"a\">×80</span><span class=\"s\">基数</span></div>",
+          "s5": "<div class=\"ld-mass\">挂载重量 <b>",
+          "s6": "<div class=\"ld-pen\"><span class=\"l\">挂载影响</span><b class=\"warn\">加速 −",
+          "s7": "<b class=\"warn\">俯仰 −",
+          "s8": "<b class=\"warn\">滚转 −",
+          "s9": "<b class=\"warn\">最大速度 −",
+          "s10": "<b class=\"warn\">失速 +",
+          "s11": "<div class=\"ld-pen\"><span class=\"l\">挂载影响</span><b>无损失</b></div>",
+          "s12": "<div class=\"ld-note\">挂载的拖累会随弹药打出而减轻，吊舱不会消耗，所以不受影响。</div>",
+          "s13": "<div class=\"ld-note\">编号前缀取自逻辑语词根 —— 环带工程是最早把逻辑语用作签字语言的厂商，详见资料库。</div>",
+          "innerHTML": {
+            "s1": "绿色为挂载，<b>琥珀为当前编辑的挂载点组</b>，青色虚线为可变后掠翼的展开位<br><span class=\"hw\">同一种武器挂到多个组上，弹药池与齐射数会一起累加</span>"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+Registry.ship({
+  order: 130,
+  id: 'diklo',
+  model: 'diklo',
+  hull: T('ships.diklo.hull'),
+  name: 'Diklo',
+  cn: T('ships.diklo.cn'),
+  cls: T('ships.diklo.cls'),
+  faction: T('ships.diklo.faction'),
+  operator: T('ships.diklo.operator'),
+  role: T('ships.diklo.role'),
+  disp: 1250,
+  dim: [62, 17.2, 2.2],
+  speed: 16,
+  crew: 22,
+  hp: 160, radius: 20, value: 120,
+  gunResist: 0.5,
+  label: T('ships.diklo.label'),
+  vials: [T('ships.diklo.vials.i0.s1'), T('ships.diklo.vials.i1.s1')],
+  arms: [T('ships.diklo.arms.i0.s1')],
+  desc: T('ships.diklo.desc')
+});

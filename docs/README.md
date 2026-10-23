@@ -28,7 +28,12 @@
 ## 常用命令
 
 ```bash
-node tools/smoke.js                 # 唯一的自动化测试，改完代码必跑
+node tools/smoke.js --only 段名      # 冒烟测试很慢（完整跑近二十分钟），日常分段跑；--list 看段名
+node tools/snapshot-data.js         # 数据 / 模型快照比对（秒级，重构安全网）
+node tools/golden.js                # 黄金回放：逻辑逐秒比对
+node tools/golden-render.js         # 画面回归：绘制调用逐帧比对
+node tools/gen-index.js             # 加 / 删 js 文件之后重新生成 index.html 的脚本块
+node tools/gen-locales.js           # 改了 js/locales 下的 JSON 之后重新生成 locales.gen.js
 node tools/probe-missions.js        # 可完成性探针：清空敌人后逐关验证能否取胜（改关卡后跑）
 node tools/release.js vX.Y.Z        # 发版：版本号手动指定 + 追加更新日志
 node tools/stamp-version.js         # 只刷新标题页的版本戳时间（提交前跑）
@@ -54,13 +59,20 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 
 ### 核心架构
 
+| 文档 | 内容 |
+|---|---|
+| [systems/modules.md](systems/modules.md) | **模块公开接口表**与旧文件 → 新位置对照（批次 1 重构后从这里找代码） |
+| [systems/tags.md](systems/tags.md) | 机制标签清单与规则 |
+| [systems/text.md](systems/text.md) | 文本层：JSON 规范、键名规则、生成步骤、伪语言 |
+
+
 | 文档 | 对应源码 | 内容 |
 |---|---|---|
 | [systems/game.md](systems/game.md) | `js/game.js` | 状态机、主循环、输入、相机、UI 绑定、设置 |
-| [systems/math3d.md](systems/math3d.md) | `js/math3d.js` | 向量、旋转、正交基、相机、投影、裁剪、射线求交 |
-| [systems/rendering.md](systems/rendering.md) | `js/render.js` | 渲染管线：画家算法、光照、天空与云、地面、粒子 |
-| [systems/audio.md](systems/audio.md) | `js/audio.js` | 程序化音效合成（WebAudio，无采样文件） |
-| [systems/tools.md](systems/tools.md) | `tools/`、`js/version.js`、`js/changelog.js` | 冒烟测试框架、发版与版本戳、预览器、改名工具 |
+| [systems/math3d.md](systems/math3d.md) | `js/core/math3d.js` | 向量、旋转、正交基、相机、投影、裁剪、射线求交 |
+| [systems/rendering.md](systems/rendering.md) | `js/render/render.js` | 渲染管线：画家算法、光照、天空与云、地面、粒子 |
+| [systems/audio.md](systems/audio.md) | `js/engine/audio.js` | 程序化音效合成（WebAudio，无采样文件） |
+| [systems/tools.md](systems/tools.md) | `tools/`、`js/core/version.js`、`js/core/changelog.js` | 冒烟测试框架、发版与版本戳、预览器、改名工具 |
 
 ### 玩法系统
 
@@ -80,7 +92,7 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 | [systems/hud.md](systems/hud.md) | `js/hud.js` | 平显：布局、各仪表、输入映射与设置系统 |
 | [systems/models.md](systems/models.md) | `js/models.js` | 低多边形几何与机型模型（含可变后掠翼） |
 | [systems/planform.md](systems/planform.md) | `js/planform.js` | 机库俯视识别图与挂载可视化 |
-| [systems/unitview.md](systems/unitview.md) | `js/unitview.js` | **单位详情页** —— 实时 3D 预览、俯视图、参数表 |
+| [systems/unitview.md](systems/unitview.md) | `js/ui/unitview.js` | **单位详情页** —— 实时 3D 预览、俯视图、参数表 |
 | [systems/data.md](systems/data.md) | `js/data.js` | **静态数据表总览** —— 各表字段契约与静默回退 |
 | [systems/codex.md](systems/codex.md) | `js/codex.js` | 游戏内资料库与动态条目 |
 

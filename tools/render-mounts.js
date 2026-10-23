@@ -35,7 +35,8 @@ const MARGIN = 1.30;
 /* ---------- 载入真正的游戏模块 ----------
    脚本清单与顺序直接读 index.html，不手工维护（tools/smoke.js 同样做法）。 */
 const htmlSrc = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const scripts = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/script>/g)].map(m => m[1]);
+const Scripts = require('./lib/scripts');
+const scripts = Scripts.loadOrder();   // 如 'js/data.js'
 
 function fakeEl() {
   return {
@@ -66,9 +67,8 @@ sandbox.document = {
 };
 const ctxVm = vm.createContext(sandbox);
 
-for (const name of scripts) {
-  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', name + '.js'), 'utf8'), ctxVm,
-    { filename: name + '.js' });
+for (const file of scripts) {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), ctxVm, { filename: file });
 }
 
 const M3 = sandbox.M3, MODELS = sandbox.MODELS, Ent = sandbox.Ent;

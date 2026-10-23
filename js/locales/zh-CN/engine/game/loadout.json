@@ -1,0 +1,14 @@
+{
+  "engine": {
+    "game": {
+      "loadout": {
+        "hpKindLabel": {
+          "tip": "翼尖",
+          "light": "通用",
+          "heavy": "重挂",
+          "belly": "机腹"
+        }
+      }
+    }
+  }
+}

@@ -7,14 +7,14 @@
      1. 从 CHANGELOG.md 顶部那条读出当前版本号与提交锚点，检查新版本号比它大
      2. git log <锚点>..HEAD 取出这批新提交，按前缀分组成草稿
      3. 把新版本追加到 CHANGELOG.md 顶部（标题与正文待润色）
-     4. 由 CHANGELOG.md 生成 js/changelog.js（游戏内「更新记录」页读它），
-        并刷新 js/version.js
+     4. 由 CHANGELOG.md 生成 js/core/changelog.js（游戏内「更新记录」页读它），
+        并刷新 js/core/version.js
 
    不带版本号只做第 4 步（重新生成两个生成物），不发版。
    流程写在 docs/VERSIONING.md 里。
 
    用法：
-     node tools/release.js                 只重新生成 js/changelog.js 与 js/version.js
+     node tools/release.js                 只重新生成 js/core/changelog.js 与 js/core/version.js
      node tools/release.js v1.11.0         发 v1.11.0（v 可省略）
      node tools/release.js v1.11.0 --dry   只打印将要写入什么，不落盘
    ============================================================ */
@@ -26,8 +26,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const MD_PATH = path.join(ROOT, 'CHANGELOG.md');
-const JS_PATH = path.join(ROOT, 'js', 'changelog.js');
-const STAMP_PATH = path.join(ROOT, 'js', 'version.js');
+const JS_PATH = path.join(ROOT, 'js', 'core', 'changelog.js');
+const STAMP_PATH = path.join(ROOT, 'js', 'core', 'version.js');
 
 const DRY = process.argv.indexOf('--dry') >= 0;
 // 第一个不是 --xxx 的参数就是要发的版本号
@@ -53,7 +53,7 @@ function git(args) {
      ### 分类
      - 条目
    解析器刻意写得窄：格式一旦漂了，宁可报错也不要"差不多"地读，
-   否则 js/changelog.js 会悄悄生成出半份日志。
+   否则 js/core/changelog.js 会悄悄生成出半份日志。
    ============================================================ */
 const HEAD_RE = /^## \[v(\d+)\.(\d+)\.(\d+)\]\s+(\d{4}-\d{2}-\d{2})\s*·\s*(.+?)\s*$/;
 
@@ -145,7 +145,7 @@ function sectionOf(subject) {
 }
 
 /* ============================================================
-   js/changelog.js —— 游戏读的那份
+   js/core/changelog.js —— 游戏读的那份
 
    用 JSON.stringify 输出，不手写引号转义 ——
    日志里会出现的引号、括号、Unicode 全都不用管。
@@ -178,7 +178,7 @@ var CHANGELOG = ${body};
 }
 
 /* ============================================================
-   js/version.js —— 主菜单左上角的版本戳
+   js/core/version.js —— 主菜单左上角的版本戳
    原来的 tools/stamp-version.js 也调这里，两处只保留一份实现。
    ============================================================ */
 function writeStamp(version) {
@@ -187,7 +187,7 @@ function writeStamp(version) {
   const subject = git('log -1 --format=%s');
 
   if (!iso) {
-    console.log('  读不到 git 记录（可能不在仓库里），跳过 js/version.js');
+    console.log('  读不到 git 记录（可能不在仓库里），跳过 js/core/version.js');
     return null;
   }
 
@@ -257,17 +257,17 @@ function main() {
     const data = generateChangelogJs(releases);
     if (!DRY) fs.writeFileSync(JS_PATH, renderChangelogJs(data, stamp ? stamp.iso : ''));
     if (stamp) {
-      console.log('  js/version.js ' + (DRY ? '将更新' : '已更新') +
+      console.log('  js/core/version.js ' + (DRY ? '将更新' : '已更新') +
         '  ' + stamp.version + '  ' + stamp.hash + '  ' + stamp.subject);
     }
-    console.log('  js/changelog.js ' + (DRY ? '将更新' : '已更新') +
+    console.log('  js/core/changelog.js ' + (DRY ? '将更新' : '已更新') +
       '  ' + releases.length + ' 个版本\n');
   }
 
   /* 不带版本号：只重新生成两个生成物，不发版。
      版本号完全由人定 —— 脚本不再按提交信息判大 / 中 / 小版本。 */
   if (!VERSION_ARG) {
-    console.log('  这批新提交 ' + commits.length + ' 条。没有指定版本号 —— 只重新生成 js/changelog.js 与 js/version.js');
+    console.log('  这批新提交 ' + commits.length + ' 条。没有指定版本号 —— 只重新生成 js/core/changelog.js 与 js/core/version.js');
     console.log('  要发版：node tools/release.js vX.Y.Z（版本号自己定，见 docs/VERSIONING.md）');
     refreshOnly(releases, top.version);
     return;
@@ -325,7 +325,7 @@ function main() {
   }
 
   /* 生成物总是重算 —— --dry 只跳过写盘，不跳过计算，
-     否则"预览"和"真跑"出来的 js/changelog.js 不一样，预览就没意义了。 */
+     否则"预览"和"真跑"出来的 js/core/changelog.js 不一样，预览就没意义了。 */
   const nextText = DRY
     ? text.slice(0, idx) + entry + text.slice(idx)
     : fs.readFileSync(MD_PATH, 'utf8');

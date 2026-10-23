@@ -1,6 +1,6 @@
 # 音效合成
 
-代码：`js/audio.js`（433 行）· 调用点 `js/game.js`、`js/entities.js`、`js/ai.js`
+代码：`js/engine/audio.js`· 调用点 `Game`、`Ent`、`AI`
 
 ---
 
@@ -23,7 +23,7 @@
 ## 节点生命周期
 
 `unlock()` **必须在用户手势之后调用**——浏览器不允许页面自行创建
-`AudioContext`。game.js 在 `mousedown` 上挂了一次 `SFX.unlock()`。
+`AudioContext`。Game 在 `mousedown` 上挂了一次 `SFX.unlock()`。
 
 `unlock()` 里一次性做完全部节点创建：取
 `window.AudioContext || window.webkitAudioContext`（都没有就返回），
@@ -90,7 +90,7 @@ if (warnOn) { warnOn = false; API.warning(true); }
 告警那一行先手动把 `warnOn` 复位再调一次，就是为了绕开
 `warning()` 开头的等值短路（见"陷阱"一节）。
 
-游戏侧的默认值与这里一一对应（`game.js` 的 `S`）：
+游戏侧的默认值与这里一一对应（`Game` 的 `S`）：
 `volMaster: 45`、`volEngine: 45`、`volSfx: 85`、`muted: false`，
 滑块范围 0–100%，`S.volMaster/100` 后才传给 `setVolumes`。
 UI 标签是"主音量 / 引擎音 / 音效 / 全部静音"。
@@ -157,14 +157,14 @@ noise(循环) → lowpass(600Hz,Q0.7) → nearG → master
 
 不可能给每架 NPC 各建一条音链：11 架 × 4 个振荡器 = 44 个节点，
 而大部分时间它们都听不见。所以只做**一条共享音链**，
-由 game.js 每帧传入"最近的一架"的距离与油门来驱动。
+由 Game 每帧传入"最近的一架"的距离与油门来驱动。
 丢失的是方向感（听不出声音来自左边还是右边），
 保住的是最重要的那条信息：**附近有人，而且他推了油门**。
 
 `API.nearby(dist, throttle, ab)`：`att = clamp(1 - dist/1500, 0, 1)`；
 `nearF.frequency = 480 + throttle*1300 + (ab ? 520 : 0)`（0.2）；
 `nearG.gain = att*att * (0.018 + throttle*0.05) * volEngine`（0.15）。
-game.js 侧遍历所有存活飞机（排除玩家）取最近的一架 `nBest`／距离 `nBd`，
+Game 侧遍历所有存活飞机（排除玩家）取最近的一架 `nBest`／距离 `nBd`，
 `nBd < 1500` 时 `SFX.nearby(nBd, nBest.throttle || 0.8, !!nBest.ab)`，
 否则 `SFX.nearby(99999, 0, false)` 把这条链压回零。
 
@@ -179,7 +179,7 @@ noise(循环) → bandpass(1250Hz,Q0.9) → gunG → master
 `gunG.gain` 与 `gunLfoG.gain` **初值都是 0**（`buildGun()`）。
 那个 32.5 Hz 的方波调制是关键——它把连续噪声切成每秒 32.5 次的脉冲，
 听感就是转膛炮的"突突突"。机炮数据是 1950 发/分
-（`data.js` 的 `rpm`，约 32.5 发/秒），调制频率与之对齐（`gunLfo` 32.5 Hz）。
+（`js/data/` 的 `rpm`，约 32.5 发/秒），调制频率与之对齐（`gunLfo` 32.5 Hz）。
 
 `API.gun(on)` 同时写两个增益，时间常数都是 0.012：
 `gunG.gain = on ? 0.115 * volSfx : 0`，
@@ -200,7 +200,7 @@ square(1150Hz) → warnG → master
 `warnG.gain = on ? 0.075 * volSfx : 0`，
 `warnLfoG.gain = on ? 0.055 * volSfx : 0`。
 
-game.js 侧每帧扫描所有存活导弹，只要存在
+Game 侧每帧扫描所有存活导弹，只要存在
 `m.team !== player.team && m.target === player && dist < 3600` 就置真——
 即"有导弹以本机为目标且在 **3.6 km** 内"。
 
@@ -284,22 +284,22 @@ boom(size) {
 
 | 方法 | 合成与参数 | 调用点 |
 |---|---|---|
-| `engine(throttle, ab, alive)` | 见"引擎"参数表 | `game.js` 每帧；阵亡后以 `(0,false,false)` 收尾 |
-| `nearby(dist, throttle, ab)` | 见"附近飞机" | `game.js` 每帧取最近一架，无目标传 `99999` |
+| `engine(throttle, ab, alive)` | 见"引擎"参数表 | `Game` 每帧；阵亡后以 `(0,false,false)` 收尾 |
+| `nearby(dist, throttle, ab)` | 见"附近飞机" | `Game` 每帧取最近一架，无目标传 `99999` |
 | `gun(on)` | `gunG=0.115*volSfx`、`gunLfoG=0.075*volSfx`（0.012） | 开火判定；`update()` 结尾兜底 `gun(false)`；暂停时关闭 |
 | `warning(on)` | `warnG=0.075*volSfx`、`warnLfoG=0.055*volSfx`（0.03） | 每帧（3.6 km 判定）；暂停/重开 `warning(false)` |
 | `lock()` | `beep(0.10, 1480, 0.055, 'square')` | 锁定进度推进 |
 | `lockTone(hi)` | `beep(0.09, hi ? 2100 : 1250, 0.045, 'square')` | 逐格提示音 |
 | `loseLock()` | `beep(0.07, 620, 0.11, 'triangle')` | 锁定丢失 / 发射被拒 |
-| `gunShotAt(dist)` | `att=(1-dist/2600)²`，`att≤0` 返回；节流 `0.06+(1-att)*0.15` s；`burst(0.13*att, 2500-(1-att)*1500, 420, 0.06, 'bandpass')` | `ai.js` 敌方开炮，"敌人到底有没有在打我"的主要线索 |
+| `gunShotAt(dist)` | `att=(1-dist/2600)²`，`att≤0` 返回；节流 `0.06+(1-att)*0.15` s；`burst(0.13*att, 2500-(1-att)*1500, 420, 0.06, 'bandpass')` | `AI` 敌方开炮，"敌人到底有没有在打我"的主要线索 |
 | `missileAt(dist)` | `att=1-dist/6000`，`att≤0` 返回；节流 0.05 s；`sweep(0.13*att, 1250-(1-att)*650, 150, 0.45, 'sawtooth')` + `burst(0.15*att, 3000-(1-att)*1800, 300, 0.5, 'lowpass')` | 敌方发射导弹，按与玩家的距离衰减 |
 | `missile()` | `sweep(0.20, 1500, 180, 0.42, 'sawtooth')` + `burst(0.22, 3400, 320, 0.55, 'lowpass')` | 己方发射 |
 | `missileFar()` | `sweep(0.10, 900, 130, 0.5, 'sawtooth')`（更远、更闷） | 敌方发射 |
 | `boom(size)` | `size = size \|\| 1`；`burst(0.30*size, 2200, 80, 0.75*size, 'lowpass')` + `sweep(0.26*size, 110, 26, 0.52*size, 'sine')` | 导弹引信起爆 `0.75`；飞机被击落 `hp>150 ? 1.5 : 1.1` |
-| `bigHit()` | `burst(0.34, 1200, 60, 1.15, 'lowpass')` + `sweep(0.30, 90, 22, 1.0, 'sine')` | `entities.js` `killGround()`：地面目标被摧毁 |
+| `bigHit()` | `burst(0.34, 1200, 60, 1.15, 'lowpass')` + `sweep(0.30, 90, 22, 1.0, 'sine')` | `Ent` `killGround()`：地面目标被摧毁 |
 | `hit()` | `burst(0.22, 4200, 1400, 0.10, 'bandpass')` | 子弹命中 |
 | `playerHit()` | `burst(0.34, 1500, 120, 0.42, 'lowpass')` + `sweep(0.22, 200, 40, 0.36, 'square')` | **无调用点** |
-| `flare()` | `burst(0.14, 3000, 2600, 0.35, 'highpass')` | `entities.js` `breakLock()` 释放干扰弹 |
+| `flare()` | `burst(0.14, 3000, 2600, 0.35, 'highpass')` | `Ent` `breakLock()` 释放干扰弹 |
 | `laser()` | `sweep(0.14, 2400, 900, 0.28, 'sawtooth')` | ECM 吊舱开机，或 DEW 定向能拦截成功 |
 | `radio()` | `burst(0.045, 2400, 1900, 0.20, 'bandpass')` | 每条无线电字幕（`cls !== 'fx'`） |
 | `stall()` | `beep(0.09, 400, 0.20, 'triangle')` | 失速标志 |

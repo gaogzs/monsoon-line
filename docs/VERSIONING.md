@@ -27,7 +27,7 @@ v 1 . 2 . 3
 | 位置 | 内容 | 谁写 |
 |---|---|---|
 | `CHANGELOG.md` 每节标题 | `## [v1.0.0] 2026-10-15 · 正式发布` | `tools/release.js`（版本号是你在命令里给的） |
-| `js/version.js` | `BUILD_STAMP.version` | `tools/release.js`（顺带重算时间戳） |
+| `js/core/version.js` | `BUILD_STAMP.version` | `tools/release.js`（顺带重算时间戳） |
 
 ---
 
@@ -59,16 +59,16 @@ node tools/release.js                  # 不发版，只重新生成两个生成
 2. `git log <锚点>..HEAD` 取出这批新提交（一条都没有就报错退出）
 3. 把新版本**追加到 `CHANGELOG.md` 顶部**，正文按提交前缀分成
    「新增 / 调整 / 修复 / 文档」四组草稿（分组只影响草稿排版，与版本号无关）
-4. 由 `CHANGELOG.md` 重新生成 `js/changelog.js`（游戏内「更新记录」页读它），
-   并刷新 `js/version.js`
+4. 由 `CHANGELOG.md` 重新生成 `js/core/changelog.js`（游戏内「更新记录」页读它），
+   并刷新 `js/core/version.js`
 
 不带版本号只做第 4 步。
 
 这几个文件是**生成物，不要手改**：
 
 ```
-js/changelog.js    ← 由 CHANGELOG.md 生成，游戏读它
-js/version.js      ← 由工具生成，主菜单左上角的版本戳读它
+js/core/changelog.js    ← 由 CHANGELOG.md 生成，游戏读它
+js/core/version.js      ← 由工具生成，主菜单左上角的版本戳读它
 ```
 
 ---

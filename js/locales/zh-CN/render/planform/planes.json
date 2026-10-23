@@ -1,0 +1,11 @@
+{
+  "render": {
+    "planform": {
+      "planes": {
+        "frigatebird": {
+          "sweepLabel": "可变后掠 20°–62°"
+        }
+      }
+    }
+  }
+}

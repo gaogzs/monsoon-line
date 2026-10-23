@@ -49,8 +49,7 @@ function findChrome() {
 }
 
 function page() {
-  const order = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')
-    .match(/<script src="([^"]+)"><\/script>/g).map(s => s.match(/src="([^"]+)"/)[1])
+  const order = require('./lib/scripts').loadOrder()
     .filter(s => !/game\.js$/.test(s));                // 不启动主循环
   const tags = order.map(s => '<script src="../../' + s.replace(/^\.\//, '') + '"></script>').join('\n');
   return `<!DOCTYPE html><html><head><meta charset="utf-8">

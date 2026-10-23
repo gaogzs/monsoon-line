@@ -1,0 +1,23 @@
+Registry.ship({
+  order: 160,
+  id: 'atoll',
+  model: 'atoll',
+  hull: T('ships.atoll.hull'),
+  name: 'Atoll',
+  cn: T('ships.atoll.cn'),
+  cls: T('ships.atoll.cls'),
+  faction: T('ships.atoll.faction'),
+  operator: T('ships.atoll.operator'),
+  role: T('ships.atoll.role'),
+  disp: 780,
+  dim: [56, 11.4, 2.6],
+  speed: 12,
+  crew: 16,
+  hp: 140, radius: 18, value: 0,
+  gunResist: 0.4,
+  neutral: true,
+  label: T('ships.atoll.label'),
+  vials: [T('ships.atoll.vials.i0.s1'), T('ships.atoll.vials.i1.s1')],
+  arms: [T('ships.atoll.arms.i0.s1')],
+  desc: T('ships.atoll.desc')
+});

@@ -1,0 +1,18 @@
+{
+  "ui": {
+    "screens": {
+      "brief": {
+        "buildCampaignList": {
+          "s1": "<div class=\"cc-desc cx-note\">该方向的作战档案尚未解封。</div>",
+          "s2": "<i>未开放</i>",
+          "s3": "已完成 <b>"
+        },
+        "buildMissionList": {
+          "innerHTML": {
+            "s1": "已完成"
+          }
+        }
+      }
+    }
+  }
+}

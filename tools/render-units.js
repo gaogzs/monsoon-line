@@ -28,7 +28,8 @@ const W = 460, H = 300;
 const YAW = 0.7, PITCH = 0.30;
 
 const htmlSrc = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const scripts = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/script>/g)].map(m => m[1]);
+const Scripts = require('./lib/scripts');
+const scripts = Scripts.loadOrder();   // 如 'js/data.js'
 
 const sandbox = {
   console, Math, JSON, Object, Array, Float32Array, Uint8Array, Buffer,
@@ -44,10 +45,8 @@ sandbox.addEventListener = () => {};
 sandbox.document = { getElementById: () => null, createElement: () => ({ getContext: () => null }) };
 const ctxVm = vm.createContext(sandbox);
 
-for (const name of ['math3d', 'models', 'planform', 'codex', 'data', 'unitview']) {
-  if (!scripts.includes(name)) continue;
-  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', name + '.js'), 'utf8'), ctxVm,
-    { filename: name + '.js' });
+for (const file of Scripts.preview()) {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), ctxVm, { filename: file });
 }
 
 const UnitView = sandbox.UnitView;

@@ -1,0 +1,13 @@
+{
+  "engine": {
+    "entities": {
+      "targets": {
+        "makeTarget": {
+          "label": {
+            "s1": "目标"
+          }
+        }
+      }
+    }
+  }
+}

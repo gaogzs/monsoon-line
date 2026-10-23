@@ -25,64 +25,89 @@
 
 ```
 monsoon-line/
-├── index.html          所有屏幕的 DOM 结构（overlay），游戏入口
+├── index.html          所有屏幕的 DOM 结构（overlay）与脚本清单，游戏入口（本地双击启动器，保持单一入口）
 ├── CHANGELOG.md        更新日志 —— 玩家在游戏内「更新记录」页看到的就是它
 ├── css/style.css       全部样式
-├── js/                 15 个文件（含自动生成的 version.js / changelog.js），加载顺序由 index.html 决定
+├── js/                 一个单位 / 一个关卡 / 一个界面一个文件（≈300 个），按"层"分目录，见下
+│   ├── core/           math3d、shading、registry（注册表与标签）、tags（标签清单）、
+│   │                   text（文本机制）、locales.gen（生成）、version / changelog（生成）
+│   ├── data/           aircraft/ weapons/ ships/ platforms/ targets/ turret-guns/ callsigns/
+│   │                   一个单位一个文件；rules.js（挂载规则函数）、voices.js、zz-seal.js
+│   ├── models/         _lib.js（ModelLib 共享构建器）、aircraft/ ships/ targets/ platforms/ ordnance/
+│   ├── missions/       _lib.js（共享生成器）、m1.js … 一关一个文件、campaigns.js
+│   ├── engine/         entities/ ai/ game/（Game 的世界侧）、loadout、combat、turret、route、ballistics、audio
+│   ├── render/         render、render-gl、env/（RenderEnv）、planform/
+│   ├── ui/             hud/ screens/（各屏）、codex/、input、camera、frame、unitview、radio、sysnote
+│   ├── boot/           main.js（主循环、开机自检、初始化）、zz-api-game.js
+│   └── locales/        zh-CN/**/*.json —— 全部玩家可见文本，只有键与文本
 ├── docs/               你正在读的东西
 │   ├── README.md       文档索引、阅读顺序、常用命令
 │   ├── VERSIONING.md   版本号规则与发版流程
 │   ├── world/          世界设定（可单独阅读）
-│   └── systems/        各子系统设计说明（js/ 下每个模块一份）
+│   └── systems/        各子系统设计说明；modules.md 是模块公开接口表
+├── backup/             批次 1 重构前的整份代码，只作对照参考（不进游戏）
 └── tools/
-    ├── smoke.js            冒烟测试（唯一的自动化测试）
-    ├── release.js          发版：版本号手动指定 + 追加 CHANGELOG.md + 生成 js/changelog.js
-    ├── stamp-version.js    只刷新 js/version.js 的时间戳（提交前跑）
-    ├── render-planform.js  俯视图 PNG 预览器（本机无浏览器时用）
-    ├── render-ships.js     舰船外形 PNG 预览器（走真正的 models.js + render.js）
-    ├── render-units.js     单位详情页 3D 预览 PNG（走 unitview 自己的渲染器）
-    ├── shot-unitview.js    无头 Chrome 截详情页布局（验证 CSS）
-    ├── lib/raster.js       几个预览器共用的光栅器 / Canvas 桩 / PNG 编码
-    ├── probe-missions.js   可完成性探针：清空敌人后逐关验证 win() 能成立
-    ├── rename-aircraft.js  机型批量改名
-    └── preview/            预览器输出的 PNG
+    ├── smoke.js            冒烟测试（很慢；日常用 --only 分段）
+    ├── snapshot-data.js    数据 / 模型快照：重构前后逐条哈希比对
+    ├── golden.js           黄金回放：固定种子每关跑 20 s，逐秒哈希全体实体状态
+    ├── golden-render.js    画面回归：每关画 3 帧，哈希全部 2D 绘制调用
+    ├── probe-perf.js       性能探针；text-census.js 中文字符串普查与允许清单
+    ├── gen-index.js        生成 index.html 的 <script> 块
+    ├── gen-locales.js / fmt-locales.js / check-locales.js / extract-text.js   文本层工具
+    ├── release.js          发版：版本号手动指定 + 追加 CHANGELOG.md + 生成 js/core/changelog.js
+    ├── stamp-version.js    只刷新 js/core/version.js 的时间戳（提交前跑）
+    ├── render-*.js / shot-unitview.js   预览器（PNG / 无头 Chrome）
+    ├── probe-*.js          各种探针（可完成性、平衡、射程……）
+    ├── lib/                sim.js（后台模拟）、scripts.js（脚本清单）、strict-json.js、raster.js
+    └── baseline/           各基线（数据快照、黄金回放、画面回归、性能、中文字符串允许清单）
 ```
 
 ---
 
-## 3. 模块划分与加载顺序
+## 3. 模块划分与加载顺序（层 + 约定）
 
-顺序在 `index.html` 底部，**不能随意调整**——后面的模块依赖前面的全局对象。
+**加载顺序只有一个权威来源：`index.html` 底部的 `<script>` 块**，它由
+`tools/gen-index.js` 生成，不手改。规则：
 
-| # | 模块 | 职责 | 依赖 |
-|---|---|---|---|
-| 0 | `version.js` → `BUILD_STAMP` · `changelog.js` → `CHANGELOG` | 版本戳与更新日志（**都由 `tools/release.js` 自动生成，不要手改**） | — |
-| 1 | `math3d.js` → `M3` | 向量、罗德里格斯旋转、相机、投影、裁剪、射线求交 | — |
-| 2 | `models.js` → `MODELS` | 低多边形几何（机体、**水面舰船**、海上目标） | M3 |
-| 3 | `planform.js` → `PLANFORM` | 机库俯视识别图数据与绘制 | WEAPONS |
-| 4 | `codex.js` → `CODEX` | 游戏内资料库文本 | — |
-| 5 | `data.js` → `CALLSIGN` `AIRCRAFT` `WEAPONS` `VOICES` | 静态数据表 | — |
-| 6 | `audio.js` → `SFX` | 音效合成 | M3（仅 clamp） |
-| 7 | `render.js` → `Renderer` | 每帧绘制 | M3 |
-| 8 | `entities.js` → `Ent` | 实体、飞行模型、导弹、粒子 | M3, WEAPONS |
-| 9 | `ai.js` → `AI` | 控制律与行为 | M3, WEAPONS, Ent |
-| 10 | `hud.js` → `HUD` | 平显 | M3, WEAPONS |
-| 11 | `unitview.js` → `UnitView` | 单位详情页：实时 3D 预览、俯视图、参数表 | M3, MODELS, PLANFORM, AIRCRAFT, SHIPS |
-| 12 | `missions.js` → `MISSIONS` | 十一关的战场生成与触发器 | Ent, AI |
-| 13 | `game.js` → `Game` `Radio` | 状态机、主循环、UI 绑定、设置 | 全部 |
+1. 按固定的**层**：`core → data → models → missions → engine → render → ui → boot`；
+   每个命名空间的 `_state.js`（只建一个空壳 `var NS = { $: {} }`）排在 `core` 之后、其余层之前，
+   所以同一个命名空间的文件可以按职责放进不同的层。
+2. 层内：`_` 开头的文件（共享库、`_schema.js`）整层最先，`zz` 开头的（`zz-seal.js`、
+   `zz-api.js`）整层最后，其余按目录与文件名字母序。
+3. `core/` 里有一份人工指定的先后：version、changelog、math3d、**text、locales.gen**、registry、tags
+   （文本机制与文本必须先于一切要写 `T('键')` 的文件）。
 
-> `unitview.js` 插在 `hud.js` 与 `missions.js` 之间，只是因为它**必须在
-> `models.js` / `planform.js` / `data.js` 之后**才能访问 `MODELS` / `PLANFORM` /
-> `AIRCRAFT` / `SHIPS`，而它本身与 `hud` / `missions` 都没有关系。
-> 它带一份**独立的 3D 渲染代码**，为什么不复用 `render.js` 见
-> [unitview.md](systems/unitview.md#关键决策为什么不复用-renderjs-的-renderer)。
+加一个单位 = 新建一个文件 + `node tools/gen-index.js`。`smoke.js` 断言 `index.html`
+与目录一致，忘了跑会在测试里炸，而不是在玩家屏幕上白屏。
 
-> **加载顺序只有一个权威来源：`index.html`。**
-> `tools/smoke.js` 从那里解析顺序，不手工维护 ——
-> 手工维护过一次，加新模块时测试反而先炸了。
+**注册表**（`core/registry.js`）：数据文件只写 `Registry.aircraft({ id, order, … })` 之类的调用；
+每层最后的 `zz-seal.js` 调一次 seal，生成消费者代码读的全局（`AIRCRAFT` `SHIPS` `PLATFORMS`
+`WEAPONS` `TURRET_GUNS` `TARGETS` `MODELS` `MISSIONS` `CAMPAIGNS` `CODEX`），然后冻结该层。
+重复 id 在注册时抛错。
 
-**注意**：`game.js` 末尾的 `window.addEventListener('load', ...)` 启动游戏。
-它必须最后加载。
+**大命名空间怎么拆**：`Ent` / `AI` / `HUD` / `Game` / `PLANFORM` / `RenderEnv` 原来各是一个
+巨型闭包。现在每个都有一个私有状态对象 `NS.$`，各文件写成
+`(function (NS) { var $ = NS.$; … })(NS)`：
+
+- 只在一个文件里用到的变量 / 函数保持局部；
+- 被别的文件用到的函数写成 `$.fn`（定义处文件顶部补 `$.fn = fn;`）；
+- 被别的文件用到的变量，所有引用（含声明）都改成 `$.x`；
+- 公开接口集中在 `zz-api.js`：`NS.key = $.key`。
+- **规则**：一个命名空间的 `$` 只许该命名空间自己的文件读写，跨命名空间只能走公开函数。
+  `smoke.js` 有静态检查。公开接口表见 [systems/modules.md](systems/modules.md)。
+
+**标签**（`core/tags.js`）：单位的独有机制 = 数据里一个标签 + 机制代码认标签，
+机制代码里不出现具体单位 id。见 [systems/tags.md](systems/tags.md)。
+
+**文本**（`js/locales/`）：玩家可见的文字只在 JSON 里，脚本里只写 `T('键')`。
+见 [systems/text.md](systems/text.md)。
+
+> 旧的单文件布局（`data.js` `models.js` `missions.js` `entities.js` `ai.js` `hud.js` `game.js`
+> `codex.js` `planform.js` `render-env.js`）已经拆完；对照关系见
+> [systems/modules.md](systems/modules.md#旧文件--新位置)。重构前的原版整份留在 `backup/`。
+
+**注意**：`js/boot/zz-api-game.js` 末尾的 `window.addEventListener('load', ...)` 启动游戏。
+它必须最后加载（`zz` 前缀保证了这一点）。
 
 ---
 
@@ -104,10 +129,10 @@ title · campaign · brief · hangar · codex · settings · help · changelog �
 - `playing` 不是 DOM 屏幕，所有 overlay 都会被隐藏
 - **`campaign` 是标题与简报之间的一层。** 它决定"打的是哪一场仗"，
   而"选哪一关"留在简报页（那里才有目标、威胁与情报）。
-  战役清单由 `CAMPAIGNS`（`js/missions.js`）驱动，
+  战役清单由 `CAMPAIGNS`（`js/missions/`）驱动，
   加新战役不需要动 `index.html`
 - **`changelog` 的内容一个字都不在界面代码里。** 它读全局 `CHANGELOG`
-  （`js/changelog.js`，由 `tools/release.js` 从根目录 `CHANGELOG.md` 生成），
+  （`js/core/changelog.js`，由 `tools/release.js` 从根目录 `CHANGELOG.md` 生成），
   所以发新版本不需要动界面。见 [6.9](#69-为什么更新日志要生成两次)
 
 **关卡索引只有一套**：`missionIdx` 始终是 `MISSIONS` 的全局下标，
@@ -268,7 +293,7 @@ requestAnimationFrame(loop)
   唯一权威（目标、威胁、情报、地图全在那儿）。另做一个选关屏就要把
   这些信息复制一份，而两份一定会脱节。
 - **加战役不需要改界面代码。** 清单由 `CAMPAIGNS` 数组生成，
-  战役名、起止时间、简述都写在数据里；`game.js` 只是把它画出来。
+  战役名、起止时间、简述都写在数据里；`Game` 只是把它画出来。
 
 代价是多了一次点击。这笔交易划算，因为"以后还会有别的战役"
 是已经确定的事，而那一刻再补这一层就要动所有返回按钮。
@@ -288,7 +313,7 @@ requestAnimationFrame(loop)
 
 - **`CHANGELOG.md`（根目录）** —— 给人读的。写它的地方是 pull request、
   是 review、是"这一版到底改了什么"的讨论。格式是 Markdown，带 `###` 分类。
-- **`js/changelog.js`** —— 给游戏读的。浏览器里没有 Markdown 解析器，
+- **`js/core/changelog.js`** —— 给游戏读的。浏览器里没有 Markdown 解析器，
   而为了这一屏去装一个（哪怕是最小的）都违反"零依赖"这条底线。
 
 所以中间放一个 `tools/release.js`：它**读 Markdown、写 JS 对象**。
@@ -297,7 +322,7 @@ requestAnimationFrame(loop)
 顺手它还解决了两件本来会反复出错的麻烦事：
 
 - **版本号只有一个来源。** `CHANGELOG.md` 顶部那条是版本号的定义处；
-  `js/version.js` 与 `CHANGELOG.current` 都从它派生。三处手写必然对不上。
+  `js/core/version.js` 与 `CHANGELOG.current` 都从它派生。三处手写必然对不上。
 - **"这一版之后有哪些提交"不需要人记。** 每个版本条目里带一个
   `<!-- commit: xxx -->` 锚点，`release.js` 用 `git log <锚点>..HEAD`
   取新提交写成草稿。锚点就是"上一版发到哪儿"的记号。
@@ -305,7 +330,7 @@ requestAnimationFrame(loop)
 
 代价是**多了一份生成物要同步**，而生成物一定会有人忘了重新生成。
 所以 `tools/smoke.js` 里加了一条硬断言：把 `CHANGELOG.md` 现场解析一遍，
-和要求 `js/changelog.js` 逐字段相等 —— 忘了跑 `release.js` 会在测试里炸，
+和要求 `js/core/changelog.js` 逐字段相等 —— 忘了跑 `release.js` 会在测试里炸，
 而不是在玩家屏幕上显示一份过期的日志。
 
 规则写在 [VERSIONING.md](VERSIONING.md)。
@@ -320,7 +345,7 @@ requestAnimationFrame(loop)
 | 颜色量化缓存 | `render.js` `shade()` | 亮度/雾浓度各 16 档做 key，缓存 rgb 字符串 |
 | 屏幕面积剔除 | `render.js` `pushModel` | 投影后小于 1.6 px² 的面直接丢弃 |
 | 距离剔除 | `render.js` `drawClouds` | 超过 16 km 的云不画 |
-| 帧率上限保护 | `game.js` `loop` | `dt` 钳到 0.05s |
+| 帧率上限保护 | `Game` `loop` | `dt` 钳到 0.05s |
 
 **当前瓶颈**是 Canvas 的 `fill()` 调用次数。如果帧率不够，
 优先降低 `MODELS` 的面数，而不是优化 JS 数学。
@@ -340,7 +365,7 @@ requestAnimationFrame(loop)
    连续玩多关会累积内存
 4. **只有一个存档点**：`cleared` 记录在内存里，刷新页面就丢
 
-> 原第 3 条"任务目标缺少屏幕内指示"已解决：`hud.js` 的 `drawOffscreen()`
+> 原第 3 条"任务目标缺少屏幕内指示"已解决：`HUD` 的 `drawOffscreen()`
 > 把屏外目标钉在安全矩形边上，已锁定目标另有专属提示（v1.4.0）。
 
 ### 可以但没必要
@@ -444,11 +469,11 @@ requestAnimationFrame(loop)
 
 ## 10. 如何加一关
 
-1. 在 `missions.js` 末尾 `MISSIONS.push({...})`，字段照抄现有任何一关
+1. 在 `js/missions/` 末尾 `MISSIONS.push({...})`，字段照抄现有任何一关
 2. 必须提供：`id` `no` `name` `en` `loc` `date` `altStart` `speedStart`
    `prose` `objectives` `threats` `intel` `map` `spawn()` `tick()` `win()` `lose()`；
-   可选 `timeLimit`（秒，倒计时由 `game.js` 统一处理，归零判负）
-3. 在 `data.js` 的 `VOICES` 里加同名 `id` 的台词表，至少要有 `start`
+   可选 `timeLimit`（秒，倒计时由 `Game` 统一处理，归零判负）
+3. 在 `js/data/` 的 `VOICES` 里加同名 `id` 的台词表，至少要有 `start`
 4. **把它的全局下标写进某个战役的 `missions` 数组**（见下一节）——
    漏了这一步，关卡会存在但永远选不到，`preflight()` 会报出来
 5. 跑 `node tools/smoke.js`——它会自动检查新任务的字段完整性；
@@ -466,18 +491,18 @@ requestAnimationFrame(loop)
 
 ## 11. 如何加一场战役
 
-1. 在 `missions.js` 的 `CAMPAIGNS` 里 `CAMPAIGNS.push({...})`，
+1. 在 `js/missions/` 的 `CAMPAIGNS` 里 `CAMPAIGNS.push({...})`，
    提供 `id` `no` `name` `en` `sub` `loc` `period` `desc` `missions`
 2. `missions` 里写**全局下标**，且每个下标只能属于一个战役。
    新战役的关卡接着 `MISSIONS` 末尾追加，所以下标是连续的
-3. **不要动 `index.html` 和 `game.js`** —— 战役屏由 `CAMPAIGNS` 生成。
+3. **不要动 `index.html` 和 `Game`** —— 战役屏由 `CAMPAIGNS` 生成。
    将来才做的战役可以写成 `missions: []`，它会以"资料封存"的
    不可点卡片出现在列表里（那类卡片**不写地名与年份**，
    免得提前承诺还没定的设定）
 4. 跑 `node tools/smoke.js`：它检查每一关都恰好归属一个战役，
    并断言"点进战役后简报页列出的关卡数 = 该战役的关卡数"
 
-建议把战役的中文名与英文代号也写进 `codex.js` 的「战役 / CAMPAIGN」条目，
+建议把战役的中文名与英文代号也写进 `js/ui/codex/` 的「战役 / CAMPAIGN」条目，
 两份文案应当同源 —— 资料库那份是完整的战略叙述，列表卡片是它的压缩版。
 
 ## 后续调整（本批）

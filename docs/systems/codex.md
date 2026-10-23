@@ -1,8 +1,8 @@
 # 资料库（资料 / CODEX）
 
-代码：`js/codex.js`（1333 行）· 渲染与导航在 `js/game.js` 的 `buildCodex()` · DOM 在 `index.html` 的 `#scr-codex`
+代码：`js/ui/codex/`· 渲染与导航在 `Game` 的 `buildCodex()` · DOM 在 `index.html` 的 `#scr-codex`
 
-一句话职责：**codex.js 只提供数据与"生成函数"**——不碰 DOM、不写样式、不决定导航；条目在 `game.js` 里被遍历、拼字符串、塞进 `#codexNav` / `#codexBody`。
+一句话职责：**js/ui/codex/ 只提供数据与"生成函数"**——不碰 DOM、不写样式、不决定导航；条目在 `Game` 里被遍历、拼字符串、塞进 `#codexNav` / `#codexBody`。
 
 > 世界设定的完整散文版本在 [docs/world/SETTING.md](../world/SETTING.md)，战役情节在 [docs/world/CAMPAIGN.md](../world/CAMPAIGN.md)。
 > 两者的关系是本文件最需要注意的部分，见下文「与 SETTING.md 的关系」。
@@ -13,20 +13,20 @@
 
 | 项 | 事实 |
 |---|---|
-| 文件 | `js/codex.js`，全中文注释 |
-| 加载位置 | `index.html` 里紧随 `planform.js` 之后、`data.js` 之前 |
+| 文件 | `js/ui/codex/`，全中文注释 |
+| 加载位置 | `index.html` 里紧随 `js/render/planform/` 之后、`js/data/` 之前 |
 | 依赖 | 静态条目零依赖；图鉴条目在 `build()` 里读 `AIRCRAFT` / `WEAPONS` / `SHIPS`（`WEAPONS` 已含补丁表注入的字段） |
 | 输出 | 全局 `var CODEX`（数组）；四个辅助函数 `_hpKind` `_capLabel` `_rngTxt` `_seekerLabel` 也挂在全局 |
 | 校验 | `tools/smoke.js` 会遍历所有 `typeof e.build === 'function'` 的条目并调用一次 |
 
-**加载顺序为什么重要**：codex.js 先于 data.js 求值。`CODEX` 数组字面量本身不引用那些表，所以能安全求值；所有对 `AIRCRAFT` / `WEAPONS` 的引用都必须留在 `build()` 函数体内，等用户点开图鉴时才执行。源码注释把这条写得很明白：
+**加载顺序为什么重要**：js/ui/codex/ 先于 js/data/ 求值。`CODEX` 数组字面量本身不引用那些表，所以能安全求值；所有对 `AIRCRAFT` / `WEAPONS` 的引用都必须留在 `build()` 函数体内，等用户点开图鉴时才执行。源码注释把这条写得很明白：
 
 ```js
-/* 注意 codex.js 在 data.js 之前加载，所以 build() 里引用那些表
+/* 注意 js/ui/codex/ 在 js/data/ 之前加载，所以 build() 里引用那些表
    必须等到被调用时才求值 —— 这正是把它们写成函数的原因。 */
 ```
 
-同理，`_rngTxt()` 里调用的 `missileRange(w)` 定义在 `data.js`——也是靠"调用时它已经加载完"才成立。**不要在 codex.js 的模块顶层直接算这些值。**
+同理，`_rngTxt()` 里调用的 `missileRange(w)` 定义在 `js/data/`——也是靠"调用时它已经加载完"才成立。**不要在 js/ui/codex/ 的模块顶层直接算这些值。**
 
 ---
 
@@ -86,7 +86,7 @@ var body = typeof e.build === 'function' ? e.build() : (e.html || '');
 
 `inv1`（机型图鉴）、`inv2`（挂载图鉴）与 `inv3`（舰艇图鉴）没有 `html`，只有 `build()`。理由只有一条：
 
-> 手写的装备表一定会和 `data.js` 脱节。
+> 手写的装备表一定会和 `js/data/` 脱节。
 
 于是 `build()` 现场遍历数据表：
 
@@ -101,7 +101,7 @@ var body = typeof e.build === 'function' ? e.build() : (e.html || '');
 - 可驾驶标记读 `a.npcOnly`：没有该字段 = 可驾驶，显示 `可驾驶` 徽章。所以**字段名和设定叙述都不预设玩家立场**（历史上这个字段叫 `enemyOnly`，已改名）。
 - 挂点数是从 `hardpointGroups[].pts.length` **现场数出来的**，不是另存的数字。
 - 中文名取 `a.cn`、英文绰号取 `a.nick`。注释里记了一次真实事故：早期把这两个字段写反，上游三架显示英文、新加的三架因为字段写反而显示中文，"正好颠倒"。
-- **型号名外面包了一层可点的 `<span class="cx-unit" data-unit="aircraft:<id>">`** —— 点进这一型自己的详情页。`codex.js` 只输出标记，**不绑事件**；绑定由 `game.js` 在 `#codexBody` 上做一次事件委托。理由见 [unitview.md](unitview.md#链接是怎么接上的)。
+- **型号名外面包了一层可点的 `<span class="cx-unit" data-unit="aircraft:<id>">`** —— 点进这一型自己的详情页。`js/ui/codex/` 只输出标记，**不绑事件**；绑定由 `Game` 在 `#codexBody` 上做一次事件委托。理由见 [unitview.md](unitview.md#链接是怎么接上的)。
 
 ### `inv2` 的关键点
 
@@ -150,7 +150,7 @@ var order = ['上游公约', '下游同盟', '分水群岛国', '调节场管理
 - **要害与舰载武备**单列一张表，因为这两列是数组（`vials` / `arms`），
   放进主表会把行挤爆
 - 最后那段"舰载弹药与机载弹药共用编号"是**静态文字**，与前面的静态条目一样
-  会随 `data.js` 漂移 —— 它没有读任何表
+  会随 `js/data/` 漂移 —— 它没有读任何表
 - **编号与舰名外面包了一层可点的 `<span class="cx-unit" data-unit="ship:<id>">`**，
   与 `inv1` 同一套约定，不需要各写一份
 
@@ -167,7 +167,7 @@ var order = ['上游公约', '下游同盟', '分水群岛国', '调节场管理
 
 ## 关键流程
 
-### 导航如何构建（`game.js` `buildCodex()`）
+### 导航如何构建（`Game` `buildCodex()`）
 
 ```js
 var lastCat = null;
@@ -204,7 +204,7 @@ if (typeof e.mount === 'function') e.mount();   // DOM 就位之后再挂
 
 **全部是 `innerHTML` 直拼**：条目里的 HTML（`<table class="cx-table">` `<h4>` `<span class="am">`）会原样生效；`title` / `sub` 缺字段就渲染成字面量 `undefined`。
 
-进入路径：`game.js` 里 `else if (go === 'codex') { buildCodex(); show('codex'); }`。所以图鉴是**懒求值**——不点进去就不会执行 `build()`。
+进入路径：`Game` 里 `else if (go === 'codex') { buildCodex(); show('codex'); }`。所以图鉴是**懒求值**——不点进去就不会执行 `build()`。
 
 `smoke.js` 对动态条目的断言（三次采样）：
 
@@ -224,7 +224,7 @@ for (const e of dyn) {
 战役情节已拆到 `CAMPAIGN.md`；对应地，资料库里**只有「战役」分类（`cmp1` / `cmp2`）讲战役**，
 其余条目只写世界本身——不提任务名、冬港、VESPER、政变，也不说"本作"。加新条目照这个分法放。
 
-| | `docs/world/SETTING.md` | `js/codex.js` |
+| | `docs/world/SETTING.md` | `js/ui/codex/` |
 |---|---|---|
 | 形态 | 纯散文（约 1230 行），可单独阅读、离线分发 | 游戏内 HTML 片段，靠 `buildCodex()` 渲染 |
 | 与代码的关系 | **零绑定**。数字全是手抄的 | 图鉴三页现场读数据表；叙事页里的数字走 `{{键}}` 占位符现读 |
@@ -239,30 +239,30 @@ for (const e of dyn) {
 
 - `inv1` / `inv2` / `inv3`：整页由 `build()` 遍历 `AIRCRAFT` / `WEAPONS` / `SHIPS` 生成。
 - 带占位符的静态页（当前 `t1` / `t3` / `t4` / `s1` / `s2` / `cmp1`）：
-  `codex.js` 末尾的循环给所有 `html` 含 `{{` 的条目自动挂上
-  `build: function () { return _cxFill(this.html); }`。`buildCodex` 本来就优先调用 `build()`，所以 `game.js` 不用改。
+  `js/ui/codex/` 末尾的循环给所有 `html` 含 `{{` 的条目自动挂上
+  `build: function () { return _cxFill(this.html); }`。`buildCodex` 本来就优先调用 `build()`，所以 `Game` 不用改。
 
 ### 占位符机制（`_CX_VALS` / `_cxFill`）
 
 | 键前缀 | 数据来源 |
 |---|---|
 | `rho.*` | `Ent.airDensity()` / `Ent.turnFactor()`（t1 密度表、20 km 的 7%、3.7 倍动压速度） |
-| `gunTable`、`gun.k3.*` | `WEAPONS` 中 `kind === 'gun'` 的全部条目（s2 机炮表、t1/s2 射程、初速、每秒发数、飞行时间） |
+| `gunTable`、`gun.cel3.*` | `WEAPONS` 中 `kind === 'gun'` 的全部条目（s2 机炮表、t1/s2 射程、初速、每秒发数、飞行时间） |
 | `w.e4.*` / `w.l2.*` | ZUN-4 的 `lockReduce` / `cd`（来自 `STORE_COOLDOWN`）/ `duration`；GUS-2 的拦截半径、锥角、概率、单次冷却 `cd` |
 | `w.v17.*` / `w.mrm.*` / `w.srm.*` | CLA-17 动力段、高空降级后动力段、转弯率、总飞行时间；对比用的 CLA-4 / TOR-2 |
 | `ms.*` | `MISSIONS`：现在只有 `cmp1` 用 `ms.m10.limit`（m10 的 `timeLimit`）。`ms.total` / `ms.highN` / `ms.highList` 仍定义着，但 `t1` 那句"几个任务在 18–22 km"已删（非战役条目不提任务），没人用 |
 
 规则：
 
-1. `_CX_VALS` 的每一项都是**函数**——codex.js 先于 data.js / entities.js / missions.js 加载，只能在渲染时求值。
+1. `_CX_VALS` 的每一项都是**函数**——js/ui/codex/ 先于 js/data/ / Ent / js/missions/ 加载，只能在渲染时求值。
 2. 未知键原样保留 `{{键}}`；`smoke.js` 断言所有动态条目不含 `undefined` / `NaN` / 未替换占位符，且 `inv2` 里出现「无制导」。
-3. `w.v17.lifeHigh` 直接调用 `Ent.effectiveLife(w, 20000)`，没有手抄公式；`entities.js` 的冲压降级改了，这里自动跟上。
+3. `w.v17.lifeHigh` 直接调用 `Ent.effectiveLife(w, 20000)`，没有手抄公式；`Ent` 的冲压降级改了，这里自动跟上。
 4. 机炮表的「装备方」列是叙事，写在 `_CX_GUN_OWNER`；新增机炮会自动出现在表里，只是装备方显示「—」。
 5. 仍然手写的物理数字（t1 的静压 / 气温列、t4 的激光功率—射程表、t3 的 0.2 / 3 / 8 秒对抗时间）不是游戏数据或没有单一字段对应，改动时需人工核对。
 
 ### 导引方式：一个判定、两处使用
 
-`weaponGuidance(w)`（codex.js，全局）返回 `{ name, note, lead }`，图鉴的 `_seekerLabel()` 与机库挂载卡片的 `storeStatLine()`（game.js）都调用它。
+`weaponGuidance(w)`（js/ui/codex/，全局）返回 `{ name, note, lead }`，图鉴的 `_seekerLabel()` 与机库挂载卡片的 `storeStatLine()`（Game）都调用它。
 `w.unguided` 或 `seeker` 缺省 / `'none'` 一律判为「无制导」——此前缺省 `seeker` 的火箭弹（rkt）与子母弹（clb）在图鉴里被标成了「雷达」。
 
 ### 已修复的漂移（改为占位符之前）
@@ -270,9 +270,9 @@ for (const e of dyn) {
 | 位置 | 原来静态写的 | 实际 |
 |---|---|---|
 | `t3` 游戏机制 | ZUN-4 冷却 | 现读 `WEAPONS.e4.cd`（`STORE_COOLDOWN.e4 = 50`） |
-| `t3` 游戏机制 | "锁定锥收窄到 ±20°" | 已有实现：`game.js` 锁定逻辑在 `ewPower > 0` 时 `cone = min(cone, 20°)`；这条不再算漂移 |
+| `t3` 游戏机制 | "锁定锥收窄到 ±20°" | 已有实现：`Game` 锁定逻辑在 `ewPower > 0` 时 `cone = min(cone, 20°)`；这条不再算漂移 |
 | `s1` | CLA-17 燃烧 6→60 s、高空 60→14 s、转弯 0.9 | `life = 10`、高空 2.4 s、`turn = 1.00`，全部改为占位符 |
-| `s2` | 机炮"1000 米射程"、0.9 秒 | `k3.range = 1600` → 1.5 秒 |
+| `s2` | 机炮"1000 米射程"、0.9 秒 | `cel3.range = 1600` → 1.5 秒 |
 | `t1` | 18 km 密度 0.12、22 km 0.045 | `Ent.airDensity`：0.099（9.9%）、0.052 |
 | `t1` | "十一个任务中有两个"在 18–22 km | 曾改为 `ms.*` 现数；后来整句删掉（非战役条目不提任务） |
 
@@ -292,7 +292,7 @@ for (const e of dyn) {
 | "可驾驶"徽章 | `AIRCRAFT[].npcOnly` |
 | 挂点类型中文化 | `_hpKind()` 的映射表 |
 | 能力门槛中文名 | `_capLabel()` 的映射表（`strike` = 重型火控） |
-| 射程列算法 | `data.js` 的 `missileRange()` |
+| 射程列算法 | `js/data/` 的 `missileRange()` |
 | 导引方式文案 | `weaponGuidance()`（图鉴与机库卡片共用） |
 | 叙事页里的数值 | `_CX_VALS` 占位符表 |
 
@@ -311,9 +311,9 @@ for (const e of dyn) {
 
 | 模块 | 关系 |
 |---|---|
-| `data.js` | `inv1` / `inv2` / `inv3` 的数据源（`AIRCRAFT` / `WEAPONS` / `SHIPS`）；`_rngTxt` 调 `missileRange()`。**加载在 codex.js 之后** |
-| `game.js` | `buildCodex()` 是唯一的消费者：建导航、渲染正文、`show('codex')` 时懒执行 |
-| `unitview.js` | 图鉴里那两个 `cx-unit` 标记的落点：`game.js` 的委托拿到 `data-unit` 后调 `UnitView.html()` / `mount()` 换成详情页。`s4` 的 `mount()` 另外直接调 `UnitView.mountModel()` 挂调节单元的 3D 预览。`.cx-unit` 的样式也在那一族里 |
+| `js/data/` | `inv1` / `inv2` / `inv3` 的数据源（`AIRCRAFT` / `WEAPONS` / `SHIPS`）；`_rngTxt` 调 `missileRange()`。**加载在 js/ui/codex/ 之后** |
+| `Game` | `buildCodex()` 是唯一的消费者：建导航、渲染正文、`show('codex')` 时懒执行 |
+| `unitview.js` | 图鉴里那两个 `cx-unit` 标记的落点：`Game` 的委托拿到 `data-unit` 后调 `UnitView.html()` / `mount()` 换成详情页。`s4` 的 `mount()` 另外直接调 `UnitView.mountModel()` 挂调节单元的 3D 预览。`.cx-unit` 的样式也在那一族里 |
 | `index.html` | 提供 `#scr-codex` / `#codexNav` / `#codexBody` 三个锚点，以及入口按钮 `data-go="codex"` |
 | `css/style.css` | `.cx-table` `.cx-title` `.cx-sub` `.cx-text` `.cx-note` `.cx-cat` `.cx-item` `.cx-fly`，以及 `<span class="am">` / `cy` / `rd` 三个强调色 |
 | `tools/smoke.js` | 断言动态条目可生成且 ≥200 字符；导航按钮 `data-go="codex"` → `scr-codex` |

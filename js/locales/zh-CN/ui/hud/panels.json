@@ -1,0 +1,25 @@
+{
+  "ui": {
+    "hud": {
+      "panels": {
+        "drawWeaponPanel": {
+          "s1": "无挂载 / CLEAN"
+        },
+        "drawAlerts": {
+          "txt_": "▲ MISSILE  导弹逼近",
+          "txt": {
+            "s1": "▲ SPIKE  雷达照射",
+            "s2": "▲ SPIKE  对空雷达截获"
+          },
+          "txt_2": "TERRAIN  低高度告警",
+          "txt_3": "STALL  失速",
+          "txt_4": "LOW Q  动压不足",
+          "txt_5": "JAMMED  电磁干扰",
+          "txt_6": "DAMAGE  受损警告",
+          "txt_7": "WINCHESTER  弹药耗尽",
+          "txt_8": "EMCON-Δ  电磁静默"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+Registry.ship({
+  order: 150,
+  id: 'icecore',
+  model: 'icecore',
+  hull: T('ships.icecore.hull'),
+  name: 'Icecore',
+  cn: T('ships.icecore.cn'),
+  cls: T('ships.icecore.cls'),
+  faction: T('ships.icecore.faction'),
+  operator: T('ships.icecore.operator'),
+  role: T('ships.icecore.role'),
+  disp: 2400,
+  dim: [92, 17.4, 5.4],
+  speed: 14,
+  crew: 46,
+  hp: 320, radius: 30, value: 0,
+  gunResist: 0.6,
+  neutral: true,
+  label: T('ships.icecore.label'),
+  vials: [T('ships.icecore.vials.i0.s1'), T('ships.icecore.vials.i1.s1')],
+  arms: [T('ships.icecore.arms.i0.s1')],
+  desc: T('ships.icecore.desc')
+});

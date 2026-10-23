@@ -36,24 +36,30 @@ function makeRng(seed) {
   };
 }
 
-function makeCtx2d() {
+/* trace 给定一个数组时，每个 2D 绘制调用 / 属性赋值都记进去（画面回归基线用，tools/golden-render.js） */
+function fmtArg(v) {
+  if (typeof v === 'number') return String(Math.round(v * 100) / 100);
+  if (typeof v === 'string') return JSON.stringify(v);
+  if (v === null || v === undefined) return String(v);
+  if (typeof v === 'object') return '[' + (v.constructor && v.constructor.name || 'obj') + ']';
+  return typeof v;
+}
+function makeCtx2d(trace) {
   return new Proxy({}, {
     get: (t, k) => {
       if (k === 'canvas') return { width: 1200, height: 700 };
-      if (k === 'measureText') return () => ({ width: 10 });
-      if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => ({ addColorStop: noop });
+      if (k === 'measureText') return (s) => { if (trace) trace.push('measureText(' + fmtArg(s) + ')'); return { width: 10 }; };
+      if (k === 'createLinearGradient' || k === 'createRadialGradient')
+        return (...a) => { if (trace) trace.push(String(k) + '(' + a.map(fmtArg).join(',') + ')'); return { addColorStop: (...c) => { if (trace) trace.push('addColorStop(' + c.map(fmtArg).join(',') + ')'); } }; };
       if (k === 'getImageData' || k === 'createImageData') return () => ({ data: new Uint8ClampedArray(4) });
-      return noop;
+      if (typeof k === 'symbol') return undefined;
+      return trace ? (...a) => { trace.push(String(k) + '(' + a.map(fmtArg).join(',') + ')'); } : noop;
     },
-    set: () => true
+    set: (t, k, v) => { if (trace) trace.push(String(k) + '=' + fmtArg(v)); return true; }
   });
 }
 
-function scriptOrder() {
-  return fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')
-    .match(/<script src="([^"]+)"><\/script>/g)
-    .map(s => s.match(/src="([^"]+)"/)[1].replace(/^\.\//, ''));
-}
+const scriptOrder = require('./scripts').loadOrder;
 
 /**
  * 建一个全新的沙箱并加载游戏。
@@ -63,7 +69,8 @@ function scriptOrder() {
  */
 function load(opt) {
   opt = opt || {};
-  const ctx2d = makeCtx2d();
+  const traceBuf = opt.trace ? [] : null;
+  const ctx2d = makeCtx2d(traceBuf);
   let clock = 0;
   const fakeEl = () => ({
     style: {}, className: '', innerHTML: '', textContent: '', value: '',
@@ -115,6 +122,10 @@ function load(opt) {
   const G = sandbox.Game;
   const api = {
     sandbox: sandbox,
+    /** opt.trace 时：2D 绘制调用记录（数组，调用方自己清空） */
+    trace: traceBuf,
+    /** 画一帧（走 Game 的 render，不推进逻辑） */
+    render() { G.__render(); return api; },
     get world() { return G.__world(); },
     get player() { return G.__player(); },
     get time() { return clock; },

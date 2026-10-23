@@ -1,6 +1,6 @@
 # 低多边形机体与舰船模型
 
-代码：`js/models.js`（1781 行）· 全局对象 `MODELS`
+代码：`js/models/`· 全局对象 `MODELS`
 
 约定（文件头注释）：**机头（舰艏）朝 +z，右翼（右舷）朝 +x，座舱（桅顶）朝 +y**，单位米。
 面不做背面剔除，靠画家算法排序绘制（见 [rendering.md](rendering.md#画家算法)）。
@@ -14,9 +14,9 @@
 
 **不做什么**：不渲染（那是 `render.js`）、不做动画、不参与逻辑、不加载任何外部资源
 （零依赖：颜色是写死的 hex 串，没有贴图、没有材质系统）。
-**不含飞行性能参数**——翼载、推重比、极速都在 `data.js` 的 `AIRCRAFT` 里，
-本文件只描述"长什么样"。舰船的参数同理在 `data.js` 的 `SHIPS` 里。
-**不含俯视识别图**——那是 `planform.js` 的另一份独立数据（见 [planform.md](planform.md)）。
+**不含飞行性能参数**——翼载、推重比、极速都在 `js/data/` 的 `AIRCRAFT` 里，
+本文件只描述"长什么样"。舰船的参数同理在 `js/data/` 的 `SHIPS` 里。
+**不含俯视识别图**——那是 `js/render/planform/` 的另一份独立数据（见 [planform.md](planform.md)）。
 
 ## 完整公开接口
 
@@ -85,7 +85,7 @@
 > 要给它们独立外形，得新增 `M.xxx` 并改 `AIRCRAFT[].model`。
 >
 > 舰船的 `span` 是**船宽**、`len` 是**舰长**（沿用同一对字段，没有为船另起名字），
-> `radius` 是受击半径。16 艘船的存在理由见 `data.js` 的 `SHIPS` 表与设定集 8.0.1 节。
+> `radius` 是受击半径。16 艘船的存在理由见 `js/data/` 的 `SHIPS` 表与设定集 8.0.1 节。
 
 ### 构造器 `MB`（文件内部使用，加新模型时要用）
 
@@ -203,15 +203,15 @@ return done(b, { span: 15.2, len: 20.5,
   morph: { map: morphMap, spread: morphSpread, swept: morphSwept } });
 ```
 
-消费端在 `render.js:321-338`：`sw = clamp(opts.sweep, 0, 1)`，对被映射的顶点做
+消费端在 `render.js`：`sw = clamp(opts.sweep, 0, 1)`，对被映射的顶点做
 `A + (B-A)*sw` 线性插值（不改 `model.v`）。`opts.sweep` 来自
-`entities.js:582`：
+`Ent`：
 
 ```js
 a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
 ```
 
-即 170 m/s 全展开、420 m/s 全后掠。`game.js:2809` 只在遍历飞机
+即 170 m/s 全展开、420 m/s 全后掠。`Game` 只在遍历飞机
 （`world.actors`，含敌机）时传 `sweep`；目标物与导弹传的是空 `{}`。
 
 **为什么重做过**：先前那版只差 18°（2.6° → 20.5°），翼尖后移 2.7 米，
@@ -290,7 +290,7 @@ b.hull([
 | 翼型 / 翼位置 | 该机型里的 `b.wing(...)` / `b.wingM(...)` 四点坐标 |
 | 可变后掠的角度 | `sweepPt(20, ...)` / `sweepPt(62, ...)`（`SP` / `SW`） |
 | 后掠枢轴与翼展 | `PIVOT` / `R_SPAN` |
-| 后掠触发的速度区间 | `entities.js:582` 的 `(a.speed - 170) / 250` |
+| 后掠触发的速度区间 | `Ent` 的 `(a.speed - 170) / 250` |
 | 模型尺寸元数据 | `done(b, { span, len })`（舰船的 `span` 是船宽） |
 | 目标受击半径 | `done(...)` 里的 `radius` **不生效**；设施看 `spawnTarget` 传的值，舰船看 `SHIPS[].radius` |
 | 圆柱 / 喷口圆周分段 | `tube(a, b, ra, rb, seg, ...)` 的 `seg`（常见 6 / 8 / 10 / 12） |
@@ -305,11 +305,11 @@ b.hull([
    但**增删机翼顶点**必须同步维护 `morphMap` / `morphSpread` / `morphSwept` 三者。
 2. **顶点是共享的。** 一个顶点被 4 个面引用是常态；`morph` 覆盖它等于同时动 4 个面。想只动一个面就得补一个独立顶点。
 3. **`span` / `len` 是没人读的元数据。** 没有代码消费 `MODELS[x].span`；
-   `planform.js` 用的是自己 `PLANFORM.planes` 里的尺寸。而且 `frigatebird` 的 `span: 15.2`
+   `js/render/planform/` 用的是自己 `PLANFORM.planes` 里的尺寸。而且 `frigatebird` 的 `span: 15.2`
    与公式算出的实际翼展 14.8（展开）/ 8.6（后掠）都不一致，
    `DESIGN.md` 变更记录又写成"15.6 → 10.1 m"——**三处数字互相对不上**，改之前先确认以哪个为准。
 4. **`air` / `ground` / `sea` / `radius` 不会自动传到目标对象上。**
-   `makeTarget()` 只从传入的 `o` 读 `radius` / `ground`；`missions.js` 对设施是把
+   `makeTarget()` 只从传入的 `o` 读 `radius` / `ground`；`js/missions/` 对设施是把
    `radius: 30`、`ground: true` 这类值**手抄**进 `spawnTarget(...)` 的，
    对舰船则由 `spawnShip()` 从 `SHIPS[].radius` 取、`ground: true` 写死——
    所以船的 `MODELS[x].radius` 与 `SHIPS[x].radius` 是两份数，**生效的是后者**。
@@ -339,22 +339,22 @@ b.hull([
 
 **上游**：只依赖 `M3`，且只在**构造期**用到向量运算
 （`V` / `add` / `sub` / `mul` / `norm` / `cross`），所以 `math3d.js`
-必须排在 `models.js` 之前（见 [DESIGN.md](../DESIGN.md#3-模块划分与加载顺序)）。
+必须排在 `js/models/` 之前（见 [DESIGN.md](../DESIGN.md#3-模块划分与加载顺序)）。
 
 **下游**：
 
 | 模块 | 怎么用 |
 |---|---|
 | `render.js` | `pushModel(model, P, fwd, up, opts)` 读 `model.v` / `model.f`，按 `model.morph` 插值 `opts.sweep` |
-| `game.js` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 **32** 个必需模型（另有 `AIRCRAFT[].model` 逐条单独检查） |
-| `entities.js` | 用 `ent.radius` 做受击判定与爆炸规模（`radius` 最终来自任务传入） |
-| `missions.js` | `spawnTarget({ model, radius, ground, ... })` 决定设施用哪个模型、多大；`spawnShip({ model, ... })` 按 `model` 查 `SHIPS` 放船 |
-| `data.js` | `AIRCRAFT[].model` 与 `SHIPS[].model` 里的字符串就是 `MODELS` 的键（如 `'frigatebird'` / `'ammonite'`） |
+| `Game` | `MODELS[w.model]` 查表；查不到时回退（`MODELS[...] \|\| MODELS.missile`）；`preflight()` 用 `needModels` 清单检查 **32** 个必需模型（另有 `AIRCRAFT[].model` 逐条单独检查） |
+| `Ent` | 用 `ent.radius` 做受击判定与爆炸规模（`radius` 最终来自任务传入） |
+| `js/missions/` | `spawnTarget({ model, radius, ground, ... })` 决定设施用哪个模型、多大；`spawnShip({ model, ... })` 按 `model` 查 `SHIPS` 放船 |
+| `js/data/` | `AIRCRAFT[].model` 与 `SHIPS[].model` 里的字符串就是 `MODELS` 的键（如 `'frigatebird'` / `'ammonite'`） |
 
-`MODELS.missile` 是**兜底模型**：`game.js` 的 `pushOneStore()`（挂载物，
-`game.js:2712`）与 `render()` 里的导弹段（`game.js:2816`）在按 model 名
+`MODELS.missile` 是**兜底模型**：`Game` 的 `pushOneStore()`（挂载物，
+`Game`）与 `render()` 里的导弹段（`Game`）在按 model 名
 查不到时回退到它，所以挂载 / 弹药至少能画出一枚弹的形状。
-**注意目标物与飞机没有这个兜底** —— `game.js:2798` / `2806` 查不到就
+**注意目标物与飞机没有这个兜底** —— `Game` / `2806` 查不到就
 `continue`，那一帧什么都不画（自检会先报错）。
 
 挂载物这一路对**敌我 NPC 都生效**：`pushStores()` 对 `world.actors` 里
@@ -366,7 +366,7 @@ NPC 读 `npcFits`。见 [loadout.md](loadout.md#npc-的挂载)。
 `frigatebird sailfish booby schist folded_wing sower relay cell sam radar depot cmdpost station missile bomb pod`
 **+ 16 艘舰船** `orca bluewhale humpback spermwhale dolphin trilobite ammonite
 seascorpion cameroceras dunkleosteus daplu skori diklo cross icecore atoll`
-——新增模型后记得往 `game.js` 的 `needModels` 数组里加，否则自检不会覆盖它。
+——新增模型后记得往 `Game` 的 `needModels` 数组里加，否则自检不会覆盖它。
 舰船是先进清单、后进关卡的（v1.4.0 起已由 `spawnShip` 用在各关里）：
 模型名写错要在自检里暴露，而不是等某个任务第一次引用它的时候才炸。
 机型借用的模型（`petrel` `skua` `albatross` `basalt` `sandstone` `spray` `boulder` 等）不在这份清单里，

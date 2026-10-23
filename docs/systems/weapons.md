@@ -1,6 +1,6 @@
 # 武器系统
 
-数据 `js/data.js` 的 `WEAPONS` · 行为 `js/entities.js` · 发射与锁定 `js/game.js`
+数据 `js/data/` 的 `WEAPONS` · 行为 `Ent` · 发射与锁定 `Game`
 的 `launch()` / `updateLock()` / `updateDEW()` / `breakLock()`
 
 ---
@@ -8,8 +8,8 @@
 ## 编号体系
 
 装备前缀取自**真实的逻辑语（Lojban）词根**（rafsi）。这不是随手拼的字母，
-每个前缀都能在主词表里查到出处 —— 权威版本在 `js/codex.js` 的
-「逻辑语」条目（`data.js` 文件头另有一份速查）。
+每个前缀都能在主词表里查到出处 —— 权威版本在 `js/ui/codex/` 的
+「逻辑语」条目（`js/data/` 文件头另有一份速查）。
 
 | 编号 | 词根 | 源词 | 含义（本作用法） |
 |---|---|---|---|
@@ -40,16 +40,16 @@
 
 同一个词根在不同势力各排各的号（机炮 `CEL-` 就是这样：上游 3/7、下游 11、分水 1、管理局 2）。
 
-**重要**：`WEAPONS` 的**对象键**（`v11` `k3` `dl4` …）是早期技术代号，
+**重要**：`WEAPONS` 的**对象键**（`v11` `cel3` `dl4` …）是早期技术代号，
 与显示名不一致，这是有意的——改键名要动多个文件，风险不值得。
 玩家看到的永远是 `name` 字段。
 
-`ROOTS`（在 `game.js`）只把**有编号前缀的键**映射到中文含义，
+`ROOTS`（在 `Game`）只把**有编号前缀的键**映射到中文含义，
 机库界面用它显示"编号含义 · 发射器 / 炮"：
 
 ```js
 var ROOTS = {
-  k1/k2/k3/k7/k11: '发射器 / 炮', v9: '组 / 群', v11: '快',
+  cel1/cel2/cel3/cel7/cel11: '发射器 / 炮', v9: '组 / 群', v11: '快',
   v17: '长', v22: '摧毁', v25: '攻击', v30: '扩散 / 播撒',
   e4: '干扰', l2: '光', dl4: '远', dl6: '之间 / 近', dl9: '防卫'
 };
@@ -81,7 +81,7 @@ var ROOTS = {
 }
 ```
 
-**这些字段不是全部写在字面量里的**。`data.js` 在 `WEAPONS` 之后按顺序
+**这些字段不是全部写在字面量里的**。`js/data/` 在 `WEAPONS` 之后按顺序
 把几张独立表合并进去，后面的会覆盖前面的同名字段：
 
 | 顺序 | 表 | 注入字段 | 备注 |
@@ -97,11 +97,11 @@ var ROOTS = {
 字面量里按旧语义定的 `0.88 s`，快得离谱；`smoke.js` 会检查这件事
 （对 `fits` 非空的非被动武器逐一核对）。
 
-射程显示（机库挂载卡片、图鉴「射程」列）统一走 `Ent.displayRange(w)`（`entities.js`）：
+射程显示（机库挂载卡片、图鉴「射程」列）统一走 `Ent.displayRange(w)`（`Ent`）：
 它读 `effRange`（真实弹道，与 AI、HUD 同一套），按弹种取一个代表性的平飞发射高度
 （对地 / 对海弹 8 km、空空弹 6 km），返回公里；无制导弹、吊舱、定向能返回 `null`（不显示"射程"）。
 
-旧入口 `missileRange(w)`（`data.js`）是"动力段能送多远"的解析式（载机初速 350 m/s 先加速到
+旧入口 `missileRange(w)`（`js/data/`）是"动力段能送多远"的解析式（载机初速 350 m/s 先加速到
 `speed` 再匀速），已不再被机库 / 图鉴使用 —— 它算不出滑翔弹、高抛弹、冲压弹随高度变化的射程，
 滑翔弹会被严重低估（GUT-9 按它只有 4.5 km，按真实弹道是 17 km）。
 
@@ -113,33 +113,33 @@ var ROOTS = {
 
 | 标记 | 被谁读 | 含义 |
 |---|---|---|
-| `reAcquire` | `entities.js` `stepMissile` | **雷达弹**丢失后在 2.6 km 且锁定锥内重新捕获最近的敌机（盲飞期 `reLockT` 之后）。红外弹不靠它，走 `irAcquire()` 自主寻的 —— `target !== 'air'` 的红外弹（GUT-9、TUM-7）只在 `world.targets` 里找地面热源，不会转去追飞机 |
+| `reAcquire` | `Ent` `stepMissile` | **雷达弹**丢失后在 2.6 km 且锁定锥内重新捕获最近的敌机（盲飞期 `reLockT` 之后）。红外弹不靠它，走 `irAcquire()` 自主寻的 —— `target !== 'air'` 的红外弹（GUT-9、TUM-7）只在 `world.targets` 里找地面热源，不会转去追飞机 |
 | `antiRadar` | `combat.js` `blast` | 对**正在辐射**的目标（预警机、开机的干扰机）伤害 ×2 |
-| `npcFits` | `entities.js` `fitsKind` / `mountPlan` | NPC 的挂点适配表（写在字面量里，不经 `STORE_ATTR`）；缺省退回 `fits` |
-| `nezer` | `ai.js`（最小发射距离 1400）、`game.js`（锁定 1.5 s） | 冲压弹：NEZ 大但近距无力 |
-| `scramjet` | `entities.js` `effectiveLife`、`hud.js` | 18 km 以上动力段骤减 |
-| `highAltImmune` | `entities.js` | 转弯下限抬到 0.78（仅 SPO-9）；代价是低空推力最多 −45%、滑翔掉速最多 ×1.6（按相对密度插值） |
-| `ballistic` | `entities.js` | 无动力，走自由落体弹道；有导引头的（GUT-9、PEJ-14）由导引转动**速度矢量**（保持速率） |
-| `glide` | `entities.js` `stepMissile` | 升阻比（仅 GUT-9 = 2.5）：垂直于速度、在铅垂面内向上的升力，大小封顶在 g·cosγ（刚好托住重力，不把弹往上拉）。有它弹才滑翔，没有就是纯抛物线 |
-| `fin` | `entities.js` `stepMissile`、`hud.js` `drawFootprint` | 弹翼修正的侧向加速度上限（m/s²，海平面 250 m/s 时，随 ρ·v² 变）。有 `glide` 的弹（GUT-9）往上修只留横向、往下修卸升力；无 `glide` 的（PEJ-14）弹翼全向修（上下左右、只改方向不加能量）。HUD 据此画泪滴形瞄准圈（`Ent.finFootprint`） |
-| `hobs` | `entities.js` `stepMissile` | 出膛后的导引头视场取 max(77°, `lockCone`)，大离轴锁定的目标不会出膛即丢 |
-| `cluster` | `entities.js` `warheadK`、图鉴 `{{cluster}}` | 数值 = 覆盖半径（米）；面杀伤本身改由 `blast = cluster`、`blastCore = blast`、`blastAir: false` 表达（PEJ-9 60、PEJ-30 80） |
-| `penetrator` | `entities.js` `warheadK` | 对加固目标（`HARD_MODELS`）全额伤害；普通战斗部 ×0.6、集束 ×0.2 |
-| `loft` | `entities.js` `stepMissile` | `{alt, dive}`：水平距离 > dive 时瞄准点抬高 alt，末段俯冲（GUT-25、BOX-14） |
-| `decoyMemory` | `entities.js` `decoyRecheck` | 盲飞结束时不会被骗走它的那团诱饵云再骗一次（CLA-4） |
-| `twinSeeker` | `entities.js` `breakLock` | 双导引头：要连中两次诱饵才脱锁（BIN-9） |
-| `unguided` | `entities.js`、`game.js` | 无制导，不找目标、走线段命中检测 |
-| `passive` | `game.js`、`ui` | 被动吊舱：不占扳机、不进入武器纵列 |
-| `duration` / `lockReduce` | `entities.js` `openEcm`（→ `spActive` / `ewLockReduce`，再由 `ai.js` 的锁定距离读） | ECM 生效时间与锁定压缩 |
-| `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | `game.js` `updateDEW`、`entities.js` `stepAircraft` | 定向能吊舱 |
+| `npcFits` | `Ent` `fitsKind` / `mountPlan` | NPC 的挂点适配表（写在字面量里，不经 `STORE_ATTR`）；缺省退回 `fits` |
+| `nezer` | `AI`（最小发射距离 1400）、`Game`（锁定 1.5 s） | 冲压弹：NEZ 大但近距无力 |
+| `scramjet` | `Ent` `effectiveLife`、`HUD` | 18 km 以上动力段骤减 |
+| `highAltImmune` | `Ent` | 转弯下限抬到 0.78（仅 SPO-9）；代价是低空推力最多 −45%、滑翔掉速最多 ×1.6（按相对密度插值） |
+| `ballistic` | `Ent` | 无动力，走自由落体弹道；有导引头的（GUT-9、PEJ-14）由导引转动**速度矢量**（保持速率） |
+| `glide` | `Ent` `stepMissile` | 升阻比（仅 GUT-9 = 2.5）：垂直于速度、在铅垂面内向上的升力，大小封顶在 g·cosγ（刚好托住重力，不把弹往上拉）。有它弹才滑翔，没有就是纯抛物线 |
+| `fin` | `Ent` `stepMissile`、`HUD` `drawFootprint` | 弹翼修正的侧向加速度上限（m/s²，海平面 250 m/s 时，随 ρ·v² 变）。有 `glide` 的弹（GUT-9）往上修只留横向、往下修卸升力；无 `glide` 的（PEJ-14）弹翼全向修（上下左右、只改方向不加能量）。HUD 据此画泪滴形瞄准圈（`Ent.finFootprint`） |
+| `hobs` | `Ent` `stepMissile` | 出膛后的导引头视场取 max(77°, `lockCone`)，大离轴锁定的目标不会出膛即丢 |
+| `cluster` | `Ent` `warheadK`、图鉴 `{{cluster}}` | 数值 = 覆盖半径（米）；面杀伤本身改由 `blast = cluster`、`blastCore = blast`、`blastAir: false` 表达（PEJ-9 60、PEJ-30 80） |
+| `penetrator` | `Ent` `warheadK` | 对加固目标（`HARD_MODELS`）全额伤害；普通战斗部 ×0.6、集束 ×0.2 |
+| `loft` | `Ent` `stepMissile` | `{alt, dive}`：水平距离 > dive 时瞄准点抬高 alt，末段俯冲（GUT-25、BOX-14） |
+| `decoyMemory` | `Ent` `decoyRecheck` | 盲飞结束时不会被骗走它的那团诱饵云再骗一次（CLA-4） |
+| `twinSeeker` | `Ent` `breakLock` | 双导引头：要连中两次诱饵才脱锁（BIN-9） |
+| `unguided` | `Ent`、`Game` | 无制导，不找目标、走线段命中检测 |
+| `passive` | `Game`、`ui` | 被动吊舱：不占扳机、不进入武器纵列 |
+| `duration` / `lockReduce` | `Ent` `openEcm`（→ `spActive` / `ewLockReduce`，再由 `AI` 的锁定距离读） | ECM 生效时间与锁定压缩 |
+| `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | `Game` `updateDEW`、`Ent` `stepAircraft` | 定向能吊舱 |
 
 desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派生量），
-`data.js` 末尾在所有挂载表合并之后替换成当前数值。desc 不再自动追加任何交战规则句子
+`js/data/` 末尾在所有挂载表合并之后替换成当前数值。desc 不再自动追加任何交战规则句子
 （武器锁定机制已整个删掉，见[调节单元附近开火](#调节单元附近开火)）。
 派生量全表（`DERIVED`）：`coneDeg` `lockKm` `flarePct` `flareRDPct` `lockResistPct` `lockReducePct`
 `interceptConeDeg` `interceptPct` `highAltPct` `volleys` `hardPct` `loftAlt` `loftDiveKm`；
 其余 `{{x}}` 取 `w[x]` 的数值，取不到就原样保留。`hardPct` 的 0.2 / 0.6 是在
-`data.js` 里**另写一份**的（`HARD_K_TEXT`），改 `entities.js` 的 `HARD_K` 时要同步。
+`js/data/` 里**另写一份**的（`HARD_K_TEXT`），改 `Ent` 的 `HARD_K` 时要同步。
 `highAltScale` / `bigTarget`（武器上）/ `selfBlind` / `emitter` / `reDone`
 没有任何代码读，已删除。
 
@@ -148,7 +148,7 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 
 ## 武器全表
 
-数字来自 `data.js`（`cd` 与 `lead` 已含后注入的覆盖）。`—` 表示无此字段。
+数字来自 `js/data/`（`cd` 与 `lead` 已含后注入的覆盖）。`—` 表示无此字段。
 `单点` = `perPoint`，即**一个挂载点**的携弹量。
 
 ### 机炮
@@ -158,11 +158,11 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 
 | 键 | 名 | 归属 | rpm | speed | dmg | `spread`（1σ） | ammo | range / highRange |
 |---|---|---|---|---|---|---|---|---|
-| `k3` | CEL-3 20mm | 上游 · 制式 | 1950 | 1100 | 7 | 0.0032 rad | 6000 | 1600 / 2600 |
-| `k7` | CEL-7 30mm | 上游 · G-6 专用重炮 | 1950 | 1020 | 17 | 0.0036 rad | 14000 | 2000 / 3100 |
-| `k11` | CEL-11 30mm | 下游 · 制式（全军一门） | 1950 | 1020 | 17 | 0.0036 rad | 14000 | 2000 / 3100 |
-| `k1` | CEL-1 20mm | 分水群岛国 · 上游外销型 | 1950 | 1100 | 7 | 0.0032 rad | 6000 | 1600 / 2600 |
-| `k2` | CEL-2 20mm | 管理局 · 上游退役库存 | 1950 | 1100 | 7 | 0.0032 rad | 6000 | 1600 / 2600 |
+| `cel3` | CEL-3 20mm | 上游 · 制式 | 1950 | 1100 | 7 | 0.0032 rad | 6000 | 1600 / 2600 |
+| `cel7` | CEL-7 30mm | 上游 · G-6 专用重炮 | 1950 | 1020 | 17 | 0.0036 rad | 14000 | 2000 / 3100 |
+| `cel11` | CEL-11 30mm | 下游 · 制式（全军一门） | 1950 | 1020 | 17 | 0.0036 rad | 14000 | 2000 / 3100 |
+| `cel1` | CEL-1 20mm | 分水群岛国 · 上游外销型 | 1950 | 1100 | 7 | 0.0032 rad | 6000 | 1600 / 2600 |
+| `cel2` | CEL-2 20mm | 管理局 · 上游退役库存 | 1950 | 1100 | 7 | 0.0032 rad | 6000 | 1600 / 2600 |
 
 `spread` 是**角度散布的标准差**，量纲是弧度 —— 展开见
 [机炮散布](#机炮散布)。
@@ -234,7 +234,7 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 有弹翼（`fin`）能末端修正；`pgb` 不加升阻比，弹道就是投放速度决定的抛物线 + 弹翼全向修正
 （`fin`，上下左右都能修、只改方向不加能量），修正范围按投放高度 / 速度约几百米到一两公里，
 HUD 画**泪滴形动态瞄准圈**（目标套进圈内 = 必中）。`rkt` 与 `clb` / `v30` 是无制导（`unguided`），
-出膛那一刻的指向就是它的一生。字段差异见 `data.js` 里「无制导弹药」与 `PEJ-30` / `pgb` 的注释。
+出膛那一刻的指向就是它的一生。字段差异见 `js/data/` 里「无制导弹药」与 `PEJ-30` / `pgb` 的注释。
 
 ### 吊舱
 
@@ -283,7 +283,7 @@ dir = norm(fwd + right * gauss() * spread + up * gauss() * spread)
 而远距离打中目标靠的是射速（见③）。
 
 **③ 远距离靠射速兜住。** 落进半径 `r` 的靶的概率是
-`P = 1 - exp(-r² / 2σ²)`（飞机受击半径 7.5 m，见 `game.js scanShot`）。
+`P = 1 - exp(-r² / 2σ²)`（飞机受击半径 7.5 m，见 `Game scanShot`）。
 CEL 系机炮每门都是 1950 发/分（原 3900，已减半；相对原来的 3900 是 1/2 的射速，即约 1/4 的实际发数），
 每次扣扳机出 1 发（`n = round(rps × 0.033)`，rps ≈ 32.5 时取 1），
 即约 **32 发/秒**（帧率远高于 32 fps，不受帧率封顶）：
@@ -302,7 +302,7 @@ CEL 系机炮每门都是 1950 发/分（原 3900，已减半；相对原来的 
 2600 m 上的落靶率就跌破 25%，`tools/smoke.js` 的那两条断言会先失败 ——
 "远距离的大范围散布靠射速弥补"这句话，在那里开始不成立。
 
-**④（附注）AI 不受这条影响。** `ai.js` 的开火条件是瞄准误差
+**④（附注）AI 不受这条影响。** `AI` 的开火条件是瞄准误差
 `off < gunCone × 3.2`，量级是 5–9°，比几千分之一弧度的散布大两个
 数量级 —— 敌机的命中率由它自己的瞄准精度决定，不是由散布决定。
 
@@ -322,7 +322,7 @@ CEL 系机炮每门都是 1950 发/分（原 3900，已减半；相对原来的 
 | `ir`（红外） | 看 `flare` | 点源导引头，热焰弹能骗 |
 | `radar`（雷达） | 看 `flareRD`（缺省回退 `flare`） | 被箔丝骗；空空雷达弹的 `flareRD` 整体低于红外弹的 `flare` |
 | `eo`（光电，仅 PEJ-30） | `flare: 0`，永远不被骗 | 成像导引头，热焰弹与箔丝都无意义 |
-| `laser`（激光照射） | — | **当前无武器使用**；机制代码在 `entities.js` 里休眠 |
+| `laser`（激光照射） | — | **当前无武器使用**；机制代码在 `Ent` 里休眠 |
 | `none` | — | 无制导 |
 
 ### 锁定：`updateLock(dt)`
@@ -449,13 +449,13 @@ hp = actor.pos + actor.fwd*4 + actor.right * side * (2.4 + rank*1.9)
 
 ## 命中与近炸
 
-v1.13 起起爆与范围伤害集中在 `js/combat.js`（`Combat`，`index.html` 里排在 `entities.js` 之后）。
+v1.13 起起爆与范围伤害集中在 `js/engine/combat.js`（`Combat`，`index.html` 里排在 `Ent` 之后）。
 旧字段 `prox` 已全部删除；`Combat.spec(w)` 在新字段缺省时从 `prox` / `cluster` 推出兼容值。
 
 | 入口 | 何时 | 结果 |
 |---|---|---|
-| `fuzeCheck`（`entities.js` `stepMissile`） | 制导弹每帧，**只看自己的目标**（或诱饵虚拟目标） | 相对运动线段求最近点：`gap < Combat.CONTACT`（1.5）= 直接命中满伤；`gap < fuze` 且最近点落在本帧内 → 在最近点起爆 |
-| `scanShot`（`game.js`） | 无制导弹撞飞机 / 设施（不走 `fuzeCheck`） | `Combat.detonate`，被撞单位作 `direct`；子弹不变 |
+| `fuzeCheck`（`Ent` `stepMissile`） | 制导弹每帧，**只看自己的目标**（或诱饵虚拟目标） | 相对运动线段求最近点：`gap < Combat.CONTACT`（1.5）= 直接命中满伤；`gap < fuze` 且最近点落在本帧内 → 在最近点起爆 |
+| `scanShot`（`Game`） | 无制导弹撞飞机 / 设施（不走 `fuzeCheck`） | `Combat.detonate`，被撞单位作 `direct`；子弹不变 |
 | 撞地 / 撞海（`pos.y <= 0`） | 所有弹 | 起爆（`{ground: true}`），以前是哑弹 |
 | 寿命到期 | 所有弹 | 起爆，以前是哑弹 |
 
@@ -484,9 +484,9 @@ dmg × k × warheadK × (antiRadar && 正在辐射 ? 2 : 1);   // direct 单位 
 - **特效 `Combat.blastFx`**：火球半径 clamp(0.35×blast, core, 0.5×blast) 且 ≥ 4；Fibonacci 球面破片壳（drag 3.5，飞到 ≈ blast）+
   拖尾粒子，继承 30% 弹速；落地 = 半球 + 0.6×blast 水柱；子母弹 = 6–10 团错时小爆（粒子 `delay`）；blast 0 只在直接命中时白闪。
   按粒子数（650 / 800）与距离（6 / 12 km）降级。`Ent.spawnParticle` 新增 `streak` / `delay`，`render.js` 画拖尾。
-- 图鉴 `inv2` 有「引信 / 爆炸半径」列（`codex.js` `_fuzeTxt` / `_blastTxt`），详情页 `weaponParams` 有同名两行。
+- 图鉴 `inv2` 有「引信 / 爆炸半径」列（`js/ui/codex/` `_fuzeTxt` / `_blastTxt`），详情页 `weaponParams` 有同名两行。
 - 调参后看分布：`node tools/probe-blast.js`（见 [tools.md](tools.md)）。
-- **设施 / 舰船走 `hitTarget`**：`game.js` 启动时 `Ent.setTargetHitHandler()` 注册自己的
+- **设施 / 舰船走 `hitTarget`**：`Game` 启动时 `Ent.setTargetHitHandler()` 注册自己的
   `hitTarget`，范围伤害打地面目标都经它结算（击毁进 `groundKilled`、误击调节单元记处罚）。
   没注册时（工具脚本）退回 `hp -= dmg` + `killGround`。
 - **加固目标（`Ent.isHard`）**：`t.hard` 或 `HARD_MODELS[t.model]`（目前只有 `radar`）。
@@ -567,7 +567,7 @@ m.decoy = { p, v, t0, p2: chance * 0.5 };   // 骗走它的那团诱饵云
   - 断言见 `tools/smoke.js`「诱饵只买到一段时间」。
 - **告警与来袭标记不只看 `m.target`。** 判据是
   "当前锁定本机"**或**"刚被本机诱饵骗掉、`reLockT > 0`、且仍在本机 3600 m 内"
-  （`game.js` 的导弹告警音、`hud.js` 的 `drawIncomingMissiles`）。
+  （`Game` 的导弹告警音、`HUD` 的 `drawIncomingMissiles`）。
   只认 `m.target` 的话，撒出一发诱饵的那一瞬间告警音与红色菱形会一起消失，
   而那枚弹还在同一片空域里飞、还可能重新咬回来 —— 这是最危险的一类假信号。
 - 成功与否由 `breakLock` 返回值表示：**只要本帧真的投了一组诱饵就返回 `true`**
@@ -577,12 +577,12 @@ m.decoy = { p, v, t0, p2: chance * 0.5 };   // 骗走它的那团诱饵云
   `v17` 长杆（雷达）`flareRD = 0.44` → 第一次 44% 被骗走。
 
 > 雷达弹曾经平均**更容易**被骗（`flare` 是逐个手调的）。现在雷达弹走
-> `data.js` 的 `FLARE_RD` 表，空空雷达弹整体低于红外弹均值，
+> `js/data/` 的 `FLARE_RD` 表，空空雷达弹整体低于红外弹均值，
 > 由 `tools/smoke.js`「箔丝有效」断言守着。
 
 ### 定向能拦截（GUS-2）
 
-在 `game.js` 的 `updateDEW(dt, actor)`，条件是：
+在 `Game` 的 `updateDEW(dt, actor)`，条件是：
 
 - 武器 `kind === 'dew'` 且有就绪的 `slotCd` 槽（值为 0）
 - 导弹以本机为目标、敌我不同队
@@ -634,15 +634,15 @@ if (!(Math.random() < chance)) continue;
 
 ## 如何加一种武器
 
-1. 在 `data.js` 的 `WEAPONS` 里加一条，**对象键用短的内部代号**
+1. 在 `js/data/` 的 `WEAPONS` 里加一条，**对象键用短的内部代号**
    （别用逻辑语前缀当键名，太长且没必要）
 2. 填 `name` 用逻辑语前缀 + 序号，`cn` 用中文代号
-3. 在 `game.js` 的 `ROOTS` 里加中文含义（若有编号前缀）
+3. 在 `Game` 的 `ROOTS` 里加中文含义（若有编号前缀）
 4. 把键名加进某个机型的 `defaultLoadout`（旧文档里的 `specials` 字段已不存在）
 5. 在 `STORE_ATTR` 里给 `fits` / `perPoint` / `mass`，并在
    `STORE_COOLDOWN` 里给 `cd`（后者 `smoke.js` 会检查）
 6. 制导弹要进 `MISSILE_LEAD`（`smoke.js` 会检查）
-7. 把键名加进 `game.js` 的 `preflight()` 检查列表
+7. 把键名加进 `Game` 的 `preflight()` 检查列表
 8. 跑 `node tools/smoke.js`
 
 **别忘第 7 步**——自检列表是手工维护的，漏了不会报错，
@@ -654,19 +654,19 @@ if (!(Math.random() < chance)) continue;
 
 | 想改什么 | 在哪 |
 |---|---|
-| 武器基础数据 | `data.js` 的 `WEAPONS` |
-| 每槽装填时间 | `data.js` 的 `STORE_COOLDOWN` |
-| 导引品质 `lead` | `data.js` 的 `MISSILE_LEAD` |
-| 挂载适配 / 单点弹数 / 重量 | `data.js` 的 `STORE_ATTR` |
-| 机体能力门槛 | `data.js` 的 `STORE_NEEDS` 与 `AIRCRAFT[].caps` |
-| 高空锁定锥收窄（×0.78） | `game.js` `updateLock()` |
+| 武器基础数据 | `js/data/` 的 `WEAPONS` |
+| 每槽装填时间 | `js/data/` 的 `STORE_COOLDOWN` |
+| 导引品质 `lead` | `js/data/` 的 `MISSILE_LEAD` |
+| 挂载适配 / 单点弹数 / 重量 | `js/data/` 的 `STORE_ATTR` |
+| 机体能力门槛 | `js/data/` 的 `STORE_NEEDS` 与 `AIRCRAFT[].caps` |
+| 高空锁定锥收窄（×0.78） | `Game` `updateLock()` |
 | 锁定速率分档 | 同上，`rate` 那一行 |
 | 一次按键打出的发数 | 武器自己的 `salvo` |
-| 近炸 / 爆炸半径 | `data.js` 的 `fuze` `blast` `blastCore` `blastAir` |
+| 近炸 / 爆炸半径 | `js/data/` 的 `fuze` `blast` `blastCore` `blastAir` |
 | 衰减曲线 / 飞机受害半径 / 直接命中距离 | `combat.js` `falloffK` / `HIT_R_AIR` / `CONTACT` |
 | 爆炸特效与预算 | `combat.js` `blastFx` / `BLAST_FX` |
-| 干扰弹冷却与粒子数 | `entities.js` `breakLock()` |
-| 定向能拦截窗口折算（1.2 s） | `game.js` `updateDEW()` |
+| 干扰弹冷却与粒子数 | `Ent` `breakLock()` |
+| 定向能拦截窗口折算（1.2 s） | `Game` `updateDEW()` |
 
 ## 地形高度钩子（为陆地做准备）
 

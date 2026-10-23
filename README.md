@@ -265,7 +265,7 @@ node tools/release.js vX.Y.Z
 ```
 
 版本号由人指定（规则见 [版本号规则](docs/VERSIONING.md)）。脚本会把这一批提交
-追加进 `CHANGELOG.md`，并刷新游戏读的 `js/changelog.js` 与主菜单上的版本戳。
+追加进 `CHANGELOG.md`，并刷新游戏读的 `js/core/changelog.js` 与主菜单上的版本戳。
 剩下要你做的只有一件事：把生成的"待润色"标题改成一句人话。
 
 游戏本身还有一层**运行时自检**（`preflight()`）：模块加载失败或数据引用了

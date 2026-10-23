@@ -1,7 +1,7 @@
 # 机库俯视识别图
 
-数据 `js/planform.js`（740 行）· 调用点 `js/game.js` 的 `buildHangar()`
-与 `js/hud.js` 的 `drawStores()` · 预览器 `tools/render-planform.js`
+数据 `js/render/planform/`· 调用点 `Game` 的 `buildHangar()`
+与 `HUD` 的 `drawStores()` · 预览器 `tools/render-planform.js`
 
 ---
 
@@ -102,20 +102,20 @@ PLANFORM.planes.frigatebird = {
 **注意这里没有 `hardpoints` 字段。** 挂点位置只有一份数据源，
 就是 `AIRCRAFT[].hardpointGroups[].pts`（同样是机头 +y 的俯视坐标）。
 识别图用 `groupsOf(ac)` 取组、用 `grp.pts` 当锚点，
-`data.js` 里也注明"同时也是机库俯视识别图上 Group 引线的锚点 ——
-单一数据源"。**不要在 `planform.js` 里再抄一份坐标。**
+`js/data/` 里也注明"同时也是机库俯视识别图上 Group 引线的锚点 ——
+单一数据源"。**不要在 `js/render/planform/` 里再抄一份坐标。**
 
 `frigatebird` 额外带 `sweepAlt` / `sweepPivot` / `sweepLabel` 三个字段
 （详见"可变后掠翼"）；其余五个机型只有 `cannon`，没有挂点字段。
 
-`planform.js` 对外只返回三个东西：
+`js/render/planform/` 对外只返回三个东西：
 
 ```js
 return { planes: P, draw: draw, paint: paint };
 ```
 
 **加新机型时**：在 `P` 里加一份数据，键名必须等于 `AIRCRAFT[].model`。
-`game.js` 的 `preflight()` 会检查这件事，漏了会报"缺少俯视识别图数据"——
+`Game` 的 `preflight()` 会检查这件事，漏了会报"缺少俯视识别图数据"——
 但它**跳过 `npcOnly` 的机型**（`if (!ac.npcOnly && !PLANFORM.planes[ac.model])`），
 所以敌方制式机、支援机不进机库、也不需要这张图。
 
@@ -138,15 +138,15 @@ return { planes: P, draw: draw, paint: paint };
 
 | 位置 | 调用 |
 |---|---|
-| 机库（`game.js` `buildHangar()`） | `PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup)` |
-| 战斗 HUD 右下角（`hud.js` `drawStores()`） | `PLANFORM.paint(ctx, bx, by, size, size, p.ac, p.loadout, { compact: true, cd: cd })` |
+| 机库（`Game` `buildHangar()`） | `PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup)` |
+| 战斗 HUD 右下角（`HUD` `drawStores()`） | `PLANFORM.paint(ctx, bx, by, size, size, p.ac, p.loadout, { compact: true, cd: cd })` |
 
 HUD 那句的 `cd` 由 `drawStores()` 现算：把每条挂载的剩余冷却
 `arr[j] / w.cd` 夹到 0..1 再取 `1 -`，得到**就绪度**放进数组。
 两边共用同一份 `paint()`，所以挂点位置与武器外形永远一致 ——
 分成两份写的话，两边一定会慢慢长得不一样。
 
-机库图下方的说明文字由 `game.js` 写在 `planCap` 里
+机库图下方的说明文字由 `Game` 写在 `planCap` 里
 （"绿色为挂载，琥珀为当前编辑的挂载点组，青色虚线为可变后掠翼的展开位"）。
 
 ---
@@ -292,8 +292,8 @@ node tools/render-planform.js     # 输出到 tools/preview/*.png
 
 它实现了一个最小的 Canvas 2D 子集（路径、描边、`quadraticCurveTo`、
 `arc`、扫描线填充、虚线）、一个抗锯齿光栅器，和一个 PNG 编码器
-（IHDR/IDAT/IEND + CRC32 + zlib），然后**加载真正的 `js/planform.js`**
-（连同 `data.js`、`math3d.js`、`models.js`）调用 `PLANFORM.draw()`。
+（IHDR/IDAT/IEND + CRC32 + zlib），然后**加载真正的 `js/render/planform/`**
+（连同 `js/data/`、`math3d.js`、`js/models/`）调用 `PLANFORM.draw()`。
 
 输出文件名三种：`<机型>-default.png`、`<机型>-clean.png`、
 `<机型>-<武器 id>.png`（把该武器填满所有挂得下的组）。
@@ -315,4 +315,4 @@ node tools/render-planform.js     # 输出到 tools/preview/*.png
 
 ## 本批更新
 
-- `drawRound` 对 `nose: 'dual'` 的弹画钝头 + 外凸的战斗部段 + 一道接缝线，与 `models.js` 的 `addRound` 轮廓一致。
+- `drawRound` 对 `nose: 'dual'` 的弹画钝头 + 外凸的战斗部段 + 一道接缝线，与 `js/models/` 的 `addRound` 轮廓一致。

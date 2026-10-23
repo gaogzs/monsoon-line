@@ -1,0 +1,12 @@
+{
+  "ui": {
+    "hud": {
+      "radar": {
+        "drawThreatRing": {
+          "s1": "▲ MISSILE 导弹逼近",
+          "s2": "▲ SPIKE 被照射"
+        }
+      }
+    }
+  }
+}

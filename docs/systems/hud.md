@@ -1,6 +1,6 @@
 # HUD、输入与设置
 
-绘制 `js/hud.js` · 输入与设置 `js/game.js`
+绘制 `HUD` · 输入与设置 `Game`
 
 > HUD 是这个游戏里**唯一画在 Canvas 上**的 UI（菜单、机库、简报都是 DOM）。
 > 原因见 [DESIGN.md](../DESIGN.md#56-屏幕用-dom不用-canvas-画-ui)。
@@ -47,7 +47,7 @@
 | `FB` | 读数（速度、高度、出力） | `15 * HUDK` |
 | `FS` | 小字（单位、标签） | `11 * HUDK` |
 
-两条位置规则，缺一不可（见 `hud.js` 顶部注释）：
+两条位置规则，缺一不可（见 `HUD` 顶部注释）：
 
 1. **位置一律从"元素所在的那条屏幕边"往内算**，而不是从屏幕中心算 ——
    否则缩放一变，贴边的元素就会朝反方向跑。
@@ -166,7 +166,7 @@ var s = M3.project(cam, p.pos + dir * 24000);
   | `THR_IDLE → 1` | `0 → 100%` | 军推区 |
   | `1 → THR_MAX (1.25)` | `100 → 125%` | 加力，淡琥珀底色 |
 
-  `THR_IDLE / THR_MAX` 定义在 `game.js`，`hud.js` 有同名副本，smoke 断言两边一致。
+  `THR_IDLE / THR_MAX` 定义在 `Game`，`HUD` 有同名副本，smoke 断言两边一致。
 - **为什么慢车是 0% 而不是 4%**：飞行模型里没有推力，油门只决定一个目标速度
   （`lerp(0.74·vStall, vMil, throttle)`，见 [flight-model.md](flight-model.md)）。
   以前读数直接是"油门杆 × 100"，松手后停在 4%，看起来像还剩 4% 推力 —— 其实那就是慢车。
@@ -186,7 +186,7 @@ var s = M3.project(cam, p.pos + dir * 24000);
 
 它还要负责 `HI-G` 提示（正在拉过载时闪红 / 琥珀），位置在 `top - U(30)`。
 
-加力与减速板都是**瞬时态**：`game.js` 里不给输入时，
+加力与减速板都是**瞬时态**：`Game` 里不给输入时，
 `throttle > 1.0` 会每帧向军推回落（`dt * 1.6`）、
 `throttle < THR_IDLE` 会向慢车回升。所以**拿它们当"稳定读数"去测会测出假失败**
 （见 `tools/smoke.js` 里那条引擎出力断言，它只敢用稳态档位）。
@@ -245,14 +245,14 @@ ry = dz * fz + dx * fx;     // 前
 
 **舰船 / 地面设施**（`kind === 'target'`）两头都打折：雷达功率大、回波强、传感器多，比战斗机难压。
 - 玩家看它们、锁它们：压制 × `JAM_SURF_K`（0.5），烧穿距离换成 `JAM_BURN_SURF`（4500 m）。
-- 它们自己受的压制：`game.js` 的 `updateJamming` 同样乘 0.5。被压时，舰空弹的锁定距离 × `jamLockK`，
+- 它们自己受的压制：`Game` 的 `updateJamming` 同样乘 0.5。被压时，舰空弹的锁定距离 × `jamLockK`，
   只能打 `clearR` 以内的飞机（`pickTargetFor` 读 `Ent.jamLockOK`）。
 烧穿距离内的目标始终 `clear`。非 `clear` 的目标**不能锁定、不进 F 键候选**，
-已有的锁定会被强制取消（`game.js` 的 `updateLock` / `cycleTarget`）。
+已有的锁定会被强制取消（`Game` 的 `updateLock` / `cycleTarget`）。
 另外 `suppressed` 本身会让锁定距离和锁定速度最多减半（`Ent.jamLockK`）。
 玩家锁对面目标时 `updateLock` 还要求 `Ent.lockOff < 锥角`（水平方位）——以前只查俯角，身后的目标也锁得上。
 AI（友军、敌军一样）用同一套门槛：被压制时只能对 `clearR` 以内的目标开火（`Ent.jamLockOK`），
-锁定距离 × `jamLockK`，开火概率也 × `jamLockK`（`ai.js` 的 `fireAtTarget`）。
+锁定距离 × `jamLockK`，开火概率也 × `jamLockK`（`AI` 的 `fireAtTarget`）。
 
 **注意**：油门条原来就压在这个圆心上，是本次搬走的（见上）。
 改左下角任何元素前，先确认它不会与雷达圆心重叠。
@@ -476,7 +476,7 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 屏幕正中上方的告警**只有这一个栈**：先收集、按 `ALERT_ORDER` 排序、从上往下逐行画。
 起点 `max(H * 0.22, U(176))`（让开任务目标块），每行占固定高度，
 **闪烁的告警暗下去时照样占位**，下面的行不会一上一下地跳。
-以前导弹 / 雷达照射、失速等、"被对空雷达截获"（写在 `game.js`）各算各的 y，同时出现就叠在一起。
+以前导弹 / 雷达照射、失速等、"被对空雷达截获"（写在 `Game`）各算各的 y，同时出现就叠在一起。
 
 优先级（上 → 下）：
 
@@ -513,7 +513,7 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 - `banner(ctx, W, H, title, sub, alpha, col)`：`H * 0.36` 处一条横带
 - `hitMark(ctx, W, H, txt, alpha, col)`：`(W/2 + 120, H/2 - 60)` 处的小提示
 
-两者都由 `game.js` 驱动，HUD 只负责画。
+两者都由 `Game` 驱动，HUD 只负责画。
 
 ---
 
@@ -526,7 +526,7 @@ HUD.hitMark(ctx, W, H, txt, alpha, col)
 HUD.computeNEZ(p, t)           // 返回不可逃逸区距离（米），非空空返回 0
 HUD.radarXY(p, wp, cx, cy, R, range)   // 世界点 → 雷达局部坐标
 HUD.offscreenRect(W, H, p)     // 屏外标记的安全矩形 {x0,y0,x1,y1}
-HUD.GREEN / AMBER / CY / RED   // 调色板，供 game.js 复用
+HUD.GREEN / AMBER / CY / RED   // 调色板，供 Game 复用
 ```
 
 `draw()` 的每帧顺序（顺序有语义，不要随意重排）：
@@ -682,9 +682,9 @@ ctx.strokeText(t, x, y);
 | 调节单元上 HUD 的距离（10 km） | `CELL_HUD_RANGE2` / `farCell()` |
 | 俯仰刻度范围 | `drawPitchLadder()` 里的 `LIM = 40` |
 | 告警阈值与优先级 | `drawAlerts()` / `ALERT_ORDER` |
-| 颜色 | `hud.js` 顶部 `GREEN / AMBER / CY / RED / DIM` |
+| 颜色 | `HUD` 顶部 `GREEN / AMBER / CY / RED / DIM` |
 
-## 全屏滤镜（`js/hudfx.js`，v1.13.2）
+## 全屏滤镜（`js/ui/hudfx.js`，v1.13.2）
 
 `HUD.draw` 最后调 `HudFx.draw(ctx, W, H, p)`，画在 `hudOpacity` 的 save/restore 之外，滤镜不跟着 HUD 变淡。
 

@@ -1,6 +1,6 @@
 # 旋转炮塔
 
-代码：`js/turret.js` · 数据：`js/data.js` 的 `TURRET_GUNS` / `SHIP_MOUNTS`（并入 `SHIPS[].mounts`）、`AIRCRAFT[].mounts` · 模型：`js/models.js` 的 `tur50 / tur75 / tur120`（带 `r` 的是下游涂装）· 探针：`tools/probe-turret.js`
+代码：`js/engine/turret.js` · 数据：`js/data/` 的 `TURRET_GUNS` / `SHIP_MOUNTS`（并入 `SHIPS[].mounts`）、`AIRCRAFT[].mounts` · 模型：`js/models/` 的 `tur50 / tur75 / tur120`（带 `r` 的是下游涂装）· 探针：`tools/probe-turret.js`
 
 来源：docs/2-0IMPL.md 阶段 3（v2.2）。
 
@@ -100,7 +100,7 @@
 
 带战斗部的炮弹会在四种情况下起爆：
 
-- 直接撞上：`game.js` 的 `scanShot`。
+- 直接撞上：`Game` 的 `scanShot`。
 - 擦过敌机：`Ent.shellFuze`，本帧弹道线段离敌机的最近距离小于 fuze。
 - 寿命到点：在空中自毁。
 - 落水：就地起爆。

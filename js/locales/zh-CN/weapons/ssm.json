@@ -1,0 +1,9 @@
+{
+  "weapons": {
+    "ssm": {
+      "cn": "破浪 · WAVEBREAKER",
+      "desc": "舰载反舰导弹。垂发或斜置发射架出管，转平后中空巡航，最后 {{loftDiveKm}} km 俯冲。",
+      "role": "舰对舰 · 反舰"
+    }
+  }
+}

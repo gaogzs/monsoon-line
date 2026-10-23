@@ -1,8 +1,8 @@
 # 主控、状态机与 UI 装配
 
-代码：`js/game.js`（3358 行） · 导出全局对象 `Game` 与 `Radio`
+代码：`Game` · 导出全局对象 `Game` 与 `Radio`
 
-> 这是加载顺序的**最后一个模块**，也是唯一“看得见全部其它模块”的地方。它干四件事：切屏幕、跑主循环、装配所有 DOM 界面、把玩家输入翻译成 `Ent` / `AI` 能吃的指令。启动靠 `js/game.js` 文件末尾（IIFE 之外）的 `window.addEventListener('load', ...)` → `Game.init()`，所以它必须最后一个加载。输入映射表与设置项清单在 [hud.md](hud.md#输入映射)，本文只讲它们**背后怎么实现**。
+> 这是加载顺序的**最后一个模块**，也是唯一“看得见全部其它模块”的地方。它干四件事：切屏幕、跑主循环、装配所有 DOM 界面、把玩家输入翻译成 `Ent` / `AI` 能吃的指令。启动靠 `Game` 文件末尾（IIFE 之外）的 `window.addEventListener('load', ...)` → `Game.init()`，所以它必须最后一个加载。输入映射表与设置项清单在 [hud.md](hud.md#输入映射)，本文只讲它们**背后怎么实现**。
 
 ---
 ## 模块定位与对外接口
@@ -13,9 +13,9 @@
 | `Radio` | `VOICES`、`SFX`、DOM 元素 `#radio` | 台词队列 + 字幕淡入淡出 |
 | `Game` | 其余全部模块 | 状态机、主循环、UI 装配、设置、输入、相机、发射、结算 |
 
-`Radio` 定义在 `Game` 之前；`Game` 通过 `newWorld()` 里的 `w.radio = Radio` 把它交给任务脚本，所以 `missions.js` 里写的是 `world.radio.raw(...)`，而不是直接抓全局。文件第一行是 `'use strict';`，`Game` / `Radio` 都是 `var` 挂上去的全局。
+`Radio` 定义在 `Game` 之前；`Game` 通过 `newWorld()` 里的 `w.radio = Radio` 把它交给任务脚本，所以 `js/missions/` 里写的是 `world.radio.raw(...)`，而不是直接抓全局。文件第一行是 `'use strict';`，`Game` / `Radio` 都是 `var` 挂上去的全局。
 
-### `Game` 的导出（`game.js` 末尾）
+### `Game` 的导出（`Game` 末尾）
 
 | 成员 | 签名 | 语义 |
 |---|---|---|
@@ -158,7 +158,7 @@ hits / banner 计时衰减
 **`suppressed` 是这三套东西的共同输入**：HUD 的雷达雪花、僚机的"数据链中断"降级、预警机的沉默都读它。
 
 开机只有一个入口 `fireEcm(actor, wid)`（手动扣扳机 / 协处理器自主 / 任务脚本的干扰机航线到站），
-它内部调 `Ent.openEcm()` 写状态、再扣冷却与播报。`toggleEmcon()` 是 EMCON-Δ 的开关（`N`）；`setWingCmd()` 在电磁静默（`emcon`）或玩家被压制（`suppressed > 0.35`）时直接拒绝下令并弹 SYS 提示（后者为 CAUTION 样式）；这只影响下令，僚机的攻击授权不变 —— 僚机自己被压制才会停火（ai.js drone 分支）。
+它内部调 `Ent.openEcm()` 写状态、再扣冷却与播报。`toggleEmcon()` 是 EMCON-Δ 的开关（`N`）；`setWingCmd()` 在电磁静默（`emcon`）或玩家被压制（`suppressed > 0.35`）时直接拒绝下令并弹 SYS 提示（后者为 CAUTION 样式）；这只影响下令，僚机的攻击授权不变 —— 僚机自己被压制才会停火（AI drone 分支）。
 
 ### `render()` 的职责
 `state !== 'playing' || !world || !player` 时只 `Renderer.begin() + end()`（空镜头背景）并返回。否则：
@@ -166,7 +166,7 @@ hits / banner 计时衰减
 ```
 Renderer.begin()
 pushModel 目标物（MODELS[t.model]；30 km 外的调节单元跳过）→ 飞机（含 sweep）→ pushStores(a) → 导弹 → Renderer.flush()
-drawTracers()                     ← game.js 自己的曳光，加色混合，画在模型之上
+drawTracers()                     ← Game 自己的曳光，加色混合，画在模型之上
 Renderer.drawParticles(world.particles);  Renderer.end()
 HUD.draw(world, player, 0, S)     ← 在 end() 之后，所以不跟着抖；dt 传的是 0（渲染不推进 HUD 的计时）
 banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”已移进 HUD 告警栈）
@@ -456,7 +456,7 @@ var WD_LIMIT = 1.5;
 
 ---
 ## UI 装配：唯一数据源
-`game.js` 里所有 DOM 界面都是**现造现填**，HTML 只留空容器。
+`Game` 里所有 DOM 界面都是**现造现填**，HTML 只留空容器。
 
 | 界面 | 生成器 | 唯一数据源 |
 |---|---|---|
@@ -466,14 +466,14 @@ var WD_LIMIT = 1.5;
 | 战役选择 | `buildCampaignList()` | `CAMPAIGNS[]` + `cleared`（进度） |
 | 简报 | `buildBrief()` + `buildMissionList()` + `drawMap()` | `MISSIONS[missionIdx]` + `CAMPAIGNS[activeCampaign]` |
 | 资料库 | `buildCodex()` | `CODEX[]`（条目可给 `html` 或 `build()`，可选 `mount()`） |
-| 更新记录 | `buildChangelog()` | `CHANGELOG.releases[]`（`js/changelog.js`，自动生成） |
+| 更新记录 | `buildChangelog()` | `CHANGELOG.releases[]`（`js/core/changelog.js`，自动生成） |
 | 结算 | `finish()` | 当场算出的 `score / rank / rows` |
 
 - `buildSettingsInto(container)` 先 `container.innerHTML = ''`，再按 `SET_GROUPS` 的组标题、`makeSetRow(item)` 逐项生成；`range / select / toggle` 三种控件各一支分支。改设置项**只需动 `SET_GROUPS` + `DEFAULTS`**，独立设置页与暂停菜单自动同步。视角用 `select`（而不是热切换）是刻意的：视角误触的代价是一瞬间失去态势感知，必须“主动选、确认”。
 - `buildHelpHTML(forPause)` 返回**两种排版**：`true` 单栏（暂停菜单，`<h4>` + `<table>`）、`false` 双栏（独立手册，两个 `.help-col`）。早期两处是两份独立 HTML，改一个忘一个。
 - 机库是**唯一让玩家做长期规划的地方**，所以 `buildHangar()` 每次都重算：`resolveLoadout` / `loadoutMass` / `passiveEffects` → 六维条显示**挂载之后**的实际值（缩水段用暗红标出并写净损失）→ 挂载点编辑器 → 俯视图 `PLANFORM.draw()`。选机体时重置 `activeHpGroup`；`loadouts[ac.id]` 只在第一次访问时按 `defaultLoadout` 初始化，之后留着玩家的改动。
-- `buildBrief()` 末尾一定调 `drawMap(m)`；地图**不画陆地** —— 战役全在纯海域上进行，画岛等于承诺一片不存在的地形。`buildCodex()` 的条目支持 `build()` 动态生成，图鉴那几条必须动态出，否则改了 `data.js` 文档就对不上。条目带 `mount()` 的，在 `innerHTML` 写进去之后再调（DOM 要先就位）—— `s4` 用它挂调节单元的 3D 预览。
-- `buildChangelog()` 只画不写：版本号与条目全在 `CHANGELOG`（`js/changelog.js`）里，而它是 `tools/release.js` 从根目录 `CHANGELOG.md` 生成的。**发新版本不需要改这个函数**，只改 `CHANGELOG.md` 再跑一次生成脚本。条目文本里的 `**强调**` 与 `` `代码` `` 由 `clInline()` 还原成 `<b>` / `<code>`，而且**先转义再还原** —— 顺序反过来的话，转义会把刚生成出来的标签一起逃掉。`js/changelog.js` 缺失时（开发中直接开 `index.html`）降级成一句提示，与版本戳同一种处理。
+- `buildBrief()` 末尾一定调 `drawMap(m)`；地图**不画陆地** —— 战役全在纯海域上进行，画岛等于承诺一片不存在的地形。`buildCodex()` 的条目支持 `build()` 动态生成，图鉴那几条必须动态出，否则改了 `js/data/` 文档就对不上。条目带 `mount()` 的，在 `innerHTML` 写进去之后再调（DOM 要先就位）—— `s4` 用它挂调节单元的 3D 预览。
+- `buildChangelog()` 只画不写：版本号与条目全在 `CHANGELOG`（`js/core/changelog.js`）里，而它是 `tools/release.js` 从根目录 `CHANGELOG.md` 生成的。**发新版本不需要改这个函数**，只改 `CHANGELOG.md` 再跑一次生成脚本。条目文本里的 `**强调**` 与 `` `代码` `` 由 `clInline()` 还原成 `<b>` / `<code>`，而且**先转义再还原** —— 顺序反过来的话，转义会把刚生成出来的标签一起逃掉。`js/core/changelog.js` 缺失时（开发中直接开 `index.html`）降级成一句提示，与版本戳同一种处理。
 
 ---
 ## Radio：队列与字幕
@@ -495,7 +495,7 @@ var queue = [], timer = 0, box = null, live = [];
 | `dt` 上限 / 异常兜底 | `loop()` 里的 `0.05` / `0.016` |
 | 油门量程上限 / 减速板阈值（慢车） | `THR_MAX = 1.25` / `THR_IDLE = 0.04` |
 | 油门推进 / 回落 / 加力阈值 | `controlPlayer()` 里的 `0.62` / `dt * 1.6` / `1.0` |
-| 高 G 倍率 | `HIG_MAX = 1.90`（掉速见 `entities.js` 的 `TURN_BLEED`） |
+| 高 G 倍率 | `HIG_MAX = 1.90`（掉速见 `Ent` 的 `TURN_BLEED`） |
 | 高 G 触发门槛 | `controlPlayer()` 里的 `demand > 0.55`、`vStall * 1.30` |
 | 相机俯仰限位 | `updateCamera()` 里的 `CAM_PITCH_LIM = 89°` |
 | 追尾镜头的偏航/俯仰平滑与位置跟随 | `1.2` / `9` / `7.5`（`exp` 时间常数） |

@@ -43,10 +43,10 @@ function findChrome() {
 /* 加载哪几个模块：只要详情页跑得起来就行。
    刻意**不加载 game.js** —— 它在 load 时会启动整个游戏，
    而这个页面只是想看一个详情页而已。 */
-const SCRIPTS = ['version', 'math3d', 'models', 'planform', 'codex', 'data', 'shading', 'render-gl', 'unitview'];
+const SCRIPTS = require('./lib/scripts').preview();
 
 function page(kind, id) {
-  const tags = SCRIPTS.map(n => '<script src="../../js/' + n + '.js"></script>').join('\n');
+  const tags = SCRIPTS.map(n => '<script src="../../' + n + '"></script>').join('\n');
   return `<!DOCTYPE html>
 <html lang="zh"><head><meta charset="utf-8">
 <link rel="stylesheet" href="../../css/style.css">

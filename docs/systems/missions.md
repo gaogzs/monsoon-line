@@ -1,21 +1,21 @@
 # 任务与战场生成
 
-代码：`js/missions.js`（十一关脚本）· `js/game.js`（`world` 对象、`startMission`、简报 `drawMap`）· `js/data.js`（`VOICES` 台词、`downstreamCallsign`）
+代码：`js/missions/`（十一关脚本）· `Game`（`world` 对象、`startMission`、简报 `drawMap`）· `js/data/`（`VOICES` 台词、`downstreamCallsign`）
 
 ---
 
 ## 1. 职责边界
 
-`missions.js` 只有一个数组 `MISSIONS` 和几个生成器函数。它负责**每一关"战场长什么样"和"什么时候算赢/输"**：
+`js/missions/` 只有一个数组 `MISSIONS` 和几个生成器函数。它负责**每一关"战场长什么样"和"什么时候算赢/输"**：
 
 | 做 | 不做 |
 |---|---|
-| `spawn(w)` 里摆飞机、平台、基地、兵力编成 | 主循环与状态机（`game.js`） |
-| `tick(w, dt)` 里推目标文本、放台词、触发增援 | 实体物理与伤害（`entities.js`） |
-| `win(w)` / `lose(w)` 返回胜负 | AI 行为（`ai.js`），只通过标签与 `behavior` 影响它 |
-| 用 `w.flags` 做一次性触发器 | 简报页 DOM（`game.js` `buildBrief` 读字段） |
+| `spawn(w)` 里摆飞机、平台、基地、兵力编成 | 主循环与状态机（`Game`） |
+| `tick(w, dt)` 里推目标文本、放台词、触发增援 | 实体物理与伤害（`Ent`） |
+| `win(w)` / `lose(w)` 返回胜负 | AI 行为（`AI`），只通过标签与 `behavior` 影响它 |
+| 用 `w.flags` 做一次性触发器 | 简报页 DOM（`Game` `buildBrief` 读字段） |
 
-`world` 由 `game.js` `newWorld()` 建立，任务脚本往里**追加**关卡专属字段（`baseTarget`、`cells`、`ace`…）。字段清单与实体结构见 [entities.md](entities.md#36-世界对象-world)。
+`world` 由 `Game` `newWorld()` 建立，任务脚本往里**追加**关卡专属字段（`baseTarget`、`cells`、`ace`…）。字段清单与实体结构见 [entities.md](entities.md#36-世界对象-world)。
 
 ---
 
@@ -27,7 +27,7 @@
 |---|---|---|
 | `MISSIONS` | `Array<mission>` | 十一关，顺序即关卡编号（`missionIdx`） |
 | `getMission` | `getMission(idx) → mission` | 取任务，越界用 `M3.clamp` 夹回合法下标 |
-| `CAMPAIGNS` | `Array<campaign>` | **战役分组**，见 §2.4。`game.js` 的战役选择屏读它 |
+| `CAMPAIGNS` | `Array<campaign>` | **战役分组**，见 §2.4。`Game` 的战役选择屏读它 |
 
 ### 2.2 生成器（**都是全局函数，不在任何命名空间里**）
 
@@ -38,10 +38,10 @@
 | `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets` |
 | `spawnCellField` | `spawnCellField(w, {xs, zs}) → [{x,y,z}]` | **调节单元阵列**：`xs × zs` 每个点一个 3×3 编组，推进 `w.targets` 与 `w.cells`，返回各组中心。见下文「调节单元阵列」 |
 | `spawnShip` | `spawnShip(w, o) → t` | **水面舰船**：按 `o.model` 查 `SHIPS` 表取 `hp/radius/value/label`（查不到回退 `SHIPS[0]`），直接调 `Ent.makeTarget` 并推入 `w.targets`；`team` 缺省 1、`fireCd` 缺省 `rnd(3,8)`；`o` 可覆盖 `hp/radius/value/label/team/drift/route/weapon/fireCd` |
-| `spawnAewc` | `spawnAewc(w, o) → a` | **空中预警机**：`spawnEnemy` + `a.aewc = true` + `route: {loiter:true, wp, exit}`。行为在 `game.js` 的 `updateAewc()` 里 |
+| `spawnAewc` | `spawnAewc(w, o) → a` | **空中预警机**：`spawnEnemy` + `a.aewc = true` + `route: {loiter:true, wp, exit}`。行为在 `Game` 的 `updateAewc()` 里 |
 | `bombTheBase` | `bombTheBase(bomber, w)` | 轰炸机抵达投弹点的动作：48 个爆炸粒子 + 对 `w.baseTarget` 造成 340 伤害 |
 
-> **水面舰船一律走 `spawnShip`。** `data.js` 里的 `SHIPS` 表（16 艘，见
+> **水面舰船一律走 `spawnShip`。** `js/data/` 里的 `SHIPS` 表（16 艘，见
 > [SETTING.md 8.0.1](../world/SETTING.md)）提供 `model` / `hp` / `radius` /
 > `value` / `label`，任务里只写"哪条船、在哪、由谁指挥"（全文件约 25 处调用）。
 > 简报与台词里的舰船称呼必须取自 `SHIPS[].hull`（「虎鲸级」这类级名，不写字母数字编号）——
@@ -69,7 +69,7 @@
 导弹的可视挂架会变少，弹药池也跟着少：上游弹按 `min(w.ammo, 挂点数 × perPoint)` 封顶，
 下游弹（`perPoint` 为 0）仍按 `w.ammo`。
 
-弹种能挂到哪类挂点由 `data.js` 的 `npcFits` 决定（**不是** `fits` —— 那是玩家机库的表）。
+弹种能挂到哪类挂点由 `js/data/` 的 `npcFits` 决定（**不是** `fits` —— 那是玩家机库的表）。
 所以给敌机指定弹种时，要确认目标机型有对应的挂点类型：
 `pelican` / `quartz` / `datum` / `lodestone` 只有机腹挂点，写 `special: 'dl6'`（格斗弹）
 不会画出来（也不会报错 —— 它照旧能发射）。不想让它带弹就**显式写 `special: null`**
@@ -88,7 +88,7 @@
 `fits` ∩ `canCarry`，NPC 这边是同样两道：
 
 1. **挂点类型**：这一组的 `kind` 必须在这件武器的适配表里
-   （`data.js` 的 `hardpointGroups[].kind` × 武器的 `fits` / `npcFits`）
+   （`js/data/` 的 `hardpointGroups[].kind` × 武器的 `fits` / `npcFits`）
 2. **机体能力**：武器的 `needs` 必须落在机型的 `caps` 里（`canCarry()`）
 
 写错了**不会崩**：那一组空着，同时在 `Ent.mountIssues` 里记一条人话，
@@ -138,7 +138,7 @@ spawnEnemy(w, {
 永不退场** —— 轰炸机是"事件"，预警机得一直在那儿。击落它是唯一让它消失的方式。
 
 `spawnAewc(w, {ac, team, label, x, y, z, a, b})` 只负责造出来与设航线；
-**它做什么**写在 `game.js` 的 `updateAewc()` 里（那里能用到 `bearing()` /
+**它做什么**写在 `Game` 的 `updateAewc()` 里（那里能用到 `bearing()` /
 `setWingCmd()` / `Radio`）：30 km 搜敌 → 方位通报 → 我方调度僚机 /
 敌方给下游分配目标 → 被 `suppressed` 压住时沉默。
 
@@ -146,7 +146,7 @@ spawnEnemy(w, {
   报了整场战役方位的那个人从此有了实体
 - **m3** 放了一架下游 `ROK-2 石英`（team 1），以及一架 `ROK-44 磁石` 干扰机：
   后者走 `jammerRoute`（m5、m7 同；现为 `Route.plan([goto, loiter], {jam})`，整条航线随队干扰）：飞到站位点后在两点间盘旋、不退场；玩家一方任何单位
-  （飞机或舰船 / 设施）进入干扰半径（12 km）就开机（`ai.js` 的 `jamAuto`）。
+  （飞机或舰船 / 设施）进入干扰半径（12 km）就开机（`AI` 的 `jamAuto`）。
   一波 30 s，强度从 1 线性降到 0.6（`openEcm` 的 `wave` 选项，不走"被对抗掉"曲线），隔 3 s 重开回满。
   m3 的磁石贴着 16 000 m 升限飞（15 800 m），在 18–19 km 主战场下方约 3 km
 - **m12** 再放一架鹈鹕（team 0，`SEXTANT`），敌方预警机的 `aewDown` 是该关的阶段事件
@@ -179,7 +179,7 @@ team 2 带了也不开火。选目标规则见 [ai.md](ai.md)「水面 / 地面�
 ### 背景单位（`team: 2`）
 
 v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，一律 `team: 2`：
-`cycleTarget` 只收 team 1，所以玩家锁不到；`ai.js` 的 `nearestSurfaceTarget`
+`cycleTarget` 只收 team 1，所以玩家锁不到；`AI` 的 `nearestSurfaceTarget`
 把 `team > 1` 排除，所以 AI 也不认。它们不计入胜负。
 
 | 关卡 | 单位 |
@@ -196,7 +196,7 @@ v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，
 MERLI 的活是**巡视检查单元状态**：`route: { wps, wpIdx: 0, wp, alt, arrive: 1500 }`，
 `wps` 是 m5 那几个单元编组中心（`spawnCellField` 的返回值）蛇形串起来——先沿左列往北、再沿右列往南——
 每个航点比该组基准高度低 1500 m（从下方看，也不会钻进单元里）。
-走的是 `ai.js` `updateRoute` 的 `wps` 分支：飞完一圈从头再来，永不退场，见 [ai.md](ai.md)。
+走的是 `AI` `updateRoute` 的 `wps` 分支：飞完一圈从头再来，永不退场，见 [ai.md](ai.md)。
 
 ### 调节单元阵列 spawnCellField
 
@@ -223,7 +223,7 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
 
 `spawnWingman` 写死的部分：机型 `folded_wing`、阵营 0、`isDrone: true`、不再指定 `special`（挂载由 KA-7 的 `defaultLoadout` 按组落位：翼下 TOR-3 ×2、机腹弹舱 CLA-4 ×2）、AI `role: 'drone', skill: 0.62`、`formation: {dx,dy,dz}`（即传入的槽位）、`a.wingIdx = idx`。
 
-### 2.3 台词（`data.js`）
+### 2.3 台词（`js/data/`）
 
 | 成员 | 语义 |
 |---|---|
@@ -231,12 +231,12 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
 | `Radio.raw(line)` | 直接插一条 `{ who, cls, tx, gap }` |
 | `downstreamCallsign(i)` | 取第 i 个下游呼号，格式 `"旱沟 DRYGULLY"`，越界取模 |
 
-任务脚本用的是 `w.radio`（`newWorld` 里指向 `Radio`）。全局事件 `'start'` 由 `startMission` 播，`'allyDown'` 由 `game.js` 主循环播。
+任务脚本用的是 `w.radio`（`newWorld` 里指向 `Radio`）。全局事件 `'start'` 由 `startMission` 播，`'allyDown'` 由 `Game` 主循环播。
 
 ### 2.4 战役（`CAMPAIGNS`）
 
 一场战役 = 一组关卡 + 一份展示文案。它**不参与战场生成**，
-只是让 `game.js` 能画出"打的是哪一场仗"这一层。
+只是让 `Game` 能画出"打的是哪一场仗"这一层。
 
 | 字段 | 谁读 | 说明 |
 |---|---|---|
@@ -244,8 +244,8 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
 | `no` | 战役卡片 | `'CAMPAIGN 01'` |
 | `name` / `en` / `sub` | 战役卡片 | 中文名 / 英文代号 / 完整行动代号 |
 | `loc` / `period` | 战役卡片 | 区域与起止时间，都是纯展示 |
-| `desc` | 战役卡片 | 一段话，压缩自 `codex.js` 的同名战役条目 |
-| `missions` | `game.js` `campaignOf` / `campaignProgress` | **`MISSIONS` 的全局下标数组** |
+| `desc` | 战役卡片 | 一段话，压缩自 `js/ui/codex/` 的同名战役条目 |
+| `missions` | `Game` `campaignOf` / `campaignProgress` | **`MISSIONS` 的全局下标数组** |
 
 三条硬约定：
 
@@ -258,7 +258,7 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
    画成不可点的卡片，且只写"该方向的作战档案尚未解封"——
    **不写地名与年份**，免得提前承诺还没定的设定。
 
-`preflight()`（`game.js`）检查：下标越界、一关多挂、漏挂、
+`preflight()`（`Game`）检查：下标越界、一关多挂、漏挂、
 `id`/`name` 缺失。它**不检查** `desc` / `loc` / `period` —— 漏了只是卡片上少一行字。
 
 ---
@@ -274,7 +274,7 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
 | `name` / `en` | 同上 | 中文名 / 英文名 |
 | `loc` / `date` | 简报页 | 地点、任务时间 |
 | `altStart` / `speedStart` | `startMission` | 初始高度/速度，**会被 `spawn()` 覆盖**（见坑 §8.1） |
-| `timeLimit` | `startMission` → `world.timeLimit/timeLeft`；`game.js` 主循环、`hud.js` `drawObjective`、`finish()` | 关卡时限（秒）。`0` = 无时限。**归零即判负，由主循环统一处理**，任务脚本不需要自己写倒计时（`m10` 用了 300 秒） |
+| `timeLimit` | `startMission` → `world.timeLimit/timeLeft`；`Game` 主循环、`HUD` `drawObjective`、`finish()` | 关卡时限（秒）。`0` = 无时限。**归零即判负，由主循环统一处理**，任务脚本不需要自己写倒计时（`m10` 用了 300 秒） |
 | `prose` | 简报正文（`innerHTML`） | 允许 HTML |
 | `objectives[]` | 简报目标列表 | 字符串数组 |
 | `threats[]` | 简报威胁列表 | 字符串数组，样式类 `th` |
@@ -298,9 +298,9 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
 | `ace` / `aceSpawned` | m3、m12 | 王牌冬港（m3 与 m12 各一次） |
 | `guarded[]` | m8 | 必须保护的上游编队（沉任一即判负） |
 | `skQueue` / `skBatch` | sk1 | 随机遭遇的六个批次（`spawn()` 一次性生成） |
-| `timeLimit` / `timeLeft` | `newWorld()` | 关卡时限；`startMission` 从 `mission.timeLimit` 落进来；归零时 `game.js` 播一句"时间到"并 `finish(false)` |
+| `timeLimit` / `timeLeft` | `newWorld()` | 关卡时限；`startMission` 从 `mission.timeLimit` 落进来；归零时 `Game` 播一句"时间到"并 `finish(false)` |
 | `groundKilled` | `newWorld()`，`Ent.killGround` 累加 | 被摧毁的地面/海面目标数（结算单列一行，`finish()` 里 `gk * 400`；低于一架飞机的 1000，免得"打不还手的设施"成为刷分捷径） |
-| `friendlyLoss` | `game.js` `hitTarget` 写、`finish()` 读 | 误伤扣分（玩家打掉 `friendlyAsset` 一次 +1） |
+| `friendlyLoss` | `Game` `hitTarget` 写、`finish()` 读 | 误伤扣分（玩家打掉 `friendlyAsset` 一次 +1） |
 
 ---
 
@@ -308,9 +308,9 @@ HUD 不标 10 km 外的（`farCell()`，罗盘 / 雷达 / 目标框都一样）�
 
 `map` 里是**世界米**，与 `spawn` 用的是同一套坐标（玩家在 −z、机头朝 +z），**没有 `y`**——它是俯视简报图，画不出高度。
 
-每关的 `axis` 声明世界 +z 的真方位（度）：上游在北、下游在南，所以多数关卡 `axis` 在 135–225 之间，每关取不同值让战线方向不重复。罗盘（`hud.js` `drawCompass`）、`game.js` `bearing()`、简报地图都加上它；简报 / 台词里的方向词必须按换算后的真方位写。
+每关的 `axis` 声明世界 +z 的真方位（度）：上游在北、下游在南，所以多数关卡 `axis` 在 135–225 之间，每关取不同值让战线方向不重复。罗盘（`HUD` `drawCompass`）、`Game` `bearing()`、简报地图都加上它；简报 / 台词里的方向词必须按换算后的真方位写。
 
-`game.js` `drawMap(m)` 先把每个标记旋到 东 / 北：
+`Game` `drawMap(m)` 先把每个标记旋到 东 / 北：
 
 ```js
 E = x·cosθ + z·sinθ;  N = −x·sinθ + z·cosθ;   // θ = axis
@@ -405,10 +405,10 @@ if (!w.flags.tallyDone && w.time > 6) {
 }
 ```
 
-`flags` 不分区、不清理，**加新键时必须用独一无二的名字**（`game.js` 自己也在用 `flags.allyDown` / `flags.timeUp`）。
+`flags` 不分区、不清理，**加新键时必须用独一无二的名字**（`Game` 自己也在用 `flags.allyDown` / `flags.timeUp`）。
 
 任务里已经用掉的 `flags` 键（节选）：m1 `killed / tallyDone / k1 / k2 / k3 / lowQ`；m2 `ambushDone / baseHit / baseLow / baseLost / relayDown / spotted`；m3 `dropped / aceSpawned / aceP2 / aceKilled`；m4 `spotted / hubHit`；m5 `spotted / radarDown`；m6 `contact / highQ / halfDone`；m7 `spotted / landersDown`；m8 `fleetHit / shipLost`；m10 `warned / lastOne`；m12 `contact / aewDown / cpDown / aceP2 / aceKilled`；sk1 `skCool`。
-（`game.js` 自己的两个：`allyDown`、`timeUp`。）
+（`Game` 自己的两个：`allyDown`、`timeUp`。）
 
 ---
 
@@ -429,7 +429,7 @@ spawn()
  ├ w.detected = player.pos.y > 1500 && player.alive；首次 true 播 spotted
  └ 地面测控平台全灭 → 播 radarDown，从南边生成 4 架截击机（2×GAL-31 高空 + 2×ROK-27），播 ambush
 
-防空浮台开火（game.js updateTargets）
+防空浮台开火（Game updateTargets）
  └ 前置：w.detected（或贴脸 5.2 km 目视）→ 发射 dl9 追踪玩家
 
 轰炸机（AI.updateRoute，不走空战 AI）
@@ -448,7 +448,7 @@ spawn()
 
 2. **`makeTarget` 的 `team` 默认是 1（敌方）。** 友方设施必须显式写 `team: 0`，否则 `cycleTarget()` 会把自家基地纳入锁定循环——而且因为它距离最近、`value` 最小，按下 F 先锁上的就是自己人。m2 的前进基地就是这么踩过坑才补上 `team: 0` 的。
 
-3. **中立调节单元用 `team: 2`，不是 `team: 1`。** `cycleTarget` 只收集 `team === 1` 的目标物，所以玩家锁不到单元；但 `scanShot` 只跳过同阵营，所以双方子弹都能打坏它。误伤扣分在 `game.js` `hitTarget` 里按 `friendlyAsset && source.isPlayer` 累加一次 `friendlyLoss`——注意它不看 `team`；AI 流弹打掉的不扣分，SEXTANT 那句"你打爆了一个调节单元"也只在玩家打的时候说。
+3. **中立调节单元用 `team: 2`，不是 `team: 1`。** `cycleTarget` 只收集 `team === 1` 的目标物，所以玩家锁不到单元；但 `scanShot` 只跳过同阵营，所以双方子弹都能打坏它。误伤扣分在 `Game` `hitTarget` 里按 `friendlyAsset && source.isPlayer` 累加一次 `friendlyLoss`——注意它不看 `team`；AI 流弹打掉的不扣分，SEXTANT 那句"你打爆了一个调节单元"也只在玩家打的时候说。
 
 4. **没有交战规则锁定。** 旧版 m3 的 `roeBlocked` / `roeActive` / `launch()` 拦截已整个删掉，`smoke.js` 断言不留残余。单元附近"谨慎使用重型武器"只是文字，约束靠误伤扣分。别再加回按空域锁武器的分支。
 
@@ -456,22 +456,22 @@ spawn()
 
 6. **`escort` 标签的含义因关而异。** m1 的护航 `a.ai.escort = true`，被排除在目标计数与胜利条件外；m3 的两架护航没有这个标签，属于"必须全部击落"的 `team 1` 单位（`win()` 只看 `team === 1 && alive`）。
 
-7. **飞完航线的单位会"自灭"。** `AI.updateRoute` 在最后一段飞完后直接 `a.alive = false`，而 `game.js` 的击落统计是 `team === 1 && !alive` 计数——以前逃生成功的轰炸机也会被算成"击落"；现在 `updateRoute` 离场时会标 `a.escaped`，`killCredit()` 不给它记功。`route.loiter`（预警机）与 `route.wps`（MERLI）两种航线永不退场。
+7. **飞完航线的单位会"自灭"。** `AI.updateRoute` 在最后一段飞完后直接 `a.alive = false`，而 `Game` 的击落统计是 `team === 1 && !alive` 计数——以前逃生成功的轰炸机也会被算成"击落"；现在 `updateRoute` 离场时会标 `a.escaped`，`killCredit()` 不给它记功。`route.loiter`（预警机）与 `route.wps`（MERLI）两种航线永不退场。
 
 8. **`sower` 与 `ace` 只换了 `phys`，没换 `ac`。** 两者都由 `spawnEnemy` 以默认机型 `schist` 创建，之后覆写 `model` 与 `phys`；`a.ac` 仍然指向 ROK-27 条目，所以 `ctrlFloor` / `ctrlFull` 来自 ROK-27。改这两架的气动时记得 `ctrlFactor` 读的是 `a.ac`。
 
 9. **`m2` 的中继平台 `t.vital = true` 没有任何人读。** 胜利条件按 `model === 'relay'` 计数，不靠 `vital`。同理 m1 的 `a.firingAllowed`、`w.baseHpFull` 都是"写了没人读"的字段。
    （`timeLimit` **不再是**这类字段 —— 它现在由主循环倒计时并统一判负，见 [game.md](game.md#newworld)。）
 
-10. **生成器函数是全局的，没有命名空间。** `spawnEnemy` / `spawnWingman` / `spawnTarget` / `spawnAewc` / `spawnShip` / `bombTheBase` 都挂在 `window` 上，`index.html` 的加载顺序里 `missions.js` 排在 `game.js` 之前。加新生成器时注意别与其它模块重名。
+10. **生成器函数是全局的，没有命名空间。** `spawnEnemy` / `spawnWingman` / `spawnTarget` / `spawnAewc` / `spawnShip` / `bombTheBase` 都挂在 `window` 上，`index.html` 的加载顺序里 `js/missions/` 排在 `Game` 之前。加新生成器时注意别与其它模块重名。
 
 11. **`w.cells` 与 `w.targets` 是同一批对象的两个视图。** `spawnTarget` 只推 `w.targets`，`spawnCellField` 再把单元推进 `w.cells`。别在关卡里手写单元循环。遍历"所有可摧毁物"用 `targets`，遍历"调节单元阵列"用 `cells`，`win()` 用的是 `targets`。
 
 12. **`flags.dropped` 复用了 `bossHit` 台词。** 播撒机降到 16000 m 以下时播的是"他在掉高度！动压撑不住了！"——那是给王牌准备的台词，`VOICES.m3` 里没有专门的投放警告事件。改文案时注意这一处复用。
 
-13. **`m1.lose()` 只判玩家阵亡。** 僚机全灭不会失败（只会在 `game.js` 里触发一次 `allyDown` 台词）。
+13. **`m1.lose()` 只判玩家阵亡。** 僚机全灭不会失败（只会在 `Game` 里触发一次 `allyDown` 台词）。
 
-14. **我方设施必须显式 `team: 0`。** `ai.js` 的 `nearestSurfaceTarget` 判据是 `t.team === a.team || t.team > 1` —— 漏写会让**下游带对地弹的飞机把友方设施当目标打**。m2 的前进基地、m4 的护卫舰、m5 的布缆船、m8 的整个上游编队都靠这一条。
+14. **我方设施必须显式 `team: 0`。** `AI` 的 `nearestSurfaceTarget` 判据是 `t.team === a.team || t.team > 1` —— 漏写会让**下游带对地弹的飞机把友方设施当目标打**。m2 的前进基地、m4 的护卫舰、m5 的布缆船、m8 的整个上游编队都靠这一条。
 
 15. **舰船的 `ttype` 用 `'ground'`，不要新造 `'ship'`。** 渲染按 `MODELS[t.model]` 查表，`ttype` 只影响 HUD 文案（`'air'` → 浮空平台，其余 → 地面设施）与受损下沉分支。舰船不下沉，所以不能写 `'air'`。
 
@@ -485,9 +485,9 @@ spawn()
 
 ## 9. 加一关需要提供什么
 
-1. 在 `js/missions.js` 末尾 `MISSIONS.push({...})`，字段照抄现有任何一关（见 §3 完整清单）。
+1. 在 `js/missions/` 末尾 `MISSIONS.push({...})`，字段照抄现有任何一关（见 §3 完整清单）。
 2. 必须提供：`id` `no` `name` `en` `loc` `date` `altStart` `speedStart` `prose` `objectives` `threats` `intel` `map` `spawn()` `tick()` `win()` `lose()`。
-3. 在 `js/data.js` 的 `VOICES` 里加**同名 `id`** 的台词表，至少要有 `start`、`win`、`lose`（`startMission` 会 `Radio.play(mission.id, 'start')`）。
+3. 在 `js/data/` 的 `VOICES` 里加**同名 `id`** 的台词表，至少要有 `start`、`win`、`lose`（`startMission` 会 `Radio.play(mission.id, 'start')`）。
 4. `map` 里的坐标是**世界米，相对进入点**；`type` 只用 `drawMap` 认得的几种（`base` / `enemy` / `relay` / `sam` / `site`）。
 5. **把新关的全局下标写进某个战役的 `missions` 数组。** 不写会触发
    `preflight()` 的"没有归属任何战役"——选关界面永远列不到它，
@@ -496,7 +496,7 @@ spawn()
    `smoke.js` 会查它有没有、数量是否在 9–60 之间。
 7. 跑 `node tools/smoke.js`：它会自动加载全部脚本、跑十一关各 240 帧，检查 NaN、卡死与异常，
    并断言战役覆盖率与"战役内关卡数"。
-8. 开机自检（`game.js` `preflight()`）会检查：`spawn/tick/win/lose` 都是函数、
+8. 开机自检（`Game` `preflight()`）会检查：`spawn/tick/win/lose` 都是函数、
    `VOICES[id]` 存在、每关恰好归属一个战役。它**不检查**
    `prose` / `objectives` / `map` 是否存在——漏了会在简报页静默变空。
 
@@ -511,10 +511,10 @@ spawn()
 | 敌机行为标签 | `spawnEnemy` 的 `behavior`（写进 `a.ai.cmd` 与 `a.behavior`） |
 | 护航是否计入目标 | `spawnEnemy` 的 `escort`，以及 `tick()` / `win()` 里的 `a.ai.escort` 判断 |
 | 敌机挂什么弹 / 吊舱 | `spawnEnemy` 的 `special` / `pods` |
-| 那些弹画在哪几类挂点上 | `data.js` 的 `npcFits` + `entities.js` `mountPlan()` |
+| 那些弹画在哪几类挂点上 | `js/data/` 的 `npcFits` + `Ent` `mountPlan()` |
 | 僚机队形与数量 | `spawnWingman(w, idx, slotX, slotY, slotZ)` |
 | 目标物血量 / 半径 / 漂移 | `spawnTarget` 的 `hp` / `radius` / `drift` |
-| 防空阵地武器与节奏 | `spawnTarget` 的 `weapon` / `fireCd`，开火逻辑在 `game.js` `updateTargets()` |
+| 防空阵地武器与节奏 | `spawnTarget` 的 `weapon` / `fireCd`，开火逻辑在 `Game` `updateTargets()` |
 | 必须保护的东西 | `w.baseTarget`（m2）与 `lose()` |
 | 雷达探测高度下限 | m2 `tick()` 里的 `player.pos.y > 1500` 与 `w.dangerAltitude` |
 | 伏击触发条件 | m2 `tick()` 里 `sites === 0 && !w.flags.ambushDone` |
@@ -523,13 +523,13 @@ spawn()
 | 播撒机投放警告高度 | m3 `tick()` 里的 `s.pos.y < 16000` |
 | 播撒机逃跑判定高度 | m3 `lose()` 里的 `s.pos.y < 14000` |
 | 调节单元的编组位置 / 数量 | 各关 `spawn()` 里 `spawnCellField` 的 `xs` / `zs` |
-| 单元间距 / 高度 / 数值 | `missions.js` `CELL_SPACING` 与 `spawnCellField` |
-| 误伤扣分金额 | `game.js` `finish()`：`friendlyLoss * 2500` |
-| 简报地图比例 / 位置 | `game.js` `drawMap()` 的 `R = 17000` 与 `cy = H*0.72` |
-| 下游呼号池 | `data.js` `CS_DOWNSTREAM` + `downstreamCallsign()` |
+| 单元间距 / 高度 / 数值 | `js/missions/` `CELL_SPACING` 与 `spawnCellField` |
+| 误伤扣分金额 | `Game` `finish()`：`friendlyLoss * 2500` |
+| 简报地图比例 / 位置 | `Game` `drawMap()` 的 `R = 17000` 与 `cy = H*0.72` |
+| 下游呼号池 | `js/data/` `CS_DOWNSTREAM` + `downstreamCallsign()` |
 | 每句台词的停顿 | `VOICES` 里每条 `{ ... gap }` |
-| 战役分组 / 展示文案 | `missions.js` 顶部的 `CAMPAIGNS` |
-| 战役内关卡序号（简报页 01/02/03） | `game.js` `buildMissionList()`，按战役内位置重编，**不看 `m.no`** |
+| 战役分组 / 展示文案 | `js/missions/` 顶部的 `CAMPAIGNS` |
+| 战役内关卡序号（简报页 01/02/03） | `Game` `buildMissionList()`，按战役内位置重编，**不看 `m.no`** |
 
 ---
 
@@ -543,5 +543,5 @@ spawn()
 | `M3` | 向量运算（`V` / `rnd` / `dist` / `clone`） |
 | `CALLSIGN` | 玩家与僚机的固定呼号 |
 | `VOICES` / `Radio` | 台词表与播放（`w.radio.play` / `w.radio.raw`） |
-| `world`（`game.js`） | 任务脚本唯一的写入目标；字段契约见 §3 |
-| `game.js` | 决定 `spawn/tick/win/lose` 的调用时机、简报渲染、结算计分 |
+| `world`（`Game`） | 任务脚本唯一的写入目标；字段契约见 §3 |
+| `Game` | 决定 `spawn/tick/win/lose` 的调用时机、简报渲染、结算计分 |

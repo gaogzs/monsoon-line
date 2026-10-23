@@ -1,7 +1,7 @@
 # 工具链与测试
 
-代码：`tools/smoke.js`（唯一的自动化测试）· `tools/release.js` + `CHANGELOG.md` + `js/changelog.js`（发版与更新日志）
-· `tools/stamp-version.js` + `js/version.js`（版本戳）
+代码：`tools/smoke.js`（唯一的自动化测试）· `tools/release.js` + `CHANGELOG.md` + `js/core/changelog.js`（发版与更新日志）
+· `tools/stamp-version.js` + `js/core/version.js`（版本戳）
 · `tools/render-planform.js`（离线机库俯视图预览）· `tools/render-ships.js`（离线舰船外形预览）
 · `tools/render-units.js`（离线单位 3D 预览）· `tools/shot-unitview.js`（无头 Chrome 截详情页布局）
 · `tools/lib/raster.js`（几个预览器共用的光栅器 / Canvas 桩 / PNG 编码）
@@ -15,7 +15,7 @@
 
 游戏本身**零依赖、无构建**——没有 `package.json`，没有 `node_modules`，
 双击 `index.html` 就能玩。`tools/` 全是**开发期的旁路**，跑在 Node 里，
-产物不参与游戏运行（唯二的例外是 `js/version.js` 与 `js/changelog.js`——
+产物不参与游戏运行（唯二的例外是 `js/core/version.js` 与 `js/core/changelog.js`——
 那两个是游戏真的要读的数据文件）。所以这里没有 npm script，
 一律 `node tools/xxx.js`。改完代码唯一必须做的事是 `node tools/smoke.js`。
 
@@ -28,10 +28,10 @@
 | `probe-missions.js` | **逐关验证"清空敌人之后到底能不能赢"**，并检查 NPC 挂载问题 | 加了新关卡、改了胜负条件之后 |
 | `probe-turret.js` | 近防炮打 1.2 km 外横穿目标的命中率（直线 / 慢转 / 加速 / 乱机动），射界外不开火、转速受限；Dunkleosteus 贴近通场的掉血（直线 20–40、机动 ≤ 8） | 改了 `turret.js` 或 `TURRET_GUNS` 之后 |
 | `probe-blast.js` | 每种空空弹按 straight / gentle / hard / jink / max / flare 六档机动各打 N 发，统计命中率、平均伤害（占 `dmg` 比例）、起爆距离，与 `probe-blast.baseline.json` 对比 | 改了近炸 / 爆炸半径 / 导引之后 |
-| `release.js` | 按命令里给的版本号追加 `CHANGELOG.md` 草稿，生成 `js/changelog.js` 与 `js/version.js` | **每次发一个版本**（`node tools/release.js vX.Y.Z`） |
-| `stamp-version.js` | 只把上一次提交写进 `js/version.js`（版本号从 `CHANGELOG.md` 顶部读） | **每次 `git commit` 之前** |
+| `release.js` | 按命令里给的版本号追加 `CHANGELOG.md` 草稿，生成 `js/core/changelog.js` 与 `js/core/version.js` | **每次发一个版本**（`node tools/release.js vX.Y.Z`） |
+| `stamp-version.js` | 只把上一次提交写进 `js/core/version.js`（版本号从 `CHANGELOG.md` 顶部读） | **每次 `git commit` 之前** |
 | `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
-| `render-ships.js` | 用真正的 `models.js` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
+| `render-ships.js` | 用真正的 `js/models/` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
 | `render-mounts.js` | 用真正的 `Ent.makeAircraft()` + `Game.__pushStores()` 把 NPC 的实体挂载渲染成 PNG | 改了挂载分配 / 挂点坐标之后 |
 | `render-units.js` | 用单位详情页自己的 `renderModel()` 把 25 个单位渲染成 PNG | 改了 `unitview.js` 的渲染代码之后 |
 | `shot-unitview.js` | 无头 Chrome 截详情页的**布局**与 WebGL 预览（需要本机有 Chrome） | 改了详情页的 HTML 结构或 CSS 之后 |
@@ -51,7 +51,7 @@
 const Sim = require('./lib/sim');
 const S = Sim.load({ seed: 42, init, quiet });  // 每次 load 一个全新沙箱
 S.start(2);                 // 开 MISSIONS[2]
-S.step(dt);                 // 调 game.js 导出的 Game.__update(dt)，不走 rAF、不画 HUD
+S.step(dt);                 // 调 Game 导出的 Game.__update(dt)，不走 rAF、不画 HUD
 S.run(30, (t, w, pl) => {}); // 推进 30 s 游戏时间，每帧回调
 S.seed(7); S.godMode();
 Sim.batch(seeds, scenario); Sim.stats(...);
@@ -61,7 +61,7 @@ Sim.batch(seeds, scenario); Sim.stats(...);
 |---|---|
 | 随机数 | `Math.random` 换成 mulberry32，同种子 = 同一场战斗 |
 | 渲染 | 假 2D 上下文（Proxy，全空操作）；拿不到 WebGL，`Renderer` 自动落到 2D |
-| 钩子 | `game.js` 导出 `__update` 专供它用 |
+| 钩子 | `Game` 导出 `__update` 专供它用 |
 
 ### `probe-render.js` —— WebGL 与 2D 画面对比
 
@@ -158,6 +158,11 @@ node tools/smoke.js --list                # 列出所有段名
 其余各段按 `--only` / `--skip` 过滤。改某个子系统时只跑相关段能省掉大半时间，
 大阶段完成后再完整跑一遍（`node tools/smoke.js`）。
 
+**已知的概率性失败**：「近防拦截」段的 `12 枚来袭一枚都没拦下` 依赖随机数。smoke 全程共用
+一条种子随机序列，前面各段多抽或少抽几个随机数（比如多加载一个脚本、调整段的顺序）就会改变
+这一段的结果，所以完整跑时偶尔失败、单独跑通常通过。遇到时先 `node tools/smoke.js --only 近防拦截`
+重跑；单独也稳定失败才是真回归。（批次 1 重构时遇到过一次，golden 回放一致，单独跑通过。）
+
 ### 输出格式与退出码
 
 ```text
@@ -238,7 +243,7 @@ const ORDER = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/s
 - 加模块只需在 `index.html` 底部加一行 `<script src="js/新模块.js"></script>`，
   smoke.js 自动跟上
 - 脚本名必须匹配 `[a-zA-Z0-9_]+`，路径必须是 `js/<名字>.js`
-- `render-planform.js:293-294` 用**同一个正则**解析同一份 `index.html`——
+- `render-planform.js` 用**同一个正则**解析同一份 `index.html`——
   两份工具、一个来源
 
 #### sandbox 里暴露了哪些全局（`smoke.js` 的 `windowStub` / `const sandbox`）
@@ -274,7 +279,7 @@ const ORDER = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/s
 const preflightBox = bodyEl.children.find(c => /开机自检发现/.test(c.innerHTML || ''));
 ```
 
-**`Game.__player()` / `Game.__world()` 是生产代码里的**（`js/game.js:2671-2672`），
+**`Game.__player()` / `Game.__world()` 是生产代码里的**（`Game`），
 测试直接用。`Game.__fireSpecial` **不存在**——所以发射一律走真实链路：
 取 `docListeners['keydown']` 里的回调，发 `{ code: 'Enter' }`。
 
@@ -307,8 +312,8 @@ function pump(frames) {
 |---|---|
 | `== 加载脚本 ==` | 16 个脚本按 `index.html` 顺序求值，任何语法错/顶层求值异常 |
 | `== 初始化 ==` | `Game.init()` 抛异常；`preflight()` 的红条；初始屏幕必须是 `scr-title` |
-| `== 导航 ==` + `== 完整流程 ==` | 八个 `data-go` 在 `game.js` 里都要有 `go === '...'` 分支，且点击后 `.active` 真的换到目标 `scr-*`；再从 title 走一遍 brief → hangar（导航失效过一次：flex item 缺 `min-height` 把 footer 顶出视口） |
-| `== 更新记录 ==` | `js/changelog.js` 必须与 `CHANGELOG.md` **逐字段相等**（忘了跑 `release.js` 的拦网）；版本号格式 `vX.Y.Z`、日期格式、`<!-- commit: -->` 锚点、每版至少一条改动、版本号严格递减、`CHANGELOG.current` 与 `js/version.js` 的版本号一致；页面上画出的条目数 = 版本数，且每个版本号都出现在 HTML 里 |
+| `== 导航 ==` + `== 完整流程 ==` | 八个 `data-go` 在 `Game` 里都要有 `go === '...'` 分支，且点击后 `.active` 真的换到目标 `scr-*`；再从 title 走一遍 brief → hangar（导航失效过一次：flex item 缺 `min-height` 把 footer 顶出视口） |
+| `== 更新记录 ==` | `js/core/changelog.js` 必须与 `CHANGELOG.md` **逐字段相等**（忘了跑 `release.js` 的拦网）；版本号格式 `vX.Y.Z`、日期格式、`<!-- commit: -->` 锚点、每版至少一条改动、版本号严格递减、`CHANGELOG.current` 与 `js/core/version.js` 的版本号一致；页面上画出的条目数 = 版本数，且每个版本号都出现在 HTML 里 |
 | `== 任务与主循环 ==` + 卡死检测：不能有飞机长时间停在原地 | `startMission(0)` 成功 + 推进 240 帧不抛异常；再让全部关卡各跑 900 帧，查 NaN、飞机连续静止 > 60 帧、同一帧同一对象出现两次、`world.actors` 重复条目（FAIL 时打出一整串现场） |
 | `== 挂载系统 ==` | 每件武器有 `fits`/`perPoint`/`mass`；可发射武器有 `speed`/`life`；`STORE_COOLDOWN` 全覆盖；制导武器有 `lead`；挂点组是偶数点且有弹可挂；玩家出击后有 `loadoutList`/`ammoPool` 且"齐射数 = 挂点数" |
 | `== 干扰与机动 ==` | 红外/雷达弹对干扰弹的失锁率贴住 `w.flare`（含"雷达弹也吃箔丝"）；`AI.steerTo` 三条基本控制律（前下方推杆、前上方拉杆、正侧方滚转） |
@@ -394,7 +399,7 @@ function pump(frames) {
 
 ## 版本戳机制
 
-### 为什么 `js/version.js` 是自动生成的
+### 为什么 `js/core/version.js` 是自动生成的
 
 它**只有 10 行**，第一行就写着"自动生成——不要手改"。它是 `tools/release.js`
 从 git 记录里写出来的（`tools/stamp-version.js` 调的也是同一个函数）：
@@ -428,7 +433,7 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 ```
 
 **每次 `git commit` 之前跑一遍 `stamp-version.js`。** 输出形如
-`js/version.js 已更新` + 版本 + 时间 + 短哈希与提交标题。
+`js/core/version.js 已更新` + 版本 + 时间 + 短哈希与提交标题。
 不在 git 仓库里时它打印 `读不到 git 记录（可能不在仓库里），跳过` 并退出。
 
 **注意一个细节**：脚本取的是**最后一次提交**的信息。你在提交 A 之后、提交 B 之前
@@ -438,7 +443,7 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 ### 标题页右上角那个版本戳的用途
 
 `index.html` 里标题屏有个 `<div id="verStamp" class="ver-stamp">`。
-`Game.init()` 里 `stampVersion()`（`js/game.js` 内，`init()` 之前）往它填
+`Game.init()` 里 `stampVersion()`（`Game` 内，`init()` 之前）往它填
 `BUILD v1.0.0 · 2026-10-15 20:24` 加一行 `09c3686　舰船与飞机不再共用命名…`。
 
 （它以前在左上角，和开机自检那几行 `.boot` 叠着印；加上版本号之后第一行变长，
@@ -458,7 +463,7 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 玩家应该看得到"这游戏更新过什么"，但浏览器里没有 Markdown 解析器，
 而为了这一屏装一个（哪怕最小的）都违反"零依赖"这条底线。
 
-所以日志写两遍：**`CHANGELOG.md` 给人读，`js/changelog.js` 给游戏读**，
+所以日志写两遍：**`CHANGELOG.md` 给人读，`js/core/changelog.js` 给游戏读**，
 中间的转换交给 `release.js`。两边都是纯数据，界面（`buildChangelog()`）
 只负责画。详见 [DESIGN.md 6.9](../DESIGN.md#69-为什么更新日志要生成两次)。
 
@@ -491,7 +496,7 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 ### 谁来保证生成物没忘
 
 `tools/smoke.js` 里加了一条硬断言：把 `CHANGELOG.md` 现场解析一遍，
-和要求 `js/changelog.js` 逐字段相等。忘了跑 `release.js` 会在测试里炸，
+和要求 `js/core/changelog.js` 逐字段相等。忘了跑 `release.js` 会在测试里炸，
 而不是在玩家屏幕上显示一份过期的日志。
 
 ---
@@ -502,7 +507,7 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 
 **"画风"光看代码判断不了，而开发机上没有浏览器。** 所以它实现了一个最小
 Canvas 2D 子集 + 光栅器 + PNG 编码器，直接把 `PLANFORM.draw()` 的输出落成图片。
-它加载的是**真正的 `js/planform.js`**，用的是同一份绘制代码——预览和游戏里
+它加载的是**真正的 `js/render/planform/`**，用的是同一份绘制代码——预览和游戏里
 看到的完全一致（同数据、同绘制函数、同底板色 `#070d12`）。
 
 ### 怎么用
@@ -522,15 +527,15 @@ node tools/render-planform.js
 ### 实现要点与限制
 
 - **它同样从 `index.html` 解析脚本名**（同一个正则），但只按顺序加载
-  `math3d` → `data` → `planform` → `models`。顺序不能乱：`planform.js`
-  依赖 `data.js` 里的 `WEAPONS`
+  `math3d` → `data` → `planform` → `models`。顺序不能乱：`js/render/planform/`
+  依赖 `js/data/` 里的 `WEAPONS`
 - 光栅器：`line()` 用点到线段距离做抗锯齿并支持虚线段；`poly()` 是扫描线 +
   奇偶规则 + 4 倍纵向超采样。**支持** `stroke` / `fill` / `fillRect` / `strokeRect` /
   `moveTo` / `lineTo` / `closePath` / `rect` / `arc` / `ellipse` / `quadraticCurveTo` /
   `setLineDash` / `save` / `restore` / `#rrggbb` 与 `rgb[a]()` 颜色
 - **不支持**（空函数，静默）：`translate` / `rotate` / `scale` / `setTransform` /
   `transform` / `fillText` / `strokeText` / `bezierCurveTo` / 渐变 / `shadow*` /
-  `clearRect`。**如果哪天 `planform.js` 开始用 `translate`/`rotate` 画图，
+  `clearRect`。**如果哪天 `js/render/planform/` 开始用 `translate`/`rotate` 画图，
   预览会静默画错（图堆在原点）而不报错**——加变换时要么同时补桩，要么换办法
 - `getContext()` 每次调用返回**新的 ctx**，路径状态不共享，绘制函数必须只取一次
 
@@ -545,7 +550,7 @@ node tools/render-planform.js
 而是直接把 `MODELS` 里的三维几何喂给**游戏自己的渲染管线**。
 
 ```
-加载 js/math3d.js → js/models.js → js/data.js → js/render.js
+加载 js/core/math3d.js → js/models/ → js/data/ → js/render/render.js
       ↓
 Renderer.init(桩 canvas) → setCamera() → pushModel(model) → flush()
 ```
@@ -605,11 +610,11 @@ node tools/render-ships.js
 ```
 Ent.makeAircraft()   ← 真造一架（含 NPC 的弹药池 / 发射槽 / 挂载分配）
 Game.__pushStores()  ← 真的那条渲染路径（与实机同一份代码）
-js/render.js         ← 真的投影 / 光照 / 画家算法
+js/render/render.js         ← 真的投影 / 光照 / 画家算法
 ```
 
 所以图上看到的就是实机上看到的。它加载**全部**脚本（清单与顺序读
-`index.html`），因为 `Game.__pushStores` 在 `game.js` 里；`Game.init()`
+`index.html`），因为 `Game.__pushStores` 在 `Game` 里；`Game.init()`
 没有被调用（`window.addEventListener` 是空实现），所以那个 IIFE 只是被加载。
 
 ### 怎么用
@@ -643,7 +648,7 @@ node tools/render-mounts.js
 - `Renderer.begin()` 之后要再 `ras.clear()` 一次，理由同 `render-ships.js`
 - 不支持玩家（`Game.init()` 没跑，`player` 是 null）。玩家的挂载本来就
   在机库里能看见，更需要肉眼确认的是敌我 NPC 那几型
-- **吊舱不再借用导弹的外壳**：`data.js` 里 9 件吊舱（`vzu` `vsc` `e4` `l2`
+- **吊舱不再借用导弹的外壳**：`js/data/` 里 9 件吊舱（`vzu` `vsc` `e4` `l2`
   `ecm2` `dec` `oep` `irp` `hdp`）的 `model` 都是 `'pod'`。在这之前它们
   全用 `'missile'`（`e4` / `l2` 甚至没写 model，靠 `|| MODELS.missile` 兜底），
   "这架带了干扰吊舱"在画面上读不出来 —— 两张预览图曾经**字节相同**
@@ -687,7 +692,7 @@ node tools/shot-unitview.js ship:bluewhale   # 指定单位（ship: 前缀表示
 v2.0.0 起最小页面额外加载 `shading.js` 与 `render-gl.js`，并给 Chromium 加 swiftshader 软件 GL 参数 ——
 截到的 3D 预览就是真机走的 WebGL 路径。
 
-它生成一个**最小页面**：只加载详情页需要的模块，刻意**不加载 `game.js`**
+它生成一个**最小页面**：只加载详情页需要的模块，刻意**不加载 `Game`**
 （那个文件在 `load` 时会启动整个游戏），再把 `UnitView.html()` 的结果插进去。
 
 Chromium 的参数里有两个是必须的：
@@ -718,7 +723,7 @@ node tools/rename-aircraft.js
 ```
 
 无参数、**无 dry-run**、**直接原地写文件**。跑完打印每个被改文件的替换次数与合计
-（形如 `js/data.js  替换 7 处` / `合计 10 处`）。`FILES` 清单是硬编码的 14 个路径：
+（形如 `js/data/  替换 7 处` / `合计 10 处`）。`FILES` 清单是硬编码的 14 个路径：
 六个 `js/*.js`（`data` / `models` / `planform` / `codex` / `missions` / `game`）、
 `docs/` 下的七份（`world/SETTING.md`、四份 `systems/*.md`、`DESIGN.md`、`README.md`）、
 以及根 `README.md`。`PLANES` 数组是唯一的对照表。
@@ -750,8 +755,8 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 | 压力测试时长 | 每关 1800 帧、每机型 600 帧、每武器 400 帧 |
 | 预览图尺寸 / 输出目录 / 底板色 | `render-planform.js` 顶部 `W`/`H`、`OUT`（`tools/preview/`）、`BG` |
 | 挂载预览的取景 / 那七个配置 | `render-mounts.js` 的 `AZ` `EL` `FOV` `MARGIN` 与 `CASES` |
-| 版本戳显示位置 | `index.html` 的 `<div id="verStamp">`，由 `js/game.js` 的 `stampVersion()` 填 |
-| 更新记录页的样式 | `style.css` 的 `.cl-*`；数据在 `js/changelog.js`，条目文本由 `clInline()` 还原 `**粗**` / `` `代码` `` |
+| 版本戳显示位置 | `index.html` 的 `<div id="verStamp">`，由 `Game` 的 `stampVersion()` 填 |
+| 更新记录页的样式 | `style.css` 的 `.cl-*`；数据在 `js/core/changelog.js`，条目文本由 `clInline()` 还原 `**粗**` / `` `代码` `` |
 | 版本号检查（格式 / 必须比当前大） | `release.js` 的 `normalizeVersion()` / `compareVersion()`；版本号本身由人在命令里给，见 [VERSIONING.md](../VERSIONING.md) 第 2 节 |
 | 改名影响哪些文件 / 旧→新对照表 | `rename-aircraft.js` 的 `FILES` / `PLANES` 数组 |
 | 近炸探针的发数 / 基线 | `probe-blast.js` 的 `--n`（默认 120）、`probe-blast.baseline.json` |
@@ -775,15 +780,15 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
    和"up 是否精确等于 (0,1,0)"，两个判据都会误报或漏报，最后用"一帧内
    `setCamera` 调用次数"才干净；飞控测量曾用远超真实的扫掠角速度去测一阶低通，
    量到的是测试参数的问题
-7. **`render-planform.js` 不支持的 Canvas 调用是静默的**：给 `planform.js` 加
+7. **`render-planform.js` 不支持的 Canvas 调用是静默的**：给 `js/render/planform/` 加
    `translate` / `rotate` / 文字 / 渐变，预览会画错而不报错
 8. **`rename-aircraft.js` 没有 dry-run 且 `FILES` 不含 `tools/`**：
    跑之前先 `git status` 干净，跑完 `git diff` 看一眼，并手动检查工具脚本
 9. **`stamp-version.js` 记的是上一次提交，且必须在提交前跑**——
    忘了跑的话页面上还是旧时间戳，"到底部署没部署"这件事就白问了
-10. **`js/version.js` 不要手改**：它是生成物，手改等于伪造部署状态
+10. **`js/core/version.js` 不要手改**：它是生成物，手改等于伪造部署状态
 11. **改了 `CHANGELOG.md` 却忘了跑 `release.js`**：游戏里读的是
-    `js/changelog.js`，不会自己跟着变。`smoke.js` 里有硬断言拦这一条
+    `js/core/changelog.js`，不会自己跟着变。`smoke.js` 里有硬断言拦这一条
 12. **`CHANGELOG.md` 的标题格式是解析契约**：`## [v1.2.3] 日期 · 标题`
     和 `<!-- commit: xxx -->` 锚点都是 `release.js` 正则认的。
     格式漂了会直接报错退出（宁可炸，也不要"差不多"地读出一份半截日志）
@@ -798,3 +803,29 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 - **smoke 分段**：新增的断言都包在 `section(...)` 里，可以用 `--only` / `--skip` 单独跑：`TOR-3 与 target:any`、`碰炸与拟真近炸`、`KA-7 默认挂载与携带量重量`、`僚机掩护撒干扰弹`、`包线缓存与滑翔校验`。
 - **render-mounts**：`folded_wing-default`（僚机默认挂载，4 件）与 `frigatebird-drm`（TOR-3 对照）。
 - **probe-envelope**：滑翔弹 nez 一项在"水平 0 距离"时（高空投放、目标逃逸追不上）标注为"无逃逸包线"，不做命中断言。
+
+## 批次 1（v3.0.0）新增的重构安全网
+
+重构最大的风险是"悄悄改了行为"，所以动手前先把现状冻结成基线（`tools/baseline/`），之后每一步都比对。
+**这些都是秒级的，日常优先用它们；`smoke.js` 完整跑要近二十分钟，只在必要时用 `--only 段名`。**
+
+| 命令 | 保证什么 |
+|---|---|
+| `node tools/snapshot-data.js [--write]` | 全部数据表、模型（顶点 / 面哈希、键序、不可枚举成员）、关卡、资料库逐条哈希，与基线逐条比对；函数按空白折叠后比较（缩进变化不算差异） |
+| `node tools/golden.js [--write] [--secs N] [--only 关]` | 固定种子，每关跑 N 秒，每秒对全体实体的 `pos / vel / hp / ammoPool` 取哈希，报第一个分歧的关卡与秒数 |
+| `node tools/golden-render.js [--write]` | 每关画 3 帧，把 2D 画布的全部绘制调用（方法名 + 两位小数的参数）取哈希。逻辑回放看不到的 HUD / UI 拆分靠它。基线来自重构前的 `backup/` |
+| `node tools/probe-perf.js [--write]` | 每关每帧耗时与实体峰值，与基线比较（只在同一台机器上有意义） |
+| `node tools/text-census.js [--check]` | 脚本里剩余的中文字符串；`--check` 对照允许清单，只许缩小 |
+| `node tools/gen-index.js [--check]` | 生成 / 检查 `index.html` 的 `<script>` 块 |
+| `node tools/gen-locales.js` · `fmt-locales.js` · `check-locales.js` · `extract-text.js` | 文本层，见 [text.md](text.md) |
+
+两个小开关：`LEGACY_TAGS=1 node tools/snapshot-data.js` 把标签还原成旧的布尔字段再比，用来核对"除迁移外一字不差"；
+快照里计划内的改动写在 `tools/snapshot-data.js` 顶部注释里。
+
+`tools/lib/scripts.js` 是脚本加载顺序的**唯一读取入口**（`loadOrder()` / `pick()` / `preview()`），
+`smoke`、`sim`、`render-*`、`probe-render`、`shot-unitview`、`rename-aircraft` 都用它，不再各写正则；
+`tools/lib/sim.js` 加 `trace: true` 记录 2D 绘制调用，`S.render()` 画一帧。
+
+### 已知的概率性失败
+
+（见上文 smoke 一节。）

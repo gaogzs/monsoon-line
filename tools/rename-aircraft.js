@@ -42,8 +42,7 @@ const PLANES = [
 ];
 
 const FILES = [
-  'js/data.js', 'js/models.js', 'js/planform.js', 'js/codex.js',
-  'js/missions.js', 'js/game.js',
+  ...require('./lib/scripts').loadOrder().filter(f => !/\/(changelog|version|locales\.gen)\.js$/.test(f)),
   'docs/world/SETTING.md',
   'docs/systems/flight-model.md',
   'docs/systems/planform.md',

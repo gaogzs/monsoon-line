@@ -1,0 +1,28 @@
+{
+  "missions": {
+    "_lib": {
+      "spawnWinterport": {
+        "ace": {
+          "callsign": "冬港 WINTERPORT"
+        },
+        "label": {
+          "s1": "WINTERPORT · 冬港"
+        }
+      },
+      "spawnCellField": {
+        "c": {
+          "label": "调节单元"
+        }
+      },
+      "shipName": {
+        "s1": "「",
+        "s2": "」"
+      },
+      "spawnShip": {
+        "shipClass": {
+          "s1": "级"
+        }
+      }
+    }
+  }
+}

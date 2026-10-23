@@ -291,18 +291,18 @@ function encodePNG(w, h, rgb, alpha) {
    加载真正的 planform.js 并渲染
    ============================================================ */
 const htmlSrc = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const scripts = [...htmlSrc.matchAll(/<script\s+src="js\/([a-zA-Z0-9_]+)\.js"><\/script>/g)].map(m => m[1]);
+const Scripts = require('./lib/scripts');
+const scripts = Scripts.loadOrder();   // 如 'js/data.js'
 
 const sandbox = { console, Math, JSON, Object, Array, Float32Array, Buffer };
 sandbox.window = sandbox;
+sandbox.addEventListener = () => {};
 sandbox.document = { getElementById: () => null, createElement: () => ({ getContext: () => null }) };
 const ctxVm = vm.createContext(sandbox);
 
 // 只加载绘制所需的最小集合：math3d（无关但无害）→ models → planform → data → 其余按需
-for (const name of ['math3d', 'data', 'planform', 'models']) {
-  if (!scripts.includes(name)) continue;
-  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', name + '.js'), 'utf8'), ctxVm,
-    { filename: name + '.js' });
+for (const file of Scripts.preview()) {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), ctxVm, { filename: file });
 }
 
 const PLANFORM = sandbox.PLANFORM;

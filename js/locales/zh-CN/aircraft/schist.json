@@ -1,0 +1,20 @@
+{
+  "aircraft": {
+    "schist": {
+      "cn": "片岩",
+      "role": "多用途战斗机",
+      "faction": "下游同盟",
+      "planformType": "后掠翼",
+      "maker": "石林机械制造集团（rokci porsi zbasu girzu）",
+      "desc": "石林机械制造集团的主力。飞行性能大致相当于十年前的 DB-11，\n      火控和电子设备还要更旧一代，但产量是上游的三倍 ——\n      他们用数量补质量，而且从来不缺愿意坐进去的人。",
+      "hardpointGroups": {
+        "i0": {
+          "label": "翼下内侧"
+        },
+        "i1": {
+          "label": "翼下外侧"
+        }
+      }
+    }
+  }
+}
