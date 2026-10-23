@@ -2,17 +2,17 @@
 
 代码：`js/core/math3d.js`· 全局对象 `M3`
 
-加载顺序里的第 1 个模块，**不依赖任何东西**。除纯文本 / 数据表的 `js/ui/codex/` 与 `js/data/` 外，其余模块都直接或间接用到它。相机的*用法*在 [rendering.md](rendering.md) 里讲，这里讲 M3 自己。
+加载顺序里最靠前的业务模块（只排在 `js/core/version.js`、`changelog.js` 之后；顺序的权威是 `tools/build/gen-index.js`），**不依赖任何东西**。除纯文本 / 数据表的 `js/ui/codex/` 与 `js/data/**` 外，其余模块都直接或间接用到它。相机的*用法*在 [rendering.md](rendering.md) 里讲，这里讲 M3 自己。
 
 ## 代码位置与职责边界
 
 **做什么**：三维向量运算（点 / 叉 / 模 / 距离 / 插值，全部不可变，每次返回新对象）；罗德里格斯轴角旋转、正交基构造、方向球面插值；标量工具（`clamp` / `lerp` / `wrapPi` / `smooth` / 随机 / 手感曲线）；相机对象构造与世界 → 相机 → 屏幕的两级投影；近平面**线段**裁剪；射线-球求交；两个单位方向之间的"转向"工具。
 
-**不做什么**：没有矩阵类型（没有 `Mat4` / `Mat3`，相机是一组基向量）；没有四元数；**不做多边形裁剪**——Sutherland–Hodgman 单平面裁剪内联在 `render.js` 的 `pushModel()` 里；求交只支持射线-球，没有射线-三角形 / 平面 / AABB；不持有任何全局状态或缓存，是纯函数集合（唯一的不纯是 `Math.random`）。
+**不做什么**：没有矩阵类型（没有 `Mat4` / `Mat3`，相机是一组基向量）；没有四元数；**不做多边形裁剪**——Sutherland–Hodgman 单平面裁剪内联在 `js/render/render.js` 的 `pushModel()` 里；求交只支持射线-球，没有射线-三角形 / 平面 / AABB；不持有任何全局状态或缓存，是纯函数集合（唯一的不纯是 `Math.random`）。
 
 ## 完整公开接口
 
-返回对象在 `math3d.js`，共 **36** 个成员。
+返回对象在 `js/core/math3d.js`，共 **36** 个成员。
 
 ### 向量
 
@@ -71,7 +71,7 @@ function rotAxis(v, axis, ang) {
 }
 ```
 
-`v' = v·cosθ + (k×v)·sinθ + k(k·v)(1−cosθ)`。**不归一化 `axis`**：传非单位轴不报错，只会静默算出被拉伸的错误姿态；调用方（`Ent` 的姿态更新）一律传正交基向量，所以成立。不用欧拉角的原因见 [DESIGN.md](../DESIGN.md#52-姿态用正交基不用欧拉角)：垂直姿态有万向节锁，而这个游戏有大量垂直机动。
+`v' = v·cosθ + (k×v)·sinθ + k(k·v)(1−cosθ)`。**不归一化 `axis`**：传非单位轴不报错，只会静默算出被拉伸的错误姿态；调用方（`js/engine/entities/aircraft.js` 的姿态更新）一律传正交基向量，所以成立。不用欧拉角的原因见 [DESIGN.md](../DESIGN.md#52-姿态用正交基不用欧拉角)：垂直姿态有万向节锁，而这个游戏有大量垂直机动。
 
 ### 正交基与退化
 
@@ -87,7 +87,7 @@ function orthonormalize(fwd, up) {
 }
 ```
 
-顺序是 **`up × fwd = right`**，与文件头 `right × up = fwd` 一致。退化参考轴按 `|f.y| > 0.9` 挑一个**不平行**的坐标轴：垂直爬升时 `fwd ≈ (0,1,0)`，必须改挑 `V(1,0,0)`。`Ent` 的 `stepAircraft()` 里有一处刻意调用：机头立起来时直接用 `orthonormalize(a.fwd, M3.V(0,1,0))` 重建基。
+顺序是 **`up × fwd = right`**，与文件头 `right × up = fwd` 一致。退化参考轴按 `|f.y| > 0.9` 挑一个**不平行**的坐标轴：垂直爬升时 `fwd ≈ (0,1,0)`，必须改挑 `V(1,0,0)`。`js/engine/entities/aircraft.js` 的 `stepAircraft()` 里有一处刻意调用：机头立起来时直接用 `orthonormalize(a.fwd, M3.V(0,1,0))` 重建基。
 
 ### 方向插值 `slerpDir`
 
@@ -161,7 +161,7 @@ function raySphere(origin, dir, center, radius) {
 
 | 想改什么 | 在哪 |
 |---|---|
-| 视场角 | **不在这里**。`makeCamera` 的 `fovYDeg` 由 `render.js` 传入（默认 58），可调值在设置页 `S.fov` |
+| 视场角 | **不在这里**。`makeCamera` 的 `fovYDeg` 由 `js/render/render.js` 的 `setCamera` 传入（默认 58），可调值在设置页 `S.fov` |
 | 焦距 / 画面中心 | `makeCamera` 里的 `focal` 与 `cx` / `cy` |
 | 近平面 | `makeCamera` 里的 `near: 0.6` |
 | 远平面 | `makeCamera` 里的 `far: 40000`（**目前无人读取**） |
@@ -174,12 +174,12 @@ function raySphere(origin, dir, center, radius) {
 ## 易踩的坑与设计取舍
 
 1. **`cam.far = 40000` 是死字段**：没人读它，距离剔除都由各绘制函数自己写死（云 16 km、雾 9000 m）。
-2. **`rotAxis` 不归一化轴，`raySphere` 假定 `dir` 是单位向量**：判别式 `b*b - c` 只在 `|dir|=1` 时才是标准二次方程，`Game` 调用前一律先 `M3.norm`；传非单位 `dir` 会静默给出错误的命中距离。
+2. **`rotAxis` 不归一化轴，`raySphere` 假定 `dir` 是单位向量**：判别式 `b*b - c` 只在 `|dir|=1` 时才是标准二次方程，`js/engine/game/combat.js` 调用前一律先 `M3.norm`；传非单位 `dir` 会静默给出错误的命中距离。
 3. **`project()` 在相机后方返回 `null`，调用方必须先判空**：要给后方目标画指示器时用 `projectUnclamped()`，它把后方点的 `z` 夹到 `near` 再投影并返回 `behind`（见 [hud.md](hud.md)）。
 4. **`projectCam` 不做 near 检查，除以任意 `c.z`**：对 `c.z ≈ 0` 的点调用会得到 Infinity / NaN，唯一防线是调用方先过 `project()` 或 `clipSeg()`。
 5. **`V` 里 `x || 0` 会把 `NaN` / `null` 默默当成 0**，没有校验。
 6. **`wrapPi` 是 `while` 循环**：正常只处理 ±π 附近，传入累加了很多圈的巨大角度会循环很多次。
-7. **所有向量运算都新建对象**（刻意取舍：可读性优先，每帧量级远小于 `ctx.fill()` 的开销）；真要压 GC，先给 `render.js` 的顶点数组池化。
+7. **所有向量运算都新建对象**（刻意取舍：可读性优先，每帧量级远小于 `ctx.fill()` 的开销）；真要压 GC，先给 `js/render/render.js` 的顶点数组池化。
 8. **`easeCurve` 会把输入夹到 `[-1,1]`**，想拿它做超过 ±1 的映射会被截断。
 
 ## 与其它模块的依赖关系
@@ -188,15 +188,15 @@ M3 依赖**无**。反向依赖（谁用了什么）：
 
 | 模块 | 用到 M3 的什么 |
 |---|---|
-| `render.js` | `makeCamera` / `toCam` / `projectCam` / `clipSeg` / `project` / `V` 几何 |
-| `js/models/` | 仅构造期用 `V` / `add` / `sub` / `mul` / `norm` / `cross`（见 [models.md](models.md)） |
-| `Ent` | `rotAxis` / `orthonormalize` / `angleBetween` / `turnToward` / `raySphere` / 全部向量运算 |
-| `AI` | `angleBetween` / `len` / `cross` / `norm` 等 |
-| `HUD` | `wrapPi`（罗盘）/ `projectUnclamped`（目标指示器）/ `len` |
-| `Game` | `raySphere`（子弹命中）/ `smooth`（g 载荷、相机回中）/ `rotAxis`（相机绕轴）/ `angleBetween` |
-| `audio.js` | 仅 `clamp` |
+| `js/render/render.js` | `makeCamera` / `toCam` / `projectCam` / `clipSeg` / `project` / `V` 几何 |
+| `js/models/**` | 仅构造期用 `V` / `add` / `sub` / `mul` / `norm` / `cross`（见 [models.md](models.md)） |
+| `js/engine/entities/**` | `rotAxis` / `orthonormalize` / `angleBetween` / `turnToward` / `raySphere` / 全部向量运算 |
+| `js/engine/ai/**` | `angleBetween` / `len` / `cross` / `norm` 等 |
+| `js/ui/hud/**` | `wrapPi`（罗盘，`instruments.js`）/ `projectUnclamped`（目标指示器，`targeting.js`）/ `len` |
+| `js/engine/game/**`、`js/ui/camera.js` | `raySphere`（子弹命中，`game/combat.js`）/ `smooth`（相机回中、控制平滑）/ `rotAxis`（相机绕轴）/ `angleBetween` / `slerpDir`（相机） |
+| `js/engine/audio.js` | 仅 `clamp` |
 | `js/render/planform/` | 仅 `clamp`（挂载就绪度显示） |
-| `js/missions/` | `rnd` 等标量工具 |
+| `js/missions/**` | `rnd` 等标量工具 |
 
-> `js/models/` 在构造期就调用 `M3`，所以 `math3d.js` 必须排在它之前
+> `js/models/**` 在构造期就调用 `M3`，所以 `js/core/math3d.js` 必须排在它之前
 > （见 [DESIGN.md](../DESIGN.md#3-模块划分与加载顺序)）。

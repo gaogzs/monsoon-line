@@ -396,5 +396,5 @@ seascorpion cameroceras dunkleosteus daplu skori diklo cross icecore atoll`
 
 ## 本批更新
 
-- **`STORE_LOOK.nose: 'dual'`**（TOR-3「雏矢」）：`js/models/ordnance/store-lib.js` 的 `addRound` 把头部改成钝圆的导引头罩（前端一段黑色窗口），后面接一段比弹体粗约 18% 的红色战斗部段。其它弹不受影响。
+- **武器文件里 `look.nose: 'dual'`**（TOR-3「雏矢」）：`js/models/ordnance/store-lib.js` 的 `addRound` 把头部改成钝圆的导引头罩（前端一段黑色窗口），后面接一段比弹体粗约 18% 的红色战斗部段。其它弹不受影响。
 - KA-7「折翼」的挂点组 B（机腹内埋弹舱）挂的是 CLA-4，几何见 loadout.md。

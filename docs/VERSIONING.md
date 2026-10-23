@@ -68,7 +68,7 @@ node tools/build/release.js                  # 不发版，只重新生成两个
 
 ```
 js/core/changelog.js    ← 由 CHANGELOG.md 生成，游戏读它
-js/core/version.js      ← 由工具生成，主菜单左上角的版本戳读它
+js/core/version.js      ← 由工具生成，标题页右上角的版本戳读它
 ```
 
 ---

@@ -1,7 +1,21 @@
 # 机库俯视识别图
 
-数据 `js/render/planform/`· 调用点 `Game` 的 `buildHangar()`
-与 `HUD` 的 `drawStores()` · 预览器 `tools/render/render-planform.js`
+数据与绘制 `js/render/planform/**`（`PLANFORM` 命名空间）· 调用点 `js/ui/screens/hangar.js`
+与 `js/ui/hud/panels.js` 的 `drawStores()`（另有 `js/ui/unitview.js`）· 预览器 `tools/render/render-planform.js`
+
+## 文件组织（v3.0.0 起）
+
+原来的单文件 `js/planform.js` 已拆成 `js/render/planform/` 下五个文件，共用命名空间 `PLANFORM`：
+
+| 文件 | 内容 |
+|---|---|
+| `_state.js` | 建空壳 `var PLANFORM = { $: {} }`；`$` 是私有状态，**只许本命名空间的文件读写**，跨命名空间走公开函数（smoke 有静态检查） |
+| `planes.js` | 各机型的俯视数据 `$.P`（即 `PLANFORM.planes`，6 个机型） |
+| `stores.js` | 挂载外形：`$.STORE_LEN`、`isPod`、`storeHalfW` / `storeLen`、`drawStore`（按武器 `look` 画）、`drawRound`、`drawStoreKind`（按 `kind` 的老画法，给没有 `look` 的吊舱用） |
+| `paint.js` | `groupsOf` / `groupStore`、`paint`（主绘制）、`draw`（机库大图）、`paintStore`（单件挂载的放大图） |
+| `zz-api.js` | 把 `$` 上的东西挂成公开 API：`PLANFORM.planes` / `draw` / `paint` / `paintStore` |
+
+加新机型 = 在 `planes.js` 里加一份数据，不需要改别处。
 
 ---
 
@@ -9,18 +23,18 @@
 
 机库里原本只有文字和统计条，玩家看不出几架飞机"长得"有什么不一样。
 右上角一张俯视识别图之后，外形差异一眼可辨。
-`P` 里现有 **6 个机型**，键名与 `AIRCRAFT[].model` 一一对应：
+`$.P` 里现有 **6 个机型**，键名与 `AIRCRAFT[].model` 一一对应：
 
 | 键 | 机型 | 翼展 / 机长（m） | 俯视特征 |
 |---|---|---|---|
-| `frigatebird` | DB-11 军舰鸟 | 15.2 / 20.4 | **变后掠翼** —— 后掠三角，翼根在中后部 |
+| `frigatebird` | DB-11 军舰鸟 | 17.6 / 20.4 | **变后掠翼** —— 后掠三角，翼根在中后部 |
 | `sailfish` | D-14 旗鱼 | 13.8 / 22.9 | **菱形翼** —— 大后掠，前后缘对称收成菱形 |
 | `booby` | G-6 鲣鸟 | 17.2 / 19.4 | **平直翼** —— 翼展最大，3 组共 6 个挂点 |
 | `petrel` | F-9 海燕 | 13.2 / 22.9 | **三角翼** —— 机身最细长，双尾喷口 |
 | `skua` | D-21 贼鸥 | 13.8 / 21.4 | **无尾菱形翼** —— 后缘前掠，扁平尾缘 |
 | `albatross` | D-33 信天翁 | 16.4 / 19.6 | **前掠翼** —— 翼尖在翼根之前 |
 
-表是按 `model` 查的，不是按 `id`：`AIRCRAFT` 17 条里，NPC 机型 `tideline`（XAMSI「潮线」）
+表是按 `model` 查的，不是按 `id`：`AIRCRAFT` 17 条（`js/data/aircraft/<id>.js`）里，NPC 机型 `tideline`（XAMSI「潮线」）
 的 `model` 是 `'sailfish'`，所以它也能取到旗鱼这份数据 —— **实际有俯视图的是 7 型**
 （6 架可驾驶 + `tideline`）。其余 10 型 NPC 没有数据，单位详情页对它们不显示这一节
 （见 [unitview.md](unitview.md)）。借用意味着 `tideline` 的识别图就是 D-14 的外形，
@@ -40,7 +54,7 @@
 - 翼展 / 机长尺寸标注
 - 内部只保留必要结构线：翼梁、机身分段、进气道、座舱盖、尾喷口
 
-配色沿用界面那一套，全部写在 `paint()` 开头的局部常量里：
+配色沿用界面那一套，全部写在 `paint()`（`paint.js`）开头的局部常量里：
 
 | 常量 | 颜色 | 用途 |
 |---|---|---|
@@ -94,7 +108,7 @@ PLANFORM.planes.frigatebird = {
   fills:   [{ pts:[[x,y]...], a }],  // 需要淡填充的面（座舱盖）
   sweepAlt:   [[[x,y],[x,y]], ...],  // 可选：可变后掠的展开位
   sweepPivot: { x, y },              // 可选：铰链位置
-  sweepLabel: '可变后掠 11°–35°',    // 可选：文字标注
+  sweepLabel: T('render.planform.planes.frigatebird.sweepLabel'),  // 可选：文字标注（中文「可变后掠 20°–62°」）
   cannon:  { x, y }             // 机炮
 };
 ```
@@ -108,14 +122,17 @@ PLANFORM.planes.frigatebird = {
 `frigatebird` 额外带 `sweepAlt` / `sweepPivot` / `sweepLabel` 三个字段
 （详见"可变后掠翼"）；其余五个机型只有 `cannon`，没有挂点字段。
 
-`js/render/planform/` 对外只返回三个东西：
+`zz-api.js` 对外只导出四个东西：
 
 ```js
-return { planes: P, draw: draw, paint: paint };
+PLANFORM.planes = $.P;  PLANFORM.draw = $.draw;
+PLANFORM.paint = $.paint;  PLANFORM.paintStore = $.paintStore;
 ```
 
-**加新机型时**：在 `P` 里加一份数据，键名必须等于 `AIRCRAFT[].model`。
-`Game` 的 `preflight()` 会检查这件事，漏了会报"缺少俯视识别图数据"——
+（`paintStore` 是后来为武器单页加的：单件挂载放大图，机头朝上居中、带长度标尺，调用点在 `js/ui/unitview.js`。）
+
+**加新机型时**：在 `planes.js` 的 `$.P` 里加一份数据，键名必须等于 `AIRCRAFT[].model`。
+`js/boot/main.js` 的 `preflight()` 会检查这件事，漏了会报"缺少俯视识别图数据"——
 但它**跳过 `npcOnly` 的机型**（`if (!ac.npcOnly && !PLANFORM.planes[ac.model])`），
 所以敌方制式机、支援机不进机库、也不需要这张图。
 
@@ -138,15 +155,15 @@ return { planes: P, draw: draw, paint: paint };
 
 | 位置 | 调用 |
 |---|---|
-| 机库（`Game` `buildHangar()`） | `PLANFORM.draw(document.getElementById('planCv'), ac, lo, activeHpGroup)` |
-| 战斗 HUD 右下角（`HUD` `drawStores()`） | `PLANFORM.paint(ctx, bx, by, size, size, p.ac, p.loadout, { compact: true, cd: cd })` |
+| 机库（`js/ui/screens/hangar.js`） | `PLANFORM.draw($.viewEl(view, 'planCv'), ac, lo, view.group)` |
+| 战斗 HUD 右下角（`js/ui/hud/panels.js` 的 `drawStores()`） | `PLANFORM.paint(ctx, bx, by, size, size, p.ac, p.loadout, { compact: true, cd: cd })` |
 
 HUD 那句的 `cd` 由 `drawStores()` 现算：把每条挂载的剩余冷却
 `arr[j] / w.cd` 夹到 0..1 再取 `1 -`，得到**就绪度**放进数组。
 两边共用同一份 `paint()`，所以挂点位置与武器外形永远一致 ——
 分成两份写的话，两边一定会慢慢长得不一样。
 
-机库图下方的说明文字由 `Game` 写在 `planCap` 里
+机库图下方的说明文字由 `js/ui/screens/hangar.js` 写在 `planCap` 里
 （"绿色为挂载，琥珀为当前编辑的挂载点组，青色虚线为可变后掠翼的展开位"）。
 
 ---
@@ -181,8 +198,10 @@ TOR-2 ×8  ─────┐
 
 ## 挂载外形
 
-`drawStore(g, x, y, kind, k, style)` 按武器 `kind` 画不同外形，
-`style.line` 决定线宽。长度查 `STORE_LEN`、宽度按机型折算：
+`drawStore(g, x, y, w, k, style)`（`stores.js`）收的是**武器对象** `w`：有 `w.look`（`js/data/weapons/**` 里
+单一数据源的外观：长度 `len`、直径 `dia`、联装 `rack`、发射巢 `nest`、`nose` / `fin` 等）就按 `look` 画
+（单发 / 多联挂梁 / 发射巢，`drawRound`）；没有 `look` 的（吊舱）退回 `drawStoreKind(g, x, y, kind, k, style)`，
+按武器 `kind` 画下表的外形。`style.line` 决定线宽。`kind` 画法的长度查 `$.STORE_LEN`、宽度按机型折算：
 
 | kind | `STORE_LEN`（m） | 宽度 `W` | 外形 |
 |---|---|---|---|
@@ -211,11 +230,12 @@ TOR-2 ×8  ─────┐
 
 ```js
 sweepAlt: [
-  [[1.30, 2.4], [7.8, 1.2]],   // 展开位前缘
-  [[1.50, -3.4], [7.8, -1.4]]  // 展开位后缘
+  [[1.30, 3.6], [9.2, -0.4]],   // 展开位前缘（20°）
+  [[1.50, -1.0], [8.4, -2.7]],  // 展开位后缘
+  [[9.2, -0.4], [8.4, -2.7]]    // 展开位翼尖
 ],
 sweepPivot: { x: 1.45, y: 1.9 },
-sweepLabel: '可变后掠 11°–35°'
+sweepLabel: T('render.planform.planes.frigatebird.sweepLabel')   // 「可变后掠 20°–62°」
 ```
 
 主轮廓画的是**后掠位**，`sweepAlt` 用**青色虚线**叠加展开位：
@@ -293,7 +313,7 @@ node tools/render/render-planform.js     # 输出到 tools/render/out/*.png
 它实现了一个最小的 Canvas 2D 子集（路径、描边、`quadraticCurveTo`、
 `arc`、扫描线填充、虚线）、一个抗锯齿光栅器，和一个 PNG 编码器
 （IHDR/IDAT/IEND + CRC32 + zlib），然后**加载真正的 `js/render/planform/`**
-（连同 `js/data/`、`math3d.js`、`js/models/`）调用 `PLANFORM.draw()`。
+（连同 `js/data/`、`js/core/math3d.js`、`js/models/`；脚本清单取自 `tools/lib/scripts.js`，顺序的权威是 `tools/build/gen-index.js`）调用 `PLANFORM.draw()`。
 
 输出文件名三种：`<机型>-default.png`、`<机型>-clean.png`、
 `<机型>-<武器 id>.png`（把该武器填满所有挂得下的组）。
@@ -302,7 +322,7 @@ node tools/render/render-planform.js     # 输出到 tools/render/out/*.png
 **改动俯视图数据后建议跑一次预览**，肉眼确认形状没画歪。
 
 > 预览器不支持 `fillText`（被实现为空函数），所以生成的图里没有文字标注
-> ——`GROUP n`、`翼展 x m`、`可变后掠 11°–35°` 在预览里都看不到。
+> ——`GROUP n`、`翼展 x m`、`可变后掠 20°–62°` 在预览里都看不到。
 > 游戏里有。这是预览器的已知限制，不影响形状正确性。
 >
 > 它对 `AIRCRAFT` 是**全表遍历**的，所以那些没有俯视数据的机型
@@ -315,4 +335,4 @@ node tools/render/render-planform.js     # 输出到 tools/render/out/*.png
 
 ## 本批更新
 
-- `drawRound` 对 `nose: 'dual'` 的弹画钝头 + 外凸的战斗部段 + 一道接缝线，与 `js/models/` 的 `addRound` 轮廓一致。
+- `drawRound`（`stores.js`）对 `nose: 'dual'` 的弹画钝头 + 外凸的战斗部段 + 一道接缝线，与 `js/models/ordnance/store-lib.js` 的 `addRound` 轮廓一致。

@@ -3,7 +3,7 @@
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
   "current": "v3.0.0",
-  "generated": "2026-10-24T00:12:42+09:00",
+  "generated": "2026-10-24T00:30:22+09:00",
   "releases": [
     {
       "version": "v3.0.0",

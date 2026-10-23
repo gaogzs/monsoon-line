@@ -1,8 +1,10 @@
 # 资料库（资料 / CODEX）
 
-代码：`js/ui/codex/`· 渲染与导航在 `Game` 的 `buildCodex()` · DOM 在 `index.html` 的 `#scr-codex`
+代码：`js/ui/codex/`（`entries/<id>.js` 逐条 + `_lib.js` + `zz-seal.js`）· 渲染与导航在 `Game` 的 `buildCodex()`（`js/ui/screens/codex.js`）· DOM 在页面模板 `locales/_html/screens/` 里的 `#scr-codex`（页面由 `tools/build/gen-pages.js` 生成，见 [pages.md](pages.md)）
 
-一句话职责：**js/ui/codex/ 只提供数据与"生成函数"**——不碰 DOM、不写样式、不决定导航；条目在 `Game` 里被遍历、拼字符串、塞进 `#codexNav` / `#codexBody`。
+一句话职责：**`js/ui/codex/` 只提供数据与"生成函数"**——不碰 DOM、不写样式、不决定导航；条目在 `Game` 里被遍历、拼字符串、塞进 `#codexNav` / `#codexBody`。
+
+> **v3.0.0 之前**整个资料库是一个叫 `js/codex.js` 的文件，里面一个巨大的 `CODEX` 数组字面量。现在一条一个文件（`js/ui/codex/entries/<id>.js`，共 24 个：`w1 w2 t1–t5 s1–s5 f1–f7 cmp1 cmp2 inv1–inv3`），用 `Registry.codexEntry({ order, cat, id, title, sub, html | build, mount? })` 注册；`order` 决定导航顺序（`w1`=10 … `t1`=30 … `f1`=120 … `cmp1`=190 · `t5`=210 · `inv1`=220 `inv2`=230 `inv3`=240）。条目里所有玩家可见的文字都不在 js 里，而在 `locales/<语言>/text/codex/<id>.json`，代码里写 `T('codex.<id>.html')` 一类的键（见 [text.md](text.md)）。
 
 > 世界设定的完整散文版本在 [docs/world/SETTING.md](../world/SETTING.md)，战役情节在 [docs/world/CAMPAIGN.md](../world/CAMPAIGN.md)。
 > 两者的关系是本文件最需要注意的部分，见下文「与 SETTING.md 的关系」。
@@ -13,36 +15,29 @@
 
 | 项 | 事实 |
 |---|---|
-| 文件 | `js/ui/codex/`，全中文注释 |
-| 加载位置 | `index.html` 里紧随 `js/render/planform/` 之后、`js/data/` 之前 |
-| 依赖 | 静态条目零依赖；图鉴条目在 `build()` 里读 `AIRCRAFT` / `WEAPONS` / `SHIPS`（`WEAPONS` 已含补丁表注入的字段） |
-| 输出 | 全局 `var CODEX`（数组）；四个辅助函数 `_hpKind` `_capLabel` `_rngTxt` `_seekerLabel` 也挂在全局 |
+| 文件 | `js/ui/codex/entries/<id>.js`（24 条，各一个文件）、`_lib.js`（占位符表 `_CX_VALS` / `_cxFill` / `_CX_GUN_OWNER` 等辅助）、`_schema.js`（仅头注释）、`zz-seal.js`（封存 + 格式化函数） |
+| 加载位置 | 脚本顺序由 `tools/build/gen-index.js` 决定：层顺序 `core → data → models → missions → engine → render → ui → boot`，`js/ui/codex/` 属于 `ui` 层，**在 `js/data/` 与 `js/engine/` 之后**（层内 `_` 开头的先、`zz-` 开头的后，所以顺序是 `_lib.js` → `entries/*` → `zz-seal.js`） |
+| 依赖 | 静态条目零依赖；图鉴条目在 `build()` 里读 `AIRCRAFT` / `WEAPONS` / `SHIPS` |
+| 输出 | `zz-seal.js` 调 `Registry.sealCodex()`，得到全局 `CODEX`（按 `order` 排好的数组）；辅助函数 `_hpKind` `_capLabel` `_rngTxt` `_seekerLabel` `weaponGuidance`（还有 `_fuzeTxt` / `_blastTxt`）也在 `zz-seal.js` 里挂成全局 |
 | 校验 | `tools/test/smoke.js` 会遍历所有 `typeof e.build === 'function'` 的条目并调用一次 |
 
-**加载顺序为什么重要**：js/ui/codex/ 先于 js/data/ 求值。`CODEX` 数组字面量本身不引用那些表，所以能安全求值；所有对 `AIRCRAFT` / `WEAPONS` 的引用都必须留在 `build()` 函数体内，等用户点开图鉴时才执行。源码注释把这条写得很明白：
-
-```js
-/* 注意 js/ui/codex/ 在 js/data/ 之前加载，所以 build() 里引用那些表
-   必须等到被调用时才求值 —— 这正是把它们写成函数的原因。 */
-```
-
-同理，`_rngTxt()` 里调用的 `missileRange(w)` 定义在 `js/data/`——也是靠"调用时它已经加载完"才成立。**不要在 js/ui/codex/ 的模块顶层直接算这些值。**
+**为什么仍然是“懒求值”**：以前（`js/codex.js` 时代）资料库比 `js/data/` 先加载，所以条目里对 `AIRCRAFT` / `WEAPONS` 的引用**必须**留在 `build()` 体内。现在 `ui` 层排在 `data` / `engine` 之后，顺序问题已经不存在；但 `build()` 与 `{{键}}` 占位符仍然在点开条目时才求值——图鉴要反映**此刻**的数据表，且 `build()` 每次打开都重跑、不缓存（见下）。习惯保持不变：**不要在条目文件顶层直接算这些值**，写进 `build()` / `_CX_VALS` 的函数里。
 
 ---
 
 ## 数据结构：`CODEX` 条目
 
-`CODEX` 是一个数组（24 条：21 静态 + 3 动态），元素有两种形态。
+`CODEX` 是一个数组（24 条：21 静态 + 3 动态），元素有两种形态。每条的 `html` / `title` / `sub` 在条目文件里是 `T('codex.<id>.xxx')`（`html` 里可含 `{{键}}` 占位符，见下）。
 
 | 字段 | 类型 | 静态条目 | 动态条目 | 缺了会怎样 |
 |---|---|---|---|---|
 | `cat` | string | ✅ | ✅ | 它在导航里会以 `undefined` 作为分类标题 |
-| `id` | string | ✅ | ✅ | **当前没有任何代码读 `id`**（`buildCodex()` 只用下标）；它是锚点/可读性用途 |
+| `id` | string | ✅ | ✅ | `Registry` 要求必填且不得重复；`buildCodex()` 导航本身只用下标 |
 | `title` | string | ✅ | ✅ | 导航项文字变成 `undefined`，正文标题也变 `undefined` |
 | `sub` | string | ✅ | ✅ | 正文标题下那行变成 `undefined`（没有兜底判断） |
 | `html` | HTML string | ✅ | ❌ | — |
 | `build` | function | ❌ | ✅ | 两者都没有时正文为空（不会报错） |
-| `mount` | function | 可选 | 可选 | 没有就不调。`buildCodex()` 在 `innerHTML` 写完之后调它，给条目挂需要真 DOM 的小部件（目前只有 `s4` 的 3D 预览） |
+| `mount` | function | 可选 | 可选 | 没有就不调。`buildCodex()`（`js/ui/screens/codex.js`）在 `innerHTML` 写完之后调它，给条目挂需要真 DOM 的小部件（目前只有 `s4` 的 3D 预览） |
 
 渲染逻辑只有这一行在做分派：
 
@@ -73,8 +68,8 @@ var body = typeof e.build === 'function' ? e.build() : (e.html || '');
 - **势力与战役拆开**：势力页只描述"谁是什么样"，不描述"谁在打谁"。将来若从别的阵营视角写战役，这些页一个字都不用改。
 - **逻辑语 `t5` 排在最后一组静态条目**，分类是"语言 / LANGUAGE"，与前面的"技术 / TECH"分开。
 
-**`inv1` / `inv2` / `inv3` 是用 `CODEX.push(...)` 追加的**，所以在数组末尾、导航最后。
-分类顺序完全取决于数组顺序——把某条挪个位置就会多出一个重复的分类标题（见下）。
+**`inv1` / `inv2` / `inv3` 的 `order` 最大（220 / 230 / 240）**，所以在数组末尾、导航最后。
+分类顺序完全取决于 `order`——把某条的 `order` 改到别的分类中间就会多出一个重复的分类标题（见下）。
 
 `s5`「海面上的东西」的位置是**刻意**的：它排在同一组的最后一条静态条目，
 紧挨着后面的 "势力 / FACTIONS"。理由是它讲的是四方加三方**都在用**的东西
@@ -101,7 +96,7 @@ var body = typeof e.build === 'function' ? e.build() : (e.html || '');
 - 可驾驶标记读 `a.npcOnly`：没有该字段 = 可驾驶，显示 `可驾驶` 徽章。所以**字段名和设定叙述都不预设玩家立场**（历史上这个字段叫 `enemyOnly`，已改名）。
 - 挂点数是从 `hardpointGroups[].pts.length` **现场数出来的**，不是另存的数字。
 - 中文名取 `a.cn`、英文绰号取 `a.nick`。注释里记了一次真实事故：早期把这两个字段写反，上游三架显示英文、新加的三架因为字段写反而显示中文，"正好颠倒"。
-- **型号名外面包了一层可点的 `<span class="cx-unit" data-unit="aircraft:<id>">`** —— 点进这一型自己的详情页。`js/ui/codex/` 只输出标记，**不绑事件**；绑定由 `Game` 在 `#codexBody` 上做一次事件委托。理由见 [unitview.md](unitview.md#链接是怎么接上的)。
+- **型号名外面包了一层可点的 `<span class="cx-unit" data-unit="aircraft:<id>">`** —— 点进这一型自己的详情页。`js/ui/codex/` 只输出标记，**不绑事件**；绑定由 `Game` 的 `bindCodexUnits()`（`js/ui/screens/codex.js`）在 `#codexBody` 上做一次事件委托。理由见 [unitview.md](unitview.md#链接是怎么接上的)。
 
 ### `inv2` 的关键点
 
@@ -167,7 +162,7 @@ var order = ['上游公约', '下游同盟', '分水群岛国', '调节场管理
 
 ## 关键流程
 
-### 导航如何构建（`Game` `buildCodex()`）
+### 导航如何构建（`Game` `buildCodex()`，`js/ui/screens/codex.js`）
 
 ```js
 var lastCat = null;
@@ -184,7 +179,7 @@ for (var i = 0; i < CODEX.length; i++) {
 
 1. **分类标题只在 `cat` 和上一条不同时插入**。所以**同一分类必须连续排在一起**；如果数组里穿插回去，导航里就会出现两个同名分类标题。
 2. 导航项是 `<div class="cx-item">`，靠 `textContent = CODEX[idx].title` 显示，`onclick` 里设置全局 `codexSel = idx` 后再调 `buildCodex()` 重建整块。
-3. **没有键盘导航**。只有鼠标点击；`codexSel` 是模块级变量，退出资料库再进来会保留上次选中项（不重置）。
+3. **没有键盘导航**。只有鼠标点击；`codexSel` 是 `js/ui/screens/codex.js` 里的闭包变量，退出资料库再进来会保留上次选中项（不重置）。
 4. 每次 `buildCodex()` 都会把 `#codexNav` / `#codexBody` 的 `innerHTML` 清空重建。`smoke.js` 的 DOM 桩专门为此让 `innerHTML` setter 清空 `children`，否则"重复进入"会看到元素越积越多。
 
 ### 条目如何渲染
@@ -204,7 +199,7 @@ if (typeof e.mount === 'function') e.mount();   // DOM 就位之后再挂
 
 **全部是 `innerHTML` 直拼**：条目里的 HTML（`<table class="cx-table">` `<h4>` `<span class="am">`）会原样生效；`title` / `sub` 缺字段就渲染成字面量 `undefined`。
 
-进入路径：`Game` 里 `else if (go === 'codex') { buildCodex(); show('codex'); }`。所以图鉴是**懒求值**——不点进去就不会执行 `build()`。
+进入路径：`js/boot/main.js` 里 `else if (go === 'codex') { $.buildCodex(); $.show('codex'); }`。所以图鉴是**懒求值**——不点进去就不会执行 `build()`。
 
 `smoke.js` 对动态条目的断言（三次采样）：
 
@@ -226,7 +221,7 @@ for (const e of dyn) {
 
 | | `docs/world/SETTING.md` | `js/ui/codex/` |
 |---|---|---|
-| 形态 | 纯散文（约 1230 行），可单独阅读、离线分发 | 游戏内 HTML 片段，靠 `buildCodex()` 渲染 |
+| 形态 | 纯散文（约 1230 行），可单独阅读、离线分发 | 游戏内 HTML 片段（存在 `locales/<语言>/text/codex/*.json`），靠 `buildCodex()` 渲染 |
 | 与代码的关系 | **零绑定**。数字全是手抄的 | 图鉴三页现场读数据表；叙事页里的数字走 `{{键}}` 占位符现读 |
 | 谁会看 | 想通读世界观的人 | 游戏里的玩家 |
 
@@ -239,22 +234,22 @@ for (const e of dyn) {
 
 - `inv1` / `inv2` / `inv3`：整页由 `build()` 遍历 `AIRCRAFT` / `WEAPONS` / `SHIPS` 生成。
 - 带占位符的静态页（当前 `t1` / `t3` / `t4` / `s1` / `s2` / `cmp1`）：
-  `js/ui/codex/` 末尾的循环给所有 `html` 含 `{{` 的条目自动挂上
+  `js/ui/codex/zz-seal.js` 开头封存 `CODEX` 之后的循环给所有 `html` 含 `{{` 的条目自动挂上
   `build: function () { return _cxFill(this.html); }`。`buildCodex` 本来就优先调用 `build()`，所以 `Game` 不用改。
 
-### 占位符机制（`_CX_VALS` / `_cxFill`）
+### 占位符机制（`_CX_VALS` / `_cxFill`，在 `js/ui/codex/_lib.js`）
 
 | 键前缀 | 数据来源 |
 |---|---|
 | `rho.*` | `Ent.airDensity()` / `Ent.turnFactor()`（t1 密度表、20 km 的 7%、3.7 倍动压速度） |
-| `gunTable`、`gun.cel3.*` | `WEAPONS` 中 `kind === 'gun'` 的全部条目（s2 机炮表、t1/s2 射程、初速、每秒发数、飞行时间） |
-| `w.e4.*` / `w.l2.*` | ZUN-4 的 `lockReduce` / `cd`（来自 `STORE_COOLDOWN`）/ `duration`；GUS-2 的拦截半径、锥角、概率、单次冷却 `cd` |
+| `gunTable`、`gun.cel3.*`（原 `gun.k3.*`；机炮 id `k1 k2 k3 k7 k11` 已改名 `cel1 cel2 cel3 cel7 cel11`） | `WEAPONS` 中 `kind === 'gun'` 的全部条目（s2 机炮表、t1/s2 射程、初速、每秒发数、飞行时间） |
+| `w.e4.*` / `w.l2.*` | ZUN-4 的 `lockReduce` / `cd`（武器文件里的槽冷却）/ `duration`；GUS-2 的拦截半径、锥角、概率、单次冷却 `cd` |
 | `w.v17.*` / `w.mrm.*` / `w.srm.*` | CLA-17 动力段、高空降级后动力段、转弯率、总飞行时间；对比用的 CLA-4 / TOR-2 |
 | `ms.*` | `MISSIONS`：现在只有 `cmp1` 用 `ms.m10.limit`（m10 的 `timeLimit`）。`ms.total` / `ms.highN` / `ms.highList` 仍定义着，但 `t1` 那句"几个任务在 18–22 km"已删（非战役条目不提任务），没人用 |
 
 规则：
 
-1. `_CX_VALS` 的每一项都是**函数**——js/ui/codex/ 先于 js/data/ / Ent / js/missions/ 加载，只能在渲染时求值。
+1. `_CX_VALS` 的每一项都是**函数**——只在渲染时求值（沿用 `codex.js` 时代的约定，也保证读到的是点开那一刻的数据）。
 2. 未知键原样保留 `{{键}}`；`smoke.js` 断言所有动态条目不含 `undefined` / `NaN` / 未替换占位符，且 `inv2` 里出现「无制导」。
 3. `w.v17.lifeHigh` 直接调用 `Ent.effectiveLife(w, 20000)`，没有手抄公式；`Ent` 的冲压降级改了，这里自动跟上。
 4. 机炮表的「装备方」列是叙事，写在 `_CX_GUN_OWNER`；新增机炮会自动出现在表里，只是装备方显示「—」。
@@ -262,17 +257,17 @@ for (const e of dyn) {
 
 ### 导引方式：一个判定、两处使用
 
-`weaponGuidance(w)`（js/ui/codex/，全局）返回 `{ name, note, lead }`，图鉴的 `_seekerLabel()` 与机库挂载卡片的 `storeStatLine()`（Game）都调用它。
+`weaponGuidance(w)`（`js/ui/codex/zz-seal.js`，全局）返回 `{ name, note, lead }`，图鉴的 `_seekerLabel()` 与机库挂载卡片的 `storeStatLine()`（`js/ui/screens/hardpoints.js`）都调用它。
 `w.unguided` 或 `seeker` 缺省 / `'none'` 一律判为「无制导」——此前缺省 `seeker` 的火箭弹（rkt）与子母弹（clb）在图鉴里被标成了「雷达」。
 
 ### 已修复的漂移（改为占位符之前）
 
 | 位置 | 原来静态写的 | 实际 |
 |---|---|---|
-| `t3` 游戏机制 | ZUN-4 冷却 | 现读 `WEAPONS.e4.cd`（`STORE_COOLDOWN.e4 = 50`） |
+| `t3` 游戏机制 | ZUN-4 冷却 | 现读 `WEAPONS.e4.cd`（武器文件 `js/data/weapons/e4.js` 里写的 50） |
 | `t3` 游戏机制 | "锁定锥收窄到 ±20°" | 已有实现：`Game` 锁定逻辑在 `ewPower > 0` 时 `cone = min(cone, 20°)`；这条不再算漂移 |
 | `s1` | CLA-17 燃烧 6→60 s、高空 60→14 s、转弯 0.9 | `life = 10`、高空 2.4 s、`turn = 1.00`，全部改为占位符 |
-| `s2` | 机炮"1000 米射程"、0.9 秒 | `cel3.range = 1600` → 1.5 秒 |
+| `s2` | 机炮"1000 米射程"、0.9 秒 | `cel3.range = 1600` → 1.5 秒（当时叫 `k3`，现 `cel3`） |
 | `t1` | 18 km 密度 0.12、22 km 0.045 | `Ent.airDensity`：0.099（9.9%）、0.052 |
 | `t1` | "十一个任务中有两个"在 18–22 km | 曾改为 `ms.*` 现数；后来整句删掉（非战役条目不提任务） |
 
@@ -284,25 +279,25 @@ for (const e of dyn) {
 
 | 想改什么 | 在哪 |
 |---|---|
-| 导航顺序 / 分类 | `CODEX` 数组顺序；分类标题由 `cat` 变化自动插入 |
-| 某一页的正文 | 该条目的 `html` 字符串 |
+| 导航顺序 / 分类 | 各条目 `Registry.codexEntry` 的 `order`；分类标题由 `cat` 变化自动插入 |
+| 某一页的正文 | `locales/<语言>/text/codex/<id>.json` 里该条目的 `html`（条目文件里是 `T('codex.<id>.html')`） |
 | 图鉴收录的机型 | `AIRCRAFT`（`inv1` 自动读） |
 | **图鉴收录的舰船** | **`SHIPS`（`inv3` 自动读）；势力分组顺序写死在 `inv3` 的 `order` 数组里** |
 | 图鉴收录的武器与分组 | `cats` 数组（`inv2` 的 `kind` 分组）+ `WEAPONS[].fits` |
 | "可驾驶"徽章 | `AIRCRAFT[].npcOnly` |
-| 挂点类型中文化 | `_hpKind()` 的映射表 |
-| 能力门槛中文名 | `_capLabel()` 的映射表（`strike` = 重型火控） |
+| 挂点类型中文化 | `zz-seal.js` 的 `_hpKind()` 映射表 |
+| 能力门槛中文名 | `zz-seal.js` 的 `_capLabel()` 映射表（`strike` = 重型火控） |
 | 射程列算法 | `js/data/` 的 `missileRange()` |
-| 导引方式文案 | `weaponGuidance()`（图鉴与机库卡片共用） |
-| 叙事页里的数值 | `_CX_VALS` 占位符表 |
+| 导引方式文案 | `zz-seal.js` 的 `weaponGuidance()`（图鉴与机库卡片共用） |
+| 叙事页里的数值 | `_lib.js` 的 `_CX_VALS` 占位符表 |
 
 ## 易踩的坑与设计取舍
 
 1. **加了新 `kind` 就要加进 `cats`**，否则整类武器在图鉴里凭空消失（`dew` 的现状）。
 2. **`build()` 里不要依赖加载顺序之外的全局**，也不要缓存结果；每次点击都会重跑。
-3. **分类必须连续**，`buildCodex` 只比较相邻两条的 `cat`。
+3. **分类必须连续**（即同一分类的 `order` 要相邻），`buildCodex` 只比较相邻两条的 `cat`。
 4. **`title` / `sub` 没有兜底**，缺字段会直接渲染 `undefined`。
-5. **`id` 是死的**：改 `id` 不会破坏任何东西，也不会改变任何行为；导航靠下标。
+5. **导航靠下标不靠 `id`**：改 `id` 不会改变导航行为（但 `Registry` 要求 `id` 唯一，且文字键 `codex.<id>.*` 要同步改）。
 6. **静态条目里新写的数字必须走占位符**；直接写死的数字会漂移（见上表）。
 7. **`build()` 抛异常会打断整次渲染**（`buildCodex` 没有 try/catch），页面停在半成品；`smoke.js` 是唯一的守门人。
 8. **势力页不带立场、战役页单独成组**是刻意的结构设计，不要为了"读起来顺"把它们合并回一页。
@@ -311,10 +306,12 @@ for (const e of dyn) {
 
 | 模块 | 关系 |
 |---|---|
-| `js/data/` | `inv1` / `inv2` / `inv3` 的数据源（`AIRCRAFT` / `WEAPONS` / `SHIPS`）；`_rngTxt` 调 `missileRange()`。**加载在 js/ui/codex/ 之后** |
-| `Game` | `buildCodex()` 是唯一的消费者：建导航、渲染正文、`show('codex')` 时懒执行 |
-| `unitview.js` | 图鉴里那两个 `cx-unit` 标记的落点：`Game` 的委托拿到 `data-unit` 后调 `UnitView.html()` / `mount()` 换成详情页。`s4` 的 `mount()` 另外直接调 `UnitView.mountModel()` 挂调节单元的 3D 预览。`.cx-unit` 的样式也在那一族里 |
-| `index.html` | 提供 `#scr-codex` / `#codexNav` / `#codexBody` 三个锚点，以及入口按钮 `data-go="codex"` |
+| `js/data/`、`js/engine/` | `inv1` / `inv2` / `inv3` 的数据源（`AIRCRAFT` / `WEAPONS` / `SHIPS`）；`_rngTxt` 调 `Ent.displayRange`、`_fuzeTxt` / `_blastTxt` 调 `Combat.spec`。**都加载在 `js/ui/codex/` 之前** |
+| `Game` | `js/ui/screens/codex.js` 的 `buildCodex()` 是唯一的消费者：建导航、渲染正文、`show('codex')` 时懒执行 |
+| `Registry` / `Tags` | 条目经 `Registry.codexEntry` 注册、`Registry.sealCodex()` 封存；详情页“机制标签”一行读 `Tags.declared()`（见 [unitview.md](unitview.md)、[tags.md](tags.md)） |
+| `locales/<语言>/text/codex/` | 条目的全部文字（`T('codex.<id>.*')`），见 [text.md](text.md) |
+| `unitview.js`（`js/ui/unitview.js`） | 图鉴里那两个 `cx-unit` 标记的落点：`Game` 的委托拿到 `data-unit` 后调 `UnitView.html()` / `mount()` 换成详情页。`s4` 的 `mount()` 另外直接调 `UnitView.mountModel()` 挂调节单元的 3D 预览。`.cx-unit` 的样式也在那一族里 |
+| 页面模板（`locales/_html/screens/`） | 提供 `#scr-codex` / `#codexNav` / `#codexBody` 三个锚点，以及入口按钮 `data-go="codex"`；根目录 `index.html` 只是启动器，见 [pages.md](pages.md) |
 | `css/style.css` | `.cx-table` `.cx-title` `.cx-sub` `.cx-text` `.cx-note` `.cx-cat` `.cx-item` `.cx-fly`，以及 `<span class="am">` / `cy` / `rd` 三个强调色 |
 | `tools/test/smoke.js` | 断言动态条目可生成且 ≥200 字符；导航按钮 `data-go="codex"` → `scr-codex` |
 | `docs/world/SETTING.md` | 同源散文，但**没有代码绑定**，参数可能已漂移 |

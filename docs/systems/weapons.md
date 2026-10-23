@@ -1,7 +1,8 @@
 # 武器系统
 
-数据 `js/data/` 的 `WEAPONS` · 行为 `Ent` · 发射与锁定 `Game`
-的 `launch()` / `updateLock()` / `updateDEW()` / `breakLock()`
+数据 `js/data/weapons/<id>.js`（汇成全局 `WEAPONS`）· 行为 `Ent`（`js/engine/entities/`）· 发射与锁定
+`Game` 的 `launch()`（`js/engine/game/launch.js`）/ `updateLock()`（`lock.js`）/ `updateDEW()`（`combat.js`），
+干扰弹 `Ent.breakLock()`（`js/engine/entities/warhead.js`）
 
 ---
 
@@ -9,7 +10,7 @@
 
 装备前缀取自**真实的逻辑语（Lojban）词根**（rafsi）。这不是随手拼的字母，
 每个前缀都能在主词表里查到出处 —— 权威版本在 `js/ui/codex/` 的
-「逻辑语」条目（`js/data/` 文件头另有一份速查）。
+「逻辑语」条目（`js/data/_schema.js` 文件头另有一份速查）。
 
 | 编号 | 词根 | 源词 | 含义（本作用法） |
 |---|---|---|---|
@@ -40,19 +41,19 @@
 
 同一个词根在不同势力各排各的号（机炮 `CEL-` 就是这样：上游 3/7、下游 11、分水 1、管理局 2）。
 
-**重要**：`WEAPONS` 的**对象键**（`v11` `cel3` `dl4` …）是早期技术代号，
-与显示名不一致，这是有意的——改键名要动多个文件，风险不值得。
-玩家看到的永远是 `name` 字段。
+**重要**：`WEAPONS` 的 **id**（= `js/data/weapons/` 下的文件名：`v11` `cel3` `dl4` …）是早期技术代号，
+与显示名不一致，这是有意的——改 id 要动多个文件，风险不值得。
+玩家看到的永远是 `name` 字段。（唯一一次改名是五门机炮：原来的 `k1 k2 k3 k7 k11` 现在叫
+`cel1 cel2 cel3 cel7 cel11`，与玩家看到的 CEL-n 对应。）
 
-`ROOTS`（在 `Game`）只把**有编号前缀的键**映射到中文含义，
-机库界面用它显示"编号含义 · 发射器 / 炮"：
+`ROOTS`（在 `js/ui/screens/hardpoints.js`）只把**有编号前缀的 id**映射到中文含义，
+机库界面用它显示"编号含义 · 发射器 / 炮"。值是 `T('ui.screens.hardpoints.ROOTS.cel3')` 这样的文本调用，
+文本在 `locales/zh-CN/text/ui/screens/hardpoints.json`；覆盖的 id：
 
 ```js
-var ROOTS = {
-  cel1/cel2/cel3/cel7/cel11: '发射器 / 炮', v9: '组 / 群', v11: '快',
-  v17: '长', v22: '摧毁', v25: '攻击', v30: '扩散 / 播撒',
-  e4: '干扰', l2: '光', dl4: '远', dl6: '之间 / 近', dl9: '防卫'
-};
+cel1 cel2 cel3 cel7 cel11  → 发射器 / 炮      v9 → 组 / 群    v11 → 快      v17 → 长
+v22 → 摧毁   v25 → 攻击   v30 → 扩散 / 播撒   pgb hbl hbh（各有一条）
+e4 → 干扰    l2 → 光      dl4 → 远   dl6 → 之间 / 近   dl9 → 防卫
 ```
 
 **那里只写中文，不写逻辑语原文**——玩家需要看懂，不是需要被炫技。
@@ -75,33 +76,28 @@ var ROOTS = {
   fuze,                      // 近炸触发半径（米，量到目标表面）；0 / 缺省 = 只有触发引信
   blast, blastCore,          // 爆炸半径 / 满伤半径（米，量到受害者表面）；blast 0 = 无溅射
   blastAir,                  // 缺省 true；false = 只伤地面（子母弹）
-  target,                    // air | ground | ship | none
-  desc,                      // 卡片与图鉴的简介（HTML）
-  stat: {dmg, spd, trn, rng, ecm}   // 0..1，仅用于界面条形图
+  target,                    // air | ground | ship | none | any
+  desc,                      // 卡片与图鉴的简介（T('weapons.xxx.desc')，文本里可含 HTML）
+  stat: {dmg, spd, trn, rng, ecm},  // 0..1，仅用于界面条形图
+  tags: [...],               // 机制标签（见下「特殊标记」），注册时展开成 { 名: true }
+  attr: { fits, perPoint, mass },   // 挂载属性，封存时平铺到武器上
+  look, role, needs, cd, lead, flareRD   // 外观 / 定位 / 能力门槛 / 每槽装填时间 / 导引品质 / 箔丝概率
 }
 ```
 
-**这些字段不是全部写在字面量里的**。`js/data/` 在 `WEAPONS` 之后按顺序
-把几张独立表合并进去，后面的会覆盖前面的同名字段：
+**一件武器的全部字段都写在它自己的文件里**（`js/data/weapons/<id>.js`，`Registry.weapon({ id, order, … })`）。
+原来这些字段散在 `STORE_ATTR` / `STORE_LOOK` / `STORE_ROLE` / `STORE_NEEDS` / `STORE_COOLDOWN` / `MISSILE_LEAD` / `FLARE_RD`
+七张表里，由 IIFE 合并进 `WEAPONS`；这七张表已不存在，封存时（`Registry.sealData()`）唯一做的合并是把 `attr` 平铺到武器上
+（`w.fits` `w.perPoint` `w.mass`）。字段含义与各自的设计理由见 [data.md](data.md#一件武器的字段是怎么来的)。
 
-| 顺序 | 表 | 注入字段 | 备注 |
-|---|---|---|---|
-| 1 | `STORE_ATTR` | `fits` `perPoint` `mass` | 挂载属性，见 [loadout.md](loadout.md) |
-| 2 | `STORE_ROLE` | `role` | 卡片与图鉴里的一句话定位 |
-| 3 | `STORE_NEEDS` | `needs` | 机体能力门槛 |
-| 4 | `STORE_COOLDOWN` | `cd` | **覆盖字面量里的 cd** |
-| 5 | `MISSILE_LEAD` | `lead` | 导引品质；无制导弹跳过 |
-
-所以**查一枚弹的真实冷却要去 `STORE_COOLDOWN`**，不是 `WEAPONS` 字面量。
-一个反面教材：`CLA-17` 曾经没写进 `STORE_COOLDOWN`，于是保留了
-字面量里按旧语义定的 `0.88 s`，快得离谱；`smoke.js` 会检查这件事
-（对 `fits` 非空的非被动武器逐一核对）。
+所以**查一枚弹的真实冷却就是看它文件里的 `cd`**。一个反面教材：`CLA-17` 曾经没写进当时的 `STORE_COOLDOWN`，于是保留了
+字面量里按旧语义定的 `0.88 s`，快得离谱；现在 `smoke.js` 对 `fits` 非空的非被动武器逐一要求 `cd ≥ 1`。
 
 射程显示（机库挂载卡片、图鉴「射程」列）统一走 `Ent.displayRange(w)`（`Ent`）：
 它读 `effRange`（真实弹道，与 AI、HUD 同一套），按弹种取一个代表性的平飞发射高度
 （对地 / 对海弹 8 km、空空弹 6 km），返回公里；无制导弹、吊舱、定向能返回 `null`（不显示"射程"）。
 
-旧入口 `missileRange(w)`（`js/data/`）是"动力段能送多远"的解析式（载机初速 350 m/s 先加速到
+旧入口 `missileRange(w)`（`js/data/rules.js`）是"动力段能送多远"的解析式（载机初速 350 m/s 先加速到
 `speed` 再匀速），已不再被机库 / 图鉴使用 —— 它算不出滑翔弹、高抛弹、冲压弹随高度变化的射程，
 滑翔弹会被严重低估（GUT-9 按它只有 4.5 km，按真实弹道是 17 km）。
 
@@ -109,37 +105,42 @@ var ROOTS = {
 
 ## 特殊标记
 
-**只有被代码读到的标记才真的有效**。下表区分两者：
+**只有被代码读到的标记才真的有效**。标记分两类：
+
+- **机制标签**：写在武器文件的 `tags: ['…']` 数组里，声明在 `js/core/tags.js`（没声明就用会在注册时抛错），运行时读 `w.tags.xxx`。
+  完整清单与"用在哪些武器"见 [tags.md](tags.md)。
+- **普通字段**：下表里没标"标签"的，仍是武器上的字段。
 
 | 标记 | 被谁读 | 含义 |
 |---|---|---|
-| `reAcquire` | `Ent` `stepMissile` | **雷达弹**丢失后在 2.6 km 且锁定锥内重新捕获最近的敌机（盲飞期 `reLockT` 之后）。红外弹不靠它，走 `irAcquire()` 自主寻的 —— `target !== 'air'` 的红外弹（GUT-9、TUM-7）只在 `world.targets` 里找地面热源，不会转去追飞机 |
-| `antiRadar` | `combat.js` `blast` | 对**正在辐射**的目标（预警机、开机的干扰机）伤害 ×2 |
-| `npcFits` | `Ent` `fitsKind` / `mountPlan` | NPC 的挂点适配表（写在字面量里，不经 `STORE_ATTR`）；缺省退回 `fits` |
+| `reAcquire`（标签） | `Ent` `stepMissile` | **雷达弹**丢失后在 2.6 km 且锁定锥内重新捕获最近的敌机（盲飞期 `reLockT` 之后）。红外弹不靠它，走 `irAcquire()` 自主寻的 —— `target !== 'air'` 的红外弹（GUT-9、TUM-7）只在 `world.targets` 里找地面热源，不会转去追飞机 |
+| `antiRadar`（标签） | `engine/combat.js` `blast` | 对**正在辐射**的目标（预警机、开机的干扰机）伤害 ×2 |
+| `npcFits` | `Ent` `fitsKind` / `mountPlan` | NPC 的挂点适配表（直接写在武器文件顶层，不在 `attr` 里）；缺省退回 `fits` |
 | `nezer` | `AI`（最小发射距离 1400）、`Game`（锁定 1.5 s） | 冲压弹：NEZ 大但近距无力 |
 | `scramjet` | `Ent` `effectiveLife`、`HUD` | 18 km 以上动力段骤减 |
-| `highAltImmune` | `Ent` | 转弯下限抬到 0.78（仅 SPO-9）；代价是低空推力最多 −45%、滑翔掉速最多 ×1.6（按相对密度插值） |
-| `ballistic` | `Ent` | 无动力，走自由落体弹道；有导引头的（GUT-9、PEJ-14）由导引转动**速度矢量**（保持速率） |
+| `highAltImmune`（标签） | `Ent` | 转弯下限抬到 0.78（仅 SPO-9）；代价是低空推力最多 −45%、滑翔掉速最多 ×1.6（按相对密度插值） |
+| `ballistic`（标签） | `Ent` | 无动力，走自由落体弹道；有导引头的（GUT-9、PEJ-14）由导引转动**速度矢量**（保持速率） |
 | `glide` | `Ent` `stepMissile` | 升阻比（仅 GUT-9 = 2.5）：垂直于速度、在铅垂面内向上的升力，大小封顶在 g·cosγ（刚好托住重力，不把弹往上拉）。有它弹才滑翔，没有就是纯抛物线 |
 | `fin` | `Ent` `stepMissile`、`HUD` `drawFootprint` | 弹翼修正的侧向加速度上限（m/s²，海平面 250 m/s 时，随 ρ·v² 变）。有 `glide` 的弹（GUT-9）往上修只留横向、往下修卸升力；无 `glide` 的（PEJ-14）弹翼全向修（上下左右、只改方向不加能量）。HUD 据此画泪滴形瞄准圈（`Ent.finFootprint`） |
-| `hobs` | `Ent` `stepMissile` | 出膛后的导引头视场取 max(77°, `lockCone`)，大离轴锁定的目标不会出膛即丢 |
+| `hobs`（标签） | `Ent` `stepMissile` | 出膛后的导引头视场取 max(77°, `lockCone`)，大离轴锁定的目标不会出膛即丢 |
 | `cluster` | `Ent` `warheadK`、图鉴 `{{cluster}}` | 数值 = 覆盖半径（米）；面杀伤本身改由 `blast = cluster`、`blastCore = blast`、`blastAir: false` 表达（PEJ-9 60、PEJ-30 80） |
-| `penetrator` | `Ent` `warheadK` | 对加固目标（`HARD_MODELS`）全额伤害；普通战斗部 ×0.6、集束 ×0.2 |
+| `penetrator`（标签） | `Ent` `warheadK` | 对加固目标（`hard` 标签的设施，见 `js/data/targets/`）全额伤害；普通战斗部 ×0.6、集束 ×0.2 |
 | `loft` | `Ent` `stepMissile` | `{alt, dive}`：水平距离 > dive 时瞄准点抬高 alt，末段俯冲（GUT-25、BOX-14） |
-| `decoyMemory` | `Ent` `decoyRecheck` | 盲飞结束时不会被骗走它的那团诱饵云再骗一次（CLA-4） |
-| `twinSeeker` | `Ent` `breakLock` | 双导引头：要连中两次诱饵才脱锁（BIN-9） |
-| `unguided` | `Ent`、`Game` | 无制导，不找目标、走线段命中检测 |
-| `passive` | `Game`、`ui` | 被动吊舱：不占扳机、不进入武器纵列 |
+| `decoyMemory`（标签） | `Ent` `decoyRecheck` | 盲飞结束时不会被骗走它的那团诱饵云再骗一次（CLA-4） |
+| `twinSeeker`（标签） | `Ent` `breakLock` | 双导引头：要连中两次诱饵才脱锁（BIN-9） |
+| `unguided`（标签） | `Ent`、`Game`、`Turret` | 无制导，不找目标、走线段命中检测 |
+| `passive`（标签） | `Loadout`、`Game`、`Ent` | 被动吊舱：不占扳机、不进入武器纵列 |
+| `silentLock`（标签） | `Ent` `passiveEffects` | 被动测距：用它锁人时对方 RWR 收不到告警（GUS-6 / GUS-9） |
 | `duration` / `lockReduce` | `Ent` `openEcm`（→ `spActive` / `ewLockReduce`，再由 `AI` 的锁定距离读） | ECM 生效时间与锁定压缩 |
-| `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | `Game` `updateDEW`、`Ent` `stepAircraft` | 定向能吊舱 |
+| `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | `Game` `updateDEW`、`Ent` `stepAircraft` | 定向能吊舱（没有充能储备，只有 `cd`，见下「定向能拦截」） |
 
 desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派生量），
-`js/data/` 末尾在所有挂载表合并之后替换成当前数值。desc 不再自动追加任何交战规则句子
+`js/data/zz-seal.js` 在 `attr` 平铺之后替换成当前数值（文本本身在 `locales/zh-CN/text/weapons/<id>.json`）。desc 不再自动追加任何交战规则句子
 （武器锁定机制已整个删掉，见[调节单元附近开火](#调节单元附近开火)）。
 派生量全表（`DERIVED`）：`coneDeg` `lockKm` `flarePct` `flareRDPct` `lockResistPct` `lockReducePct`
 `interceptConeDeg` `interceptPct` `highAltPct` `volleys` `hardPct` `loftAlt` `loftDiveKm`；
 其余 `{{x}}` 取 `w[x]` 的数值，取不到就原样保留。`hardPct` 的 0.2 / 0.6 是在
-`js/data/` 里**另写一份**的（`HARD_K_TEXT`），改 `Ent` 的 `HARD_K` 时要同步。
+`js/data/zz-seal.js` 里**另写一份**的（`HARD_K_TEXT`），改 `Ent` 的 `HARD_K`（`warhead.js`）时要同步。
 `highAltScale` / `bigTarget`（武器上）/ `selfBlind` / `emitter` / `reDone`
 没有任何代码读，已删除。
 
@@ -148,7 +149,7 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 
 ## 武器全表
 
-数字来自 `js/data/`（`cd` 与 `lead` 已含后注入的覆盖）。`—` 表示无此字段。
+数字来自 `js/data/weapons/<id>.js`（`attr` 已平铺；`cd`、`lead`、`flareRD` 就是文件里写的值）。`—` 表示无此字段。
 `单点` = `perPoint`，即**一个挂载点**的携弹量。
 
 ### 机炮
@@ -169,34 +170,35 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 
 ### 空空导弹
 
-| 键 | 名 | seeker | speed | boost | life/vsLife | turn | lockDist | dmg | flare | fuze | blast/core | lead | cd | 单点 |
+| 键 | 名 | seeker | speed | boost | life/vsLife | turn | lockDist | dmg | flare（雷达弹另有 flareRD） | fuze | blast/core | lead | cd | 单点 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `srm` | TOR-2 短矢 | ir | 760 | 180 | 4.5 / 12 | 1.75 | 4200 | 30 | 0.38 | 12 | 18 / 2 | 0.38 | 4.8 | 8 |
-| `trm` | TOR-4 短哨 | ir | 820 | 210 | 5.0 / 13 | 1.95 | 4800 | 32 | 0.24 | 12 | 18 / 2 | 0.48 | 5.6 | 6 |
-| `hos` | TOR-6 环刃 | ir | 700 | 240 | 4.0 / 11 | 2.60 | 3200 | 28 | 0.42 | 11 | 17 / 2 | 0.30 | 5.2 | 4 |
-| `kkv` | TOR-8 透针 ⁿ | ir | 760 | 220 | 4.5 / 12 | 2.73 | 3800 | 48 | 0.40 | 0 | 0 / 0（仅直接命中） | 0.45 | 3.4 | 10 |
-| `qsr` | GIR-5 群刺 | ir | 740 | 190 | 4.2 / 11 | 1.70 | 4000 | 24 | 0.40 | 10 | 16 / 2 | 0.42 | 7.6 | 12 |
-| `wasp` | SUT-7 蜂刺 | ir | 860 | 260 | 4.8 / 12 | 2.15 | 5200 | 38 | 0.36 | 13 | 19 / 2 | 0.55 | 8.4 | 3 |
-| `swm` | GIR-12 鸦群 | ir | 720 | 300 | 3.5 / 9 | 2.55 | 3400 | 16 | 0.44 | 8 | 14 / 2 | 0.44 | 4.4 | 16 |
-| `v9` | GIR-9 蜂群 | ir | 830 | 200 | 4.0 / 9 | 1.90 | 3800 | 44 | 0.50 | 13 | 19 / 2 | 0.52 | 6 | 2 |
-| `v11` | SUT-11 锥刺 | ir | 790 | 280 | 5.0 / 11 | 2.45 | 4600 | 56 | 0.35 | 16 | 22 / 2 | 0.62 | 9.2 | 2 |
-| `mrm` | CLA-4 中继 | radar | 900 | 200 | 8.0 / 20 | 1.45 | 8600 | 40 | 0.30 | 18 | 30 / 4 | 0.78 | 15 | 4 |
-| `hwm` | CLA-8 雷鼓 ⁿ | radar | 810 | 180 | 8.0 / 20 | 1.16 | 8000 | 46 | 0.34 | 22 | 60 / 10 | 0.74 | 19.5 | 2 |
-| `arm` | SPO-8 追云 | radar | 880 | 190 | 7.5 / 18 | 1.35 | 9500 | 52 | 0.35 | 22 | 44 / 7 | 0.72 | 18 | 2 |
-| `v17` | CLA-17 长杆 | radar | 1150 | 160 | 10.0 / 30 | 1.00 | 12500 | 62 | 0.72 | 21 | 33 / 4 | 0.86 | 22 | 1 |
-| `vlar` | CLA-12 极远 | radar | 980 | 150 | 12.0 / 30 | 0.78 | 16000 | 66 | 0.66 | 27 | 49 / 7 | 0.90 | 32 | 1 |
-| `hva` | SPO-9 落雷 | radar | 980 | 240 | 8.0 / 18 | 1.30 | 11000 | 62 | 0.70 | 26 | 48 / 7 | 0.80 | 26 | 1 |
-| `dl4` | DAR-4 砾石 | radar | 880 | 210 | 6.5 / 16 | 1.25 | 7200 | 30 | 0.45 | 20 | 32 / 4 | 0.74 | 6.8 | 0① |
+| `srm` | TOR-2 短矢 | ir | 760 | 180 | 4.5 / 12 | 1.75 | 4200 | 30 | 0.38 | 12 | 18 / 2 | 0.38 | 4.8 | 10 |
+| `trm` | TOR-4 短哨 | ir | 820 | 210 | 5.0 / 13 | 1.95 | 4800 | 32 | 0.24 | 12 | 18 / 2 | 0.48 | 5.6 | 8 |
+| `hos` | TOR-6 环刃 | ir | 700 | 240 | 4.0 / 11 | 2.60 | 3200 | 28 | 0.42 | 11 | 17 / 2 | 0.30 | 5.2 | 6 |
+| `kkv` | TOR-8 透针 ⁿ | ir | 760 | 220 | 4.5 / 12 | 2.73 | 3800 | 48 | 0.40 | 0 | 0 / 0（仅直接命中） | 0.45 | 3.4 | 12 |
+| `qsr` | GIR-5 群刺 | ir | 740 | 190 | 4.2 / 11 | 1.70 | 4000 | 24 | 0.40 | 10 | 16 / 2 | 0.42 | 7.6 | 16 |
+| `wasp` | SUT-7 蜂刺 | ir | 860 | 260 | 4.8 / 12 | 2.15 | 5200 | 38 | 0.36 | 13 | 19 / 2 | 0.55 | 8.4 | 4 |
+| `swm` | GIR-12 鸦群 | ir | 720 | 300 | 3.5 / 9 | 2.55 | 3400 | 16 | 0.44 | 8 | 14 / 2 | 0.44 | 4.4 | 20 |
+| `v9` | GIR-9 蜂群 | ir | 830 | 200 | 4.0 / 9 | 1.90 | 3800 | 44 | 0.50 | 13 | 19 / 2 | 0.52 | 6 | 4 |
+| `v11` | SUT-11 锥刺 | ir | 790 | 280 | 5.0 / 11 | 2.45 | 4600 | 56 | 0.35 | 16 | 22 / 2 | 0.62 | 9.2 | 3 |
+| `mrm` | CLA-4 中继 | radar | 900 | 200 | 8.0 / 20 | 1.45 | 8600 | 40 | 0.30 / 0.30 | 18 | 30 / 4 | 0.78 | 15 | 6 |
+| `hwm` | CLA-8 雷鼓 ⁿ | radar | 810 | 180 | 8.0 / 20 | 1.16 | 8000 | 46 | 0.34 / 0.34 | 22 | 60 / 10 | 0.74 | 19.5 | 3 |
+| `arm` | SPO-8 追云 | radar | 880 | 190 | 7.5 / 18 | 1.35 | 9500 | 52 | 0.35 / 0.32 | 22 | 44 / 7 | 0.72 | 18 | 3 |
+| `v17` | CLA-17 长杆 | radar | 1150 | 160 | 10.0 / 30 | 1.00 | 12500 | 62 | 0.72 / 0.44 | 21 | 33 / 4 | 0.86 | 22 | 2 |
+| `vlar` | CLA-12 极远 | radar | 980 | 150 | 12.0 / 30 | 0.78 | 16000 | 66 | 0.66 / 0.42 | 27 | 49 / 7 | 0.90 | 32 | 2 |
+| `hva` | SPO-9 落雷 | radar | 980 | 240 | 8.0 / 18 | 1.30 | 11000 | 62 | 0.70 / 0.40 | 26 | 48 / 7 | 0.80 | 26 | 2 |
+| `dl4` | DAR-4 砾石 | radar | 880 | 210 | 6.5 / 16 | 1.25 | 7200 | 30 | 0.45 / 0.34 | 20 | 32 / 4 | 0.74 | 6.8 | 0① |
 | `dl6` | BIN-6 燧火 | ir | 780 | 190 | 4.5 / 10 | 2.05 | 3600 | 26 | 0.35 | 14 | 20 / 2 | 0.48 | 4.4 | 0① |
-| `dl9` | BAD-9 高墙 | radar | 940 | 320 | 9.0 / 22 | 1.50 | 9000 | 48 | 0.60 | 24 | 36 / 4 | 0.80 | 14 | 0① |
+| `dl9` | BAD-9 高墙 | radar | 940 | 320 | 9.0 / 22 | 1.50 | 9000 | 48 | 0.60 / 0.42 | 24 | 36 / 4 | 0.80 | 14 | 0① |
 | `vbn` | BIN-9 双生 | ir | 780 | 300 | 4.0 / 10 | 2.10 | 4200 | 42 | 0.58 | 12 | 18 / 2 | 0.66 | 8 | 0① |
 | `otr` | TOR-1 旧锭 | ir | 620 | 200 | 3.0 / 7 | 1.35 | 3000 | 30 | 0.86 | 18 | 28 / 8 | 0.32 | 6 | 0① |
-| `ss6` | FAN-6 海墙 | radar | 960 | 330 | 9.5 / 22 | 1.45 | 9500 | 46 | 0.42② | 24 | 36 / 4 | 0.80 | 15 | 0① |
+| `ss6` | FAN-6 海墙 | radar | 960 | 330 | 9.5 / 22 | 1.45 | 9500 | 46 | 0.58 / 0.42② | 24 | 36 / 4 | 0.80 | 15 | 0① |
+| `drm` | TOR-3 雏矢 | ir | 760 | 180 | 4.5 / 12 | 1.75 | 4200 | 30 | 0.38 | 12 | 18 / 2 | 0.38 | 4.8 | 0①（僚机专用，`target: 'any'`） |
 
 ① `fits: []` —— 下游专用弹（以及上游舰载的 FAN-6），玩家挂不上（见 [loadout.md](loadout.md)）。
 `fuze` / `blast/core` 的定数规则见 [命中与近炸](#命中与近炸)。
 ⁿ v1.13 新增（2.0 计划 2.5）：`kkv` 动能杀伤，`fuze 0 / blast 0`，最近点距表面不到 `Combat.CONTACT` 才命中；`hwm` 以 `mrm` 为母型的重战斗部，打编队。
-② 雷达弹的 `flare` 由 `FLARE_RD` 覆盖。FAN-6 只装在**我方舰艇**上（`target.weapon = 'ss6'`），
+② 雷达弹另有 `flareRD`（箔丝概率，写在武器文件里；表里写成 `flare / flareRD`）。FAN-6 只装在**我方舰艇**上（`target.weapon = 'ss6'`），
 对空射击的选目标规则见 [ai.md](ai.md)「水面目标的对空射击」。
 
 **锁定锥**（`lockCone`，发射时的离轴角上限；v2.0.1 起普通红外格斗弹收窄）：
@@ -213,28 +215,30 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 
 | 键 | 名 | kind | seeker | speed | boost | life/vsLife | turn | lockDist | dmg | blast/core | cd | 单点 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `asl` | GUT-9 滑翔锤 | agm | ir | 320 | — | 14 / 26 | 0.55 | 6000 | 150 | 30 / 8 | 11 | 4 |
-| `asl2` | GUT-12 凿岩 | agm | radar | 480 | 140 | 10 / 22 | 0.90 | 9000 | 340 | 45 / 10 | 16 | 2 |
-| `v25` | GUT-25 重锤 | agm | radar | 730 | 120 | 14 / 50 | 0.62 | 8000 | 175 | 30 / 8 | 18 | 2 |
-| `lcm` | GUT-30 远帆 | agm | radar | 480 | 110 | 30 / 42 | 0.48 | 14000 | 300 | 45 / 10 | 36 | 1 |
-| `sat` | SPO-6 云裂 | asm | radar | 540 | 130 | 9 / 20 | 1.05 | 8200 | 260 | 20 / 6 | 19 | 2 |
-| `v22` | SPO-22 锚 | asm | radar | 920 | 130 | 12 / 45 | 0.55 | 8600 | 260 | 20 / 6 | 22 | 1 |
-| `rkt` | PEJ-6 撒星 | bomb | 无制导 | 620 | 520 | 3 / 3 | — | — | 22 | 14 / 4 | 4 | 28 |
-| `clb` | PEJ-9 碎玉 | bomb | 无制导 | 300 | — | 12 / 24 | — | — | 118 | 60 / 60③ | 14 | 2 |
-| `v30` | PEJ-30 铁蒺藜 | bomb | 无制导 | 280 | — | 12 / 24 | — | — | 210 | 80 / 80③ | 16 | 1 |
+| `asl` | GUT-9 滑翔锤 | agm | ir | 320 | — | 14 / 26 | 0.55 | 35000④ | 150 | 30 / 8 | 11 | 6 |
+| `asl2` | GUT-12 凿岩 | agm | radar | 480 | 140 | 10 / 22 | 0.90 | 9000 | 340 | 45 / 10 | 16 | 3 |
+| `v25` | GUT-25 重锤 | agm | radar | 730 | 120 | 14 / 50 | 0.62 | 8000 | 175 | 30 / 8 | 18 | 3 |
+| `lcm` | GUT-30 远帆 | agm | radar | 480 | 110 | 30 / 42 | 0.48 | 14000 | 300 | 45 / 10 | 36 | 2 |
+| `sat` | SPO-6 云裂 | asm | radar | 540 | 130 | 9 / 20 | 1.05 | 8200 | 260 | 20 / 6 | 19 | 3 |
+| `v22` | SPO-22 锚 | asm | radar | 920 | 130 | 12 / 45 | 0.55 | 8600 | 260 | 20 / 6 | 22 | 2 |
+| `rkt` | PEJ-6 撒星 | bomb | 无制导 | 620 | 520 | 3 / 3 | — | — | 22 | 14 / 4 | 4 | 36 |
+| `clb` | PEJ-9 碎玉 | bomb | 无制导 | 300 | — | 12 / 24 | — | — | 118 | 60 / 60③ | 14 | 3 |
+| `v30` | PEJ-30 铁蒺藜 | bomb | 无制导 | 280 | — | 12 / 24 | — | — | 210 | 80 / 80③ | 16 | 2 |
 | `pgb` | PEJ-14 点穴 | bomb | eo | 300 | — | 12 / 24 | 0.30 | 12000 | 165 | 40 / 10 | 16 | 6 |
 | `hbl` | PEJ-4 飞蝗 | bomb | — | 300 | — | 12 / 24 | — | — | 70 | 24 / 6 | 5 | 12（轻 / 重 / 腹） |
 | `hbh` | PEJ-22 镇岳 | bomb | — | 280 | — | 12 / 24 | — | — | 420 | 110 / 45 | 24 | 3（仅重挂点） |
 | `vgt` | TUM-7 碎石 | agm | ir | 430 | 120 | 9 / 20 | 0.62 | 7000 | 190 | 30 / 8 | 11 | 0① |
 | `vsr` | BOX-14 坍方 | asm | radar | 560 | 150 | 11 / 24 | 0.55 | 9000 | 260 | 20 / 6 | 15.6 | 0① |
+| `ssm` | SPO-30 破浪 | asm | radar | 620 | 160 | 40 / 50 | 0.60 | 16000 | 260 | 20 / 6 | 6 | 0①（舰对舰，`npcOnly`，`loft`） |
 
-③ `blastAir: false`：只伤地面，满半径满伤（子母弹）。对地弹都**没有 `fuze`**，只靠触发 / 撞地 / 寿命到期起爆。
+③ `blastAir: false`：只伤地面，满半径满伤（子母弹）。
+④ GUT-9 的 `lockDist` 按高空（8–12 km、300 m/s 左右）投放的滑翔距离定，低空投放够不着这么远。对地弹都**没有 `fuze`**，只靠触发 / 撞地 / 寿命到期起爆。
 
-`asl` 与 `pgb` 是**无动力但有制导**（`ballistic: true`）：`asl` 有升阻比（`glide`）能滑翔、
+`asl` 与 `pgb` 是**无动力但有制导**（`ballistic` 标签）：`asl` 有升阻比（`glide`）能滑翔、
 有弹翼（`fin`）能末端修正；`pgb` 不加升阻比，弹道就是投放速度决定的抛物线 + 弹翼全向修正
 （`fin`，上下左右都能修、只改方向不加能量），修正范围按投放高度 / 速度约几百米到一两公里，
-HUD 画**泪滴形动态瞄准圈**（目标套进圈内 = 必中）。`rkt` 与 `clb` / `v30` 是无制导（`unguided`），
-出膛那一刻的指向就是它的一生。字段差异见 `js/data/` 里「无制导弹药」与 `PEJ-30` / `pgb` 的注释。
+HUD 画**泪滴形动态瞄准圈**（目标套进圈内 = 必中）。`rkt` 与 `clb` / `v30` 是无制导（`unguided` 标签），
+出膛那一刻的指向就是它的一生。字段差异见 `js/data/weapons/` 里 `rkt.js` / `v30.js` / `pgb.js` 的注释。
 
 ### 吊舱
 
@@ -242,19 +246,19 @@ HUD 画**泪滴形动态瞄准圈**（目标套进圈内 = 必中）。`rkt` 与
 |---|---|---|---|---|---|
 | `e4` | ZUN-4 回声 | ecm | 主动：`duration 6s`、`lockReduce 0.40` | 50 | 1 |
 | `l2` | GUS-2 日光 | dew | 定向能拦截（见下） | 36 | 1 |
-| `ecm2` | ZUN-8 静默 | ecm 被动 | `lockResist 0.40` | 0 | 1 |
+| `ecm2` | ZUN-8 静默 | ecm 被动 | `lockResist 0.30` | 0 | 1 |
 | `dec` | ZUN-12 雾障 | ecm 被动 | `flareBonus 40` | 0 | 1 |
 | `oep` | GUS-6 明瞳 | ecm 被动 | `lockRangeBonus 0.45` | 0 | 1 |
 | `irp` | GUS-9 夜枭 | ecm 被动 | `lockRangeBonus 0.25`、`lockResist 0.15` | 0 | 1 |
 | `hdp` | JDA-3 护盾 | ecm 被动 | `armorBonus 0.22` | 0 | 1 |
-| `vzu` | SAV-6 迷雾 | ecm 被动 | `lockResist 0.30`（下游，`fits: []`；玩家锁它时也生效） | 6.8 | 0 |
-| `vsc` | SAV-14 焦炬 | ecm | 下游烧穿吊舱：`jamRadius 9000`、`jamK 0.85` 范围压制（见 [game.md](game.md) `updateJamming()`） | 40 | 0 |
+| `vzu` | SAV-6 迷雾 | ecm 被动 | `lockResist 0.22`（下游，`fits: []`；玩家锁它时也生效） | 6.8 | 0 |
+| `vsc` | SAV-14 焦炬 | ecm | 下游烧穿吊舱：`jamRadius 12000`、`jamK 0.85`、`duration 8` 范围压制（见 [game.md](game.md) `updateJamming()`） | 40 | 0 |
 
 ---
 
 ### 炮塔用炮
 
-舰炮、近防炮、遥控炮、尾炮不在 `WEAPONS` 里，在 `TURRET_GUNS`（NPC 专用，不进挂载图鉴）。
+舰炮、近防炮、遥控炮、尾炮不在 `WEAPONS` 里，在 `TURRET_GUNS`（`js/data/turret-guns/<id>.js`，NPC 专用，不进挂载图鉴）。
 字段与机炮相同，另有 `gravity` / `fuze` / `blast` / `blastCore`（大口径近炸、定时空爆）、`airRange`、`surface`，
 以及 `kind: 'launcher'` 的导弹发射架。全表与瞄准逻辑见 [turret.md](turret.md)。
 
@@ -321,7 +325,7 @@ CEL 系机炮每门都是 1950 发/分（原 3900，已减半；相对原来的 
 |---|---|---|
 | `ir`（红外） | 看 `flare` | 点源导引头，热焰弹能骗 |
 | `radar`（雷达） | 看 `flareRD`（缺省回退 `flare`） | 被箔丝骗；空空雷达弹的 `flareRD` 整体低于红外弹的 `flare` |
-| `eo`（光电，仅 PEJ-30） | `flare: 0`，永远不被骗 | 成像导引头，热焰弹与箔丝都无意义 |
+| `eo`（光电，仅 PEJ-14） | `flare: 0`，永远不被骗 | 成像导引头，热焰弹与箔丝都无意义 |
 | `laser`（激光照射） | — | **当前无武器使用**；机制代码在 `Ent` 里休眠 |
 | `none` | — | 无制导 |
 
@@ -433,29 +437,28 @@ hp = actor.pos + actor.fwd*4 + actor.right * side * (2.4 + rank*1.9)
 打出的弹初速是 `actor.speed + 70`。发射后该槽进入 `wp.cd` 冷却，
 `spCd` 更新为"最快就绪的那个槽"的剩余时间。
 
-玩家发射时 `fireSpecial()` 还会按类型播无线电呼号：
+玩家发射时 `fireSpecial()`（`js/ui/input.js`，经 `launchCall(w)`）还会按类型播无线电呼号：
 
 | 条件 | 台词 |
 |---|---|
-| `unguided` 或 `kind` 为 `bomb` / `agm` / `asm` | **投放** |
+| `kind !== 'aam'`（炸弹 / 对地 / 反舰）或带 `unguided` 标签 | **投放** |
 | `seeker === 'radar'` | **Fox 3** |
-| `seeker === 'laser'` | **照射** |
 | 其余 | **Fox 2** |
 
 （炸弹报"投放"而不是 Fox 2 —— 原来的判断只看了 `unguided`，
-于是 PEJ-30 这类制导炸弹会喊出战斗机发射格斗弹的呼号。）
+于是 PEJ-14 这类制导炸弹会喊出战斗机发射格斗弹的呼号。）
 
 ---
 
 ## 命中与近炸
 
-v1.13 起起爆与范围伤害集中在 `js/engine/combat.js`（`Combat`，`index.html` 里排在 `Ent` 之后）。
+v1.13 起起爆与范围伤害集中在 `js/engine/combat.js`（`Combat`）。
 旧字段 `prox` 已全部删除；`Combat.spec(w)` 在新字段缺省时从 `prox` / `cluster` 推出兼容值。
 
 | 入口 | 何时 | 结果 |
 |---|---|---|
 | `fuzeCheck`（`Ent` `stepMissile`） | 制导弹每帧，**只看自己的目标**（或诱饵虚拟目标） | 相对运动线段求最近点：`gap < Combat.CONTACT`（1.5）= 直接命中满伤；`gap < fuze` 且最近点落在本帧内 → 在最近点起爆 |
-| `scanShot`（`Game`） | 无制导弹撞飞机 / 设施（不走 `fuzeCheck`） | `Combat.detonate`，被撞单位作 `direct`；子弹不变 |
+| `scanShot`（`Game`，`js/engine/game/combat.js`） | 无制导弹撞飞机 / 设施（不走 `fuzeCheck`） | `Combat.detonate`，被撞单位作 `direct`；子弹不变 |
 | 撞地 / 撞海（`pos.y <= 0`） | 所有弹 | 起爆（`{ground: true}`），以前是哑弹 |
 | 寿命到期 | 所有弹 | 起爆，以前是哑弹 |
 
@@ -484,19 +487,19 @@ dmg × k × warheadK × (antiRadar && 正在辐射 ? 2 : 1);   // direct 单位 
 - **特效 `Combat.blastFx`**：火球半径 clamp(0.35×blast, core, 0.5×blast) 且 ≥ 4；Fibonacci 球面破片壳（drag 3.5，飞到 ≈ blast）+
   拖尾粒子，继承 30% 弹速；落地 = 半球 + 0.6×blast 水柱；子母弹 = 6–10 团错时小爆（粒子 `delay`）；blast 0 只在直接命中时白闪。
   按粒子数（650 / 800）与距离（6 / 12 km）降级。`Ent.spawnParticle` 新增 `streak` / `delay`，`render.js` 画拖尾。
-- 图鉴 `inv2` 有「引信 / 爆炸半径」列（`js/ui/codex/` `_fuzeTxt` / `_blastTxt`），详情页 `weaponParams` 有同名两行。
+- 图鉴 `inv2` 有「引信 / 爆炸半径」列（`js/ui/codex/entries/inv2.js` 的 `_fuzeTxt` / `_blastTxt`），详情页 `weaponParams` 有同名两行。
 - 调参后看分布：`node tools/test/probes/probe-blast.js`（见 [tools.md](tools.md)）。
 - **设施 / 舰船走 `hitTarget`**：`Game` 启动时 `Ent.setTargetHitHandler()` 注册自己的
   `hitTarget`，范围伤害打地面目标都经它结算（击毁进 `groundKilled`、误击调节单元记处罚）。
   没注册时（工具脚本）退回 `hp -= dmg` + `killGround`。
-- **加固目标（`Ent.isHard`）**：`t.hard` 或 `HARD_MODELS[t.model]`（目前只有 `radar`）。
-  `warheadK`：`penetrator`（GUT-12）×1、`cluster` ×0.2、其余战斗部 ×0.6；机炮子弹无 `b.w`，不打折。
+- **加固目标（`Ent.isHard`）**：`t.hard` 或设施带 `hard` 标签（`js/data/targets/*.js` 里写了 `tags: ['hard']` 的，目前只有 `radar`；实体创建时标签带到 `t.tags`）。
+  `warheadK`：`penetrator` 标签（GUT-12）×1、`cluster` ×0.2、其余战斗部 ×0.6；机炮子弹无 `b.w`，不打折。
 
 - **机炮抗性（`gunResist`）**：小口径航炮子弹（`b.kind === 'bullet'` 且 `b.cal ≤ Ent.SMALL_CAL` = 40 mm）
   打中带 `gunResist` 的单位，伤害 ×(1 − gunResist)（`Ent.gunResistK`，封顶 0.999）。导弹、炸弹、
   大口径炮弹不受影响。飞机、设施、舰船都吃（`scanShot` 两个分支各乘一次）；与 JDA-3 的 `armor` 相乘叠加。
-  数值来源：`AIRCRAFT[].gunResist`（ROK-40 0.15、预警 / 干扰机 0.05，其余 0）、`SHIPS[].gunResist`
-  （小艇 0 → 航母 0.995）、`GUN_RESIST_MODELS`（调节单元 0.75、SAM 0.5、雷达 0.6、中继 0.7、站点 0.9）。
+  数值来源：`AIRCRAFT[].gunResist`（ROK-40 0.15、预警 / 干扰机 0.05，其余 0）、`SHIPS[].gunResist` / `PLATFORMS[].gunResist`
+  （小艇 0 → 航母 0.995）、`TARGETS[model].gunResist`（`js/data/targets/*.js`：调节单元 0.75、SAM 0.5、雷达 0.6、中继 0.7、站点 0.9；原来的 `GUN_RESIST_MODELS` 表）。
   机炮武器的 `cal` 字段（mm）由 `fireGun` 写到子弹上。
 
 子弹与**无制导弹**都用 `M3.raySphere()` 做**线段**求交
@@ -576,13 +579,13 @@ m.decoy = { p, v, t0, p2: chance * 0.5 };   // 骗走它的那团诱饵云
 - 举例：`v11` 锥刺（红外）`flare = 0.35` → 第一次投放 35% 被骗走；
   `v17` 长杆（雷达）`flareRD = 0.44` → 第一次 44% 被骗走。
 
-> 雷达弹曾经平均**更容易**被骗（`flare` 是逐个手调的）。现在雷达弹走
-> `js/data/` 的 `FLARE_RD` 表，空空雷达弹整体低于红外弹均值，
+> 雷达弹曾经平均**更容易**被骗（`flare` 是逐个手调的）。现在雷达弹各自写了
+> `flareRD`（原来的 `FLARE_RD` 表，并进了武器文件），空空雷达弹整体低于红外弹均值，
 > 由 `tools/test/smoke.js`「箔丝有效」断言守着。
 
 ### 定向能拦截（GUS-2）
 
-在 `Game` 的 `updateDEW(dt, actor)`，条件是：
+在 `Game` 的 `updateDEW(dt, actor)`（`js/engine/game/combat.js`），条件是：
 
 - 武器 `kind === 'dew'` 且有就绪的 `slotCd` 槽（值为 0）
 - 导弹以本机为目标、敌我不同队
@@ -604,7 +607,7 @@ if (!(Math.random() < chance)) continue;
 成功后烧毁导弹、播 `laser()` 音效与一句电台；玩家还会在"挂载切换"同一处（`SysNote`）弹一条拦截提示。
 
 **没有充能储备，只有单次冷却**：拦截不消耗弹药。每个 GUS-2 挂点占一个 `slotCd` 发射槽，
-拦截成功后该槽设为 `cd`（18 s），由 `stepAircraft` 与导弹同一套逻辑倒计时，
+拦截成功后该槽设为 `cd`（36 s），由 `stepAircraft` 与导弹同一套逻辑倒计时，
 冷却条画在右下角 STORES 缩略图里。多个吊舱各自独立。
 吊舱是自动系统，不要求被选为当前武器。
 
@@ -624,8 +627,8 @@ if (!(Math.random() < chance)) continue;
 
 ## 挂载与出装
 
-**一种武器能不能出场、能挂到哪、一个挂点带几发，由 `STORE_ATTR` 决定**，
-不在本表里。完整机制见 [loadout.md](loadout.md)。
+**一种武器能不能出场、能挂到哪、一个挂点带几发，由武器文件里的 `attr` 决定**，
+不在本节的参数里。完整机制见 [loadout.md](loadout.md)。
 
 简言之：`fits` 决定它能上哪些挂载点类型，`perPoint` 决定单点携弹量，
 `mass` 决定它对机动性的拖累。
@@ -634,19 +637,20 @@ if (!(Math.random() < chance)) continue;
 
 ## 如何加一种武器
 
-1. 在 `js/data/` 的 `WEAPONS` 里加一条，**对象键用短的内部代号**
-   （别用逻辑语前缀当键名，太长且没必要）
-2. 填 `name` 用逻辑语前缀 + 序号，`cn` 用中文代号
-3. 在 `Game` 的 `ROOTS` 里加中文含义（若有编号前缀）
-4. 把键名加进某个机型的 `defaultLoadout`（旧文档里的 `specials` 字段已不存在）
-5. 在 `STORE_ATTR` 里给 `fits` / `perPoint` / `mass`，并在
-   `STORE_COOLDOWN` 里给 `cd`（后者 `smoke.js` 会检查）
-6. 制导弹要进 `MISSILE_LEAD`（`smoke.js` 会检查）
-7. 把键名加进 `Game` 的 `preflight()` 检查列表
-8. 跑 `node tools/test/smoke.js`
+1. 新建 `js/data/weapons/<id>.js`，写一个 `Registry.weapon({ order, id, … })`，**id 用短的内部代号**
+   （别用逻辑语前缀当 id，太长且没必要）；`order` 决定在机库 / 图鉴里的先后
+2. 填 `name` 用逻辑语前缀 + 序号，`cn` / `desc` / `role` 用 `T('weapons.<id>.cn')` 等，
+   并在 `locales/zh-CN/text/weapons/<id>.json` 里写文本
+3. 玩家能挂的写 `attr: { fits, perPoint, mass }`，并写 `cd`（每槽装填时间，`smoke.js` 要求 ≥ 1）；
+   制导弹写 `lead`，雷达弹再写 `flareRD`；需要机体门槛写 `needs`，外观写 `look`
+4. 要用机制标签就写 `tags: ['…']`（没声明的先在 `js/core/tags.js` 声明，见 [tags.md](tags.md)）
+5. 在 `js/ui/screens/hardpoints.js` 的 `ROOTS` 里加中文含义（若有编号前缀）
+6. 把 id 加进某个机型的 `defaultLoadout`（旧文档里的 `specials` 字段已不存在）
+7. 需要自检就把 id 加进 `js/boot/main.js` `preflight()` 里的 `needWeapons` 列表
+8. `node tools/build/gen-pages.js`（把新文件加进各语言页面副本的脚本清单），再跑 `node tools/test/smoke.js`
 
 **别忘第 7 步**——自检列表是手工维护的，漏了不会报错，
-但那个武器永远不会出现在自检里。
+但那个武器永远不会出现在自检里。只给 NPC 用的弹见 [loadout.md](loadout.md#加一种新武器)。
 
 ---
 
@@ -654,19 +658,19 @@ if (!(Math.random() < chance)) continue;
 
 | 想改什么 | 在哪 |
 |---|---|
-| 武器基础数据 | `js/data/` 的 `WEAPONS` |
-| 每槽装填时间 | `js/data/` 的 `STORE_COOLDOWN` |
-| 导引品质 `lead` | `js/data/` 的 `MISSILE_LEAD` |
-| 挂载适配 / 单点弹数 / 重量 | `js/data/` 的 `STORE_ATTR` |
-| 机体能力门槛 | `js/data/` 的 `STORE_NEEDS` 与 `AIRCRAFT[].caps` |
-| 高空锁定锥收窄（×0.78） | `Game` `updateLock()` |
+| 武器基础数据 | `js/data/weapons/<id>.js` |
+| 每槽装填时间 | 同文件的 `cd` |
+| 导引品质 `lead` | 同文件的 `lead` |
+| 挂载适配 / 单点弹数 / 重量 | 同文件的 `attr` |
+| 机体能力门槛 | 同文件的 `needs` 与 `AIRCRAFT[].caps` |
+| 高空锁定锥收窄（×0.78） | `Game` `updateLock()`（`js/engine/game/lock.js`） |
 | 锁定速率分档 | 同上，`rate` 那一行 |
 | 一次按键打出的发数 | 武器自己的 `salvo` |
-| 近炸 / 爆炸半径 | `js/data/` 的 `fuze` `blast` `blastCore` `blastAir` |
-| 衰减曲线 / 飞机受害半径 / 直接命中距离 | `combat.js` `falloffK` / `HIT_R_AIR` / `CONTACT` |
-| 爆炸特效与预算 | `combat.js` `blastFx` / `BLAST_FX` |
-| 干扰弹冷却与粒子数 | `Ent` `breakLock()` |
-| 定向能拦截窗口折算（1.2 s） | `Game` `updateDEW()` |
+| 近炸 / 爆炸半径 | 武器文件的 `fuze` `blast` `blastCore` `blastAir` |
+| 衰减曲线 / 飞机受害半径 / 直接命中距离 | `js/engine/combat.js` `falloffK` / `HIT_R_AIR` / `CONTACT` |
+| 爆炸特效与预算 | `js/engine/combat.js` `blastFx` / `BLAST_FX` |
+| 干扰弹冷却与粒子数 | `Ent` `breakLock()`（`js/engine/entities/warhead.js`） |
+| 定向能拦截窗口折算（1.2 s） | `Game` `updateDEW()`（`js/engine/game/combat.js`） |
 
 ## 地形高度钩子（为陆地做准备）
 

@@ -1,6 +1,6 @@
 # 挂载系统
 
-数据 `js/data/` · 逻辑 `Game` · 显示 `js/render/planform/` / `HUD`
+数据 `js/data/`（机型的 `hardpointGroups`、武器的 `attr`、`rules.js`） · 逻辑 `Loadout`（`js/engine/loadout.js`）+ `Ent`（`js/engine/entities/mounts.js`）+ `Game` · 显示 `js/ui/screens/hangar.js` / `hardpoints.js`、`js/render/planform/`、`HUD`
 
 ---
 
@@ -43,9 +43,9 @@ hardpointGroups: [
 
 - `pts` 是**机体系俯视坐标**（机头 +y，右翼 +x，单位米）
 - **`pts` 同时就是俯视识别图的标注锚点** —— 单一数据源，不要再另建一份
-- 每组点数**必须是偶数**（成对挂载）；`smoke.js` 检查 `pts.length % 2`
+- 每组点数**必须是偶数**（成对挂载）；`tools/test/smoke.js` 检查 `pts.length % 2`
 - 组上可以带一个 `hy`：**吊挂高度**（机体系 y，米）。不写就用
-  `Ent.STORE_HY` 按 `kind` 给的默认值。默认值是按战斗机定的，
+  `Ent.STORE_HY`（`js/engine/entities/mounts.js`）按 `kind` 给的默认值。默认值是按战斗机定的，
   大型机体要自己给 —— 否则挂载物会埋进机身（`smoke.js` 有几何断言盯着，
   见 [data.md](data.md#hardpointgroups--defaultloadout)）
 
@@ -53,7 +53,7 @@ hardpointGroups: [
 
 | 机型 | 组数 | 点数 | 组号与类型 |
 |---|---|---|---|
-| DB-11 军舰鸟 | 4 | 8 | A tip · B heavy · C light · D light |
+| DB-11 军舰鸟 | 3 | 6 | A light · B heavy · C belly |
 | D-14 旗鱼 | 3 | 6 | A heavy · B light · C belly |
 | G-6 鲣鸟 | 3 | 6 | A heavy · B light · C light |
 | F-9 海燕 | 2 | 4 | A heavy · B light |
@@ -61,7 +61,7 @@ hardpointGroups: [
 | D-33 信天翁 | 3 | 6 | A heavy · B light · C tip |
 
 `maxLoad`（最大挂载重量 kg）：军舰鸟 6500、旗鱼 4800、鲣鸟 7200、
-海燕 5200、贼鸥 4200、信天翁 5000、折翼 1200。
+海燕 5200、贼鸥 4200、信天翁 5000、折翼 4200。
 
 ### 挂载点类型
 
@@ -74,10 +74,12 @@ hardpointGroups: [
 
 显示时用 `hpKindLabel()` 翻成中文：翼尖 / 通用 / 重挂 / 机腹。
 
-### 武器挂载属性 `STORE_ATTR`
+### 武器挂载属性 `attr`
+
+写在每件武器自己的文件里（`js/data/weapons/<id>.js`），封存时平铺到武器上，所以运行时读的是 `WEAPONS[k].fits` / `.perPoint` / `.mass`：
 
 ```js
-srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
+Registry.weapon({ id: 'srm', …, attr: { fits: ['tip', 'light', 'heavy'], perPoint: 10, mass: 95 }, … })
 ```
 
 | 字段 | 含义 |
@@ -86,53 +88,59 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 | `perPoint` | **单个挂载点**提供几发 |
 | `mass` | **单件**重量（kg） |
 
-全表（键 = 武器内部代号）：
+全表（键 = 武器 id；原来是 `STORE_ATTR` 一张表，方便一眼横着比较，现在看这里）：
 
 | 武器 | fits | perPoint | mass |
 |---|---|---|---|
-| `srm` TOR-2 | tip, light, heavy | 8 | 95 |
-| `trm` TOR-4 | tip, light, heavy | 6 | 105 |
-| `hos` TOR-6 | tip, light, heavy | 4 | 100 |
-| `qsr` GIR-5 | tip, light, heavy | 12 | 92 |
-| `wasp` SUT-7 | tip, light, heavy | 3 | 145 |
-| `swm` GIR-12 | tip, light, heavy | 16 | 62 |
-| `v9` GIR-9 | tip, light, heavy | 2 | 110 |
-| `v11` SUT-11 | light, heavy | 2 | 135 |
-| `mrm` CLA-4 | light, heavy, belly | 4 | 195 |
-| `v17` CLA-17 | heavy | 1 | 285 |
-| `arm` SPO-8 | heavy | 2 | 310 |
-| `vlar` CLA-12 | heavy | 1 | 720 |
-| `hva` SPO-9 | heavy | 1 | 560 |
-| `v25` GUT-25 | heavy, belly | 2 | 330 |
-| `asl` GUT-9 | light, heavy | 4 | 240 |
-| `asl2` GUT-12 | heavy, belly | 2 | 520 |
-| `sat` SPO-6 | heavy | 2 | 410 |
-| `v22` SPO-22 | heavy | 1 | 640 |
-| `v30` PEJ-30 | heavy, belly | 1 | 295 |
-| `clb` PEJ-9 | heavy, belly | 2 | 350 |
-| `rkt` PEJ-6 | light, heavy | 28 | 280 |
-| `lcm` GUT-30 | heavy, belly | 1 | 780 |
-| `e4` ZUN-4 | light, belly | 1 | 215 |
-| `l2` GUS-2 | light, belly | 1 | 190 |
+| `srm` TOR-2 | tip, light, heavy | 10 | 95 |
+| `trm` TOR-4 | tip, light, heavy | 8 | 105 |
+| `hos` TOR-6 | tip, light, heavy | 6 | 100 |
+| `kkv` TOR-8 | tip, light, heavy | 12 | 90 |
+| `hwm` CLA-8 | light, heavy | 3 | 240 |
+| `mrm` CLA-4 | light, heavy, belly | 6 | 195 |
+| `arm` SPO-8 | heavy | 3 | 310 |
+| `vlar` CLA-12 | heavy | 2 | 720 |
+| `qsr` GIR-5 | tip, light, heavy | 16 | 92 |
+| `wasp` SUT-7 | tip, light, heavy | 4 | 145 |
+| `asl` GUT-9 | light, heavy | 6 | 240 |
+| `asl2` GUT-12 | heavy, belly | 3 | 520 |
+| `sat` SPO-6 | heavy | 3 | 410 |
+| `rkt` PEJ-6 | light, heavy | 36 | 280 |
+| `clb` PEJ-9 | heavy, belly | 3 | 350 |
 | `ecm2` ZUN-8 | tip, light, belly | 1 | 240 |
 | `dec` ZUN-12 | light, belly | 1 | 210 |
 | `oep` GUS-6 | light, belly | 1 | 175 |
 | `irp` GUS-9 | tip, light, belly | 1 | 160 |
 | `hdp` JDA-3 | light, belly | 1 | 320 |
+| `swm` GIR-12 | tip, light, heavy | 20 | 62 |
+| `hva` SPO-9 | heavy | 2 | 560 |
+| `lcm` GUT-30 | heavy, belly | 2 | 780 |
+| `v11` SUT-11 | light, heavy | 3 | 135 |
+| `v9` GIR-9 | tip, light, heavy | 4 | 110 |
+| `v17` CLA-17 | heavy | 2 | 285 |
+| `v22` SPO-22 | heavy | 2 | 640 |
+| `v25` GUT-25 | heavy, belly | 3 | 330 |
+| `v30` PEJ-30 | heavy, belly | 2 | 295 |
+| `pgb` PEJ-14 | heavy, belly | 6 | 280 |
+| `hbl` PEJ-4 | light, heavy, belly | 12 | 120 |
+| `hbh` PEJ-22 | heavy | 3 | 900 |
+| `e4` ZUN-4 | light, belly | 1 | 215 |
+| `l2` GUS-2 | light, belly | 1 | 190 |
 
-下游专用弹（`dl4` / `dl6` / `dl9` / `vgt` / `vsr` / `vbn` / `otr` / `vzu`）
-的 `fits` 是**空数组**，表示玩家挂不上它们。
+下游专用弹（`dl4` / `dl6` / `dl9` / `vgt` / `vsr` / `vbn` / `otr` / `vzu` / `vsc`）、僚机专用的 `drm`、
+舰载的 `ss6` / `ssm` 的 `fits` 是**空数组**（直接写在武器文件顶层，不用 `attr`），表示玩家挂不上它们。
 
 但"玩家挂不上"不等于"挂不上"。空数组在 `w.fits && …` 里是 truthy，
 所以渲染实体挂载时如果拿 `fits` 当判据，这批弹会被全部过滤掉 ——
 敌机机翼永远是干净的。NPC 走的就是另一张表：
 
-| 武器 | `npcFits`（写在 `WEAPONS` 条目里，不在 `STORE_ATTR`） |
+| 武器 | `npcFits`（写在武器文件顶层，不在 `attr`） |
 |---|---|
 | `dl4` DAR-4 | light, heavy |
 | `dl6` BIN-6 | tip, light, heavy |
 | `vbn` BIN-9 | tip, light, heavy |
 | `otr` TOR-1 | tip, light, heavy |
+| `drm` TOR-3 | light, heavy |
 | `vsc` SAV-14 | light, belly |
 | `vgt` TUM-7 | heavy, belly |
 | `vsr` BOX-14 | heavy |
@@ -144,10 +152,11 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 不查就会把格斗弹画到预警机的机腹上。两张表的取舍见
 [§ NPC 的挂载](#npc-的挂载)。
 
-**为什么单独放一张 `STORE_ATTR` 表而不是塞进 `WEAPONS`**：
-这样能横着比较"谁挂得下、谁带得多、谁更重"，不用在几百行表里翻。
-`js/data/` 在 `WEAPONS` 定义之后用一个 IIFE 把 `fits` / `perPoint` / `mass`
-**合并进**对应的 `WEAPONS[k]`，所以运行时 `WEAPONS[k].fits` 是存在的。
+**为什么 `fits` / `perPoint` / `mass` 要成组放进 `attr`，而不是散在武器字段里**：
+它们是同一件事的三个侧面（挂得下 / 带多少 / 多重），挂载系统一起读；
+封存时由 `Registry.sealData()` 把 `attr` 里的字段平铺到武器上并删掉 `attr`，
+所以运行时 `WEAPONS[k].fits` 是存在的。（原来是 `js/data/` 里的一串补丁表加 IIFE 合并，
+拼错键名会被静默丢弃；现在各字段就在武器文件里。）
 
 ---
 
@@ -156,12 +165,12 @@ srm: { fits: ['tip', 'light', 'heavy'], perPoint: 8, mass: 95 }
 | 层 | 字段 | 判据 | 回答的问题 |
 |---|---|---|---|
 | 挂点类型 | `WEAPONS[].fits` | 是否包含该组的 `kind` | **物理上挂不挂得住** |
-| 机体能力 | `WEAPONS[].needs` ∩ `AIRCRAFT[].caps` | 机型是否具备所需能力 | **这架飞机撑不撑得住** |
+| 机体能力 | `WEAPONS[].needs`（武器文件里的 `needs`）∩ `AIRCRAFT[].caps` | 机型是否具备所需能力 | **这架飞机撑不撑得住** |
 
 只有 `fits` 的时候，"位置一样就能挂" —— 于是制空战斗机也能挂上
 重型巡航导弹，机体差异等于白设计。所以补了第二层。
 
-判定函数：
+判定函数（`js/data/rules.js`）：
 
 ```js
 function canCarry(ac, w) {
@@ -177,7 +186,7 @@ function canCarry(ac, w) {
 
 ### 能力标签
 
-`STORE_NEEDS` 只给**少数有门槛的**武器加要求，大部分弹谁都能挂：
+`needs` 只给**少数有门槛的**武器加要求（写在各武器文件里），大部分弹谁都能挂：
 
 | 能力 | 含义 | 需要的武器（键） |
 |---|---|---|
@@ -197,7 +206,7 @@ function canCarry(ac, w) {
 | D-33 信天翁 | （无）—— 纯格斗机 |
 | KA-7 折翼 | （无，且 `npcOnly`；默认挂载见下文 KA-7 一节） |
 
-> `SPO-8` 追云**不在** `STORE_NEEDS` 里。它原来被标成"反辐射弹"、要求
+> `SPO-8` 追云**没有** `needs`。它原来被标成"反辐射弹"、要求
 > `strike`（对地火控），于是只有攻击机和多用途机能挂 —— 而它其实是一枚
 > **对空的重型拦截弹**，最该带它的恰恰是制空 / 截击机（D-14、F-9），
 > 那些机型没有 `strike`，反而挂不上。那个门槛造成的是荒谬的分配，
@@ -206,11 +215,11 @@ function canCarry(ac, w) {
 >
 > **但"反辐射"这个标签本身没有删。** 它当时的另一个问题是"没有机制支撑"
 > —— 世界里既没有雷达开机状态、也没有预警机。这两样现在都有了
-> （预警机 + `ewPower` + EMCON-Δ），所以 `antiRadar` 重新写回 `WEAPONS`，
-> 由 `Ent` 的 `isRadiating()` + `detonate()` 实现"对正在辐射的
+> （预警机 + `ewPower` + EMCON-Δ），所以 `antiRadar` 重新写回武器（现在是 `tags: ['antiRadar']`），
+> 由 `Ent` 的 `isRadiating()` + `Combat` 的 `blast` 实现"对正在辐射的
 > 目标伤害翻倍"。**挂载门槛不复原** —— 它是对空弹，这一点没变。
 
-**默认配置也受这条约束**，`preflight()` 会检查，`smoke.js` 也会。
+**默认配置也受这条约束**，`preflight()`（`js/boot/main.js`）会检查，`smoke.js` 也会。
 
 ---
 
@@ -218,7 +227,7 @@ function canCarry(ac, w) {
 
 ### 机库里的配置
 
-`getLoadout(ac)` 按需初始化，结构就是"组号 → 武器键"：
+`Game` 的 `getLoadout(ac)`（`js/engine/game/loadout.js`）按需初始化（调 `Loadout.defaults(ac)`，存在 `$.loadouts[ac.id]`），结构就是"组号 → 武器键"：
 
 ```js
 loadouts['frigatebird'] = { A: 'srm', B: 'v11', C: 'oep' }
@@ -226,9 +235,11 @@ loadouts['frigatebird'] = { A: 'srm', B: 'v11', C: 'oep' }
 
 默认值取自机型的 `defaultLoadout`，未指定的组是 `null`（空置）。
 
-### `resolveLoadout(ac, lo)`
+### `Loadout.resolve(ac, lo)`
 
-把"组 → 武器"展开成一条一条可用武器：
+展开 / 称重 / 被动汇总 / 落到飞机这四件事，现在都在 `js/engine/loadout.js` 的 `Loadout`
+（`defaults` / `resolve` / `mass` / `passive` / `apply`），机库、开局共用同一份（原来写在 `Game` 里，叫 `resolveLoadout` / `loadoutMass`）。
+`resolve` 把"组 → 武器"展开成一条一条可用武器：
 
 ```js
 { wid, w, points, ammo, salvo }
@@ -248,10 +259,12 @@ e.ammo   += g.pts.length * (w.perPoint || 1);   // 弹药池
 
 两条规则：
 
-- **被动吊舱被 `continue` 掉**，不进武器纵列表（它们没有扳机可扣）
+- **被动吊舱（`w.tags.passive`）被 `continue` 掉**，不进武器纵列表（它们没有扳机可扣）
 - 排序：**空空弹（`kind === 'aam'`）排前面**，同组内按 `name` 字典序
 
-### 落到玩家身上（`startMission()`）
+### 落到玩家身上（`Loadout.apply`，`startMission()` 调用）
+
+`js/engine/game/mission-start.js` 里先 `Loadout.resolve(ac, lo)`，造机之后 `Loadout.apply(p, ac, lo, wl)` 一次性写好：
 
 ```js
 p.loadoutList = wl;                         // 上面那个数组
@@ -264,7 +277,7 @@ p.loadFactor = min(1, 挂载总重 / maxLoad);
 p.loadout = lo;                             // 原始配置，HUD 缩略图用
 ```
 
-### `syncWeapon(a)`
+### `syncWeapon(a)`（`js/engine/game/world.js`）
 
 把 `wpIdx` 指向的那一条同步到既有代码路径用的三个字段：
 
@@ -279,7 +292,7 @@ a.spCd    = min(a.slotCd[e.wid]);      // 最快就绪的那个槽的剩余时�
 HUD 与 AI 一个"现在能不能打"的判据。切换武器**不重置** `spCd`，
 `syncWeapon` 会从 `slotCd` 里重新取。
 
-`cycleSpecial()`（游戏里按 `R`）只做 `wpIdx = (wpIdx + 1) % len`，
+`cycleSpecial()`（`js/ui/input.js`，游戏里按 `R`）只做 `wpIdx = (wpIdx + 1) % len`，
 只有一种武器时不切换（播一声 `loseLock` 提示音后返回）。
 **切枪不清零锁定进度**：`lockProgress` 由 `updateLock()` 按新武器的
 参数重新判，清零会让"对同一个敌人连打几种弹"这种多挂载玩法打不出来。
@@ -288,8 +301,8 @@ HUD 与 AI 一个"现在能不能打"的判据。切换武器**不重置** `spCd
 
 ## 发射与装填
 
-发射入口是 `Game` 的 `launch(actor, target, w)`（玩家的
-`fireSpecial()` 也会走到这里）。核心流程：
+发射入口是 `Game` 的 `launch(actor, target, w)`（`js/engine/game/launch.js`；玩家的
+`fireSpecial()`，在 `js/ui/input.js`，也会走到这里）。核心流程：
 
 ```js
 var slotArr = actor.slotCd ? actor.slotCd[actor.special] : null;
@@ -319,8 +332,8 @@ actor.spCd = Math.min.apply(null, slotArr);
 
 | 名字 | 在哪 | 含义 |
 |---|---|---|
-| `WEAPONS[].salvo` | `js/data/` | **一次按键打出几发** |
-| `loadoutList[].salvo` / `points` | `resolveLoadout` | **有几个发射槽**（= 能在装填前连按几次） |
+| `WEAPONS[].salvo` | 武器文件 | **一次按键打出几发** |
+| `loadoutList[].salvo` / `points` | `Loadout.resolve` | **有几个发射槽**（= 能在装填前连按几次） |
 
 所以 HUD / 机库上显示的那个"齐射 N"其实是**槽数**；
 真正的"一次几发"写在武器数据里，卡片底部不直接显示。
@@ -359,9 +372,9 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 用一个永远减不到 0 的值，语义是"这个挂架本来就空着" ——
 比让 HUD 一直显示"装填中"更诚实。
 
-**注意 `STORE_COOLDOWN` 必须覆盖所有可发射武器**（`smoke.js` 会检查
-`fits` 非空的非被动武器）。漏掉的话那件武器会保留 `js/data/` 里的原始 `cd` ——
-那个值可能是按旧语义定的，会快得离谱（CLA-17 就这样漏过一次）。
+**每件玩家可发射武器都必须写 `cd`**（武器文件里的字段；`smoke.js` 会检查
+`fits` 非空的非被动武器 `cd ≥ 1`）。`cd` 就是每个槽的装填时间；漏写或按旧语义写成 0.1 级的数，
+会快得离谱（CLA-17 当年在独立的 `STORE_COOLDOWN` 表里漏过一次，保留了字面量里的旧值）。
 
 ---
 
@@ -385,7 +398,7 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 3. **制式弹 `a.special` 铺满再剩下的** —— 只在**完全没有**逐组配置时生效
 
 第 2 条的顺序不是随便定的：吊舱占位是**从最后一组往前**。挂点组在
-`js/data/` 里按"内侧 → 外侧"排，倒着走等于让吊舱优先落在外侧/机腹，
+`js/data/aircraft/` 里按"内侧 → 外侧"排，倒着走等于让吊舱优先落在外侧/机腹，
 把靠里的重挂点留给制式弹。按正序（从第一组往后）会踩到：`spray`
 （通用 + 机腹）挂一枚空空弹加一个吊舱时，吊舱先吃掉通用挂点，
 而那枚弹挂不上机腹 —— **机翼上一枚弹都画不出来**，可 AI 照样在发射
@@ -395,7 +408,7 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 吊舱吃掉挂点后，导弹的**可视挂架会变少，弹药池也跟着变少**：
 上游弹的储备按 `min(w.ammo, 挂点数 × perPoint)` 封顶 —— 机翼上挂不下的弹打不出来。
 
-`Ent` 内部的 `buildNpcMounts(a)`（不导出；`makeAircraft()` 末尾对非玩家调用）据此建两样东西：
+`Ent` 内部的 `buildNpcMounts(a)`（`js/engine/entities/mounts.js`，不导出；`makeAircraft()` 末尾对非玩家调用）据此建两样东西：
 
 - `a.ammoPool[wid] = min(w.ammo, 挂点数 × perPoint)` —— `w.ammo` 是"打一仗的预算"，
   但不能超过机翼上实际挂得下的量（以前直接取 `w.ammo`，KA-7 两个轻挂点能打出 44 发 GIR-9）。
@@ -431,23 +444,23 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 
 ## 被动吊舱
 
-带 `passive: true` 的吊舱共 6 件（其中 5 件写在 `STORE_ATTR` 里、玩家可挂；
+带 `passive` 标签（`tags: ['passive']`）的吊舱共 6 件（其中 5 件写了 `attr`、玩家可挂；
 `vzu` 是下游专用、`fits: []`）。它们**不占扳机**——
 装上就一直在起作用，也不会出现在 HUD 的武器纵列表里。
 
 | 键 | 名 | 字段 | 值 | 效果 |
 |---|---|---|---|---|
-| `ecm2` | ZUN-8 静默 | `lockResist` | 0.40 | 敌方对你的锁定距离 ×(1−0.40) |
-| `vzu` | SAV-6 迷雾 | `lockResist` | 0.30 | 同上（下游，玩家挂不上） |
+| `ecm2` | ZUN-8 静默 | `lockResist` | 0.30 | 敌方对你的锁定距离 ×(1−0.30) |
+| `vzu` | SAV-6 迷雾 | `lockResist` | 0.22 | 同上（下游，玩家挂不上） |
 | `hdp` | JDA-3 护盾 | `armorBonus` | 0.22 | 全向减伤，可叠加 |
-| `oep` | GUS-6 明瞳 | `lockRangeBonus` / `silentLock` | 0.45 | 锁定距离 ×(1+0.45)；**被动测距，不触发对方 RWR** |
-| `irp` | GUS-9 夜枭 | `lockRangeBonus` / `lockResist` / `silentLock` | 0.25 / 0.15 | 同时给三项 |
+| `oep` | GUS-6 明瞳 | `lockRangeBonus` / `silentLock`（标签） | 0.45 | 锁定距离 ×(1+0.45)；**被动测距，不触发对方 RWR** |
+| `irp` | GUS-9 夜枭 | `lockRangeBonus` / `lockResist` / `silentLock`（标签） | 0.25 / 0.15 | 同时给三项 |
 | `dec` | ZUN-12 雾障 | `flareBonus` | 40 | 额外干扰弹组数（×挂载点数） |
 
-`silentLock` 是唯一的布尔项：装了就为真，决定**你用主动雷达锁别人时对方收不收得到告警**
+`silentLock` 是唯一的标签项（其余是数值字段；汇总结果是布尔）：装了就为真，决定**你用主动雷达锁别人时对方收不收得到告警**
 （见 [ai.md](ai.md) 的 RWR 扫描）。它是"你不开雷达，我也不开"那句设定的落点。
 
-汇总由 `Ent.passiveEffects(list)` 完成 —— `Game` 的 `passiveEffects(ac, lo)` 只负责把
+汇总由 `Ent.passiveEffects(list)`（`js/engine/entities/ecm.js`）完成 —— `Loadout.passive(ac, lo)` 只负责把
 挂载点分组翻译成 `[{wid, n}]` 再转给它，因为**敌机也要用同一份实现**
 （`js/missions/` 的 `spawnEnemy` 收 `o.pods`）：
 
@@ -468,7 +481,7 @@ e.lockRange = Math.min(e.lockRange, 1.9);
 - 吊舱内部的 `lockResist` **取最大值而不是相加** —— 两件抗锁定吊舱不会叠成因找不到
 - `armor` / `lockRange` / `flareBonus` **乘该组的点数**（左右各一 = ×2）
 
-在 `startMission()` 里落到玩家实体上：
+在 `Loadout.apply()` 里落到玩家实体上（最后两行 `ewAuto` / `emcon` 由 `js/engine/game/mission-start.js` 在 `apply` 之后另写）：
 
 ```js
 p.armor      = pe.armor;         // 全向减伤
@@ -487,8 +500,8 @@ p.emcon      = false;            // EMCON-Δ 电磁静默（N 键切换）
 而不是纯损失。带满弹的飞机更重更笨，而一件吊舱换来的可能是
 整场交战的锁定优势，或者一次活下来的机会。
 
-**两条路径不要混**：`resolveLoadout()` 会 `continue` 掉 `passive` 武器
-（它们没有扳机可扣），被动效果必须走 `passiveEffects()` 单独汇总。
+**两条路径不要混**：`Loadout.resolve()` 会 `continue` 掉 `passive` 武器
+（它们没有扳机可扣），被动效果必须走 `Loadout.passive()` → `Ent.passiveEffects()` 单独汇总。
 又：`vzu` 的 `lockResist` 当初被多包了一层 `passiveEffect: {...}`，
 而汇总读的是顶层字段，于是那条加成**完全没有生效**；现在六件
 被动吊舱都写顶层。
@@ -506,7 +519,7 @@ a.silentLock` 上，`a.lockResist` 走 `Ent.setStealth`（与机体匿踪合并�
 ### 总重与 `loadFactor`
 
 ```js
-// loadoutMass(ac, lo)
+// Loadout.mass(ac, lo)
 m += g.pts.length * (w.perPoint || 1) * (w.mass || 100);   // 逐组累加
 // 出击时
 loadK = min(1, m / (ac.maxLoad || 5000));                  // loadFactor
@@ -537,7 +550,7 @@ roll   × (1 − 0.12·lf)
 面板上写着"俯仰 −18%"，手感上却只有速度那几项。现在放在函数最前面，
 失速判定、姿态旋转、目标速度读的都是打过折的 `p`。
 
-**玩家和 NPC 都吃挂载重量惩罚。** 玩家的 `loadFactor` 由 `Game` 按机库配置设定；
+**玩家和 NPC 都吃挂载重量惩罚。** 玩家的 `loadFactor` 由 `Loadout.apply` 按机库配置设定；
 NPC 的由 `buildNpcMounts` 按实体挂载算（`Ent`），口径相同：`loadFactor = min(1, 挂载总重 / maxLoad)`。
 两边随弹药消耗都会减轻：`curLoadFactor` 按弹药池的剩余比例折算（吊舱不随打空而变轻）。
 NPC 的满挂重量取 `挂点数 × perPoint × mass`；没有重量表的下游弹按占位值 `perPoint 1 × mass 100` 算。
@@ -547,7 +560,7 @@ NPC 的满挂重量取 `挂点数 × perPoint × mass`；没有重量表的下�
 
 ### 系数只有一份
 
-`loadoutPenalty()` 放在 `js/data/`，**机库面板和物理共用它**。
+`loadoutPenalty()` 放在 `js/data/rules.js`，**机库面板和物理共用它**。
 
 原因是一次真实的漂移：面板曾经自己写了一个 `loadK × 18`，
 只取了俯仰那一项，把最狠的加速 −26% 和失速速度升高全漏掉了，
@@ -563,7 +576,7 @@ NPC 的满挂重量取 `挂点数 × perPoint × mass`；没有重量表的下�
 
 ## 界面怎么表达
 
-### 机库的六维条
+### 机库的六维条（`buildHangar(view)`，`js/ui/screens/hangar.js`）
 
 显示的**不是机型固有值，而是挂载之后**的实际值：
 
@@ -599,6 +612,11 @@ NPC 的满挂重量取 `挂点数 × perPoint × mass`；没有重量表的下�
 | **左** | 挂载点组列表：组号、位置、点数与类型、当前挂了什么。点击切换右栏 | `buildHpGroups()` |
 | **右** | 当前组能挂的东西，**每个一张卡片**：型号 + 中文名 + 携弹量、**定位**（`role`）、**简介**（`desc`）、关键参数（射程 / 导引 / 重量 / 冷却） | `buildHpPicker()` / `makeStoreCard()` / `storeStatLine()` |
 
+以上函数都在 `js/ui/screens/hardpoints.js`，由 `buildHardpointEditor(ac, lo, view)` 串起来。
+`view` 是编辑器的视图对象（机库用的是 `Game.$.hangarView`）：`ac`（机型下标）、`group`（选中的挂载点组）、
+`ids`（元素 id 表，键缺省时用键名本身）、`rebuild`（改动之后怎么重画）。**编辑器不再读写全局的 `selectedAC` / `activeHpGroup`**，
+批次 4 的整备界面传一套自己的 id 就能复用同一份。
+
 右栏的筛选就是前面那两层：
 
 ```js
@@ -620,7 +638,7 @@ if (!canCarry(ac, w)) { blocked++; continue; }         // 机体能力
 卡片底部 `storeStatLine(w, n)` 拼的参数行：
 
 - 被动吊舱 → `被动 · 不占扳机`
-- 否则 → `n 个发射槽`、`射程 x.x km`（`missileRange()`）、
+- 否则 → `n 个发射槽`、`射程 x.x km`（`Ent.displayRange()`）、
   定向能另有 `拦截 1.2 km`、`导引 …`
 - 末尾总是 `w.mass` kg，以及 `冷却 x.xs`（若有）
 
@@ -643,7 +661,7 @@ HUD 底部中央，一行一种武器：
 
 ### 俯视缩略图（机库大图）
 
-`PLANFORM.draw(cv, ac, lo, activeGroup)` → `planform.paint()`：
+`PLANFORM.draw(cv, ac, lo, activeGroup)` → `paint()`（`js/render/planform/paint.js`）：
 
 - 挂载点位置直接来自 `hardpointGroups[].pts`（同一份数据）
 - 每个挂载点画一个 `drawStore()` 图形，类型不同颜色不同（`isPod()` 区分吊舱）
@@ -654,12 +672,12 @@ HUD 底部中央，一行一种武器：
 - 可变后掠翼（DB-11）额外用**青色虚线**画出展开位的翼缘，并标注
   `可变后掠 11°–35°`（这是识别图的示意角，与 3D 模型的 20°→62° 不是同一套数）
 
-页面下方的说明文字也来自 `Game`：
+页面下方的说明文字（`locales/zh-CN/text/` 里）：
 「绿色为挂载，琥珀为当前编辑的挂载点组，青色虚线为可变后掠翼的展开位」。
 
 ### 战斗中的挂载状态图
 
-`HUD` 的 `drawStores()` 在右下角画一个 `compact` 版俯视图，
+`HUD` 的 `drawStores()`（`js/ui/hud/panels.js`）在右下角画一个 `compact` 版俯视图，
 和机库大图**共用同一份 `PLANFORM.paint()`**（分成两份写迟早会长得不一样）。
 它额外把每个槽的**就绪度**传进去：
 
@@ -674,25 +692,24 @@ cd[wid] = slots.map(剩余 => 1 - clamp(剩余 / w.cd, 0, 1));
 
 ## 加一种新武器
 
-1. 在 `WEAPONS` 里加数据
-2. 在 `STORE_ATTR` 里加 `fits` / `perPoint` / `mass`
-3. 在 `STORE_COOLDOWN` 里加 `cd`（`smoke.js` 会检查）
-4. 需要的话加进某个机型的 `defaultLoadout`
+1. 新建 `js/data/weapons/<id>.js`，写 `Registry.weapon({ … })`，玩家能挂的写 `attr: { fits, perPoint, mass }`
+2. 写 `cd`（每槽装填时间，`smoke.js` 会检查 ≥ 1）；制导弹写 `lead`，雷达弹写 `flareRD`；机体门槛写 `needs`
+3. 需要的话加进某个机型的 `defaultLoadout`
+4. 文本（`cn` / `desc` / `role`）写进 `locales/zh-CN/text/weapons/<id>.json`；`node tools/build/gen-pages.js` 把新文件加进页面副本
 5. 跑 `node tools/test/smoke.js`
 
-**别忘第 3 步。** 漏了不会崩，但那个武器永远不会出现在任何下拉框里。
+**别忘第 2 步的 `cd`。** 漏了不会崩，但 `smoke.js` 会拦；绕过它的话那个武器的槽冷却是 `undefined`。完整的字段清单见 [weapons.md](weapons.md#数据字段) 与 [data.md](data.md#一件武器的字段是怎么来的)。
 
-只给 NPC 用的弹（下游那批）走另一条路：`fits` 留空数组、`perPoint` / `mass`
-填 0，再写一条 `npcFits`（§ NPC 的挂载）；`STORE_ATTR` / `STORE_COOLDOWN`
-里都不用出现它 —— 玩家那边根本不列它。
+只给 NPC 用的弹（下游那批）走另一条路：`fits` 写空数组（顶层，不用 `attr`）、`perPoint` / `mass` 填 0，再写一条 `npcFits`（§ NPC 的挂载）；
+玩家那边根本不列它，所以不需要 `attr`。（它们的 `cd` 仍然要写，是给 NPC 的开火节奏用的。）
 
 ## 加一架新飞机
 
-1. 在 `AIRCRAFT` 里定义 `hardpointGroups`（**点数必须成对**）和 `defaultLoadout`
-2. 在 `js/render/planform/` 的 `P` 里加同名的俯视轮廓
-3. 跑冒烟测试
+1. 新建 `js/data/aircraft/<id>.js`，定义 `hardpointGroups`（**点数必须成对**）和 `defaultLoadout`
+2. 在 `js/render/planform/planes.js` 里加同名的俯视轮廓
+3. `node tools/build/gen-pages.js`，再跑冒烟测试
 
-`preflight()` 会检查：组是否成对（`pts.length >= 2`）、每组是否有武器挂得上
+`preflight()`（`js/boot/main.js`）会检查：组是否成对（`pts.length >= 2`）、每组是否有武器挂得上
 （`fits` ∩ `canCarry`，`npcOnly` 机型跳过这条）、默认配置里引用的组与武器是否存在
 且真的能挂到那一组、是否缺 `phys`、可驾驶机型是否有俯视轮廓。
 
@@ -702,23 +719,24 @@ cd[wid] = slots.map(剩余 => 1 - clamp(剩余 / w.cd, 0, 1));
 
 | 想改什么 | 在哪 |
 |---|---|
-| 挂载点布局与类型 | `js/data/` 各机型的 `hardpointGroups` |
-| 单点弹数 / 重量 / 适配类型 | `js/data/` 的 `STORE_ATTR` |
-| NPC 的挂点适配 | `js/data/` 各武器的 `npcFits` |
-| NPC 的挂载分配（吊舱先占） | `Ent` 的 `mountPlan()` / `buildNpcMounts()` |
-| 实体挂载渲染（3D） | `Game` 的 `pushStores()` / `pushOneStore()` |
-| 每槽冷却 | `js/data/` 的 `STORE_COOLDOWN` |
-| 能力门槛与机型能力 | `js/data/` 的 `STORE_NEEDS` / `AIRCRAFT[].caps` |
-| 最大挂载重量 | `js/data/` 各机型的 `maxLoad` |
-| 挂载惩罚系数 | `js/data/` 的 `loadoutPenalty()` |
-| 总重公式（是否含 perPoint） | `Game` 的 `loadoutMass()` |
-| 被动效果汇总与上限 | `Game` 的 `passiveEffects()` |
+| 挂载点布局与类型 | `js/data/aircraft/<id>.js` 的 `hardpointGroups` |
+| 单点弹数 / 重量 / 适配类型 | 武器文件的 `attr`（`js/data/weapons/<id>.js`） |
+| NPC 的挂点适配 | 武器文件的 `npcFits` |
+| NPC 的挂载分配（吊舱先占） | `Ent` 的 `mountPlan()` / `buildNpcMounts()`（`js/engine/entities/mounts.js`） |
+| 实体挂载渲染（3D） | `pushStores()` / `pushOneStore()`（`js/ui/frame.js`） |
+| 每槽冷却 | 武器文件的 `cd` |
+| 能力门槛与机型能力 | 武器文件的 `needs` / `AIRCRAFT[].caps` |
+| 最大挂载重量 | 机型文件的 `maxLoad` |
+| 挂载惩罚系数 | `loadoutPenalty()`（`js/data/rules.js`） |
+| 总重公式（是否含 perPoint） | `Loadout.mass()`（`js/engine/loadout.js`） |
+| 被动效果汇总与上限 | `Ent.passiveEffects()`（`js/engine/entities/ecm.js`）；分组翻译在 `Loadout.passive()` |
+| 展开 / 落到飞机 | `Loadout.resolve()` / `Loadout.apply()` |
 | 空挂架标记 | `Ent` 的 `SLOT_EMPTY`（1e9） |
 | 一次按键打几发 | `WEAPONS[].salvo` |
-| 六维条算法 | `Game` `buildHangar()` |
-| 选装卡片 | `Game` `buildHpPicker()` / `makeStoreCard()` / `storeStatLine()` |
+| 六维条算法 | `buildHangar()`（`js/ui/screens/hangar.js`） |
+| 选装卡片 | `buildHpPicker()` / `makeStoreCard()` / `storeStatLine()`（`js/ui/screens/hardpoints.js`） |
 | 俯视缩略图 | `js/render/planform/` `paint()` / `drawStore()` / `groupStore()` |
-| 战斗挂载状态图 | `HUD` `drawStores()` |
+| 战斗挂载状态图 | `HUD` `drawStores()`（`js/ui/hud/panels.js`） |
 
 ## KA-7 默认挂载（本批）
 

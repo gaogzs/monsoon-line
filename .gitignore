@@ -34,8 +34,8 @@ yarn-error.log*
 # 本项目零依赖、无需构建；保留这些规则以防将来引入工具链
 # ---------------------------------------------------------------
 node_modules/
-dist/
-build/
+/dist/
+/build/
 out/
 .cache/
 .parcel-cache/

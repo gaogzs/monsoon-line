@@ -1,6 +1,6 @@
 # 运行时实体系统
 
-代码：`Ent`（实体本体）· `Game`（世界对象、发射链路、锁定、清理）· `js/data/`（`WEAPONS` / `AIRCRAFT` 数据表）
+代码：`Ent`（实体本体，`js/engine/entities/*.js`）· `Game`（世界对象、发射链路、锁定、清理，`js/engine/game/*.js`）· `js/data/`（`WEAPONS` / `AIRCRAFT` 等数据表，由 `Registry` 封存）
 
 > 大气、动压、姿态积分、导弹动力学的**数值模型**见 [flight-model.md](flight-model.md)。
 > 本文只讲运行时实体系统：对象长什么样、谁创建谁销毁、一次发射与一次命中是怎么走完的。
@@ -9,15 +9,31 @@
 
 ## 1. 职责边界
 
-`Ent` 提供全局 `Ent`，做四件事：
+`Ent` 提供全局 `Ent`，做四件事。v3.0.0 起它不再是一个巨型闭包，而是 `js/engine/entities/` 下按职责命名的小文件（私有状态走 `Ent.$`，公开接口集中在 `zz-api.js`；规则见 [modules.md](modules.md)）：
+
+| 文件 | 管什么 |
+|---|---|
+| `physics.js` | 大气密度 / 动压 / 控制因子 / 转弯因子 / 阻力系数、地形钩子（`terrainY` `groundY` `agl` `setTerrain`） |
+| `aircraft.js` | `makeAircraft` / `stepAircraft` / `curLoadFactor` / `nozzlesOf` |
+| `mounts.js` | 挂点适配（`fitsKind`）、NPC 挂载分配（`buildNpcMounts`）、选弹（`chooseWeapon` / `setWeapon` / `weaponMatchesTarget`）、挂载物位置（`storePos` 等） |
+| `missile.js` | `makeMissile` / `stepMissile`、红外重捕获、诱饵二次欺骗 |
+| `range.js` | 有效射程、发射包线、`aiReach` / `lockOff` |
+| `radiation.js` | 反辐射判定与烧穿干扰（`jam*`、`isRadiating`） |
+| `warhead.js` | 加固与战斗部系数、近炸 / 碰炸、`detonate`、`breakLock` / `breakLockFor`、设施伤害分流（`hitSurface` / `hitAny`） |
+| `guns.js` | 机炮与炮弹（`fireGun` / `fireGunFrom` / `stepBullet`） |
+| `damage.js` | `damage` / `kill` / `killGround` |
+| `ecm.js` | 被动吊舱与匿踪（`passiveEffects` / `setStealth` / `openEcm`） |
+| `particles.js` | 粒子、爆炸、舰尾浪花 |
+| `targets.js` | `makeTarget` / `stepTarget` |
+
 
 | 做 | 不做 |
 |---|---|
 | 构造与推进飞机 / 导弹 / 子弹 / 粒子 / 目标物 | 大气模型与操控权限曲线的**取舍理由**（见 flight-model.md） |
-| 伤害与击杀结算（`damage` / `kill` / `killGround`） | 发射槽分配、装填计时、齐射枚数（在 `Game` `launch()`） |
-| 机炮射速节流与子弹生成（`fireGun`） | 谁能打谁、锁定进度（`Game` `updateLock` / `cycleTarget` / `targetMismatch`） |
+| 伤害与击杀结算（`damage` / `kill` / `killGround`） | 发射槽分配、装填计时、齐射枚数（在 `Game` `launch()`，`engine/game/launch.js`） |
+| 机炮射速节流与子弹生成（`fireGun`） | 谁能打谁、锁定进度（`Game` `updateLock`，`engine/game/lock.js`；`cycleTarget` / `targetMismatch` 在 `ui/input.js`） |
 | 干扰弹投放与欺骗（`breakLock`） | AI 控制律、编队、航线（`AI`） |
-| 每帧积分位置 / 姿态 / 速度 | 绘制（`render.js` / `HUD`） |
+| 每帧积分位置 / 姿态 / 速度 | 绘制（`js/render/` / `HUD`） |
 
 一句概括：**`Ent` 是纯逻辑，不碰 DOM、Canvas、WebAudio**（音效只通过全局 `SFX` 调用）。所有实体都是普通对象字面量，没有类、没有原型方法——想加字段就直接加，`compact()` 也不会替你清理。
 
@@ -25,7 +41,7 @@
 
 ## 2. 完整公开接口
 
-`Ent` 的全部导出（`Ent` 末尾），逐个列出：
+`Ent` 的全部导出（`js/engine/entities/zz-api.js`，`Ent.xxx = $.xxx`），逐个列出（表里没列的 `airDragK` `storeHy` `nozzlesOf` `surfaceBelow` `forEachStoreSlot` `storeForSlot` `targetClass` `curLoadFactor` `contactScan` `setEcm` `gunMuzzle` `flashRings` `wakeSpray` `glideReach` `maxReach` `flyTo` `envelopeRange` `envelopeCached` `displayRange` `naturalPoint` `gunLead` `groundY` `terrainY` `isLand` `agl` `SEA_Y` `setTerrain` `finFootprint` `jam*` `gunResistK` `SMALL_CAL` 等见文末与 [modules.md](modules.md)）：
 
 | 成员 | 签名 | 语义 |
 |---|---|---|
@@ -33,7 +49,7 @@
 | `qOf` | `qOf(y, speed) → Pa` | 动压 `½ρv²` |
 | `ctrlFactor` | `ctrlFactor(y, speed, ac) → 0..1` | 气动权限系数，端点可被机型覆盖 |
 | `turnFactor` | `turnFactor(y) → 0.34..1` | 导弹转弯率的气动缩放 |
-| `makeAircraft` | `makeAircraft(o) → a` | 造飞机。`o = {type, team, x/y/z, fwd, speed, throttle, special, loadout, pods, isPlayer, isDrone, flares, radio, group}`。非玩家会顺手建 `ammoPool` / `slotCd`（§ 3.1） |
+| `makeAircraft` | `makeAircraft(o) → a` | 造飞机。`o = {type, team, x/y/z, fwd, speed, throttle, special, loadout, pods, isPlayer, flares, radio, group}`（无人机不再靠 `o.isDrone`，而是机型 `tags.unmanned`，造机时 `a.tags = ac.tags`）。非玩家会顺手建 `ammoPool` / `slotCd`（§ 3.1） |
 | `stepAircraft` | `stepAircraft(a, dt, world)` | 飞机每帧：挂载惩罚→动压→失速→姿态→速度→位置→冷却→拖烟 |
 | `fitsKind` | `fitsKind(w, kind, playerStyle) → bool` | 这件武器挂得住这种挂点吗。玩家读 `fits`，NPC 读 `npcFits`（缺省退回 `fits`） |
 | `mountPlan` | `mountPlan(a) → [弹种或 null]` | 逐组挂载分配（逐组配置 → 吊舱 → 制式弹），下标对齐 `ac.hardpointGroups` |
@@ -41,11 +57,11 @@
 | `STORE_HY` | `{ tip, light, heavy, belly }` | 默认吊挂高度表（米，机体系）。机型可用挂点组的 `hy` 覆盖 |
 | `chooseWeapon` | `chooseWeapon(a, t, dist) → 武器id\|null` | AI 开火前挑一件：按目标类别（对空 / 对面）+ 射程（`aiReach`，够得着的取最短）。判据见 §7 坑 14 |
 | `effRange` | `effRange(w, alt) → m` | 有效动力射程：用 `stepMissile` 朝远处假目标直飞一次量出，按 2 km 高度档缓存在 `w.__eff`；带 loft 的对面弹再用 `loftReach/hitsAt` 对真目标二分修正。模拟世界带 `silent`，`Combat.detonate` 不出声。例：BOX-14 `lockDist` 9000 → 4 km 高约 8.4 km；SPO-6 8200 → 约 7.6 km |
-| `aiReach` | `aiReach(w, alt, k=0.9) → m` | `min(lockDist, effRange × k)`。`AI` 的 `fireAtTarget` / `surfaceTargetFor`、`chooseWeapon`、`Game` `pickTargetFor`（舰载防空）、`route.js` strike 都用它 |
+| `aiReach` | `aiReach(w, alt, k=0.9) → m` | `min(lockDist, effRange × k)`。`AI` 的 `surfaceTargetFor`（`ai/util.js`）与开火分支（`ai/brain.js` / `ai/tactics.js`）、`chooseWeapon`、`Game` `pickTargetFor`（舰载防空，`engine/game/combat.js`）、`engine/route.js` strike 都用它 |
 | `lockOff` | `lockOff(a, t, w) → rad` | 发射离轴角：对面弹（target 是 ground/ship）只量水平方位、忽略垂直；对空弹量三维夹角。玩家对面锁定、AI `okAng`、route strike 共用 |
 | `setWeapon` | `setWeapon(a, wid)` | 把它设成"当前触发的那件"（`special` / `spAmmo` / `spCd`）。玩家换弹与 AI 选弹共用 |
 | `weaponMatchesTarget` | `weaponMatchesTarget(w, t) → bool` | 武器能不能打这个目标（与 `Game` 的 `targetMismatch` 同源） |
-| `mountIssues` | `[string]` | 关卡里写错的 NPC 挂载（挂不上 / 能力不足）。`smoke.js` 断言它是空的 |
+| `mountIssues` | `[string]` | 关卡里写错的 NPC 挂载（挂不上 / 能力不足）。`tools/test/smoke.js` 断言它是空的 |
 | `clearMountIssues` | `clearMountIssues()` | 清空上表（测试用） |
 | `makeMissile` | `makeMissile(o) → m` | 造导弹/炸弹。`o = {weapon, team, pos, fwd, speed, target, owner}` |
 | `stepMissile` | `stepMissile(m, dt, world)` | 导弹每帧：动力段→导引→位置→近炸→尾迹 |
@@ -63,9 +79,9 @@
 | `stepParticles` | `stepParticles(list, dt)` | 粒子每帧：寿命 → 位移 → 阻力 → 重力 |
 | `explode` | `explode(list, pos, scale, count)` | 爆炸：多色火球 + 黑烟 |
 | `detonate` | `detonate(m, t, world)` | 兼容包装，转 `Combat.detonate`（范围伤害见 [weapons.md](weapons.md#命中与近炸)）。`clusterBurst` 已删除 |
-| `isHard` | `isHard(t) → bool` | 加固目标：`t.hard` 或 `HARD_MODELS[t.model]` |
-| `warheadK` | `warheadK(w, t) → 系数` | 战斗部对目标的系数：非加固 1；加固时 `penetrator` 1、`cluster` 0.2、其余 0.6 |
-| `hitSurface` | `hitSurface(tg, dmg, world, source)` | 对设施 / 舰船结算一次伤害：有回调走 `hitTarget`，没有就 `hp -= dmg` + `killGround`。`hitAny` 的设施分支就是它；`smoke.js` 也直接调它测误伤计数 |
+| `isHard` | `isHard(t) → bool` | 加固目标：`t.hard` 或 `t.tags.hard`（`makeTarget` 从 `TARGETS[model].tags` 带上；旧的 `HARD_MODELS` 已并进 `js/data/targets/`） |
+| `warheadK` | `warheadK(w, t) → 系数` | 战斗部对目标的系数：非加固 1；加固时 `w.tags.penetrator` 1、`cluster` 0.2、其余 0.6 |
+| `hitSurface` | `hitSurface(tg, dmg, world, source)` | 对设施 / 舰船结算一次伤害：有回调走 `hitTarget`，没有就 `hp -= dmg` + `killGround`。`hitAny` 的设施分支就是它；`tools/test/smoke.js` 也直接调它测误伤计数 |
 | `setTargetHitHandler` | `setTargetHitHandler(fn)` | `Game` 注册 `hitTarget(tg, dmg, source)`，制导弹 / 子母弹打设施都走它（击毁计数、误击处罚）；未注册时退回 `hp -= dmg` + `killGround` |
 | `damage` | `damage(ent, amt, world, source) → bool` | 对**飞机**结算伤害（含装甲减伤），返回是否击杀 |
 | `kill` | `kill(ent, world, groundImpact, source)` | 击落飞机：爆炸 + 音效 + `source.kills++` |
@@ -83,13 +99,13 @@
 
 ### 3.1 飞机 `a`（`kind: 'air'`）
 
-`makeAircraft()` 建立字段，`Game` / `js/missions/` 再补一批。**后续开发者靠这张表上手**：
+`makeAircraft()` 建立字段，`Game` / `js/missions/` 再补一批。**后续开发者靠这张表上手**（`Game` 的字段写入者现在分散在 `engine/game/*.js`、`ui/*.js`）：
 
 ```js
 {
   kind:'air', team, type, ac,          // ac 指向 AIRCRAFT 条目（ctrlFull/ctrlFloor 从这读）
   phys, model, name, nick,
-  alive, isPlayer, isDrone,
+  alive, isPlayer, tags,                // tags 来自 ac.tags（unmanned …），旧 isDrone 已删
   pos, fwd, up, right,                 // 三个正交基，right = up × fwd
   speed, vel, throttle, ab,
   hp, maxHp, gunResist,                // gunResist：机炮抗性（AIRCRAFT[].gunResist，缺省 0）
@@ -124,15 +140,15 @@
 | `loadoutList` / `ammoPool` / `loadout` | `Game` `startMission`（玩家）/ `js/missions/` `spawnEnemy` 的 `o.loadout`（NPC） | 挂载列表 / 各武器储备 / **逐组**配置（组 id → 弹种）。NPC 的 `ammoPool` / `slotCd` 在 `makeAircraft()` 里就建好了（见 [loadout.md](loadout.md#npc-的挂载)） |
 | `wpIdx` / `spSalvo` | `Game` | 当前挂载下标；`spSalvo` **写入后无人读取** |
 | `loadFactor` | 玩家：`Game` `startMission`；NPC：`buildNpcMounts`（都会设） | 挂载重量惩罚，`stepAircraft()` 开头经 `curLoadFactor` 读。有 `loadModel` 时随弹药池折算：打光弹药即变轻 |
-| `armor` / `lockRangeK` / `silentLock` | `Game` `startMission`（玩家）/ `js/missions/` `spawnEnemy`（敌机 `pods`，不设 `lockRangeK`） | 被动吊舱加成（`lockResist` 不再单独写，改由 `Ent.setStealth` 与机体匿踪合并）。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
-| `gLoad` / `brake` / `hiG` | `Game` `controlPlayer` | 高 G 倍率 / 减速板 / HUD 指示 |
+| `armor` / `lockRangeK` / `silentLock` | `Game` `startMission`（`engine/game/mission-start.js`，玩家）/ `js/missions/` `spawnEnemy`（敌机 `pods`，不设 `lockRangeK`） | 被动吊舱加成（`lockResist` 不再单独写，改由 `Ent.setStealth` 与机体匿踪合并）。**两边同源** —— 都走 `Ent.passiveEffects()`；`silentLock` 是被动测距，决定对方 RWR 收不收得到告警 |
+| `gLoad` / `brake` / `hiG` | `Game` `controlPlayer`（`engine/game/control.js`） | 高 G 倍率 / 减速板 / HUD 指示 |
 | `sweep` | `stepAircraft` | 可变后掠翼位置（仅 `ac.variableSweep`） |
-| `ai` | `AI.attach` | 见 [ai.md](ai.md) |
-| `route` | `js/missions/`（轰炸机） | 走 `AI.updateRoute`，不参与空战 |
+| `ai` | `AI.attach`（`ai/brain.js`） | 见 [ai.md](ai.md) |
+| `route` | `js/missions/`（轰炸机） | 走 `ai/brain.js` 的 `updateRoute`，不参与空战 |
 | `recon` / `flee` / `bigTarget` / `weaponPod` / `isAce` / `wave` / `behavior` / `wingIdx` | `js/missions/` | 任务脚本自用标签 |
-| `wdPrev` / `wdStill` | `Game` `watchdog` | 看门狗状态（见 §5.6） |
-| `aimDir` | `Game` `updateMouseAim` | 鼠标引导的世界瞄准方向，HUD 画准星用 |
-| `planAlpha` / `rollLock` / `prevDesired` / `aimRate` | `AI.steerTo` | 飞控跨帧状态 |
+| `wdPrev` / `wdStill` | `Game` `watchdog`（`engine/game/update.js`） | 看门狗状态（见 §5.6） |
+| `aimDir` | `Game` `updateMouseAim`（`engine/game/control.js`） | 鼠标引导的世界瞄准方向，HUD 画准星用 |
+| `planAlpha` / `rollLock` / `prevDesired` / `aimRate` | `AI.steerTo`（`ai/steer.js`） | 飞控跨帧状态 |
 | `ctrlAuth` | `stepAircraft` | 当前舵效（动压 × 失速），steerTo 与 FCS 表读取 |
 
 ### 3.2 导弹 / 炸弹 `m`（`kind: 'missile'`）
@@ -147,11 +163,11 @@
 
 - `fuze` = `Combat.spec(w).fuze`；`fuzeRel` / `fuzeRef`：上一帧弹相对目标的位置及量的是谁（换目标即作废），供 `fuzeCheck` 求线段最近点。
 - `w` 是 `WEAPONS[weapon]` 的引用，所有弹道参数都从这读，弹体本身**不复制**它们。
-- `vel` 只在**无动力弹**（`w.ballistic`）里独立累积；有发动机的弹每帧 `vel = fwd × speed`。
+- `vel` 只在**无动力弹**（`w.tags.ballistic`）里独立累积；有发动机的弹每帧 `vel = fwd × speed`。
 - `decoyTries` / `reLockT` 是诱饵的两个计数器：前者控制"越投越难骗"，
   后者是骗中之后的盲飞期（见 §4.5）。两者**都不因成功而清零**。
-- `seekers`：导引头数，`twinSeeker`（BIN-9）为 2，`breakLock` 每骗中一次先扣一个，扣到 1 才真正脱锁。
-- `dewRolled`：定向能拦截已对哪架飞机掷过骰（`Game` `updateDEW`，每枚弹只判一次）。
+- `seekers`：导引头数，`w.tags.twinSeeker`（BIN-9）为 2，`breakLock` 每骗中一次先扣一个，扣到 1 才真正脱锁。
+- `dewRolled`：定向能拦截已对哪架飞机掷过骰（`Game` `updateDEW`，`engine/game/combat.js`，每枚弹只判一次）。
 - 运行期追加：`decoy`（`{p, v, t0, p2, done}`，骗走它的那团诱饵云，供 `decoyRecheck`）、`spoofed`（骗到它的飞机，只在 `reLockT > 0` 期间被避开）、
   `laserLost`（激光照射丢失，当前无武器使用）。
 
@@ -161,7 +177,7 @@
 { kind:'bullet', team, alive, pos, prev, vel, dmg, life, owner }
 ```
 
-`prev` **只给渲染画曳光线段用**——命中检测不用它，`Game` `scanShot()` 会自己按 `pos - vel*dt` 反推上一帧位置。
+`prev` **只给渲染画曳光线段用**——命中检测不用它，`Game` `scanShot()`（`engine/game/combat.js`）会自己按 `pos - vel*dt` 反推上一帧位置。
 
 ### 3.4 粒子 `p`
 
@@ -178,8 +194,9 @@
 ```js
 { kind:'target', team, ttype:'air'|'ground', label, model, alive, dead,
   pos, fwd, up, right, speed, vel,
-  hp, maxHp, radius, gunResist, ground, big, drift, drifting,   // gunResist：o.gunResist → GUN_RESIST_MODELS[model] → 0
+  hp, maxHp, radius, gunResist, ground, big, drift, drifting,   // gunResist：o.gunResist → TARGETS[model].gunResist → 0
   route, wpIdx, arrive, heading,
+  tags,                                                         // hard / regulator / relay / sam / cullFar（来自 TARGETS[model].tags）
   fireCd, weapon, value }
 ```
 
@@ -191,12 +208,12 @@
   走位移而不是线段方向，是为了在拐弯处也给出连续朝向）。
   走完最后一段：`loop` 回绕，否则调 `onArrive(t, world)` 停住；`despawn` 则退场。
   `speed` 是**米/秒** —— `SHIPS[].speed` 是节，接入时自己 ×0.514。
-- `weapon` 非空时由 `Game` `updateTargets()` 当成防空阵地开火（`pickTargetFor` 按阵营选目标：team 1 玩家优先、team 0 只打敌机、team 2 不开火，见 [ai.md](ai.md)）；`team` 默认 1。
+- `weapon` 非空时由 `Game` `updateTargets()`（`engine/game/combat.js`）当成防空阵地开火（`pickTargetFor` 按阵营选目标：team 1 玩家优先、team 0 只打敌机、team 2 不开火，见 [ai.md](ai.md)）；`team` 默认 1。
 - 任务脚本追加：`friendlyAsset`（打坏扣分）、`vital`（**写入后无人读取**）。
 
 ### 3.6 世界对象 `world`
 
-`world` 在 `Game` `newWorld()` 里建立（普通对象，没有类），任务 `spawn()` 再往里塞关卡专属字段：
+`world` 在 `Game` `newWorld()`（`engine/game/world.js`）里建立（普通对象，没有类），任务 `spawn()` 再往里塞关卡专属字段：
 
 ```js
 // newWorld() —— 所有关卡都有
@@ -220,7 +237,7 @@
 
 ## 4. 关键流程
 
-### 4.1 一帧内实体更新顺序（`Game` `update()`）
+### 4.1 一帧内实体更新顺序（`Game` `update()`，`engine/game/update.js`）
 
 ```
 world.time += dt；Radio.update(dt)
@@ -251,8 +268,8 @@ updateCamera(dt)
 
 ```
 keydown Enter / 鼠标右键
-  → fireSpecial()            Game：查 kind / 弹药 / spCd / 目标类型匹配
-  → launch(player, t, world) Game
+  → fireSpecial()            Game（`ui/input.js`）：查 kind / 弹药 / spCd / 目标类型匹配
+  → launch(player, t, world) Game（`engine/game/launch.js`）
       ├ 找槽：slotCd[special] 里第一个 ≤0 的槽（找不到就按不出去）
       ├ 由槽下标算挂点位置：side = si%2 ? +1 : −1，rank = floor(si/2)
       ├ for q in 0..(salvo−1): Ent.makeMissile(...) → world.missiles.push
@@ -266,7 +283,7 @@ keydown Enter / 鼠标右键
 ### 4.3 装填与冷却：`slotCd` 的真实语义
 
 - 槽数 = 该武器占用的**挂载点数**（玩家的 `Game` `startMission` 按 `wl[wi].salvo` 建数组；
-  NPC 的 `Ent` `buildNpcMounts()` 在造飞机时建，槽数 = 它挂得住的挂点数）。
+  NPC 的 `Ent` `buildNpcMounts()`（`entities/mounts.js`）在造飞机时建，槽数 = 它挂得住的挂点数）。
 - 按一次发射键只打**一个**槽（外加该武器的 `salvo` 枚共用这一槽，如 GIR-5 三联装）。
 - 每个槽独立倒计时（`stepAircraft` 里的 `for (var ck in a.slotCd)`），切挂载不会跳过装填。
 - 储备弹少于挂架数时，多出来的槽一开始就是 `SLOT_EMPTY`（`1e9`），永远不会装填完成——HUD 显示的是"没得装了"，而不是骗人的"装填中"。
@@ -328,7 +345,7 @@ Combat.blast：半径内 actors + targets（同队、发射者除外）× fallof
 IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 现在 `spoofed` 只在盲飞期内生效，归零后导弹可以重新咬住本机。
 
-**告警口径**：导弹告警音（`Game`）与来袭标记（`HUD`）
+**告警口径**：导弹告警音（`Game`）与来袭标记（`HUD`，`ui/hud/`）
 判据是"当前锁定本机"**或**"刚被本机诱饵骗掉、`reLockT > 0`、且仍在本机 3600 m 内"。
 只认 `m.target` 会让撒出诱饵的那一瞬间告警与标记一起消失，
 而那枚弹还在同一片空域飞。
@@ -339,25 +356,25 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 
 | 想改什么 | 在哪 |
 |---|---|
-| 每槽装填时间 | `js/data/` `STORE_COOLDOWN`（**每槽**，覆盖 `WEAPONS[].cd`） |
-| 一次按键打几枚 | `js/data/` `WEAPONS[].salvo` + `Game` `launch()` |
-| 空挂架标记值 | `Ent` `SLOT_EMPTY`（`1e9`） |
-| 机炮射速 / 单发伤害 / 初速 | `js/data/` `WEAPONS[cel3/cel7]` 的 `rpm` / `dmg` / `speed` |
+| 每槽装填时间 | `js/data/weapons/<id>.js` 的 `cd`（**每槽**；原 `STORE_COOLDOWN` 侧表已并入武器文件） |
+| 一次按键打几枚 | `js/data/weapons/` 的 `salvo` + `Game` `launch()`（`engine/game/launch.js`） |
+| 空挂架标记值 | `Ent` `SLOT_EMPTY`（`entities/aircraft.js`，`1e9`） |
+| 机炮射速 / 单发伤害 / 初速 | `js/data/` `WEAPONS[cel3/cel7]`（五门机炮 id 为 `cel1 cel2 cel3 cel7 cel11`，原 `k1 k2 k3 k7 k11`） 的 `rpm` / `dmg` / `speed` |
 | 机炮有效射程（含高空翻倍） | `js/data/` 的 `range` / `highRange`，由 `fireGun()` 换算成子弹寿命 |
 | 机炮散布 | `js/data/` `spread`，`fireGun()` 里做成随机方向偏移 |
-| 飞机命中半径（7.5 m） | `Game` `scanShot()` |
-| 目标物命中半径 | `makeTarget()` 的 `radius`，默认 10 |
-| 爆炸规模 / 颜色 | `Ent` `explode()` 的 `cols` 与 `count` |
-| 受损拖烟阈值 | `stepAircraft()` 里 `a.hp < a.maxHp * 0.45` |
+| 飞机命中半径（7.5 m） | `Combat.HIT_R_AIR`（`engine/combat.js`），`scanShot()` 引用它 |
+| 目标物命中半径 | `makeTarget()`（`entities/targets.js`）的 `radius`，默认 10 |
+| 爆炸规模 / 颜色 | `Ent` `explode()`（`entities/particles.js`）的 `cols` 与 `count` |
+| 受损拖烟阈值 | `stepAircraft()`（`entities/aircraft.js`） 里 `a.hp < a.maxHp * 0.45` |
 | 加力尾焰间隔 | `stepAircraft()` 里 `trailTimer = 0.028` |
-| 粒子数量上限 | `Game` `compact()` 里的 `> 900` |
-| 干扰弹投放间隔 / 组数 | `Ent` `breakLock()` 的 `flareCd = 0.45`、`makeAircraft()` 里 `flares` 初值 80 |
-| 被干扰概率 | `js/data/` `WEAPONS[].flare` |
-| 锁定速率 / 锥角 / 距离 | `Game` `updateLock()` + `js/data/` 的 `lockCone` / `lockDist` / `nezer` / `seeker` |
-| 地面火力开火节奏 | `Game` `updateTargets()`：`t.fireCd = w.cd + rnd(0,2)` |
-| 看门狗静止判定 | `Game` `WD_LIMIT = 1.5`、`moved < 0.02` |
+| 粒子数量上限 | `Game` `compact()`（`engine/game/update.js`）里的 `> 900` |
+| 干扰弹投放间隔 / 组数 | `Ent` `breakLock()`（`entities/warhead.js`）的 `flareCd = 0.45`、`makeAircraft()` 里 `flares` 初值 80 |
+| 被干扰概率 | `js/data/weapons/` 的 `flare`（雷达导引头用 `flareRD`） |
+| 锁定速率 / 锥角 / 距离 | `Game` `updateLock()`（`engine/game/lock.js`）+ `js/data/weapons/` 的 `lockCone` / `lockDist` / `nezer` / `seeker` |
+| 地面火力开火节奏 | `Game` `updateTargets()`（`engine/game/combat.js`）：`t.fireCd = w.cd + rnd(0,2)` |
+| 看门狗静止判定 | `engine/game/update.js` 的 `WD_LIMIT = 1.5`、`moved < 0.02` |
 | 飞行天花板 / 撞地高度 | `stepAircraft()` 里的 `23000` 与 `pos.y <= 2` |
-| 大气 / 动压曲线 | `airDensity()` / `qOf()` / `ctrlFactor()`，理由见 flight-model.md |
+| 大气 / 动压曲线 | `entities/physics.js` 的 `airDensity()` / `qOf()` / `ctrlFactor()`，理由见 flight-model.md |
 
 ---
 
@@ -366,13 +383,13 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 | 依赖 | 方向 | 说明 |
 |---|---|---|
 | `M3` | 被依赖 | 所有向量与旋转。`rotAxis` / `orthonormalize` / `raySphere` / `turnToward` / `angleBetween` |
-| `WEAPONS` `AIRCRAFT` | 被依赖 | 弹道参数与机型性能；`makeAircraft` 找不到机型会**静默回退到 `AIRCRAFT[0]`** |
-| `Combat` | 被依赖 | `spec` / `radiusOf` / `detonate`（`combat.js` 加载在 `Ent` 之后，只在运行期调用） |
+| `WEAPONS` `AIRCRAFT` `TARGETS` | 被依赖 | 弹道参数与机型性能；`makeAircraft` 找不到机型会**静默回退到 `AIRCRAFT[0]`** |
+| `Combat` | 被依赖 | `spec` / `radiusOf` / `detonate`（`engine/combat.js` 加载在 `Ent` 之后，只在运行期调用） |
 | `SFX` | 被依赖 | `boom` / `flare` / `hit` / `laser` / `bigHit` |
 | `world` | 参数 | 由 `Game` 建立，实体只读它做归属与音效（`world.particles`） |
-| `AI` | 依赖 `Ent` | `AI.update` 写 `a.ctrl`，调 `Ent.fireGun` / `Ent.breakLock` |
+| `AI` | 依赖 `Ent` | `AI.update`（`ai/brain.js`）写 `a.ctrl`，调 `Ent.fireGun` / `Ent.breakLock` |
 | `js/missions/` | 依赖 `Ent` | `makeAircraft` / `makeTarget` / `spawnParticle` / `damage` / `killGround` |
-| `Game` | 依赖 `Ent` | `launch()` / `updateLock()` / `updateDEW()` / `watchdog()` / `pushStores()` |
+| `Game` | 依赖 `Ent` | `launch()` / `updateLock()` / `updateDEW()` / `watchdog()`（`engine/game/*.js`）/ `pushStores()`（`ui/frame.js`） |
 
 ---
 
@@ -387,11 +404,11 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 
 4. **无制导弹必须给初速。** `makeMissile` 里 `vel` 对 `ballistic` 弹显式赋值；给 0 的话它就"从空中静止开始往下掉"，抛出的动能全丢。这是踩过的坑，注释里留着。
 
-5. **尾迹判据是 `ballistic` 不是 `unguided`。** 两者正交：有发动机 / 无制导的火箭巢应当拉烟，无发动机 / 有制导的滑翔弹不应当。按 `unguided` 判断会把两类全弄反。
+5. **尾迹判据是 `tags.ballistic` 不是 `tags.unguided`。** 两者正交：有发动机 / 无制导的火箭巢应当拉烟，无发动机 / 有制导的滑翔弹不应当。按 `unguided` 标签判断会把两类全弄反。
 
-6. **槽数组是**按武器**建的，渲染是**按挂点组**遍历的。** `Game` `pushStores()` 必须自己维护 `used[wid]` 起始下标，否则两组挂同一种弹时会共用前两个槽，出现"打掉一个、两组同时消失"。**推进 `used[wid]` 必须发生在适配检查之后**——否则一个挂不上的组也会占掉下标，把它后面的挂架整体顶偏。
+6. **槽数组是**按武器**建的，渲染是**按挂点组**遍历的。** `Game` `pushStores()`（`ui/frame.js`）必须自己维护 `used[wid]` 起始下标，否则两组挂同一种弹时会共用前两个槽，出现"打掉一个、两组同时消失"。**推进 `used[wid]` 必须发生在适配检查之后**——否则一个挂不上的组也会占掉下标，把它后面的挂架整体顶偏。
 
-7. **挂载重量是整体替换 `p`，不是就地缩放。** `stepAircraft()` 里 `p = { vMax, vMil, vStall, accel, decel, pitch, roll, yaw }`——少列一个字段（历史上漏过 `accel`/`decel`）就会让那个字段变成 `undefined`，加速变成瞬时。加字段时记得同步这里。**这一段还必须在函数开头**：以前它在姿态旋转之后，pitch / roll 惩罚从未生效、失速判定用的是未打折的 `vStall`。
+7. **挂载重量是整体替换 `p`，不是就地缩放。** `stepAircraft()`（`entities/aircraft.js`）里 `p = { vMax, vMil, vStall, accel, decel, pitch, roll, yaw }`——少列一个字段（历史上漏过 `accel`/`decel`）就会让那个字段变成 `undefined`，加速变成瞬时。加字段时记得同步这里。**这一段还必须在函数开头**：以前它在姿态旋转之后，pitch / roll 惩罚从未生效、失速判定用的是未打折的 `vStall`。
 
 8. **AI 每次开火前都会重新选弹，而且它现在也有 `slotCd` 了。** `AI` 调 `Ent.chooseWeapon()` 挑一件（对空 / 对面 + 够得着的里面射程最短），`Ent.setWeapon()` 把它设成 `a.special`——这就是"AI 换武器"的全部，没有独立的选弹状态。以前 NPC 的 `slotCd` 是空对象，`launch()` 对它退回单冷却 `spCd`；现在 `buildNpcMounts()` 会按挂点数建槽（实体挂载要靠它判断"这一发还在不在"）。这不改变 AI 的射速 —— `AI` 的 `s.shootT = rnd(2.6, 5.2) × (1.6 − 0.6·skill)` 通常比槽冷却长。
 
@@ -405,13 +422,13 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 
 13. **`fits` 是"玩家能不能挂"，不是"挂不挂得上"。** 下游弹的 `fits` 是空数组（玩家拿不到实物），而空数组是 truthy —— 拿它当"挂点适配"判据会把敌机的挂载全部过滤掉。所以 `Ent.fitsKind()` 分两张表：玩家 `fits`、NPC `npcFits`。加新武器时别只填一张。
 
-14. **AI 选弹与玩家选弹必须同源。** `Ent.weaponMatchesTarget()` 是"这弹能不能打那个目标"的**唯一**判据（`Game` 的 `targetMismatch` 与它一致）：目标是 `kind === 'target'` 的东西就算对面。两边各写一套的话，玩家会被提示"换对地弹"，而 AI 会拿格斗弹去打海面平台 —— 这类不一致不会报错，只会让行为看起来"有点笨"。同理，"设成当前武器"只有 `Ent.setWeapon()` 一个入口（玩家的 `syncWeapon` 也走它）。
+14. **AI 选弹与玩家选弹必须同源。** `Ent.weaponMatchesTarget()` 是"这弹能不能打那个目标"的**唯一**判据（`Game` 的 `targetMismatch`，`ui/input.js`，与它一致）：目标是 `kind === 'target'` 的东西就算对面。两边各写一套的话，玩家会被提示"换对地弹"，而 AI 会拿格斗弹去打海面平台 —— 这类不一致不会报错，只会让行为看起来"有点笨"。同理，"设成当前武器"只有 `Ent.setWeapon()` 一个入口（玩家的 `syncWeapon`，`engine/game/world.js`，也走它）。
 
 ---
 
 ## 8. 一句话导航
 
-改数值先看 `js/data/`（武器、机型），改**行为**再看 `Ent`；改**发射许可与锁定**看 `Game`。飞行模型的理由全部在 [flight-model.md](flight-model.md)，别在本文里重复第二遍。
+改数值先看 `js/data/`（一个单位一个文件：武器、机型、目标），改**行为**再看 `js/engine/entities/` 里对应职责的文件；改**发射许可与锁定**看 `engine/game/launch.js` / `lock.js`。飞行模型的理由全部在 [flight-model.md](flight-model.md)，别在本文里重复第二遍。
 
 ## 碰炸、近炸与干扰弹（`contactScan` / `breakLockFor`）
 

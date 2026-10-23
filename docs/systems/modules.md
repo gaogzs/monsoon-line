@@ -2,13 +2,13 @@
 
 批次 1（v3.0.0 底层重构）之后，`js/` 里没有"一个文件一个巨型闭包"了：每个命名空间拆成按职责命名的小文件，
 共享状态放在 `NS.$`。**只许该命名空间自己的文件读写 `NS.$`；跨命名空间只能走下面的公开函数。**
-`tools/test/smoke.js` 有静态检查。
+`tools/test/smoke.js`（「挂载系统」段）有静态检查，详见 [tools.md](tools.md#21-个可选段)。
 
 ## 命名空间
 
 ### `Ent` —— 实体、飞行模型、导弹、粒子、伤害
 
-文件：`engine/entities/_state.js`、`engine/entities/aircraft.js`、`engine/entities/damage.js`、`engine/entities/ecm.js`、`engine/entities/guns.js`、`engine/entities/missile.js`、`engine/entities/mounts.js`、`engine/entities/particles.js`、`engine/entities/physics.js`、`engine/entities/radiation.js`、`engine/entities/range.js`、`engine/entities/targets.js`、`engine/entities/warhead.js`
+文件：`engine/entities/_state.js`、`engine/entities/aircraft.js`、`engine/entities/damage.js`、`engine/entities/ecm.js`、`engine/entities/guns.js`、`engine/entities/missile.js`、`engine/entities/mounts.js`、`engine/entities/particles.js`、`engine/entities/physics.js`、`engine/entities/radiation.js`、`engine/entities/range.js`、`engine/entities/targets.js`、`engine/entities/warhead.js`、`engine/entities/zz-api.js`
 
 公开接口（`Ent.xxx`）：`airDensity`、`airDragK`、`qOf`、`ctrlFactor`、`turnFactor`、`makeAircraft`、`stepAircraft`、`hostile`、`fitsKind`、`mountPlan`、`storePos`、`storeHy`、`nozzlesOf`、`surfaceBelow`、`STORE_HY`、`forEachStoreSlot`、`storeForSlot`、`chooseWeapon`、`setWeapon`、`targetClass`、`curLoadFactor`、`contactScan`、`weaponMatchesTarget`、`mountIssues`、`clearMountIssues`、`makeMissile`、`stepMissile`、`effectiveLife`、`breakLock`、`breakLockFor`、`openEcm`、`passiveEffects`、`setEcm`、`setStealth`、`ECM_LEAD_K`、`fireGun`、`fireGunFrom`、`shellFuze`、`detonateShell`、`gunMuzzle`、`flashRings`、`stepBullet`、`SLOT_EMPTY`、`spawnParticle`、`stepParticles`、`explode`、`damage`、`kill`、`killGround`、`explode2`、`detonate`、`wakeSpray`、`effRange`、`glideReach`、`maxReach`、`flyTo`、`envelopeRange`、`envelopeCached`、`displayRange`、`naturalPoint`、`gunLead`、`groundY`、`terrainY`、`isLand`、`agl`、`SEA_Y`、`setTerrain`、`finFootprint`、`aiReach`、`AI_RANGE_K`、`lockOff`、`isHard`、`warheadK`、`hitAny`、`isRadiating`、`jamState`、`jamShown`、`jamDuty`、`jamRanges`、`jamPress`、`jamLockOK`、`jamLockK`、`JAM_BURN_R`、`JAM_SURF_K`、`JAM_BURN_SURF`、`gunResistK`、`SMALL_CAL`、`setTargetHitHandler`、`hitSurface`、`makeTarget`、`stepTarget`、`randUnit`
 
@@ -16,7 +16,7 @@
 
 ### `AI` —— AI 控制律与行为
 
-文件：`engine/ai/_state.js`、`engine/ai/brain.js`、`engine/ai/steer.js`、`engine/ai/tactics.js`、`engine/ai/util.js`
+文件：`engine/ai/_state.js`、`engine/ai/brain.js`、`engine/ai/steer.js`、`engine/ai/tactics.js`、`engine/ai/util.js`、`engine/ai/zz-api.js`
 
 公开接口（`AI.xxx`）：`attach`、`update`、`steerTo`、`findIncoming`、`nearestEnemy`、`leadTo`、`strafeTarget`
 
@@ -24,7 +24,7 @@
 
 ### `HUD` —— 平显
 
-文件：`ui/hud/_state.js`、`ui/hud/aids.js`、`ui/hud/base.js`、`ui/hud/instruments.js`、`ui/hud/panels.js`、`ui/hud/radar.js`、`ui/hud/targeting.js`、`ui/hud/text.js`
+文件：`ui/hud/_state.js`、`ui/hud/aids.js`、`ui/hud/base.js`、`ui/hud/instruments.js`、`ui/hud/panels.js`、`ui/hud/radar.js`、`ui/hud/targeting.js`、`ui/hud/text.js`、`ui/hud/zz-api.js`
 
 公开接口（`HUD.xxx`）：`draw`、`banner`、`hitMark`、`computeNEZ`、`computeEnvelope`、`radarXY`、`offscreenRect`、`drawAlerts`、`ALERT_ORDER`、`thrPercent`、`THR_IDLE`、`THR_MAX`、`GREEN`、`AMBER`、`CY`、`RED`
 
@@ -32,21 +32,21 @@
 
 ### `Game` —— 状态机、主循环、屏幕、输入、相机
 
-文件：
+文件：`engine/game/_state.js`、`engine/game/vars.js`、`engine/game/world.js`、`engine/game/launch.js`、`engine/game/mission-start.js`、`engine/game/control.js`、`engine/game/lock.js`、`engine/game/combat.js`、`engine/game/update.js`、`engine/game/finish.js`、`engine/game/loadout.js`、`ui/camera.js`、`ui/frame.js`、`ui/input.js`、`ui/screens/nav.js`、`ui/screens/settings.js`、`ui/screens/hangar.js`、`ui/screens/hardpoints.js`、`ui/screens/brief.js`、`ui/screens/codex.js`、`ui/screens/pause.js`、`ui/screens/changelog.js`、`boot/main.js`、`boot/zz-api-game.js`
 
 公开接口（`Game.xxx`）：`init`、`startMission`、`__player`、`__world`、`__pushStores`、`__updateTargets`、`__update`、`__render`、`__updateLock`、`__cycleTarget`、`__scanShot`、`__camFrame`、`__thr`、`__camPitch`
 
-文件按职责分在 `js/engine/game/`（世界侧：vars、world、launch、mission-start、control、lock、combat、update、finish、loadout）、`js/ui/`（input、camera、frame）、`js/ui/screens/`（nav、settings、hangar、hardpoints、brief、codex、pause、changelog）、`js/boot/main.js`（主循环、开机自检、初始化）。`__` 开头的是测试 / 回归钩子（`__render` 只画一帧、`__update` 只推进逻辑）。
+文件按职责分在 `js/engine/game/`（世界侧：vars、world、launch、mission-start、control、lock、combat、update、finish、loadout）、`js/ui/`（input、camera、frame）、`js/ui/screens/`（nav、settings、hangar、hardpoints、brief、codex、pause、changelog）、`js/boot/main.js`（主循环、开机自检、初始化）；公开接口集中在 `js/boot/zz-api-game.js`。`__` 开头的是测试 / 回归钩子（`__render` 只画一帧、`__update` 只推进逻辑，供 `tools/lib/sim.js` 与 `golden*.js` 用）。
 
 ### `PLANFORM` —— 平面识别图
 
-文件：`render/planform/_state.js`、`render/planform/paint.js`、`render/planform/planes.js`、`render/planform/stores.js`
+文件：`render/planform/_state.js`、`render/planform/paint.js`、`render/planform/planes.js`、`render/planform/stores.js`、`render/planform/zz-api.js`
 
 公开接口（`PLANFORM.xxx`）：`planes`、`draw`、`paint`、`paintStore`
 
 ### `RenderEnv` —— GL 环境层（天空 / 海面 / 云 / 粒子）
 
-文件：`render/env/_state.js`、`render/env/build.js`、`render/env/create.js`、`render/env/shaders.js`
+文件：`render/env/_state.js`、`render/env/build.js`、`render/env/create.js`、`render/env/shaders.js`、`render/env/zz-api.js`
 
 公开接口（`RenderEnv.xxx`）：`create`、`PERIOD`
 
@@ -54,11 +54,12 @@
 
 | 全局 | 文件 | 公开接口 |
 |---|---|---|
-| `Registry` | `core/registry.js` | `aircraft` `ship` `platform` `weapon` `turretGun` `target` `model` `modelGroup` `mission` `campaign` `codexEntry`（注册）；`list` `byId` `seal` `sealData` `sealModels` `sealMissions` `sealCodex` |
+| `Registry` | `core/registry.js` | `aircraft` `ship` `platform` `weapon` `turretGun` `target` `model` `modelGroup` `mission` `campaign` `codexEntry`（注册）；`list` `byId` `seal` `sealData` `sealModels` `sealMissions` `sealCodex` `isSealed` |
 | `Tags` | `core/registry.js`（声明在 `core/tags.js`） | `declare` `expand` `has` `declared` |
-| `Text` / `T` | `core/text.js` | `T(key[, ctx])` `T.pick` `T.has`；`Text.load` `lang` `keys` `unused` `missing` |
+| `Text` / `T` | `core/text.js` | `T(key[, ctx])` `T.pick` `T.has`；`Text.load` `lang` `keys` `unused` `missing` `flatten` |
 | `Loadout` | `engine/loadout.js` | `defaults(ac)` `resolve(ac, lo)` `mass(ac, lo)` `passive(ac, lo)` `apply(ent, ac, lo[, wl])` —— 机库、开局（以及批次 4 的整备点）共用 |
 | `ModelLib` | `models/_lib.js` 等 | 模型构建器：`V` `C` `MB` `mast` `house` `done` `orientClosed` `seaBase` `jacket` `pDeck`，收尾遍 `finish` |
+| `M3` | `core/math3d.js` | 见 [math3d.md](math3d.md) |
 | `Combat` `Turret` `Route` `Ballistics` `SFX` | `engine/*.js` | 见各自的 systems 文档 |
 | `Renderer` `RenderGL` | `render/render.js` `render/render-gl.js` | 见 [rendering.md](rendering.md) |
 | `UnitView` `HudFx` `Radio` `SysNote` `CODEX` | `ui/` | 见 [unitview.md](unitview.md)、[hud.md](hud.md)、[codex.md](codex.md) |

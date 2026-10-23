@@ -1,6 +1,6 @@
 # 旋转炮塔
 
-代码：`js/engine/turret.js` · 数据：`js/data/` 的 `TURRET_GUNS` / `SHIP_MOUNTS`（并入 `SHIPS[].mounts`）、`AIRCRAFT[].mounts` · 模型：`js/models/` 的 `tur50 / tur75 / tur120`（带 `r` 的是下游涂装）· 探针：`tools/test/probes/probe-turret.js`
+代码：`js/engine/turret.js` · 数据：`js/data/turret-guns/<id>.js`（`Registry.turretGun`，封存成 `TURRET_GUNS`）、舰船文件 `js/data/ships/<id>.js` 的 `mounts` / `launchers`（原 `SHIP_MOUNTS` / `SHIP_LAUNCHERS` 已并入）、机型文件 `js/data/aircraft/<id>.js` 的 `mounts` · 模型：`js/models/ships/turrets.js`（`tur50 / tur75 / tur120` 及 `MODELS.composeTurrets`；带 `r` 的是下游涂装）· 探针：`tools/test/probes/probe-turret.js`
 
 来源：docs/2-0IMPL.md 阶段 3（v2.2）。
 
@@ -21,19 +21,20 @@
 | Trilobite | 30 mm 遥控炮 ×1 |
 | Seascorpion | 30 mm 遥控炮 ×2 |
 | Daplu | 20 mm 遥控炮 ×1 |
-| ROK-40（飞机） | 20 mm 尾炮 ×1，管后半球，没有实体 |
+| ROK-40（飞机，`js/data/aircraft/boulder.js`） | 20 mm 尾炮 ×1（`tail20a`，机载版），管后半球，没有实体 |
 
-炮位数量必须和 `SHIPS[].arms` 的文本一致（smoke 断言）。近防炮、遥控炮、尾炮没有实体，从炮位点直接射出。
+炮位数量必须和 `SHIPS[].arms` 的文本一致（`tools/test/smoke.js` 断言）。近防炮、遥控炮、尾炮没有实体，从炮位点直接射出。
 
 ## 数据
 
-`TURRET_GUNS`（NPC 专用，不进 `WEAPONS`，也就不进挂载图鉴）：
+`TURRET_GUNS`（NPC 专用，不进 `WEAPONS`，也就不进挂载图鉴；一门炮一个文件，在 `js/data/turret-guns/`）：
 
 | id | rpm | 初速 | dmg | 射程 | cal | 对空散布 | 对海散布 | 战斗部 |
 |---|---|---|---|---|---|---|---|---|
 | ciws20 | 750 | 1100 | 4 | 1800（对飞机 1200） | 20 | 0.006 | 同左 | — |
 | aa30 | 300 | 1000 | 9 | 2500 | 30 | 0.005 | 同左 | — |
 | tail20 | 300 | 900 | 5 | 1200 | 20 | 0.006 | 同左 | — |
+| tail20a | 150 | 900 | 5 | 1200 | 20 | 0.006 | 同左 | —（ROK-40 机载版，射速是 `tail20` 的一半；`AIM_BY_GUN` 没有它的条目，走缺省火控） |
 | n50 | 80 | 1050 | 12 | 4500（对飞机 4000） | 50 | 0.008 | 0.002 | fuze 4 / blast 8 / core 1.5，也打海面 |
 | n75 | 24 | 900 | 30 | 8000（对飞机 6000） | 75 | 0.010 | 0.0025 | fuze 6 / blast 13 / core 2 |
 | n120 | 8 | 800 | 80 | 14000（对飞机 8000） | 120 | 0.013 | 0.003 | fuze 8 / blast 18 / core 3 |
@@ -45,18 +46,20 @@
 - **射速**：近防炮砍得最多（1800 → 750；一度砍到 450，但炮塔转动和弹速已经削掉了一截实际威力，又提回来一些）。尾炮和 30 mm 遥控炮比近防炮还慢。50 / 75 / 120 mm 只略降，因为它们射速一慢一眼就看得出。
 - **对空火控门槛**：敌方（team 1）的炮和舰空弹同一条规矩 —— 本方被对空雷达截获（`world.detected`）后才打飞机，或者目标低于 `dangerAltitude` 且在 5.2 km 内（目视 / 光电）。近防炮自带雷达，不受限制；我方舰船不设门槛。中大口径炮对空另有 `airRange`，比舰空弹的射程近：接近时先挨舰空弹，再进炮的射程。
 - **散布**：中大口径对空散得很开，天上炸成一片，气氛要足，但很少真打中机动目标。对海面的散布另算，小得多，对地还是打得准。
-- **迟钝的火控**：口径越大越迟钝，见 `AIM_BY_GUN`：
+- **迟钝的火控**：口径越大越迟钝，见 `js/engine/turret.js` 的 `AIM_BY_GUN`：
   - 速度滤波 `lag` 从 0.6 s 到 1.3 s。
   - 瞄准漂移 `err` 从 0.003 到 0.006。
   - 定时引信有相对误差 `fuzeErr`，5–7%。
 
 效果：平直飞过去必死，稍微机动就大大降低，大幅机动几乎不掉。
 
-**发射架**：`kind: 'launcher'` + `weapon`（`WEAPONS` 的 id）、`cd`、`ammo`（0 = 不限）、`loft`（按距离抬高瞄准点的比例）、`launchSpeed`。同一套索敌与转动，不算提前量，对准就 `Ent.makeMissile`。目前没有舰船装，数据里留了一个示例 `lnchSam`。
+**发射架**：`kind: 'launcher'` + `weapon`（`WEAPONS` 的 id）、`cd`、`ammo`（0 = 不限）、`loft`（按距离抬高瞄准点的比例）、`launchSpeed`。同一套索敌与转动，不算提前量，对准就 `Ent.makeMissile`。现在已有多艘舰船 / 浮台装了（`js/data/turret-guns/` 里有 `lnchSam` `lnchSsm` `rotSam` `vlsSam` `vlsSsm` `railSsm`，舰船文件的 `launchers` 字段引用；`Turret.attach(host, mounts, launchers)` 把发射器接在炮位后面一起跑）。
 
 炮位 `mounts[]`：`{ id, gun, pos:[x,y,z], yaw0, arc:{yawMin,yawMax,pitchMin,pitchMax}, model, role }`，可选 `slew`、`aim` 覆盖缺省值。`pos` 是宿主模型空间（+z 船头、+x 右、+y 上），实体炮塔的 `pos` 是甲板上的座圈位置。
 
 ## 每帧（`Turret.step`）
+
+（每帧驱动：舰船 / 设施在 `engine/game/combat.js` 的 `updateTargets`，飞机在 `engine/game/update.js` 的 `update()`，都调 `Turret.stepAll`。）
 
 1. **索敌**：每 `react`（0.6 s，带抖动）一次。射程 + 1.5 km 内没有敌人就整门休眠。候选按"转过去要多久 + 距离"打分，海面目标加 3 分（两用炮先打飞机），手上的目标减 0.6（滞回）。中立（team 2）不打。
 2. **提前量**：不读目标的真实速度和加速度，而是读滤过的：
@@ -100,7 +103,7 @@
 
 带战斗部的炮弹会在四种情况下起爆：
 
-- 直接撞上：`Game` 的 `scanShot`。
+- 直接撞上：`Game` 的 `scanShot`（`engine/game/combat.js`）。
 - 擦过敌机：`Ent.shellFuze`，本帧弹道线段离敌机的最近距离小于 fuze。
 - 寿命到点：在空中自毁。
 - 落水：就地起爆。
@@ -109,11 +112,11 @@
 
 ## 渲染与预览
 
-- 游戏里：`Turret.push(host, Renderer.pushModel)` 推两件，底座随方位转，炮身随方位和俯仰转。
-- 预览：`MODELS.composeTurrets(base, mounts)` 按零位把实体炮塔合进船体网格，结果会缓存。用到它的有单位详情页、`render-ships.js` 和 `render-units.js`。smoke 断言合并后的面数。
+- 游戏里：`Turret.push(host, Renderer.pushModel)`（由 `ui/frame.js` 调）推两件，底座随方位转，炮身随方位和俯仰转。
+- 预览：`MODELS.composeTurrets(base, mounts)` 按零位把实体炮塔合进船体网格，结果会缓存。用到它的有单位详情页（`js/ui/unitview.js`）和渲染侧的舰船 / 单位绘制。`tools/test/smoke.js` 断言合并后的面数。
 
 ## 发射架的动态射程（`launcherInEnvelope`）
 
 - 发射架（`kind: 'launcher'`）开火前，制导弹还要过 `Ent.envelopeCached` 的包线闸门：`d ≤ min(lockDist, rmax) × 余量`（空中 0.9，地面 / 海面 0.8）。
 - 缓存挂在炮位 `tu` 上，0.2 s 刷新；发射速度取 `gun.launchSpeed`（缺省 140）。
-- 只改开火判定，不改目标选择（`pickTargetFor`、`samReach` 仍是静态射程，用于决定"谁会被盯上"）。
+- 只改开火判定，不改目标选择（`pickTargetFor`、`samReach`，在 `engine/game/combat.js`，仍是静态射程，用于决定"谁会被盯上"）。

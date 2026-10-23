@@ -1,21 +1,50 @@
 # 主控、状态机与 UI 装配
 
-代码：`Game` · 导出全局对象 `Game` 与 `Radio`
+代码：`Game`（`js/engine/game/` + `js/ui/{input,camera,frame}.js` + `js/ui/screens/` + `js/boot/`）· `Radio`（`js/ui/radio.js`）· `SysNote`（`js/ui/sysnote.js`）
 
-> 这是加载顺序的**最后一个模块**，也是唯一“看得见全部其它模块”的地方。它干四件事：切屏幕、跑主循环、装配所有 DOM 界面、把玩家输入翻译成 `Ent` / `AI` 能吃的指令。启动靠 `Game` 文件末尾（IIFE 之外）的 `window.addEventListener('load', ...)` → `Game.init()`，所以它必须最后一个加载。输入映射表与设置项清单在 [hud.md](hud.md#输入映射)，本文只讲它们**背后怎么实现**。
+> `Game` 是加载顺序里**靠后的一族**，也是唯一“看得见全部其它模块”的地方。它干四件事：切屏幕、跑主循环、装配所有 DOM 界面、把玩家输入翻译成 `Ent` / `AI` 能吃的指令。启动靠 `js/boot/zz-api-game.js` 末尾的 `window.addEventListener('load', ...)` → `Game.init()`，所以那个文件必须在 `Game` 的所有文件之后加载（脚本顺序的权威是 `tools/build/gen-index.js`，见 [modules.md](modules.md)）。输入映射表与设置项清单在 [hud.md](hud.md#输入映射)，本文只讲它们**背后怎么实现**。
+
+> **v3.0.0 之前**这一族是一个叫 `js/game.js` 的巨型闭包（`Radio`、`SysNote`、`Game` 三个 IIFE 挤在一个文件里，局内状态全是闭包局部变量）。现在拆成按职责命名的小文件；**文中出现的函数名没变**，只是不再同处一个闭包。
+
+### 文件组织：职责 → 文件
+`Game` 命名空间有一个私有状态对象 `Game.$`（`js/engine/game/_state.js` 里 `var Game = { $: {} }`）；每个文件写成 `(function (Game) { var $ = Game.$; … })(Game)`，把自己的函数挂到 `$.xxx` 上互相调用。`$` **只许 `Game` 自己的文件读写**，外部（测试、别的命名空间）只能走 `zz-api-game.js` 暴露的公开接口。
+
+| 职责 | 文件 | 主要内容 |
+|---|---|---|
+| 状态变量 | `engine/game/vars.js` | `state / paused / world / player / mission / missionIdx / selectedAC / activeCampaign / loadouts / keys / mouse / aimMode / cam* / banner / hits / stats / cleared` 与常量 `THR_MAX / THR_IDLE / HIG_MAX / AIM_*` |
+| 世界 | `engine/game/world.js` | `newWorld()`、`w.fireMissile`、`syncWeapon()` |
+| 挂载配置 | `engine/game/loadout.js` | `getLoadout(ac)`、`hpKindLabel`（展开 / 称重 / 落机在 `js/engine/loadout.js` 的 `Loadout`） |
+| 开局 | `engine/game/mission-start.js` | `startMission(idx)` |
+| 玩家控制 | `engine/game/control.js` | `controlPlayer`、`updateMouseAim`、`aimDirNow`、`resetAim`、`toggleAimMode` |
+| 锁定 / 电子战 | `engine/game/lock.js` | `updateLock`、`updateEWAuto`、`updateJamming`、`updateAewc`（含预警机通报） |
+| 发射 | `engine/game/launch.js` | `launch`、`fireEcm`、`salvoShots`、`vsSkill` |
+| 战斗结算 | `engine/game/combat.js` | `scanShot`、`resolveBullets`、`hitTarget`、`updateTargets`、`updateDEW` |
+| 每帧推进 | `engine/game/update.js` | `update(dt)`、`watchdog`、`compact` |
+| 结算 | `engine/game/finish.js` | `finish(win)`、`combatEvents`、`killCredit`、`friendlyLosses` |
+| 输入 / 选目标 / 发射键 | `ui/input.js` | `bindInput`、`cycleTarget`、`rankTargets`、`fireSpecial`、`cycleSpecial`、`setWingCmd`、`toggleEmcon`、`updateTargetKey` |
+| 相机 | `ui/camera.js` | `updateCamera`、出画处理（`frameDeficit` / `softClampFrame` / `stepFrameExtra`）、`camPitchFor` |
+| 画一帧 | `ui/frame.js` | `render()`、`pushStores` / `pushOneStore`、`drawTracers` |
+| 屏幕切换 | `ui/screens/nav.js` | `show` / `hideAll` / 指针锁定 |
+| 设置与手册 | `ui/screens/settings.js` | `SET_GROUPS` / `DEFAULTS` / `KEYMAP` / `TIPS` / `GUIDE`、`loadSettings` / `saveSettings`、`buildSettingsInto` / `buildHelpHTML` |
+| 机库 | `ui/screens/hangar.js` + `hardpoints.js` | `$.hangarView`、`buildHangar(view)`、`buildHardpointEditor(ac, lo, view)` |
+| 简报 / 战役 | `ui/screens/brief.js` | `buildCampaignList`、`buildMissionList`、`buildBrief`、`drawMap`、`campaignOf` |
+| 资料库 / 更新记录 / 暂停 | `ui/screens/{codex,changelog,pause}.js` | `buildCodex`、`buildChangelog`、`togglePause` / `switchPauseTab` / `buildHelpPage` |
+| 主循环与启动 | `boot/main.js` | `loop`、`preflight` / `report`、`init`（绑 `data-go` 与各按钮） |
+| 公开接口 | `boot/zz-api-game.js` | `Game.init / startMission / __*` 与 `load` 监听 |
+| 无线电 / 系统提示 | `ui/radio.js`、`ui/sysnote.js` | `Radio`、`SysNote` 两个独立全局 |
 
 ---
 ## 模块定位与对外接口
-文件里是两个互相独立的 IIFE，各自挂一个全局 `var`：
+`Radio` 与 `Game` 是两个互相独立的全局 `var`：
 
 | 全局 | 依赖 | 职责 |
 |---|---|---|
 | `Radio` | `VOICES`、`SFX`、DOM 元素 `#radio` | 台词队列 + 字幕淡入淡出 |
 | `Game` | 其余全部模块 | 状态机、主循环、UI 装配、设置、输入、相机、发射、结算 |
 
-`Radio` 定义在 `Game` 之前；`Game` 通过 `newWorld()` 里的 `w.radio = Radio` 把它交给任务脚本，所以 `js/missions/` 里写的是 `world.radio.raw(...)`，而不是直接抓全局。文件第一行是 `'use strict';`，`Game` / `Radio` 都是 `var` 挂上去的全局。
+`Radio`（`js/ui/radio.js`）加载在 `Game` 之前；`Game` 通过 `newWorld()`（`engine/game/world.js`）里的 `w.radio = Radio` 把它交给任务脚本，所以 `js/missions/` 里写的是 `world.radio.raw(...)`，而不是直接抓全局。
 
-### `Game` 的导出（`Game` 末尾）
+### `Game` 的导出（`js/boot/zz-api-game.js`）
 
 | 成员 | 签名 | 语义 |
 |---|---|---|
@@ -24,8 +53,11 @@
 | `__player` | `__player()` | 返回当前 `player`，未开局为 `null` |
 | `__world` | `__world()` | 返回当前 `world`，未开局为 `null` |
 | `__pushStores` | `__pushStores(a)` | 直接暴露内部的 `pushStores`：断言要能单独喂一架飞机进来，数它画了几个挂载 |
+| `__update` / `__render` | `(dt)` / `()` | 只推进逻辑 / 只画一帧，给 `tools/lib/sim.js` 与 `tools/test/golden-render.js` 用 |
+| `__updateTargets` / `__updateLock` / `__cycleTarget` / `__scanShot` | 同名内部函数 | 单独喂一帧做断言 |
+| `__camFrame` / `__camPitch` / `__thr` | 对象 | 相机出画处理、镜头俯仰映射、油门分界点，供断言脱离整局单独验算 |
 
-后三个是**给 `tools/test/smoke.js` 做断言用的调试口**，不是玩法接口。局内状态全部藏在 IIFE 闭包里：`state / paused / world / player / mission / missionIdx / activeCampaign / selectedAC / loadouts / activeHpGroup / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared / S`。
+除 `init` / `startMission` 外都是**给 `tools/test/` 做断言用的调试口**，不是玩法接口。局内状态全部放在 `Game.$` 里（`vars.js` 声明）：`state / paused / world / player / mission / missionIdx / activeCampaign / selectedAC / loadouts / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared`，设置对象 `S` 在 `ui/screens/settings.js`；机库正在编辑的挂载组不再是全局 `activeHpGroup`，而在 `$.hangarView.group`。**`$` 只许 `Game` 自己的文件读写**。
 
 ### `Radio` 的导出
 
@@ -38,7 +70,7 @@
 
 ---
 ## 屏幕状态机
-`state` 是字符串，取值与 DOM 屏幕 id 一一对应（`#scr-<id>`）：`title · campaign · brief · hangar · codex · settings · help · changelog · debrief`，外加一个**没有 DOM 屏幕**的 `playing`。`show(id)` 是唯一的菜单切换入口：
+`state` 是字符串，取值与 DOM 屏幕 id 一一对应（`#scr-<id>`）：`title · campaign · brief · hangar · codex · settings · help · changelog · debrief`，外加一个**没有 DOM 屏幕**的 `playing`。`show(id)`（`ui/screens/nav.js`）是唯一的菜单切换入口：
 
 ```js
 function show(id) {
@@ -57,12 +89,12 @@ function show(id) {
 3. **离开战斗必须 `Radio.clear()`**。字幕的淡出靠战斗循环里的 `Radio.update()` 推进；一回到菜单就再没人管它们，最后几条会永远挂在屏幕上（从战斗返回主菜单后残留的通讯记录就是这个原因）。
 
 ### `data-go` 与“没有兜底 `else`”
-`init()` 把 `document.querySelectorAll('[data-go]')` 全部绑上同一个 `click`：
+`init()`（`boot/main.js`）把 `document.querySelectorAll('[data-go]')` 全部绑上同一个 `click`：
 
 | `data-go` | 动作 |
 |---|---|
 | `campaign` | `buildCampaignList(); show('campaign')` |
-| `hangar` | `buildHangar(); show('hangar')` |
+| `hangar` | `setHangarMode(sortie); buildHangar(); show('hangar')`（从简报 / 结算页进来是“选机出击”，从主菜单进来只是逛机库、不显示出击键） |
 | `brief` | 若 `activeCampaign` 不含 `missionIdx` 则夹回本战役首关，然后 `buildBrief(); show('brief')` |
 | `codex` | `buildCodex(); show('codex')` |
 | `settings` | `buildSettingsInto(#setWrap); show('settings')` |
@@ -74,7 +106,7 @@ function show(id) {
 
 **为什么没有兜底 `else`**（源码注释明写）：早先的写法让任何拼错的 `data-go` 值都静默跳回标题页，出问题时完全看不出哪里错了。现在未知值**什么也不做** —— 改动时如果点了按钮没反应，第一件事就是查 `data-go` 字符串。
 
-**别的入口**：`Esc` 在 `playing` 时 `togglePause()`、在 `campaign / hangar / codex / help / changelog / brief` 时回 `show('title')`、其余状态什么也不做；`window` 的 `blur` 清空 `keys`、松开左右键并**战斗中自动暂停**（切出去不会让飞机继续飞）；暂停菜单三页签 `main / settings / help` 由 `switchPauseTab(name)` 切 `[data-ptab]` 与 `#pane-*` 的 `.on`。
+**别的入口**：`Esc`（`ui/input.js`）在 `playing` 时 `togglePause()`、在 `campaign / hangar / codex / help / changelog / brief` 时回 `show('title')`、其余状态什么也不做；`window` 的 `blur`（同在 `bindInput`）清空 `keys`、松开左右键并**战斗中自动暂停**（切出去不会让飞机继续飞）；暂停菜单三页签 `main / settings / help` 由 `switchPauseTab(name)`（`ui/screens/pause.js`）切 `[data-ptab]` 与 `#pane-*` 的 `.on`。
 
 ### 战役层（`campaign`）
 
@@ -104,6 +136,8 @@ function show(id) {
 
 ---
 ## 主循环
+`loop` 在 `boot/main.js`；下面的示意把 `$.` 前缀省掉了（真实代码读写 `$.state / $.paused / $.last`，`update` / `render` 分别来自 `engine/game/update.js` 与 `ui/frame.js`）。
+
 ```js
 function loop(ts) {
   requestAnimationFrame(loop);              // 先排队，再干活：中途异常也不断帧
@@ -123,10 +157,12 @@ function loop(ts) {
 
 - **`dt` 上限 0.05s**：切标签页再切回来时，两帧间的真实间隔可能是几秒；不夹的话一次 `update` 会把飞机瞬移出几公里、导弹瞬间命中。0.05 = 20 FPS，是“最慢的可玩帧率”的等价步长。
 - **暂停时只停 `update`，`render` 照跑** —— 这是设置能热调整的前提：玩家在暂停菜单里拖 FOV / 镜头距离滑块，画面立刻变。见 [DESIGN.md §4.2](../DESIGN.md#42-主循环)。
-- 首帧的 `last` 不是 0：`init()` 结尾用 `requestAnimationFrame(function (t) { last = t; requestAnimationFrame(loop); })` 把第一帧时间戳先吃掉，避免第一帧 `dt` 巨大。
+- 首帧的 `last`（`$.last`）不是 0：`init()` 结尾用 `requestAnimationFrame(function (t) { last = t; requestAnimationFrame(loop); })` 把第一帧时间戳先吃掉，避免第一帧 `dt` 巨大。
 - 正常玩下来 **`update` 永远在 `render` 之前**，而相机计算是 `update` 的最后一步。
 
 ### `update(dt)` 的顺序（顺序有语义）
+函数在 `engine/game/update.js`；各步调用的 `controlPlayer` / `updateLock` / `updateJamming` / `updateAewc` / `updateEWAuto` / `updateDEW` / `resolveBullets` / `updateTargets` / `updateCamera` 分别在 `control.js` / `lock.js` / `combat.js` / `ui/camera.js`。
+
 ```
 world.time += dt;  Radio.update(dt)                     ← 字幕计时
 if (player.alive) controlPlayer(dt) else SFX.gun(false)
@@ -157,10 +193,12 @@ hits / banner 计时衰减
 
 **`suppressed` 是这三套东西的共同输入**：HUD 的雷达雪花、僚机的"数据链中断"降级、预警机的沉默都读它。
 
-开机只有一个入口 `fireEcm(actor, wid)`（手动扣扳机 / 协处理器自主 / 任务脚本的干扰机航线到站），
-它内部调 `Ent.openEcm()` 写状态、再扣冷却与播报。`toggleEmcon()` 是 EMCON-Δ 的开关（`N`）；`setWingCmd()` 在电磁静默（`emcon`）或玩家被压制（`suppressed > 0.35`）时直接拒绝下令并弹 SYS 提示（后者为 CAUTION 样式）；这只影响下令，僚机的攻击授权不变 —— 僚机自己被压制才会停火（AI drone 分支）。
+开机只有一个入口 `fireEcm(actor, wid)`（`launch.js`；手动扣扳机 / 协处理器自主 / 任务脚本的干扰机航线到站），
+它内部调 `Ent.openEcm()` 写状态、再扣冷却与播报。`toggleEmcon()`（`ui/input.js`）是 EMCON-Δ 的开关（`N`）；`setWingCmd()`（同文件） 在电磁静默（`emcon`）或玩家被压制（`suppressed > 0.35`）时直接拒绝下令并弹 SYS 提示（后者为 CAUTION 样式）；这只影响下令，僚机的攻击授权不变 —— 僚机自己被压制才会停火（AI drone 分支）。
 
 ### `render()` 的职责
+`ui/frame.js`。
+
 `state !== 'playing' || !world || !player` 时只 `Renderer.begin() + end()`（空镜头背景）并返回。否则：
 
 ```
@@ -172,13 +210,15 @@ HUD.draw(world, player, 0, S)     ← 在 end() 之后，所以不跟着抖；dt
 banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”已移进 HUD 告警栈）
 ```
 
-调节单元每关 9–54 个、大多在远处，`render()` 用 `CELL_DRAW_RANGE2`（30 km 的平方）把远的直接跳过 —— 雾里一个点，画了也看不见。HUD 那边另有一道 10 km 的 `farCell()`（见 [hud.md](hud.md)）。
+调节单元每关 9–54 个、大多在远处，`render()` 对带 `cullFar` 标签的目标（见 [tags.md](tags.md)）用 `CELL_DRAW_RANGE2`（30 km 的平方）把远的直接跳过 —— 雾里一个点，画了也看不见。HUD 那边另有一道 10 km 的 `farCell()`（`ui/hud/radar.js`，见 [hud.md](hud.md)）。
 
 曳光长度按距离自适应（`min(90, max(13, bDist * 0.045))`）—— 固定 13 米在 1500 米外只有 0.5°，看起来像“弹速很慢”。
 
 ---
 ## 世界生命周期
 ### `newWorld()`
+`engine/game/world.js`。
+
 普通对象，没有类（与 [DESIGN.md §4.3](../DESIGN.md#43-世界对象) 一致）：
 
 ```js
@@ -202,13 +242,17 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 两个后挂的成员：`w.radio = Radio`；`w.fireMissile(actor, target)` —— **AI 唯一的发射入口**，内部转 `launch(actor, target, w)`，非玩家发射时按距离播 `SFX.missileAt()`（玩家那一路在 `fireSpecial()` 里已播过 `SFX.missile()`，刻意不重复）。
 
 ### `startMission(idx)`
+`engine/game/mission-start.js`。
+
 1. `missionIdx = idx`；`mission = MISSIONS[idx]`；`world = newWorld()`；`stats = { startTime: 0, endTime: 0 }`；然后 `Ent.makeAircraft({ type, team: 0, isPlayer: true, y: mission.altStart, fwd: (0,0,1), speed: mission.speedStart })`。
-2. 把机库配置落到飞机上：`p.loadoutList = resolveLoadout(ac, lo)`；`p.ammoPool[wid] = ammo`；`p.slotCd[wid]` **一个挂点一个槽**（长度 = `e.salvo`），储备少于挂架数时多出来的槽填 `Ent.SLOT_EMPTY`（`1e9`，语义是“这个挂架本来就空着”，`stepAircraft` 里永不装填）；`p.loadFactor = loadK`；被动吊舱经 `passiveEffects()` 汇成 `p.armor / p.lockRangeK / p.flares`，`p.lockResist` 由 `Ent.setStealth(p, pe, 各组武器)` 写入（机体匿踪被外挂折损后与吊舱抗锁定合并）；`p.loadModel` 记录每类弹的拖累份额，`Ent.curLoadFactor` 每帧按弹药池折算（弹打出去拖累随之减轻，吊舱恒定）；`p.loadout = lo` 留一份给 HUD 画挂载俯视图。
-3. `p.name = p.label = CALLSIGN.player`；入 `world.actors`；写回闭包 `player`；`mission.spawn(world)` —— 敌机、平台、僚机全由任务脚本自己造。
+2. 把机库配置落到飞机上：`wl = Loadout.resolve(ac, lo)` 展开成武器列表，`Ent.makeAircraft` 造机后 `Loadout.apply(p, ac, lo, wl)`（`js/engine/loadout.js`）一次性写好：`p.loadoutList`；`p.ammoPool[wid] = ammo`；`p.slotCd[wid]` **一个挂点一个槽**（长度 = `e.salvo`），储备少于挂架数时多出来的槽填 `Ent.SLOT_EMPTY`（`1e9`，语义是“这个挂架本来就空着”，`stepAircraft` 里永不装填）；`p.loadFactor`；被动吊舱经 `Ent.passiveEffects()` 汇成 `p.armor / p.lockRangeK / p.flares`，`p.lockResist` 由 `Ent.setStealth(p, pe, 各组武器)` 写入（机体匿踪被外挂折损后与吊舱抗锁定合并）；`p.loadModel` 记录每类弹的拖累份额，`Ent.curLoadFactor` 每帧按弹药池折算（弹打出去拖累随之减轻，吊舱恒定）；`p.loadout = lo` 留一份给 HUD 画挂载俯视图。（旧版这些逻辑是 `startMission` 里手写的 `resolveLoadout / passiveEffects`。）
+3. `p.name = p.label = CALLSIGN.player`；入 `world.actors`；写回 `$.player`；`mission.spawn(world)` —— 敌机、平台、僚机全由任务脚本自己造。
 4. 初始镜头 `camFwd = p.fwd`、`camUp = (0,1,0)`、`camPos = p.pos + (0, 30, -110)`；`Radio.clear()` → `Radio.play(mission.id, 'start')`；横幅 `banner = { t: 3.4, ... }`。
 5. `hideAll(); state = 'playing'; paused = false;` 摘掉暂停层，`p.target = null`。
 
 ### `finish(win)`
+`engine/game/finish.js`。
+
 - `if (win) cleared[MISSIONS[missionIdx].id] = true;` —— **`cleared` 是本次会话内的对象，刷新页面就丢**（见 [DESIGN.md §8](../DESIGN.md#8-已知问题与待改进) 第 5 条），但键已经改成 `mission.id` 而不是下标：新战役的关卡是接着 `MISSIONS` 追加的，按下标记会让进度错位；`buildMissionList()` 与 `buildCampaignList()` 都读它显示“已完成”。
 - 结算数值当场算：
 
@@ -230,11 +274,11 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 - 逐项填 DOM（`#dRank #dTitle #dSub #dCallsign #dTable #dQuote #btnNext`），最后 `show('debrief')`，关掉 `warning / gun` 声道。`#btnNext` 在“输了”或“**本战役已完结**”时 `disabled` —— 它只在当前战役内推进（`CAMPAIGNS[campaignOf(missionIdx)].missions`），不会把玩家直接送进别的战役；跨战役要回战役选择屏。
 
 ### 已知的内存问题
-`finish()` **不释放任何东西**：`world`、`player` 仍被闭包引用，`world.actors / particles` 也原样留着（`debrief` 背后还要画战场快照）。只有 `#btnAbort`（放弃任务）那条路径会 `player = null; world = null;`。连续玩多关会累积内存，见 [DESIGN.md §8](../DESIGN.md#8-已知问题与待改进) 第 4 条。
+`finish()` **不释放任何东西**：`$.world`、`$.player` 仍被 `Game.$` 引用，`world.actors / particles` 也原样留着（`debrief` 背后还要画战场快照）。只有 `#btnAbort`（放弃任务，`boot/main.js`）那条路径会 `$.player = null; $.world = null;`。连续玩多关会累积内存，见 [DESIGN.md §8](../DESIGN.md#8-已知问题与待改进) 第 4 条。
 
 ---
 ## 输入
-绑定全在 `bindInput()`：
+绑定全在 `bindInput()`（`ui/input.js`）：
 
 - `document` 的 `keydown` / `keyup` 维护 `keys[e.code]` 布尔表（用 `e.code` 而非 `key`，与键盘布局无关）。`Space / Arrow* / Tab` 会被 `preventDefault()` —— `Tab` 在游戏里是切目标键，不拦就会把焦点送出画布。
 - 鼠标：`mousedown`（左键置 `mouse.left`、右键**立即** `fireSpecial()`）、`mouseup`、`contextmenu` 阻止菜单、`mousemove` 用 `getBoundingClientRect()` 换算成画布内坐标、`wheel` 微调油门（`-deltaY * 0.0007`，夹到 `[0, THR_MAX]`，`{ passive: true }`）。`window` 的 `resize` → `Renderer.resize()`。
@@ -244,13 +288,15 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 具体哪个键干什么见 [hud.md 的输入映射表](hud.md#输入映射)，下面只讲机制。
 
 ### 鼠标引导机头 `updateMouseAim(dt)`（战雷式）
+（`engine/game/control.js`；`mousemove` / 指针锁定的事件绑定在 `ui/input.js`，`releasePointer` / `requestAimLock` 在 `ui/screens/nav.js`。）
+
 1. 瞄准方向存在世界坐标里：`aimYaw / aimPitch`（俯仰限 ±89°）。`mousemove` 用 `movementX/Y × AIM_SENS × FOV/56` 转动它；单个事件位移超过 `AIM_SPIKE_PX = 200` 的当尖峰丢掉（Chrome 锁定指针时偶发的巨大位移、未锁定时光标移出画布再移回的第一下 —— 不丢的话准星被甩到"随机"方向，镜头跟过去像被重置）；指针锁定先请求 `{ unadjustedMovement: true }`（原始位移，尖峰更少），不支持时退回普通锁定；点击画布时 `requestPointerLock()`，菜单 / 暂停时 `releasePointer()` 交还指针。
 2. `aimInit = false`（重生、`M` 切模式）时下一帧 `resetAim()` 从机头重新取。
 3. `AI.steerTo(player, aimDirNow(), player.ctrl, player, dt)` —— 传 `dt` 启用瞄准角速度前馈（见 [ai.md](ai.md)）；`player.aimDir` 供 HUD 画准星与机头连线。
 4. 追尾镜头（`S.camMode === 0`）在鼠标引导时跟 `aimDir` 而不跟机头，平滑系数 14；键盘直控时仍跟机头。这样准星固定在画面中心、机头标记去追它，机头才能真正收敛到准星上。跟 `aimDir` 时俯仰走 `camPitchFor(瞄准俯仰, S.fov)`：镜头上限是 `90° − FOV/2`，瞄准拉满 89° 时**天顶正好卡在画面上沿**（天底卡在下沿），CMD 贴着它 —— 看起来能一直朝正上方飞，只是光标推不过那条边。上限随 FOV 实时变（56° → 62°，38° → 71°，100° → 40°）。`k = max(0, 2·上限 − 89°)` 以下镜头 = 瞄准（FOV 56° 时 35° 以下准星在正中），之外 `k + (A − k)·r·(1 − (1 − t)^(1/r))` 平滑收到上限：衔接处斜率为 1、到 89° 时斜率为 0，全程单调。（以前是软膝 78° → 87°，拉满时画面几乎全是空天。）
 
 ### 键盘直控与油门轴
-`controlPlayer(dt)`：
+`controlPlayer(dt)`（`control.js`）：
 
 - `aimMode === true`：先 `updateMouseAim()`，然后 **W/S/A/D/Q/E 只在按下时覆盖飞控**（`if (kp) c.pitch = kp;`），所以“指令增稳”模式下键盘随时能打断。
 - `aimMode === false`：`c.pitch/roll/yaw` 直接由按键的 −1/0/1 组成。
@@ -271,7 +317,7 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 
 ---
 ## 相机
-`updateCamera(dt)` 每帧在 `update()` 末尾跑一次。自由视角状态 `camYaw / camPitch` 是模块级的：
+`updateCamera(dt)`（`ui/camera.js`）每帧在 `update()` 末尾跑一次。自由视角状态 `camYaw / camPitch` 存在 `$` 里（`vars.js`）：
 
 ```js
 ← / →  camYaw ∓ dt * 1.3     ↑ / ↓  camPitch ± dt * 0.9（夹 ±1.5）
@@ -326,8 +372,8 @@ Renderer.setCamera(p.pos + viewOff, camDir, (0,1,0), S.fov);
 
 #### 出画处理（`S.camFrame`）
 
-> **目前只开放 0 静态拉远**：设置里的选项已隐藏，`loadSettings` 强制 `camFrame = 0`。
-> 1 / 2 两种的代码与测试保留，要放出来时把 `SET_GROUPS` 里注释掉的那项加回来、去掉强制归零即可。
+> **目前只开放 0 静态拉远**：设置里的选项已隐藏，`loadSettings`（`ui/screens/settings.js`）强制 `camFrame = 0`。
+> 1 / 2 两种的代码与测试保留，要放出来时把 `ui/screens/settings.js` 的 `SET_GROUPS` 里注释掉的那项加回来、去掉强制归零即可。
 飞机在镜头系里的位置是 `−off`：深度 `f`、竖直 `u`、水平 `r`；`u / (f·tan半视场)` 就是画面归一化纵坐标（±1 = 边缘）。
 
 - **静态底座（三种模式共用）**：`frameDeficit` 用**目标偏移** `wantOff` 算飞机要落进画面 `FRAME_FILL = 0.7` 以内、深度不小于 6 m 还得再退多少，并进 `wantOff`。设定本身放不下（距离 2、高度 10、FOV 38）时自动拉开，设定不变这段距离就不变。
@@ -377,6 +423,8 @@ Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);
 ---
 ## 目标、锁定与武器
 ### `cycleTarget()`（`F` / `Tab`）
+（`ui/input.js`）
+
 候选分成两组：`air`（`alive && team !== player.team` 的 `world.actors`）与 `surf`（`alive && team === 1` 的 `world.targets`）—— 中立的调节单元**不进锁定循环**。当前弹 `WEAPONS[player.special].target === 'air'` 时 air 是主类，否则 surf 是主类：**两类都要能锁到，只是顺序不同**。
 
 排序在 `rankTargets(prim, sec)`：
@@ -392,6 +440,8 @@ Renderer.setCamera(cp, p.fwd, p.up, S.fov + 6);
 **短按 / 长按**（`tgtKey` / `TGT_HOLD` / `updateTargetKey`）：`F`/`Tab` 的 `keydown` 只记按下时刻，**松开**时才切目标（以前 `keydown` 就切）；按住 ≥ `TGT_HOLD`（0.45 s）则清空目标（SysNote `已取消选择目标`），松开不再切。帮助文字写作 `F / Tab`。
 
 ### `updateLock(dt)`
+（`engine/game/lock.js`）
+
 对空与对面是**两套判据**：
 
 ```js
@@ -409,6 +459,8 @@ player.lockInCone = (对空 ? off : Ent.lockOff(...)) < cone;              // HU
 另写三个标志给 HUD / 发射用：`lockOk`（本帧在锥角与距离内）、`lockInCone`（只看锥角，`drawConeCue` 读）、`lockCone`（本帧实际锥角）。`lockProgress` 满 → `player.locked = true`，不满或换目标/丢目标即复位为 `false`。`w.kind === 'ecm' || 'dew'` 直接 `lockProgress = 1`。
 
 ### `fireSpecial()`（右键 / `Enter`）
+（`ui/input.js`；真正出膛的是 `engine/game/launch.js` 的 `launch()`。）
+
 1. `state !== 'playing' || !player.alive` → 返回。
 2. `ecm` → 转 `launch()`；`dew` → 播“GUS-2 是自动拦截系统”并返回；`spAmmo <= 0` 或 `spCd > 0` → `SFX.loseLock()` 返回。
 3. **目标类别检查不拦开火**：`targetMismatch(w, t)` 矛盾时 `updateLock()` 不开始锁定（进度归零、目标保留）；开火时允许强制开火，按无锁定处理（`t = null`），出 SysNote `强制开火（无锁定）：…`（“按 R 换成对地挂载”）。类别对得上时同样不拦开火，但**锁定决定导弹拿不拿得到目标**：制导武器（`guided`）只有 `player.locked` 时才把选中目标交给 `launch()`，否则传 `null` —— 红外弹靠 `irAcquire` 在导引头视场里自己找、雷达 / 对面弹直飞（只有 `reAcquire` 类会再捕获），并出 SysNote `未锁定：…`。无制导武器不受影响。
@@ -416,7 +468,9 @@ player.lockInCone = (对空 ? off : Ent.lockOff(...)) < cone;              // HU
 4. `launch()` 成功后按武器类型播无线电：无制导 / `bomb/agm/asm` → **投放**；`seeker === 'radar'` → **Fox 3**；`laser` → **照射**；其余 → **Fox 2**。
 
 ### `launch(actor, target, w)` —— 玩家与 AI 的双路径
-`Ent.makeAircraft()` 给每架飞机都建了 `slotCd: {}` 与 `spCd: 0`；**玩家**在 `startMission()` 里为每件武器填出真正的槽数组，**AI** 的 `slotCd` 始终是空对象。`launch()` 据此走两条冷却路径：
+（`engine/game/launch.js`）
+
+`Ent.makeAircraft()` 给每架飞机都建了 `slotCd: {}` 与 `spCd: 0`；**玩家**在 `Loadout.apply()` 里为每件武器填出真正的槽数组，**AI** 的 `slotCd` 始终是空对象。`launch()` 据此走两条冷却路径：
 
 | | 玩家 | AI |
 |---|---|---|
@@ -430,7 +484,7 @@ player.lockInCone = (对空 ? off : Ent.lockOff(...)) < cone;              // HU
 - **没有交战规则拦截**：旧的 `roeBlocked` 分支已删，调节单元附近开火只有误伤扣分这一种后果。
 - **无目标也允许发射**（无制导弹与“打出去自己找”的弹都不该被拦）。出声：玩家 `SFX.missile()` + `shotsFired++`；AI 距离玩家 < 6000 m 时 `SFX.missileFar()`。
 
-`cycleSpecial()`（`R`）只在 `loadoutList.length >= 2` 时切 `wpIdx`，然后 `syncWeapon()` 把槽数组里**最快就绪的槽**折算成 `spCd`。切枪**不清零 `lockProgress`**：换弹种类后“还锁不锁得住”应由新武器的参数重判，清零会让“对同一个敌人连打几种弹”这个多挂载玩法打不出来。
+`cycleSpecial()`（`R`，`ui/input.js`）只在 `loadoutList.length >= 2` 时切 `wpIdx`，然后 `syncWeapon()`（`world.js`）把槽数组里**最快就绪的槽**折算成 `spCd`。切枪**不清零 `lockProgress`**：换弹种类后“还锁不锁得住”应由新武器的参数重判，清零会让“对同一个敌人连打几种弹”这个多挂载玩法打不出来。
 
 ---
 ## 看门狗
@@ -438,45 +492,48 @@ player.lockInCone = (对空 ? off : Ent.lockOff(...)) < cone;              // HU
 var WD_LIMIT = 1.5;
 ```
 
-`watchdog(dt)` 遍历 `world.actors`，把位置变化（三个分量绝对值之和）小于 `0.02` 的帧累加进 `a.wdStill`；超过 1.5 秒就：用 `console.warn` 打一条含 `name / wdStill / speed / fwd / ctrl / pos / hp` 的记录；把姿态重置成 `fwd=(0,0,1) up=(0,1,0) right=(1,0,0)`、速度设为 `max(vStall * 1.4, 180)`、`vel = fwd * speed`、清 `stall`；`wdStill = 0` 让它继续飞。
+`watchdog(dt)`（`engine/game/update.js`）遍历 `world.actors`，把位置变化（三个分量绝对值之和）小于 `0.02` 的帧累加进 `a.wdStill`；超过 1.5 秒就：用 `console.warn` 打一条含 `name / wdStill / speed / fwd / ctrl / pos / hp` 的记录；把姿态重置成 `fwd=(0,0,1) up=(0,1,0) right=(1,0,0)`、速度设为 `max(vStall * 1.4, 180)`、`vel = fwd * speed`、清 `stall`；`wdStill = 0` 让它继续飞。
 
 **兜的是什么**：有飞机在空中“钉住”过（位置完全不动、速度读数却正常），根因至今没定位到，所以这是纯粹的兜底。**为什么值得兜**：玩家分不清“这架飞机卡住了”和“我打不着它”，一架悬停的敌机会让整场战斗都显得坏了。**为什么留 `console.warn`**：万一真被触发，那条记录就是下次定位根因的起点。`mission` 结束后 `update()` 不再运行，所以“结算时的静止”不会被误判成卡死。
 
 ---
 ## 开机自检 `preflight()`
-`init()` 的第一行。返回 `problems` 数组，全空时 `console.log` 一条绿色“自检通过”。检查内容：
+`boot/main.js`，`init()` 的第一行。返回 `problems` 数组，全空时 `console.log` 一条绿色“自检通过”。检查内容：
 
-1. **核心模块**：`M3 MODELS PLANFORM CODEX AIRCRAFT WEAPONS VOICES CALLSIGN SFX Renderer Ent AI HUD MISSIONS Radio` 逐个查 `typeof window[...]`，缺任何一个就**立即 `report()` 并返回**（后面没法查）。
+1. **核心模块**：`M3 MODELS PLANFORM CODEX AIRCRAFT WEAPONS VOICES CALLSIGN SFX Renderer Ent AI HUD MISSIONS CAMPAIGNS Radio` 逐个查 `typeof window[...]`，缺任何一个就**立即 `report()` 并返回**（后面没法查）。
 2. **每个机型**：`model` 在 `MODELS` 里、`gun` 在 `WEAPONS` 里、有 `hardpointGroups`、每组 `pts.length >= 2`（必须成对）、`phys.vMax` 存在；可驾驶机型还要 `PLANFORM.planes[model]` 存在，且每个挂载点组“在当前机体能力下至少有一种武器挂得上”。NPC 机型跳过最后一条 —— 下游弹的 `fits` 是空的。
-3. **默认配置**（`defaultLoadout`）：组存在、武器存在、`fits` 匹配该组 `kind`、`canCarry(ac, w)` 成立（后者会报出缺哪项机体能力）。
-4. **静态清单**：`needModels`（`frigatebird sailfish booby schist folded_wing sower relay cell sam radar depot cmdpost station missile bomb`）与 `needWeapons`（`k3 k7 v11 v9 v17 v22 v25 v30 e4 l2 dl4 dl6 dl9`）逐项存在。
+3. **默认配置**（机型的 `defaultLoadout` 字段）：组存在、武器存在、`Ent.fitsKind` 匹配该组 `kind`、`canCarry(ac, w)` 成立（后者会报出缺哪项机体能力）。
+4. **静态清单**：`needModels`（`frigatebird sailfish booby schist folded_wing sower relay cell sam radar depot cmdpost station missile bomb pod`，外加 `SHIPS` 表里所有舰船模型）与 `needWeapons`（`cel1 cel2 cel3 cel7 cel11 v11 v9 v17 v22 v25 v30 e4 l2 dl4 dl6 dl9 hwm kkv pgb`）逐项存在；清单以 `boot/main.js` 为准。
 5. **每个任务**：`spawn / tick / win / lose` 是函数，且 `VOICES[m.id]` 存在。
 
 **失败时怎么报**：`report(problems)` 在 `document.body` 末尾插一个 `position:fixed; bottom:0; z-index:9999` 的暗红框（`max-height:36vh`、可滚动），标题是“开机自检发现 N 个问题（请把这一段发给开发者）：”，每条一行 `·`；同时 `console.error`。**不弹窗、不阻断游戏** —— 开发者工具没开的时候，这条红条就是唯一的报告渠道。见 [DESIGN.md §6.1](../DESIGN.md#61-为什么有开机自检)。
 
 ---
 ## UI 装配：唯一数据源
-`Game` 里所有 DOM 界面都是**现造现填**，HTML 只留空容器。
+`Game` 里所有 DOM 界面都是**现造现填**，HTML 只留空容器（容器来自 `locales/_html/` 的模板片段，生成方式见 [pages.md](pages.md)；根目录 `index.html` 现在只是启动器）。生成器分别住在 `js/ui/screens/` 的各文件里（见上面的“职责 → 文件”表）。
 
 | 界面 | 生成器 | 唯一数据源 |
 |---|---|---|
 | 设置（独立页 + 暂停页签） | `buildSettingsInto(container)` | `SET_GROUPS` + `DEFAULTS` |
 | 操作说明（手册页 + 暂停页签） | `buildHelpHTML(forPause)` | `KEYMAP` + `TIPS` + `GUIDE`（实战指南，图标由 `HELP_ICONS` 画） |
-| 机库 | `buildHangar()` → `buildHardpointEditor()` | `AIRCRAFT` + `WEAPONS` + `loadouts` |
+| 机库 | `buildHangar(view)` → `buildHardpointEditor(ac, lo, view)` | `AIRCRAFT` + `WEAPONS` + `$.loadouts` |
 | 战役选择 | `buildCampaignList()` | `CAMPAIGNS[]` + `cleared`（进度） |
 | 简报 | `buildBrief()` + `buildMissionList()` + `drawMap()` | `MISSIONS[missionIdx]` + `CAMPAIGNS[activeCampaign]` |
-| 资料库 | `buildCodex()` | `CODEX[]`（条目可给 `html` 或 `build()`，可选 `mount()`） |
+| 资料库 | `buildCodex()` | `CODEX[]`（`js/ui/codex/entries/<id>.js` 逐条注册，由 `zz-seal.js` 封存；条目可给 `html` 或 `build()`，可选 `mount()`），见 [codex.md](codex.md) |
 | 更新记录 | `buildChangelog()` | `CHANGELOG.releases[]`（`js/core/changelog.js`，自动生成） |
 | 结算 | `finish()` | 当场算出的 `score / rank / rows` |
 
 - `buildSettingsInto(container)` 先 `container.innerHTML = ''`，再按 `SET_GROUPS` 的组标题、`makeSetRow(item)` 逐项生成；`range / select / toggle` 三种控件各一支分支。改设置项**只需动 `SET_GROUPS` + `DEFAULTS`**，独立设置页与暂停菜单自动同步。视角用 `select`（而不是热切换）是刻意的：视角误触的代价是一瞬间失去态势感知，必须“主动选、确认”。
 - `buildHelpHTML(forPause)` 返回**两种排版**：`true` 单栏（暂停菜单，`<h4>` + `<table>`）、`false` 双栏（独立手册，两个 `.help-col`）。早期两处是两份独立 HTML，改一个忘一个。
-- 机库是**唯一让玩家做长期规划的地方**，所以 `buildHangar()` 每次都重算：`resolveLoadout` / `loadoutMass` / `passiveEffects` → 六维条显示**挂载之后**的实际值（缩水段用暗红标出并写净损失）→ 挂载点编辑器 → 俯视图 `PLANFORM.draw()`。选机体时重置 `activeHpGroup`；`loadouts[ac.id]` 只在第一次访问时按 `defaultLoadout` 初始化，之后留着玩家的改动。
+- `buildHangar(view)` 与 `buildHardpointEditor(ac, lo, view)` **不再读写全局** `selectedAC` / `activeHpGroup`：视图状态都在 `view`（`Game.$.hangarView` 是机库页那一份，字段 `ac / group / ids / rebuild`；`ac` 读写 `$.selectedAC`），DOM 元素用 `$.viewEl(view, key)` 按 `view.ids` 取，所以别的界面可以传自己的一套 id 复用同一个编辑器。
+- 机库是**唯一让玩家做长期规划的地方**，所以 `buildHangar(view)` 每次都重算：`Loadout.resolve` / `Loadout.mass` / `Loadout.passive` → 六维条显示**挂载之后**的实际值（缩水段用暗红标出并写净损失）→ 挂载点编辑器 → 俯视图 `PLANFORM.draw()`。选机体时重置 `view.group`；`$.loadouts[ac.id]` 只在第一次访问时经 `getLoadout()` → `Loadout.defaults(ac)` 初始化，之后留着玩家的改动。
 - `buildBrief()` 末尾一定调 `drawMap(m)`；地图**不画陆地** —— 战役全在纯海域上进行，画岛等于承诺一片不存在的地形。`buildCodex()` 的条目支持 `build()` 动态生成，图鉴那几条必须动态出，否则改了 `js/data/` 文档就对不上。条目带 `mount()` 的，在 `innerHTML` 写进去之后再调（DOM 要先就位）—— `s4` 用它挂调节单元的 3D 预览。
-- `buildChangelog()` 只画不写：版本号与条目全在 `CHANGELOG`（`js/core/changelog.js`）里，而它是 `tools/build/release.js` 从根目录 `CHANGELOG.md` 生成的。**发新版本不需要改这个函数**，只改 `CHANGELOG.md` 再跑一次生成脚本。条目文本里的 `**强调**` 与 `` `代码` `` 由 `clInline()` 还原成 `<b>` / `<code>`，而且**先转义再还原** —— 顺序反过来的话，转义会把刚生成出来的标签一起逃掉。`js/core/changelog.js` 缺失时（开发中直接开 `index.html`）降级成一句提示，与版本戳同一种处理。
+- `buildChangelog()` 只画不写：版本号与条目全在 `CHANGELOG`（`js/core/changelog.js`）里，而它是 `tools/build/release.js` 从根目录 `CHANGELOG.md` 生成的。**发新版本不需要改这个函数**，只改 `CHANGELOG.md` 再跑一次生成脚本。条目文本里的 `**强调**` 与 `` `代码` `` 由 `clInline()` 还原成 `<b>` / `<code>`，而且**先转义再还原** —— 顺序反过来的话，转义会把刚生成出来的标签一起逃掉。`js/core/changelog.js` 缺失时（开发中直接开某个页面副本）降级成一句提示，与版本戳同一种处理。
 
 ---
 ## Radio：队列与字幕
+`js/ui/radio.js`；同目录的 `js/ui/sysnote.js` 是 `SysNote`（屏幕中下方的单条系统提示，`show(html, {warn, dur})` / `clear()`，样式与无线电行同一套，一次只显示一条，新的顶掉旧的）。`show()` 在 `ui/screens/nav.js`，离开战斗时 `Radio.clear(); SysNote.clear()`。
+
 ```js
 var queue = [], timer = 0, box = null, live = [];
 ```
@@ -484,7 +541,7 @@ var queue = [], timer = 0, box = null, live = [];
 - `play(id, evt)` 把整组台词**展开压栈**；`raw(line)` 压一条。台词对象形如 `{ who, cls, tx, gap }`。
 - `update(dt)`：`timer -= dt`；`timer <= 0 && queue.length` 时弹出一条交给 `push()`，然后 `timer = L.gap === undefined ? 1.4 : L.gap` —— **`gap` 是“这条说完之后隔多久出下一条”**，缺省 1.4s。
 - `push(L)`：造一个 `.rad-line <cls>` 的 `div`，`who` 包成 `.who`、正文包成 `.tx`；`live` 里记 `{ node, t: 5.6 }`；**超过 4 条就挤掉最旧的**；`cls !== 'fx'` 时播 `SFX.radio()`。`cls === 'fx'` 的字幕额外加 class `radiofx`，用于战场音效的字幕化。
-- 淡出：`t < 0.5` 时 `node.style.opacity = max(0, t / 0.5)`，`t <= 0` 摘除。**字幕完全靠 `Radio.update()` 驱动**，而它只在 `update(dt)` 里被调用 → 离开战斗必须 `Radio.clear()`（见 `show()`），否则队列没人推进、最后几条会永久挂在屏幕上。
+- 淡出：`t < 0.5` 时 `node.style.opacity = max(0, t / 0.5)`，`t <= 0` 摘除。**字幕完全靠 `Radio.update()` 驱动**，而它只在 `update(dt)` 里被调用 → 离开战斗必须 `Radio.clear()`（见 `nav.js` 的 `show()`），否则队列没人推进、最后几条会永久挂在屏幕上。
 - `world.radio === Radio`，所以任务脚本里的台词走同一个队列，玩家、僚机、`SEXTANT`、`fx` 共用一套节奏。队列**不分优先级**：谁的 `raw/play` 先调用谁先出队。
 
 ---
@@ -511,7 +568,8 @@ var queue = [], timer = 0, box = null, live = [];
 | 粒子数量上限 | `compact()` 里的 `900` |
 | 挂架高度 / 实体缩放 | `STORE_HY` / `pushOneStore()` 里的 `0.85` |
 | 曳光长度与宽度 | `drawTracers()` 里的 `0.045 / 13 / 90`、`1600` |
-| 设置项清单 | `SET_GROUPS`（同 [hud.md](hud.md#各项)） |
+| 设置项清单 | `ui/screens/settings.js` 的 `SET_GROUPS`（同 [hud.md](hud.md#各项)） |
+| 文件位置 | 上表参数所在函数见前面“职责 → 文件”（`loop` / `preflight` 在 `boot/main.js`，`controlPlayer` 在 `control.js`，`updateLock` 在 `lock.js`，`finish` 在 `finish.js`，`updateCamera` 在 `ui/camera.js`，`drawTracers` / `pushOneStore` 在 `ui/frame.js`，`STORE_HY` 在 `js/engine/entities/mounts.js`，`compact` / `watchdog` 在 `update.js`） |
 
 ---
 ## 易踩的坑与设计取舍
@@ -522,14 +580,14 @@ var queue = [], timer = 0, box = null, live = [];
 5. **暂停时只停 `update`**，所以暂停菜单里改设置能立刻看到效果；反过来，任何“在 `update` 里做的一次性初始化”在暂停期间不会发生。
 6. **方向键自由视角只在追尾机位有效**；**目标机位有目标时 FOV 写死 55、不读 `S.fov`**。
 7. **加力/减速板是瞬时态**：拿它们当稳态读数去测会得到假失败（`tools/test/smoke.js` 的引擎出力断言只用稳态档位）。
-8. **槽数组与挂载组的下标要自己维护**（`pushStores()` 里的 `used{}`）：槽数组按武器建、遍历按组走，两组挂同一种弹时若不自己累加起始下标，就会“四个挂架共用前两个槽”，打掉一个两组同时消失、后两个永不消失。发射那边是对的（`launch` 遍历整个 `slotCd[wid]`），**只有实体渲染会错位**。
+8. **槽数组与挂载组的下标要自己维护**（`ui/frame.js` `pushStores()` 里的 `used{}`）：槽数组按武器建、遍历按组走，两组挂同一种弹时若不自己累加起始下标，就会“四个挂架共用前两个槽”，打掉一个两组同时消失、后两个永不消失。发射那边是对的（`launch` 遍历整个 `slotCd[wid]`），**只有实体渲染会错位**。
 9. **`launch()` 兼容两种冷却形态**：`slotCd[wid]` 存在就走槽数组，不存在才退回 `actor.spCd`。AI 靠的就是后一条 —— 别把那个 `else if (actor.spCd > 0)` 删掉，否则 AI 会变成无冷却连射。
-10. **底部 `window.addEventListener('load', ...)` 必须最后加载**：`Game.init()` 第一件事就是 `preflight()` 检查所有全局模块，前面任何一个 `<script>` 没跑完都会报“核心模块 X 未加载”。**已知未释放**：`finish()` 之后 `world / player` 仍被闭包与 `debrief` 的渲染路径引用，只有 `#btnAbort` 会置空。
+10. **`js/boot/zz-api-game.js` 里的 `window.addEventListener('load', ...)` 必须在 `Game` 所有文件之后加载**（文件名的 `zz-` 前缀就是为了排在最后）：`Game.init()` 第一件事就是 `preflight()` 检查所有全局模块，前面任何一个 `<script>` 没跑完都会报“核心模块 X 未加载”。**已知未释放**：`finish()` 之后 `world / player` 仍被 `Game.$` 与 `debrief` 的渲染路径引用，只有 `#btnAbort` 会置空。
 11. **加关之后忘了写进 `CAMPAIGNS[].missions`**：关卡本身能跑、能通过 `preflight` 的字段检查，只是在选关界面永远列不出来。`preflight()` 现在会报“没有归属任何战役”，但触发它的前提是新关确实被加进了 `MISSIONS`。同一关被两个战役引用也会报。
 
 ## 本批更新
 
-- **命中检测**：`scanShot` 只处理子弹与舰炮弹。导弹与无制导弹的碰炸统一在 `Ent.contactScan`（`stepMissile` 里调用）。
+- **命中检测**：`scanShot`（`combat.js`）只处理子弹与舰炮弹。导弹与无制导弹的碰炸统一在 `Ent.contactScan`（`stepMissile` 里调用）。
 - **锁定**：`updateLock` 按目标类别分支（`Ent.targetClass`）。`target: 'any'` 对地面目标不乘 1.35、不做俯角判据，锁定距离与对空一样。
 - **目标切换**：`wantAir` 认 `'any'`；`targetMismatch` 对 `'any'` 直接交给 `weaponMatchesTarget`。
 - **事件**：`combatEvents` 消化 `{type:'wingflare'}`，僚机掩护撒弹时发电台"干扰弹，掩护长机。"，8 s 限频。

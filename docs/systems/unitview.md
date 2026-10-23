@@ -1,6 +1,6 @@
 # 单位详情页与实时 3D 预览
 
-代码：`js/ui/unitview.js` · 入口在 `Game` 的 `buildCodex()` · 样式在 `css/style.css` 的 `/* 单位详情页 */` 一段
+代码：`js/ui/unitview.js` · 入口在 `Game` 的 `buildCodex()`（`js/ui/screens/codex.js`）· 样式在 `css/style.css` 的 `/* 单位详情页 */` 一段
 
 一句话职责：**给图鉴里的每个单位一页自己的详情** —— 实时旋转的 3D 预览、
 矢量俯视识别图、设定全文、完整参数表。它只生成 HTML 与驱动一个 canvas，
@@ -18,15 +18,14 @@
 | 项 | 事实 |
 |---|---|
 | 文件 | `js/ui/unitview.js`，全中文注释 |
-| 加载位置 | `index.html` 里紧随 `HUD` 之后（**必须在 `js/ui/codex/` / `js/data/` / `js/models/` / `js/render/planform/` 之后**） |
-| 依赖 | `M3`（相机与向量）、`MODELS`、`PLANFORM`、`AIRCRAFT`、`SHIPS`、`WEAPONS`（只为了显示机炮名） |
+| 加载位置 | 属于 `ui` 层，顺序由 `tools/build/gen-index.js` 决定：层顺序 `core → data → models → missions → engine → render → ui → boot`，所以它**天然在 `js/data/` / `js/models/` / `js/render/planform/` 之后**；层内按字母序排在 `ui/hud/`、`ui/codex/` 之后（`js/core/math3d.js` 在最前面的 core 层） |
+| 依赖 | `M3`（相机与向量）、`MODELS`、`PLANFORM`、`AIRCRAFT`、`SHIPS`、`PLATFORMS`、`WEAPONS`、`Tags`（“机制标签”一行读 `Tags.declared()`）、`RenderGL` / `js/core/shading.js` |
 | 输出 | 全局 `var UnitView`，七个方法 |
-| DOM | 只**生成字符串**；插入由 `Game` 负责。挂载时只找 `#uvCanvas` / `#uvPlan` 两个 id |
+| DOM | 只**生成字符串**；插入由 `Game`（`js/ui/screens/codex.js`）负责。挂载时只找 `#uvCanvas` / `#uvPlan` 两个 id |
 | 校验 | `tools/test/smoke.js` 里"单位详情页"一组断言（4 条） |
 
 **顶层只做一件事**：`var LIGHT = M3.norm(...)`。其余对 `AIRCRAFT` / `SHIPS` / `MODELS`
-的引用全部在函数体里 —— 所以它可以安全地先于 `js/data/` 之外的东西求值，
-但**加载顺序仍然必须在 `math3d.js` 之后**，否则 `M3` 未定义。
+的引用全部在函数体里（并带 `typeof` 守卫），**加载顺序必须在 `js/core/math3d.js` 之后**，否则 `M3` 未定义——`core` 层最先加载，这点自动满足。
 
 ---
 
@@ -42,15 +41,15 @@ UnitView.renderModel(cvs, model, yaw, pitch)   // 渲染一帧（工具与测试
 UnitView.findUnit(kind, id) // → { kind, rec, model, modelKey } 或 null
 ```
 
-`kind` 有三个取值：`'aircraft'`（查 `AIRCRAFT`）、`'ship'`（查 `SHIPS`）与 `'weapon'`
+`kind` 有三个取值：`'aircraft'`（查 `AIRCRAFT`）、`'ship'`（查 `SHIPS`，海上平台 `PLATFORMS` 也走这一类，参数表按 `fixed` 分支）与 `'weapon'`
 （查 `WEAPONS[id]`，模型是 `MODELS.store(w)`，俯视栏改由 `PLANFORM.paintStore` 画 640×300）。
 详情页的总数就是三张表里被图鉴列出的条目之和，加一条记录就多一页，不需要登记。
 
 **图鉴之外的调用方**：`mountModel()` 不依赖 `#uvCanvas`，谁给 canvas 就挂谁 ——
-机库的 `#hangar3d`（`Game`，`keepAngle = true`）与图鉴 `s4` 的 `#cxCell3d`
-（`js/ui/codex/` 条目的 `mount()`，挂 `MODELS.cell`）。同一时刻只有一个预览在转，`stop()` 照旧收尾。
+机库的 `#hangar3d`（`Game`，`js/ui/screens/hangar.js`，`keepAngle = true`）与图鉴 `s4` 的 `#cxCell3d`
+（`js/ui/codex/entries/s4.js` 的 `mount()`，挂 `MODELS.cell`）。同一时刻只有一个预览在转，`stop()` 照旧收尾。
 
-**`html()` 与 `mount()` 是分开的两步**，因为 `Game` 是先 `innerHTML =` 再挂载的：
+**`html()` 与 `mount()` 是分开的两步**，因为 `Game`（`buildCodex()`）是先 `innerHTML =` 再挂载的：
 字符串里只有占位 `<canvas id="uvCanvas">`，真正的初始化必须等它进了 DOM。
 
 ---
@@ -191,7 +190,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 ### 俯视图画布固定 640×440
 
 `mount()` 里把 `#uvPlan` 的 `width` / `height` 属性直接写成 `640` / `440` ——
-**与机库 `index.html` 里 `<canvas id="planCv" width="640" height="440">` 完全一致**。
+**与机库页面模板（`locales/_html/screens/hangar.html`）里 `<canvas id="planCv" width="640" height="440">` 完全一致**。
 
 理由是 `PLANFORM.paint()` 的左右标注栏（`padL` / `padR = 132`）是**像素**量：
 画布越扁，机身能分到的缩放 `k` 就越小，俯视图看着就越小。
@@ -202,6 +201,10 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 150），读回来的已经是扁画布的比。要按容器现算，必须用 `getBoundingClientRect()`
 或者先写 `style.height`；但既然机库已经有一个定死的尺寸，直接对齐它更省事，
 也让两边是同一套留白比例。
+
+### 机制标签一行（`tagsRow`）
+
+参数表末尾有一行“机制标签”：读该单位 `def.tags` 里的键，逐个用 `Tags.declared()`（`js/core/tags.js`，每个标签登记时写的那一句 `doc`）翻成一句话，没登记的键不显示。标签的概念与登记方式见 [tags.md](tags.md)；它让玩家能在资料库里看到“这型有什么特殊机制”，而不用去翻数据文件。
 
 ### 阵营与制造方分两行
 
@@ -244,8 +247,8 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 
 | 位置 | 为什么 |
 |---|---|
-| `Game` 的 `buildCodex()` 开头 | 每切一次条目/单位就重建一次 DOM，不停的话 rAF 会越积越多 |
-| `Game` 的 `show(id)` 里（`id !== 'codex'` 时） | 离开资料库这一屏 —— 否则它在后台一直烧 CPU，还画在一个已经隐藏的 canvas 上 |
+| `Game` 的 `buildCodex()` 开头（`js/ui/screens/codex.js`） | 每切一次条目/单位就重建一次 DOM，不停的话 rAF 会越积越多 |
+| `Game` 的 `show(id)` 里（`js/ui/screens/nav.js`；`id` 既不是 `codex` 也不是 `hangar` 时，因为机库也在用 `mountModel()`） | 离开资料库这一屏 —— 否则它在后台一直烧 CPU，还画在一个已经隐藏的 canvas 上 |
 
 `mount()` 与 `mountModel()` 自己也会先调 `stop()`，所以重复挂载是安全的。
 
@@ -257,18 +260,20 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 
 | 模块 | 用它的什么 |
 |---|---|
-| `math3d.js` | `M3.V` / `M3.norm` / `M3.sub` / `M3.clamp` / `M3.makeCamera` |
+| `js/core/math3d.js` | `M3.V` / `M3.norm` / `M3.sub` / `M3.clamp` / `M3.makeCamera` |
 | `js/models/` | `MODELS[key]` 的 `v` / `f`（顶点与面） |
 | `js/render/planform/` | `PLANFORM.planes` 判断有没有俯视图；`PLANFORM.draw()` 画它 |
-| `js/data/` | `AIRCRAFT` / `SHIPS` / `WEAPONS` |
-| `js/ui/codex/` | 只借一个 `_capLabel()`（能力门槛的中文名，缺了就退回原始标识） |
+| `js/data/` | `AIRCRAFT` / `SHIPS` / `PLATFORMS` / `WEAPONS` |
+| `js/core/tags.js` | `Tags.declared()`（机制标签一行） |
+| `js/core/shading.js`、`js/render/render-gl.js` | WebGL 预览与游戏同一套着色 |
+| `js/ui/codex/zz-seal.js` | 借 `_capLabel()`（能力门槛的中文名，缺了就退回原始标识）、`_seekerLabel()` / `_rngTxt()`（武器页的导引与射程行） |
 
 **下游**：
 
 | 模块 | 怎么用 |
 |---|---|
-| `Game` | `buildCodex()` 生成并挂载（单位页调 `mount()`，带 `mount()` 的条目由条目自己挂）；`show()` 负责停；单位链接由 `bindCodexUnits()` 的事件委托接住；机库调 `mountModel()` + `composeLoadout()` |
-| `js/ui/codex/` | 三个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:frigatebird">`（`ship:` / `weapon:` 同理）；`s4` 条目的 `mount()` 直接调 `mountModel()` |
+| `Game`（`js/ui/screens/{codex,nav,hangar}.js`） | `buildCodex()` 生成并挂载（单位页调 `mount()`，带 `mount()` 的条目由条目自己挂）；`show()` 负责停；单位链接由 `bindCodexUnits()` 的事件委托接住；机库调 `mountModel()` + `composeLoadout()` |
+| `js/ui/codex/entries/`（`inv1` `inv2` `inv3`） | 三个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:frigatebird">`（`ship:` / `weapon:` 同理）；`s4` 条目的 `mount()` 直接调 `mountModel()` |
 | `css/style.css` | `.uv-*` 一族类 |
 | `tools/render/render-units.js` | 直接用 `renderModel()` 把 33 个单位各渲染一张 PNG |
 | `tools/render/shot-unitview.js` | 生成最小页面（含 `shading.js` / `render-gl.js`，swiftshader），交给无头 Chrome 截详情页的**布局**与 WebGL 预览 |
@@ -282,7 +287,7 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 <span class="cx-unit" data-unit="aircraft:frigatebird"> ... </span>
 ```
 
-`Game` 在 `#codexBody` 上挂**一个** `onclick` 做事件委托，从 `ev.target`
+`Game` 的 `bindCodexUnits()`（`js/ui/screens/codex.js`）在 `#codexBody` 上挂**一个** `onclick` 做事件委托，从 `ev.target`
 往上找 `data-unit`（进入详情）或 `data-unit-back`（返回）。
 
 **为什么不用逐个绑**：正文每次重建都是整块 `innerHTML`，逐个绑会漏、会重复绑。
@@ -324,9 +329,9 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 | 拖动灵敏度 | `onDragMove()` 里的 `0.010` / `0.008` |
 | 俯仰限位 | `PITCH_LIMIT` |
 | 预览画布尺寸 | `css/style.css` 的 `.uv-3d{ height }` |
-| 俯视图画布尺寸 | `unitview.js` `mount()` 里的 `640` / `440`（须与 `index.html` 的 `#planCv` 一致） |
+| 俯视图画布尺寸 | `unitview.js` `mount()` 里的 `640` / `440`（须与 `locales/_html/screens/hangar.html` 的 `#planCv` 一致） |
 | 左右栏比例 | `css/style.css` 的 `.uv-body{ grid-template-columns }` |
-| 参数表有哪些行 | `aircraftParams()` / `shipParams()` |
+| 参数表有哪些行 | `aircraftParams()` / `shipParams()` / `platformParams()` / `weaponParams()`；“机制标签”行是 `tagsRow()`；行标题与文字走 `T('ui.unitview.*')`，在 `locales/<语言>/text/ui/unitview.json` |
 | 详情页的 HTML 结构 | `html()` |
 
 ## 相关工具

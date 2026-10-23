@@ -1,6 +1,13 @@
 # AI 行为
 
-代码：`AI`· 调用方：`js/missions/` 的 `spawnEnemy()` / `spawnWingman()`、`Game` 的 `updateMouseAim()`
+代码：`AI`（`js/engine/ai/*.js`）· 调用方：`js/missions/` 的 `spawnEnemy()` / `spawnWingman()`、`Game` 的 `updateMouseAim()`（`engine/game/control.js`）
+
+> v3.0.0 起 `AI` 不再是一个闭包，而是四个按职责命名的文件（私有状态走 `AI.$`，公开接口集中在 `ai/zz-api.js`，规则见 [modules.md](modules.md)）：
+> `util.js`（索敌与工具：`findIncoming` / `nearestEnemy` / `nearestEnemyTo` / `surfaceTargetFor` / `approachSurface` / `leadThreat`）、
+> `steer.js`（控制律 `steerTo` 与 `STEER_*` / `K_*` 常数）、
+> `brain.js`（`attach` / `update` 主决策、`updateRoute`、`clampCeiling`、开火与干扰逻辑）、
+> `tactics.js`（`pursue` / `evade` / `leadTo` / `strafeTarget` / `aiEnvelope`）。
+> 下文提到的函数按此归位，不再逐个标文件。
 
 ---
 
@@ -16,7 +23,7 @@
 | 函数 | 签名 | 用途 |
 |---|---|---|
 | `AI.attach` | `(a, opt) → a.ai` | 挂上 AI 状态；`opt = {role, skill, formation, cmd}` |
-| `AI.update` | `(a, dt, world)` | 每帧决策 + 操纵 + 开火；带 `a.route` 的单位转 `updateRoute()` |
+| `AI.update` | `(a, dt, world)` | 每帧决策 + 操纵 + 开火；带 `a.route` 的单位转 `updateRoute()`（`brain.js` 内部函数，不对外导出） |
 | `AI.steerTo` | `(a, desired, out, st, dt?) → out` | 控制律；`out` 是 `{pitch, roll, yaw}`，就地写入后返回 |
 | `AI.findIncoming` | `(a, world) → missile \| null` | 4.2 km 内、以本机为目标的敌弹 |
 | `AI.nearestEnemy` | `(a, world, maxR) → actor \| null` | 最近敌机（按 `Ent.hostile`：0 与 1 互为敌，2 是中立、不算）；`maxR` 默认 16 000 m |
@@ -80,7 +87,7 @@ AI 传飞机自己（`a`），玩家传 `player`。
 闭环实测（左下方拖动，稳态坡度）：4°/s → 0°，8°/s → −5°，10°/s → −29°，
 12°/s → −79°，16°/s → −137°；机头误差 < 1°。断言见 `tools/test/smoke.js`。
 
-### 玩家侧：战雷式瞄准（Game）
+### 玩家侧：战雷式瞄准（Game，`engine/game/control.js`）
 鼠标**位移**（指针锁定）转动世界坐标里的 `aimYaw / aimPitch`（±89°），
 追尾镜头跟瞄准方向而不跟机头，`updateMouseAim(dt)` 把它交给 `steerTo`。
 HUD 中心是准星（CMD），青色标记是机头，二者之间有虚线；THR 带右侧的 FCS 三根表
@@ -92,7 +99,7 @@ HUD 中心是准星（CMD），青色标记是机头，二者之间有虚线；T
 
 | 字段 | 初值 | 含义 |
 |---|---|---|
-| `role` | `'enemy'` | `enemy` / `drone` / `wingman`；预警机由 `spawnAewc()` 改成 `support`（它带 `route`，不走状态机） |
+| `role` | `'enemy'` | `enemy` / `drone` / `wingman`（`drone` 是 AI 角色，与机型标签 `tags.unmanned` 是两回事；战果归属等处读的是后者）；预警机由 `spawnAewc()` 改成 `support`（它带 `route`，不走状态机） |
 | `skill` | 0.6 | 0..1，见「技能等级」 |
 | `mode` | `'pursue'` | `pursue` / `evade` / `extend` |
 | `modeT` | 0 | `extend` 剩余时间 |
@@ -153,7 +160,7 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | `wingman` + `cover` | 同 `drone + cover`（共用 `leadThreat()`） |
 | 其余（含 `enemy`） | 被主动雷达照射时优先咬照射者（12 km 内）；否则 `nearestEnemy(a, world, role === 'wingman' ? 11000 : 15000)`；**空中一个都没有时**，带得动对面弹的飞机转去挑面目标（`surfaceTargetFor`） |
 
-**照射判定（RWR，`a.rwrT / a.rwrSrc`）**：敌对、`target === a`、挂主动雷达弹（`seeker === 'radar'`）才算照射；`silentLock` / `emcon` 不告警。无人僚机的目标选择里，只有**它自己**被压制（`suppressed > 0.35`）才会放弃目标、只规避不开火；长机电磁静默或被压制只是下不了令，僚机照旧按现有指令攻击。
+**照射判定（RWR，`a.rwrT / a.rwrSrc`）**：敌对、`target === a`、挂主动雷达弹（`seeker === 'radar'`）才算照射；`silentLock`（标签 `w.tags.silentLock`，被动吊舱汇总进 `a.silentLock`）/ `emcon` 不告警。无人僚机的目标选择里，只有**它自己**被压制（`suppressed > 0.35`）才会放弃目标、只规避不开火；长机电磁静默或被压制只是下不了令，僚机照旧按现有指令攻击。
 **玩家要锁满（`player.locked`）才算** —— 只是选中、锁定环还在走，对方收不到告警，可以贴近了再锁。以前选中即照射。AI 之间仍是"选中即照射"。
 
 > **面目标（海上平台 / 地面设施）是后加的。** 在这之前 `nearestEnemy` 只扫
@@ -226,7 +233,7 @@ if (pos.y > ceil - 1200 && dir.y > 0.08) dir = norm(V(dir.x,  0.08, dir.z));  //
 
 > 固定 -0.22 在十七公里上是不够的：那里舵效只剩三成，"想压平"这个愿望
 > 执行不出来，于是一架为了追高目标而爬上来的敌机会**一路爬上去**。
-> 按超出量线性加强之后，超得越多压得越狠，配合 `smoke.js` 里那条
+> 按超出量线性加强之后，超得越多压得越狠，配合 `tools/test/smoke.js` 里那条
 > 以 `ctrlFactor` 为判据的断言，敌机才会真的留在自己那一层。
 
 **为什么要有它**：极高空 `q = ½ρv²` 掉到几千时操控权限只剩百分之十几。
@@ -275,7 +282,7 @@ a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
 就返回了，根本不进开火段，不受这条影响。
 
 开火时调 `Ent.fireGun(a, world)`，并按距离播敌方机炮声
-（`SFX.gunShotAt`，内部采样节流）。别人开火的声音是刻意加的：
+（`SFX.gunShotAt`，`engine/audio.js`，内部采样节流）。别人开火的声音是刻意加的：
 以前只有玩家自己的机炮有音效，AI 打出去的子弹**无声**，
 而它们通常在视线的侧后方，于是玩家会以为"敌人从来不开炮"。
 
@@ -349,7 +356,7 @@ a.route = {
 };
 ```
 
-**分段型**（`route.legs`，`js/engine/route.js` 的 `Route.plan(legs, {jam})`，在 `combat.js` 之后加载）：
+**分段型**（`route.legs`，`js/engine/route.js` 的 `Route.plan(legs, {jam})`，在 `engine/combat.js` 之后加载）：
 `updateRoute` 先调 `Route.step`，它只决定"往哪飞、多高、要不要开火"，结果写回 `route.wp / route.alt`；转向与高度保持仍走下面那套。
 无 `legs` 的旧单段写法不变。
 
@@ -399,7 +406,7 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
 > 2. **`fireGun` 没有方向参数**：弹丸方向写死 `a.fwd`、炮口在
 >    `a.pos + fwd*6`（机头）。就算放开角度，它也是朝前打。
 > **已解决（v2.2 阶段 3）**：尾炮整段删掉，改成 ROK-40 的 `mounts` 里一门没有实体的 `tail20` 炮塔
-> （`js/engine/turret.js`，管后半球），由 `Game` 每帧 `Turret.stepAll` 驱动，不影响航向。`route.tailGun` 已删除。见 [turret.md](turret.md)。
+> （`js/engine/turret.js`，管后半球），由 `Game`（`engine/game/update.js`）每帧 `Turret.stepAll` 驱动，不影响航向。`route.tailGun` 已删除。见 [turret.md](turret.md)。
 
 > 为什么不做成通用 AI：它们在战场上不是战斗单位，而是**事件**。
 > 玩家要处理的不是"一个会缠斗的对手"，而是"一个正在飞向某处的进程"。
@@ -408,7 +415,7 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
 
 ## 水面 / 地面目标的对空射击（`Game`）
 
-带 `t.weapon` 的设施与舰船不走 `AI`，由 `Game` 的 `updateTargets(dt)` 每帧处理：
+带 `t.weapon` 的设施与舰船不走 `AI`，由 `Game` 的 `updateTargets(dt)`（`engine/game/combat.js`）每帧处理：
 `fireCd` 走完后调 `pickTargetFor(t, w)` 选目标，再 `Ent.makeMissile`（朝目标方向偏上 260 m 出筒，
 初速 140，弹的 `team` = 发射者阵营），`fireCd = w.cd + rnd(0, 2)`。
 
@@ -423,8 +430,8 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
   告警音 / RWR 由主循环按 `m.target` 判，打僚机的弹不会让玩家听到告警。
 - 舰艇打下的敌机记在 `world.shipKilled`，僚机 / 无人机打下的记在 `world.wingKilled`；
   两者在战报里合并成「友军击落」一行，**不进** `world.killed`（综合评定只算玩家自己的），也不弹 `KILL` 提示。
-  击杀者来自 `Ent.kill` 写的 `killedBy`（被打残后坠海的取 `lastHitBy`），归属判定在 `Game` 的 `killCredit()`。
-- 断言入口：`Game.__updateTargets`（`smoke.js` 用它单推一帧，确认我方舰艇不朝玩家打）。
+  击杀者来自 `Ent.kill` 写的 `killedBy`（被打残后坠海的取 `lastHitBy`），归属判定在 `Game` 的 `killCredit()`（`engine/game/finish.js`；玩家方 `tags.unmanned` 的无人僚机击杀记入玩家战果）。
+- 断言入口：`Game.__updateTargets`（`tools/test/smoke.js` 用它单推一帧，确认我方舰艇不朝玩家打）。
 
 ---
 
@@ -465,7 +472,7 @@ desired = norm(V(tan.x, climb, tan.z));      // 取切向 → 持续转圈
 > **数据链中断时的自主防御降级**（此时即便指令是 `spread` 也不开火）。
 >
 > 数据链中断来自 `suppressed` —— 被敌方干扰机的辐射场罩住时置位，
-> 见 [game.md](game.md) 的 `updateJamming()`。这是设定 7.5
+> 见 [game.md](game.md) 的 `updateJamming()`（`engine/game/lock.js`）。这是设定 7.5
 > "强对抗环境下数据链会被切断，无人机自动降级为完全自主防御模式"
 > 那句在玩法上的落点。
 
@@ -493,7 +500,7 @@ M3 播撒机 0.25、护航 0.58–0.72、
 
 好处是**手感一致**：敌人做机动的方式和玩家一样。代价是**改它要同时验证两边**：
 
-- 滚转锁存依赖调用方传入的 `state`，AI 传机自己，玩家在 `Game` 里传 `player`
+- 滚转锁存依赖调用方传入的 `state`，AI 传机自己，玩家在 `Game`（`engine/game/control.js`）里传 `player`
 - 瞄准角速度前馈只在传 `dt` 时启用 —— 只有玩家传，AI 不传
 - 代价参数（`STEER_*`）与执行增益（`K_*`）同时影响玩家手感和 AI 转向
 
@@ -503,26 +510,26 @@ M3 播撒机 0.25、护航 0.58–0.72、
 
 | 想改什么 | 在哪 |
 |---|---|
-| 转向力度 | `steerTo()` 里 `rollErr * 2.8`、`off * 2.3`、`yawErr * 1.6` |
-| 滚转锁存阈值 | `steerTo()` 里 `2.55` |
-| 鼠标满杆点 / 混合轴 / 推杆轴 | `AIM_FULL_MAG` / `AIM_BLEND_MAG` / `AIM_PUSH_AXIS` |
-| 推杆锥边界与直立门槛 | `steerTo()` 里 `up < -0.5`、`upright > 0.7` |
-| 规避触发距离（4.2 km） | `findIncoming()` 里的 `4200` |
-| 脱离血量阈值 | `update()` 里 `a.hp < a.maxHp * 0.25` |
-| 威胁警戒半径 | `nearestEnemy()` 调用处的 `15000` / `11000` / `9000` |
-| 面目标搜索半径 | `surfaceTargetFor()` 里取"自己最远那件对面弹的 `aiReach × 1.15`"（旧：`lockDist`） |
+| 转向力度（执行增益） | `ai/steer.js` 的 `K_ROLL` / `K_PITCH` / `K_YAW`（旧的 `rollErr * 2.8` 等写法已被代价函数取代） |
+| 滚转锁存阈值 | `steerTo()` 里 `rollLock` 判据（`|span| > 2.6`） |
+| 代价函数参数（姿态代价 / 推杆权限 / 偏航权重 / 平滑） | `ai/steer.js` 的 `STEER_LAMBDA0` / `STEER_THETA0` / `STEER_PUSH_K` / `STEER_YAW_W` / `STEER_ALPHA_RATE` / `STEER_NEG_G` |
+| 瞄准前馈（前瞻 / 低通 / 上限） | `ai/steer.js` 的 `STEER_LEAD_PLAN` / `STEER_LEAD_EXEC` / `STEER_RATE_TAU` / `STEER_RATE_MAX` |
+| 规避触发距离（4.2 km） | `ai/util.js` `findIncoming()` 里的 `4200` |
+| 脱离血量阈值 | `ai/brain.js` `update()` 里 `a.hp < a.maxHp * 0.25` |
+| 威胁警戒半径 | `ai/brain.js` 里 `nearestEnemy()` 调用处的 `15000` / `11000` / `9000` |
+| 面目标搜索半径 | `ai/util.js` `surfaceTargetFor()` 里取"自己最远那件对面弹的 `aiReach × 1.15`"（旧：`lockDist`） |
 | 分段航线 | `js/engine/route.js`（`ARRIVE`、段缺省值） |
-| 挑弹规则（类别 + 射程） | `Ent` `chooseWeapon()` |
-| 对地目标的接近角 | `approachSurface()` 里的 `-0.06`（远）/ `-0.02`（近） |
-| 升限钳制 | `clampCeiling()` 里的 `1200` / `-0.22` / `0.08` |
+| 挑弹规则（类别 + 射程） | `Ent` `chooseWeapon()`（`entities/mounts.js`） |
+| 对地目标的接近角 | `ai/util.js` `approachSurface()` 里的 `-0.06`（远）/ `-0.02`（近） |
+| 升限钳制 | `ai/brain.js` `clampCeiling()` 里的 `1200` / `-0.22` / `0.08` |
 | 编队槽位 | `js/missions/` `spawnWingman()` 的调用参数 |
 | 各机技能 | `js/missions/` 各关 `spawn()` 里的 `skill` |
-| 导弹最小发射距离 | `update()` 里 `spW.nezer ? 1400 : (对面目标 ? 1200 : 700)` |
+| 导弹最小发射距离 | `ai/brain.js` `update()` 里 `spW.nezer ? 1400 : (对面目标 ? 1200 : 700)` |
 
 ## 发射包线闸门（动态射程）
 
-- 静态 `aiReach` 只是上界。通过上界后，再用真实弹道的 `rmax` / `nez`（`Ent.envelopeCached`，0.1 s 刷新）卡一次。
-- 制导弹才卡；炸弹和火箭靠它们自己的落点标记。
+- 静态 `aiReach`（`entities/range.js`）只是上界。通过上界后，再用真实弹道的 `rmax` / `nez`（`Ent.envelopeCached`，0.1 s 刷新；AI 侧封装是 `ai/tactics.js` 的 `aiEnvelope`）卡一次。
+- 制导弹才卡；炸弹和火箭（`tags.unguided`）靠它们自己的落点标记。
 - 高 skill（≥ 0.6）要求进 `nez`（目标掉头逃逸也能打中），低 skill 进 `rmax`。
 - **保守余量按目标类别分开**：空中目标 `AI_RANGE_MARGIN_AIR = 0.9`，地面 / 海面 `AI_RANGE_MARGIN_SURF = 0.8`（移动慢的地面目标打偏更丢人，对地多留余量）。
 
@@ -530,7 +537,7 @@ M3 播撒机 0.25、护航 0.58–0.72、
 
 - 仅 `s.cmd === 'cover'` 时生效。有导弹锁定长机（`world.player`）、且距长机 `< 3600 m` 时，僚机对**每枚弹**掷一次骰（概率 0.6，记在 `m.coverRolled[僚机名]` 上）。
 - 中了就固定连放 3 轮（`s.flareBurst = 3`，`s.flareFor = 长机`），不管骗没骗中；之后由 `breakLockFor(僚机, 长机)` 逐组投放。
-- 投放时推入 `world.events` 的 `{type:'wingflare'}`，`Game` 据此发电台（8 s 限频）。
+- 投放时推入 `world.events` 的 `{type:'wingflare'}`，`Game`（`engine/game/finish.js` 的 `combatEvents`）据此发电台（8 s 限频）。
 - 自保的 evade 连放优先；两者共用同一个库存，所以一次 60 s 的统计里消耗可能不是 3 的倍数。
 - `s.envClock` 在 `update` 开头按 `dt` 累计，是包线缓存的时钟。
-- 僚机速度包线：`vMil` / `vStall` 乘 `loadoutPenalty(Ent.curLoadFactor(a))`（挂载越重、AI 估的可用速度越保守）。
+- 僚机速度包线：`vMil` / `vStall` 乘 `loadoutPenalty(Ent.curLoadFactor(a))`（`loadoutPenalty` 在 `js/data/rules.js`）（挂载越重、AI 估的可用速度越保守）。

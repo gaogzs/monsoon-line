@@ -1,6 +1,8 @@
 # 音效合成
 
-代码：`js/engine/audio.js`· 调用点 `Game`、`Ent`、`AI`
+代码：`js/engine/audio.js` · 调用点 `Game`（`js/engine/game/*.js`、`js/ui/input.js`、`js/ui/screens/*.js`、`js/boot/main.js`）、`Ent`（`js/engine/entities/`）、`AI`（`js/engine/ai/`）、`Combat`（`js/engine/combat.js`）
+
+> 本文里“`Game` 每帧 / `Game` 侧”指的是 `js/engine/game/update.js` 的 `update(dt)`（引擎音、附近飞机、告警、枪声兜底都在这里），设置滑块的应用在 `js/ui/screens/settings.js` 的 `applyAudioSettings()`，解锁与放弃任务时的收尾在 `js/boot/main.js`。
 
 ---
 
@@ -10,8 +12,8 @@
 
 理由：
 
-1. **零资源分发**。游戏只有一个 HTML + 一个 CSS + 15 个 JS，
-   可以直接邮件发送
+1. **零资源分发**。游戏是纯静态网页（页面 HTML + 一份 CSS + 一批 JS，没有构建后的打包产物依赖运行时下载），
+   可以直接打包发送
 2. **不会有加载失败**。没有 404、没有解码错误、没有格式兼容问题
 3. **可以连续调制**。引擎音要随油门连续变频，
    用采样循环做这件事会很难听
@@ -23,7 +25,7 @@
 ## 节点生命周期
 
 `unlock()` **必须在用户手势之后调用**——浏览器不允许页面自行创建
-`AudioContext`。Game 在 `mousedown` 上挂了一次 `SFX.unlock()`。
+`AudioContext`。`Game.init()`（`js/boot/main.js`）在 `document` 的 `mousedown` 上挂了一次 `SFX.unlock()`（各 `data-go` 按钮的点击里也会调）。
 
 `unlock()` 里一次性做完全部节点创建：取
 `window.AudioContext || window.webkitAudioContext`（都没有就返回），
@@ -90,7 +92,7 @@ if (warnOn) { warnOn = false; API.warning(true); }
 告警那一行先手动把 `warnOn` 复位再调一次，就是为了绕开
 `warning()` 开头的等值短路（见"陷阱"一节）。
 
-游戏侧的默认值与这里一一对应（`Game` 的 `S`）：
+游戏侧的默认值与这里一一对应（`js/ui/screens/settings.js` 的 `DEFAULTS` / `S`，经 `applyAudioSettings()` 传给 `setVolumes`）：
 `volMaster: 45`、`volEngine: 45`、`volSfx: 85`、`muted: false`，
 滑块范围 0–100%，`S.volMaster/100` 后才传给 `setVolumes`。
 UI 标签是"主音量 / 引擎音 / 音效 / 全部静音"。
@@ -157,14 +159,14 @@ noise(循环) → lowpass(600Hz,Q0.7) → nearG → master
 
 不可能给每架 NPC 各建一条音链：11 架 × 4 个振荡器 = 44 个节点，
 而大部分时间它们都听不见。所以只做**一条共享音链**，
-由 Game 每帧传入"最近的一架"的距离与油门来驱动。
+由 `Game` 的 `update()` 每帧传入"最近的一架"的距离与油门来驱动。
 丢失的是方向感（听不出声音来自左边还是右边），
 保住的是最重要的那条信息：**附近有人，而且他推了油门**。
 
 `API.nearby(dist, throttle, ab)`：`att = clamp(1 - dist/1500, 0, 1)`；
 `nearF.frequency = 480 + throttle*1300 + (ab ? 520 : 0)`（0.2）；
 `nearG.gain = att*att * (0.018 + throttle*0.05) * volEngine`（0.15）。
-Game 侧遍历所有存活飞机（排除玩家）取最近的一架 `nBest`／距离 `nBd`，
+`engine/game/update.js` 遍历所有存活飞机（排除玩家）取最近的一架 `nBest`／距离 `nBd`，
 `nBd < 1500` 时 `SFX.nearby(nBd, nBest.throttle || 0.8, !!nBest.ab)`，
 否则 `SFX.nearby(99999, 0, false)` 把这条链压回零。
 
@@ -200,7 +202,7 @@ square(1150Hz) → warnG → master
 `warnG.gain = on ? 0.075 * volSfx : 0`，
 `warnLfoG.gain = on ? 0.055 * volSfx : 0`。
 
-Game 侧每帧扫描所有存活导弹，只要存在
+`update.js` 每帧扫描所有存活导弹，只要存在
 `m.team !== player.team && m.target === player && dist < 3600` 就置真——
 即"有导弹以本机为目标且在 **3.6 km** 内"。
 

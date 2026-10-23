@@ -6071,10 +6071,6 @@ try {
 /* ============================================================
    结果
    ============================================================ */
-if (LIST) {
-  console.log('\n可用分段（--only / --skip 用这些名字）：\n  ' + ALL_SECTIONS.join('\n  ') + '\n');
-  process.exit(0);
-}
 section('TOR-3 与 target:any', () => {
   const bad = [];
   const D = sandbox.WEAPONS.drm, Ent4 = sandbox.Ent, M4 = sandbox.M3;
@@ -6200,6 +6196,11 @@ section('包线缓存与滑翔校验', () => {
   else ok('包线：envelopeCached 0.2 s 内复用、之后刷新；asl 滑翔 rmax 的 0.9 倍处命中（校验生效）');
 });
 
+/* --list：必须等全部 section() 都登记完再打印，否则最后几段不显示 */
+if (LIST) {
+  console.log('\n可用分段（--only / --skip 用这些名字）：\n  ' + ALL_SECTIONS.join('\n  ') + '\n');
+  process.exit(0);
+}
 console.log('');
 if (problems.length) {
   console.log('\x1b[31m✗ 冒烟测试失败：' + problems.length + ' 项\x1b[0m\n');

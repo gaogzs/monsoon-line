@@ -178,7 +178,7 @@ var CHANGELOG = ${body};
 }
 
 /* ============================================================
-   js/core/version.js —— 主菜单左上角的版本戳
+   js/core/version.js —— 标题页右上角的版本戳
    原来的 tools/build/stamp-version.js 也调这里，两处只保留一份实现。
    ============================================================ */
 function writeStamp(version) {
@@ -198,7 +198,7 @@ function writeStamp(version) {
 
   const out = `/* 自动生成 —— 不要手改。
    由 tools/build/release.js 从 git 记录写出，每次提交前重新生成。
-   主菜单左上角显示它的时间与版本号，用来确认当前部署的是哪一版。 */
+   标题页右上角显示它的时间与版本号，用来确认当前部署的是哪一版。 */
 var BUILD_STAMP = {
   version: ${JSON.stringify(version || '')},
   time: '${local}',

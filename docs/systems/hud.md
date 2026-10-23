@@ -1,6 +1,22 @@
 # HUD、输入与设置
 
-绘制 `HUD` · 输入与设置 `Game`
+绘制 `HUD`（`js/ui/hud/`）· 输入与设置 `Game`（`js/ui/input.js`、`js/ui/screens/settings.js`）
+
+> **HUD 现在是 `js/ui/hud/` 下的一族文件**（v3.0.0 之前是单个 `js/hud.js` 巨型闭包）。命名空间 `HUD` 有私有状态对象 `HUD.$`，每个文件写成 `(function (HUD) { var $ = HUD.$; … })(HUD)`；`$` 只许本命名空间的文件读写，公开接口集中在 `zz-api.js`。文中函数名没变，只是分处不同文件：
+>
+> | 文件 | 内容 |
+> |---|---|
+> | `_state.js` | `var HUD = { $: {} }` |
+> | `base.js` | 调色板（`GREEN / AMBER / CY / RED / DIM / BLUE`）、`HUDK` 缩放、`U()` / `gap()` / `applyScale()`、`hmiLayout()`、`draw()`（唯一入口与每帧顺序） |
+> | `instruments.js` | `drawCompass`、`drawBoresight`、`drawTapes` / `tape`、`thrPercent` / `thrTape`、`drawEnginePanel`、`ctrlGauges`；`THR_IDLE / THR_MAX` 的 HUD 副本 |
+> | `radar.js` | `drawRadar`、`farCell`、`radarXY`、`drawBlips`、`drawPitchLadder`、`threatState` / `drawThreatRing`（RWR） |
+> | `targeting.js` | `drawTargets`、`drawLockBox`、`drawConeCue`、`drawLeadReticle`、`drawAllyMark` / `drawPlainMark`、`drawLaserStatus` |
+> | `aids.js` | `drawCcip`、`drawFootprint`、`computeEnvelope` / `computeNEZ`、`offscreenRect` / `edgePoint` / `drawOffscreen` |
+> | `panels.js` | `drawWeaponPanel`、`drawAlerts`（`ALERT_ORDER`）、`drawStores`、`drawFriendlyShots`、`drawIncomingMissiles`、`drawTargetBearing`、`drawObjective` |
+> | `text.js` | `text()`、`isLightCol`、`banner()`、`hitMark()` |
+> | `zz-api.js` | 公开接口：`HUD.draw / banner / hitMark / computeNEZ / computeEnvelope / radarXY / offscreenRect / drawAlerts / ALERT_ORDER / thrPercent / THR_IDLE / THR_MAX / GREEN / AMBER / CY / RED` |
+>
+> 全屏滤镜 `HudFx` 是独立文件 `js/ui/hudfx.js`（见文末）。玩家可见文字走 `T('键')`，字符串在 `locales/<语言>/text/ui/hud/` 一类的 json 里，见 [text.md](text.md)。
 
 > HUD 是这个游戏里**唯一画在 Canvas 上**的 UI（菜单、机库、简报都是 DOM）。
 > 原因见 [DESIGN.md](../DESIGN.md#56-屏幕用-dom不用-canvas-画-ui)。
@@ -166,7 +182,7 @@ var s = M3.project(cam, p.pos + dir * 24000);
   | `THR_IDLE → 1` | `0 → 100%` | 军推区 |
   | `1 → THR_MAX (1.25)` | `100 → 125%` | 加力，淡琥珀底色 |
 
-  `THR_IDLE / THR_MAX` 定义在 `Game`，`HUD` 有同名副本，smoke 断言两边一致。
+  `THR_IDLE / THR_MAX` 定义在 `Game`（`js/engine/game/vars.js`），`HUD`（`js/ui/hud/instruments.js`）有同名副本，smoke 断言两边一致。
 - **为什么慢车是 0% 而不是 4%**：飞行模型里没有推力，油门只决定一个目标速度
   （`lerp(0.74·vStall, vMil, throttle)`，见 [flight-model.md](flight-model.md)）。
   以前读数直接是"油门杆 × 100"，松手后停在 4%，看起来像还剩 4% 推力 —— 其实那就是慢车。
@@ -186,7 +202,7 @@ var s = M3.project(cam, p.pos + dir * 24000);
 
 它还要负责 `HI-G` 提示（正在拉过载时闪红 / 琥珀），位置在 `top - U(30)`。
 
-加力与减速板都是**瞬时态**：`Game` 里不给输入时，
+加力与减速板都是**瞬时态**：`Game`（`controlPlayer`，`js/engine/game/control.js`）里不给输入时，
 `throttle > 1.0` 会每帧向军推回落（`dt * 1.6`）、
 `throttle < THR_IDLE` 会向慢车回升。所以**拿它们当"稳定读数"去测会测出假失败**
 （见 `tools/test/smoke.js` 里那条引擎出力断言，它只敢用稳态档位）。
@@ -245,10 +261,10 @@ ry = dz * fz + dx * fx;     // 前
 
 **舰船 / 地面设施**（`kind === 'target'`）两头都打折：雷达功率大、回波强、传感器多，比战斗机难压。
 - 玩家看它们、锁它们：压制 × `JAM_SURF_K`（0.5），烧穿距离换成 `JAM_BURN_SURF`（4500 m）。
-- 它们自己受的压制：`Game` 的 `updateJamming` 同样乘 0.5。被压时，舰空弹的锁定距离 × `jamLockK`，
+- 它们自己受的压制：`Game` 的 `updateJamming`（`engine/game/lock.js`）同样乘 0.5。被压时，舰空弹的锁定距离 × `jamLockK`，
   只能打 `clearR` 以内的飞机（`pickTargetFor` 读 `Ent.jamLockOK`）。
 烧穿距离内的目标始终 `clear`。非 `clear` 的目标**不能锁定、不进 F 键候选**，
-已有的锁定会被强制取消（`Game` 的 `updateLock` / `cycleTarget`）。
+已有的锁定会被强制取消（`Game` 的 `updateLock`（`lock.js`）/ `cycleTarget`（`ui/input.js`））。
 另外 `suppressed` 本身会让锁定距离和锁定速度最多减半（`Ent.jamLockK`）。
 玩家锁对面目标时 `updateLock` 还要求 `Ent.lockOff < 锥角`（水平方位）——以前只查俯角，身后的目标也锁得上。
 AI（友军、敌军一样）用同一套门槛：被压制时只能对 `clearR` 以内的目标开火（`Ent.jamLockOK`），
@@ -476,7 +492,7 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 屏幕正中上方的告警**只有这一个栈**：先收集、按 `ALERT_ORDER` 排序、从上往下逐行画。
 起点 `max(H * 0.22, U(176))`（让开任务目标块），每行占固定高度，
 **闪烁的告警暗下去时照样占位**，下面的行不会一上一下地跳。
-以前导弹 / 雷达照射、失速等、"被对空雷达截获"（写在 `Game`）各算各的 y，同时出现就叠在一起。
+以前导弹 / 雷达照射、失速等、"被对空雷达截获"（那时写在 `Game` 里）各算各的 y，同时出现就叠在一起。
 
 优先级（上 → 下）：
 
@@ -513,7 +529,7 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 - `banner(ctx, W, H, title, sub, alpha, col)`：`H * 0.36` 处一条横带
 - `hitMark(ctx, W, H, txt, alpha, col)`：`(W/2 + 120, H/2 - 60)` 处的小提示
 
-两者都由 `Game` 驱动，HUD 只负责画。
+两者都由 `Game` 驱动（`ui/frame.js` 的 `render()` 在 `HUD.draw` 之后画），HUD 只负责画。
 
 ---
 
@@ -527,6 +543,7 @@ HUD.computeNEZ(p, t)           // 返回不可逃逸区距离（米），非空�
 HUD.radarXY(p, wp, cx, cy, R, range)   // 世界点 → 雷达局部坐标
 HUD.offscreenRect(W, H, p)     // 屏外标记的安全矩形 {x0,y0,x1,y1}
 HUD.GREEN / AMBER / CY / RED   // 调色板，供 Game 复用
+// 以上都在 js/ui/hud/zz-api.js 里挂出；另有 computeEnvelope / drawAlerts / ALERT_ORDER / thrPercent / THR_IDLE / THR_MAX
 ```
 
 `draw()` 的每帧顺序（顺序有语义，不要随意重排）：
@@ -577,6 +594,8 @@ ctx.strokeText(t, x, y);
 
 ## 输入映射
 
+事件绑定在 `js/ui/input.js` 的 `bindInput()`；下表“代码位置”里的函数分别在 `engine/game/control.js`（`controlPlayer` / `toggleAimMode`）、`ui/input.js`（`cycleTarget` / `cycleSpecial` / `fireSpecial` / `setWingCmd` / `toggleEmcon`）、`ui/camera.js`（`updateCamera`）、`ui/screens/nav.js`（`requestAimLock`）、`ui/screens/pause.js`（`togglePause`）。
+
 | 输入 | 作用 | 代码位置 |
 |---|---|---|
 | 鼠标移动 | 转动世界瞄准方向（默认，指针锁定） | `mousemove` → `aimYaw / aimPitch` |
@@ -608,7 +627,7 @@ ctx.strokeText(t, x, y);
 
 ### 数据驱动
 
-`SET_GROUPS` 描述所有设置项，`buildSettingsInto(container)` 把
+`SET_GROUPS` 描述所有设置项（都在 `js/ui/screens/settings.js`，标题 / 提示文字走 `T()`），`buildSettingsInto(container)` 把
 任意容器填满控件。**独立设置页和暂停菜单里的设置页共用全部代码。**
 
 加一个设置项 = 往 `SET_GROUPS` 加一行 + 在 `DEFAULTS` 加默认值。
@@ -653,9 +672,9 @@ ctx.strokeText(t, x, y);
 - **设置**：与独立设置页完全相同的控件
 - **操作说明**：`buildHelpHTML(true)` 生成的单栏版本
 
-页签切换由 `switchPauseTab(name)` 处理。
+页签切换由 `switchPauseTab(name)`（`js/ui/screens/pause.js`）处理。
 
-**操作说明是单一数据源**：`KEYMAP` 和 `TIPS` 两个数组同时喂给
+**操作说明是单一数据源**：`KEYMAP` 和 `TIPS` 两个数组（`js/ui/screens/settings.js`）同时喂给
 独立手册页和暂停菜单。早期这里是两份独立的 HTML，改一个忘一个。
 
 实战指南（`GUIDE`）同样两处共用。它里面的图标（`HELP_ICONS`）是手画的 SVG，
@@ -667,7 +686,7 @@ ctx.strokeText(t, x, y);
 
 | 想改什么 | 在哪 |
 |---|---|
-| HUD 整体缩放范围 | `applyScale()` 里的 `clamp(k, 0.6, 1.8)` |
+| HUD 整体缩放范围 | `base.js` `applyScale()` 里的 `clamp(k, 0.6, 1.8)` |
 | 三档字号 | `applyScale()` 里的 12 / 15 / 11 |
 | 速度带位置 | `drawTapes()` 里的 `gap(132, W, 0.15)` |
 | 引擎出力带位置 | `drawTapes()` 里的 `x + U(104)` |
@@ -682,7 +701,9 @@ ctx.strokeText(t, x, y);
 | 调节单元上 HUD 的距离（10 km） | `CELL_HUD_RANGE2` / `farCell()` |
 | 俯仰刻度范围 | `drawPitchLadder()` 里的 `LIM = 40` |
 | 告警阈值与优先级 | `drawAlerts()` / `ALERT_ORDER` |
-| 颜色 | `HUD` 顶部 `GREEN / AMBER / CY / RED / DIM` |
+| 颜色 | `js/ui/hud/base.js` 顶部 `GREEN / AMBER / CY / RED / DIM` |
+
+各行所在文件见开头的文件表（`drawTapes` / `thrTape` 在 `instruments.js`，`drawRadar` / `drawPitchLadder` / `farCell`（`CELL_HUD_RANGE2`）在 `radar.js`，`offscreenRect` / `edgePoint` 在 `aids.js`，`drawAlerts` 在 `panels.js`，`hmiLayout` 在 `base.js`）。
 
 ## 全屏滤镜（`js/ui/hudfx.js`，v1.13.2）
 

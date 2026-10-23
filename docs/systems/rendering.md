@@ -6,7 +6,7 @@
 > 与模型共用一个深度缓冲。曳光、HUD 仍是 Canvas 2D。下文"天空与太阳""云""地面""粒子"几节描述的是 **2D 回退**的画法。
 > 下文的画家算法 / 补接缝 / 近平面裁剪描述的是 **2D 兜底路径**，仍然存在、仍然正确。
 
-渲染器是一个 IIFE，只导出一个 `Renderer` 单例。它不认识实体、任务、HUD，
+`js/render/render.js` 是一个 IIFE，只导出一个 `Renderer` 单例。它不认识实体、任务、HUD，
 只接受"一个模型 + 一个位姿"，把它变成屏幕上的多边形。所有世界坐标单位是米。
 
 ---
@@ -28,15 +28,15 @@
 
 | 来源 | 值 | 效果 |
 |---|---|---|
-| 设置 显示→渲染 | `renderMode` 0 = 自动（WebGL） / 1 = 兼容（2D） | `Game` 的 `applyRenderMode()` → `setMode('auto' \| '2d')` |
+| 设置 显示→渲染 | `renderMode` 0 = 自动（WebGL） / 1 = 兼容（2D） | `js/ui/screens/settings.js` 的 `applyRenderMode()` → `setMode('auto' \| '2d')` |
 | URL `?render=2d` | — | 强制 2D，**覆盖设置**（排查用） |
 | 拿不到 WebGL2 | — | `begin()` 里 `RenderGL.begin()` 失败 → 本帧走画家算法（工具脚本、老显卡） |
 
 `usingGL()` 返回本帧实际走的路径。`pushModel()` 在 GL 路径下直接转给 `RenderGL.push()`。
 
-**`shading.js` 是着色唯一来源**：光照方向 `LIGHT`、雾（900–9000 m，封顶 0.82，雾色 `[150,176,196]`）、
+**`js/core/shading.js` 是着色唯一来源**：光照方向 `LIGHT`、雾（900–9000 m，封顶 0.82，雾色 `[150,176,196]`）、
 `AMBIENT 0.44 / DIFFUSE 0.56 / DEGENERATE 0.62`、自发光封顶 1.5、16 档量化。
-`render.js` 与 `render-gl.js` 都读它 —— 改一处两边一起变。两条路径的画面差异由 `tools/render/probe-render.js` 盯着。
+`js/render/render.js` 与 `js/render/render-gl.js` 都读它 —— 改一处两边一起变。两条路径的画面差异由 `tools/render/probe-render.js` 盯着。
 
 ---
 
@@ -44,6 +44,8 @@
 
 只有主画面那个实例（`RenderGL` 默认实例 = `create({ env: true })`）画环境；3D 预览不画。
 `js/render/env/` 编译失败时 `RenderGL.envReady()` 为 false，环境整层退回 2D，模型照旧走 GL。
+
+`js/render/env/` 是 `RenderEnv` 命名空间，拆成 `shaders.js`（着色器源码与 `$.BLOBS` / `$.PERIOD` 等常量）、`build.js`（云团网格 / 软粒子贴图的构建）、`create.js`（`create(gl, compile)`：建程序、画各个 pass）、`zz-api.js`（对外导出）、`_state.js`（建空壳 `RenderEnv.$`）。`$` 只许本命名空间的文件读写，其它命名空间走公开函数（smoke 有静态检查）。
 
 | 项 | 做法 |
 |---|---|
@@ -53,7 +55,7 @@
 | 海面 | 底色按低于地平线的角度取 `SEA.stops`；40–320 m 四层程序波浪法线（按像素在海面上的覆盖宽度淡出，防闪）；1.3 / 5 km 两层大块明暗（高空时的速度感）；菲涅耳反射天空 + 太阳闪烁带；低空才看得见的白浪；`hazeDist` 指数雾融到地平线 |
 | 深度 | 所有环境着色器都写与模型相同的对数深度（`gl_FragDepth`），天空写 1 |
 | 云团（封存） | `js/render/env/` 的 `BLOBS = false`：柔边贴片和低多边形实体云的代码都保留，但不画。现在天上只有平面云（远景云层 + 高空云片），远景云层也不再按距离淡入 |
-| 云 | 仍用 `render.js` 的 `CLOUD_LAYERS` / `cloudSeeds` 与 6400 m 平铺（5×5 格），10 km 以上不画云团。**实体云**：每朵 1–3 个随机低多边形团块（细分二十面体压扁、顶点随机扰动、底部压平），三遍画：① 背面 +视深 / 正面 −视深加进 R32F 得到穿过的厚度（先与场景深度取 min）② 最近正面的平涂颜色 ③ 合成 α = 1 − e^(−厚度×密度)。边缘不做淡出。拿不到 `EXT_color_buffer_float` + `EXT_float_blend` 时退回柔边贴片 |
+| 云 | 仍用 `js/render/render.js` 的 `CLOUD_LAYERS` / `cloudSeeds` 与 6400 m 平铺（5×5 格），10 km 以上不画云团。**实体云**：每朵 1–3 个随机低多边形团块（细分二十面体压扁、顶点随机扰动、底部压平），三遍画：① 背面 +视深 / 正面 −视深加进 R32F 得到穿过的厚度（先与场景深度取 min）② 最近正面的平涂颜色 ③ 合成 α = 1 − e^(−厚度×密度)。边缘不做淡出。拿不到 `EXT_color_buffer_float` + `EXT_float_blend` 时退回柔边贴片 |
 | 软粒子 | 不透明模型 + 海面画完后，把深度 blit 到一张深度纹理；云贴片读它，靠近机身 / 海面时淡出，不出现硬切边 |
 | 远景云层 | `DECKS`：2.1 km、5.2 km 两层低质量噪声云片，与高空云片同一个着色器。按水平距离 10→16 km 淡入，接上云团的淡出 —— 高空往下看四面都有低层云，不会只有脚下一块 |
 | 高空云片 | 12.6 km、17.4 km 两层（`SHEETS`），逐像素求视线与水平面交点，fbm 噪声，x 向拉长成卷云丝；穿过时不糊脸 |
@@ -72,7 +74,7 @@ GL 内顺序：天空 + 海面 → 不透明模型 →（深度解析）→ 高�
 | `Renderer.setQuality(0\|1)` | 设置 显示→画面（`gfxQuality`）。0 = 标准：关软粒子 |
 | `Renderer.setGfx({ env, clouds, sheets, particles, soft })` | 单项开关，和旧画面并排对比用（控制台里调）。`env:false` = 天空 / 云 / 海面整层退回 2D |
 
-参数在 `shading.js` 的 `EARTH_R / SKY / SEA / CLOUD / SHEETS`。`tools/render/probe-render.js` 的 `env-*` 场景截新旧对比图（只报告）。
+参数在 `js/core/shading.js` 的 `EARTH_R / SKY / SEA / CLOUD / SHEETS`。`tools/render/probe-render.js` 的 `env-*` 场景截新旧对比图（只报告）。
 
 ---
 
@@ -102,7 +104,7 @@ GL 内顺序：天空 + 海面 → 不透明模型 →（深度解析）→ 高�
 ```
 
 - `pos` 是 `clone` 出来的独立副本；`fwd / up / right` 由 `M3.orthonormalize(fwd, up)` 现场构造，
-  三者互相正交且 **`right = up × fwd`**（`math3d.js` 头部注释写成 `right × up = fwd`，同一个右手关系）。
+  三者互相正交且 **`right = up × fwd`**（`js/core/math3d.js` 头部注释写成 `right × up = fwd`，同一个右手关系）。
   `up` 会先对 `fwd` 做 Gram–Schmidt 正交化；共线时（`len2(u) < 1e-8`）退化到参考向量兜底。
 - `focal = (h * 0.5) / tan(fovYDeg * π/180 / 2)`，`cx = w/2`，`cy = h/2`。
 - `near = 0.6`（米），`far = 40000`。**`far` 目前只是数据，管线里没有任何地方读它**——
@@ -168,7 +170,7 @@ arr.sort(function (a, b) { return b.d - a.d; });
 
 ## 光照与大气透视
 
-`LIGHT` 是渲染器顶部的一个固定世界方向：
+`LIGHT` 定义在 `js/core/shading.js`（`render.js` 顶部 `var LIGHT = Shading.LIGHT` 取用），是一个固定世界方向：
 
 ```js
 LIGHT = M3.norm(M3.V(-0.42, 0.80, 0.43))
@@ -193,7 +195,7 @@ color = mix(baseColor, (150,176,196), fog)
 ```
 
 三个常量分别是 `FOG_NEAR = 900`、`FOG_FAR = 9000`、`FOG_MAX = 0.82`，
-雾色分量是 `FOG_R / FOG_G / FOG_B = 150 / 176 / 196`。
+雾色 `FOG_RGB = [150, 176, 196]`（都在 `Shading` 里，`render.js` 顶部取成局部变量）。
 
 颜色不是每帧拼字符串，而是**量化缓存**（见 `shade()`）：
 亮度 `b` 与雾浓度 `fog` 各量化成 16 档（`bi = (b*16)|0`，夹在 0…15），
@@ -221,13 +223,13 @@ color = mix(baseColor, (150,176,196), fog)
 | `usingGL` | `usingGL()` | 本帧是否走 WebGL（`begin()` 时决定） |
 | `drawParticles` | `drawParticles(list)` | 2D：用 `globalCompositeOperation = 'lighter'` 画数组里的活粒子。GL 环境层：`flush()` 之前调用时交给 `RenderGL.pushParticles`，随模型一起画 |
 | `setQuality` / `setGfx` | 见"WebGL 环境层" | 环境层画质与单项开关 |
-| `addShake` | `addShake(v)` | `shake = min(shake + v, 26)`，给后续 `begin()` 消费。**目前 `js/` 里没有任何调用点**，是为受击/爆炸预留的接口 |
+| `addShake` | `addShake(v)` | `shake = min(shake + v, 26)`，给后续 `begin()` 消费。调用点在 `js/engine/combat.js`（玩家受击、附近爆炸） |
 | `line` / `rect` / `circle` / `ring` / `text` | 见左列签名 | 屏幕空间绘制辅助，HUD 用：线段 `(x1,y1,x2,y2,col,w=1)`、`fillRect` 简写 `(x,y,w,h,col)`、实心圆 `(x,y,r,col)`、描边圆 `(x,y,r,col,w=1)`、文本 `(t,x,y,col,font='12px Consolas, monospace',align='left')`（画完复位 `textAlign`） |
 | `W` / `H` / `ctx` | 只读 getter | CSS 像素宽高；原始 2D 上下文（HUD 直接拿去用） |
 
 ### `pushModel` 的模型与 `opts`
 
-`model`（来自 `js/models/`）形如：
+`model`（来自 `js/models/**`，见 [models.md](models.md)）形如：
 
 ```js
 { v: [[x,y,z], ...],                   // 机体坐标顶点：机头 +z、右翼 +x、上 +y
@@ -256,6 +258,8 @@ color = mix(baseColor, (150,176,196), fog)
 
 ## 每帧顺序
 
+以下顺序由 `js/ui/frame.js` 的绘制函数驱动（`Renderer.begin()` … `HUD.draw(...)`）。
+
 ```
 Renderer.begin()
   ├─ 重置两个池游标（poolN = faceN = 0）
@@ -275,7 +279,7 @@ pushModel() × N        ← 只收集，不绘制（GL 路径转给 RenderGL.pus
 Renderer.drawParticles(world.particles)   ← 2D：直接画；GL 环境层：只收集
 Renderer.flush()       ← 2D：排序 + 绘制全部面；GL：渲染离屏画布并 drawImage
 
-drawTracers()          ← Game 自己的曳光弹，画在一切之上
+drawTracers()          ← `js/ui/frame.js` 自己的曳光弹，画在一切之上
 Renderer.end()                            ← ctx.restore()
 
 HUD.draw(world, player, 0, S)             ← 在 restore 之后，所以 HUD 不跟着抖
@@ -284,7 +288,7 @@ HUD.draw(world, player, 0, S)             ← 在 restore 之后，所以 HUD �
 注意三点：**① 抖动只作用于 3D 层**——偏移在 `save()` 之后 `translate`，`end()` 的 `restore()`
 把它抹掉，之后画的 HUD、横幅、命中提示都不抖（抖的画面 + 稳的 HUD 才有撞击感，一起抖只会晕）。
 **② 天空/云/地面在 `save()` 之前画**，所以它们也不抖，抖的是模型和粒子。
-**③ 菜单状态下** `state !== 'playing'`，`render()` 只调 `begin()` + `end()`，留下空镜头背景。
+**③ 菜单状态下** `state !== 'playing'`，`js/ui/frame.js` 的绘制函数只调 `begin()` + `end()`，留下空镜头背景。
 
 ---
 
@@ -334,17 +338,17 @@ g = createLinearGradient(0, min(0, hy - H), 0, max(H, hy))
 
 ## 云
 
-`CLOUD_LAYERS` 定义了**五层**云，共 `22+20+18+16+14 = 90` 个种子：
+`CLOUD_LAYERS`（`js/render/render.js`）定义了**五层**云，共 `13+12+11+9+8 = 53` 个种子：
 
 | 层 | 高度 `y0–y1` (m) | 尺寸 `s0–s1` (m) | 透明度 `a0–a1` | 个数 `n` | 说明 |
 |---|---|---|---|---|---|
-| 1 | 500 – 2600 | 500 – 1500 | 0.30 – 0.52 | 22 | 低层积云 |
-| 2 | 3200 – 6200 | 600 – 1900 | 0.24 – 0.44 | 20 | 中层 |
-| 3 | 6800 – 10200 | 700 – 2300 | 0.20 – 0.38 | 18 | 中高层 |
-| 4 | 10800 – 15200 | 800 – 2600 | 0.15 – 0.30 | 16 | 高层 |
-| 5 | 15800 – 21400 | 900 – 3000 | 0.11 – 0.24 | 14 | 平流层薄云 |
+| 1 | 1400 – 2800 | 500 – 1500 | 0.30 – 0.52 | 13 | 低层积云（云底 1400 m，低空飞行不贴着云） |
+| 2 | 3400 – 6200 | 600 – 1900 | 0.24 – 0.44 | 12 | 中层 |
+| 3 | 6800 – 10200 | 700 – 2300 | 0.20 – 0.38 | 11 | 中高层 |
+| 4 | 10800 – 15200 | 800 – 2600 | 0.15 – 0.30 | 9 | 高层 |
+| 5 | 15800 – 21400 | 900 – 3000 | 0.11 – 0.24 | 8 | 平流层薄云 |
 
-覆盖 500 m 到 21400 m。**为什么必须分这么多层**：早期版本只有一层（700–2600 m），
+覆盖 1400 m 到 21400 m。**为什么必须分这么多层**：早期版本只有一层（700–2600 m），
 而玩家在 M1 的 `altStart` 是 7600 m、M3 是 19500 m。云全部在脚下 5–18 km 处，
 俯角超过 40°，落在垂直视场（默认 `S.fov = 56°`）之外——**完全看不见**，于是玩家在单色海面上
 失去了所有姿态参照。云在这个游戏里不是装饰，是**滚转感知的唯一信息来源**。
@@ -392,7 +396,7 @@ y0 = clamp(hy, -2, H + 2)
 
 ## 粒子
 
-粒子对象由 `Ent` 的 `spawnParticle()` 创建，字段与渲染器约定一致：
+粒子对象由 `Ent.spawnParticle()`（`js/engine/entities/particles.js`）创建，字段与渲染器约定一致：
 
 ```js
 { pos, vel, life, life0, size, color, alive, grow, alpha, drag, grav }
@@ -410,10 +414,10 @@ alpha = clamp(lifeK, 0, 1) * p.alpha
 `grow` 的粒子随时间**变小**（`1.6 - lifeK`），是"膨胀后消散"的近似。
 半径 `< 1.4 px` 时用 `fillRect` 画方点（比 `arc` 便宜），否则画圆，屏幕外按 `±3r` 剔除。
 
-数量上限 **900**，由调用方 `Game` 的 `compact()` 维护：`out.length > 900` 时
+数量上限 **900**，由调用方 `js/engine/game/update.js` 的 `compact()` 维护：`out.length > 900` 时
 `splice(0, out.length - 900)` 裁掉**最旧**的（数组是追加顺序，队首最老）。渲染器自己不设上限。
 粒子的运动（`life` 递减、`vel` 积分、`drag` 指数衰减、`grav` 只作用于 y）在
-`Ent.stepParticles()` 里，不在渲染器。
+`Ent.stepParticles()`（同在 `particles.js`）里，不在渲染器。
 
 ---
 
@@ -442,11 +446,11 @@ alpha = clamp(lifeK, 0, 1) * p.alpha
 
 | 想改什么 | 在哪 |
 |---|---|
-| 视场角 | 设置页「视场角 FOV」，默认 `S.fov = 56`，范围 38–100° |
-| 镜头距离 / 高度 | 设置页，`S.camDist = 52` / `S.camHeight = 13` |
+| 视场角 | 设置页「视场角 FOV」（`js/ui/screens/settings.js`），默认 `S.fov = 56`，范围 38–100° |
+| 镜头距离 / 高度 | 设置页，`S.camDist = 10`（范围 2–10）/ `S.camHeight = 8`（范围 −15–10），镜头逻辑在 `js/ui/camera.js` |
 | 机位（追尾 / 座舱 / 目标） | 设置页，`S.camMode = 0` |
-| 光照方向（同时决定太阳位置） | `render.js` 顶部 `LIGHT` |
-| 雾的距离与颜色 | `FOG_NEAR` / `FOG_FAR` / `FOG_MAX` 与 `FOG_R` / `FOG_G` / `FOG_B` |
+| 光照方向（同时决定太阳位置） | `js/core/shading.js` 的 `LIGHT` |
+| 雾的距离与颜色 | `js/core/shading.js` 的 `FOG_NEAR` / `FOG_FAR` / `FOG_MAX` / `FOG_RGB` |
 | 天空渐变的四段颜色 | `drawSky()` 里的 `addColorStop` |
 | 云的高度分层 | `CLOUD_LAYERS[].y0 / y1` |
 | 云的数量 / 大小 / 透明度 | `CLOUD_LAYERS[].n / s0,s1 / a0,a1` |
@@ -455,5 +459,5 @@ alpha = clamp(lifeK, 0, 1) * p.alpha
 | 面剔除阈值 | `pushModel()` 里的 `area < 1.6` |
 | 描边补缝条件 | `flush()` 里的 `f.n <= 4 && f.d < 900` |
 | 抖动上限 | `addShake()` 里的 `26` |
-| 粒子数量上限 | `Game` 的 `compact()` 里的 `900` |
-| 单个模型的顶点上限 | `render.js` 的 `MAXV = 2048` |
+| 粒子数量上限 | `js/engine/game/update.js` 的 `compact()` 里的 `900` |
+| 单个模型的顶点上限 | `js/render/render.js` 的 `MAXV = 2048` |
