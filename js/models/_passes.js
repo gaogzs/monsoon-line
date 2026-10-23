@@ -264,8 +264,6 @@
       }
       return m;
     }
-    ['orca', 'bluewhale', 'humpback', 'spermwhale', 'dolphin', 'trilobite', 'ammonite', 'seascorpion',
-      'cameroceras', 'dunkleosteus', 'daplu', 'skori', 'diklo', 'cross', 'icecore', 'atoll'].forEach(function (id) { if (M[id]) settle(M[id]); });
     settleIds.forEach(function (id) { if (M[id]) settle(M[id]); });
   };
 })(ModelLib);
