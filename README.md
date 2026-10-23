@@ -295,7 +295,7 @@ node tools/release.js vX.Y.Z
 
 ## 许可
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)，Copyright (c) 2026 Xiwei Gao
 
 本项目为完全虚构的作品。文中所有国家、组织、事件与人物均属架空设定，
 与现实无关；出现的任何装备与技术细节不应被视为现实中的军事信息。
