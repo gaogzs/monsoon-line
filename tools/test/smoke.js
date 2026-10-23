@@ -5889,10 +5889,10 @@ try {
 /* ============================================================
    近防拦截与命中反馈（2-0IMPL 4.7）
 
-   已知会概率失败：「12 枚来袭一枚都没拦下」依赖随机数，而 smoke 全程共用
-   一条种子随机序列，前面各段多抽或少抽几个随机数（例如多加载一个脚本）就会
-   改变这里的结果。单独跑（--only 近防拦截）通常通过，完整跑偶尔失败。
-   遇到时先单独重跑这一段；单独也稳定失败才是真回归。
+   第 2 条是概率事件：近防每次掷骰拦不拦得住是随机的，实测单轮 12 枚里一枚都没拦下的概率约 18%
+   （60 个种子里 11 个）。这条只验"拦截机制会触发、会报事件、事件数与被拦弹数一致"，所以
+   最多重复 8 轮全新的交战，第一次出现拦截就算过 —— 8 轮全空的概率约 0.18^8 ≈ 1e-6，
+   一轮约 0.2 s，平均只多跑 0.2 s。不再依赖 smoke 全程共用的那条随机序列。
    ============================================================ */
 section('近防拦截', () => {
 console.log('\n近防拦截');
@@ -5917,31 +5917,35 @@ try {
   }
   // 2. 多枚来袭里至少拦下一枚，拦截时报 intercept 事件、弹标记 intercepted
   {
-    const h = mk();
-    const w = { time: 0, actors: [], targets: [h], bullets: [], missiles: [], particles: [], events: [], silent: true };
-    /* 来袭弹一枚一枚错开（每枚多隔 1.5 km）：这条只验"拦截会发生、会报事件"，
-       不是测饱和。以前 12 枚挤在 13 s 里到，饱和下正常也只拦 1–2 枚，拦下 0 枚的概率不小 */
-    for (let k = 0; k < 12; k++) {
-      const a = k * 0.5;
-      const r = 3500 + k * 1500;
-      const p = V3.V(Math.sin(a) * r, 30, Math.cos(a) * r);
-      /* speed 压到 300：这条只验"拦截机制会触发、会报事件"，不是测饱和。
-         慢弹在近防射界里待得久、单次掷骰概率还封顶（speedK → 1.2），12 枚全漏掉的
-         概率可以忽略 —— 免得前面几段多消耗几个随机数就把这里整个掀翻。 */
-      w.missiles.push(EN.makeMissile({ weapon: 'ssm', team: 1, pos: p, fwd: V3.norm(V3.sub(h.pos, p)), speed: 300, target: h }));
-    }
-    const all = w.missiles.slice(), evs = [];
-    for (let f = 0; f < 60 * 45; f++) {
-      TU.stepAll(h, w, 1 / 60);
-      for (const m of w.missiles) EN.stepMissile(m, 1 / 60, w);
-      w.missiles = w.missiles.filter(m => m.alive && !(m.intercepted));
-      evs.push(...w.events); w.events.length = 0;
-      w.time += 1 / 60;
-      if (!all.some(m => m.alive)) break;
-    }
-    const n = all.filter(m => m.intercepted).length;
-    if (!n) bad.push('12 枚来袭一枚都没拦下');
-    if (evs.filter(e => e.type === 'intercept').length !== n) bad.push('拦截事件数 ' + evs.length + ' 与被拦截弹数 ' + n + ' 不符');
+    /* 来袭弹一枚一枚错开（每枚多隔 1.5 km）：这条只验"拦截会发生、会报事件"，不是测饱和。
+       speed 压到 300：慢弹在近防射界里待得久。即便如此单轮全漏的概率仍有 ~18%，
+       所以最多重复 8 轮全新的交战，第一次出现拦截就停（见本段开头的说明）。 */
+    const round = () => {
+      const h = mk();
+      const w = { time: 0, actors: [], targets: [h], bullets: [], missiles: [], particles: [], events: [], silent: true };
+      for (let k = 0; k < 12; k++) {
+        const a = k * 0.5;
+        const r = 3500 + k * 1500;
+        const p = V3.V(Math.sin(a) * r, 30, Math.cos(a) * r);
+        w.missiles.push(EN.makeMissile({ weapon: 'ssm', team: 1, pos: p, fwd: V3.norm(V3.sub(h.pos, p)), speed: 300, target: h }));
+      }
+      const all = w.missiles.slice(), evs = [];
+      for (let f = 0; f < 60 * 45; f++) {
+        TU.stepAll(h, w, 1 / 60);
+        for (const m of w.missiles) EN.stepMissile(m, 1 / 60, w);
+        w.missiles = w.missiles.filter(m => m.alive && !(m.intercepted));
+        evs.push(...w.events); w.events.length = 0;
+        w.time += 1 / 60;
+        if (!all.some(m => m.alive)) break;
+      }
+      return { n: all.filter(m => m.intercepted).length, nEv: evs.filter(e => e.type === 'intercept').length, evTotal: evs.length };
+    };
+    let r = null, rounds = 0;
+    do {
+      r = round(); rounds++;
+      if (r.nEv !== r.n) bad.push('拦截事件数 ' + r.nEv + ' 与被拦截弹数 ' + r.n + ' 不符（第 ' + rounds + ' 轮）');
+    } while (!r.n && rounds < 8);
+    if (!r.n) bad.push('连续 ' + rounds + ' 轮、每轮 12 枚来袭，一枚都没拦下');
   }
   // 3. 玩家的弹打中东西报 HIT 事件；别人的弹不报
   {
