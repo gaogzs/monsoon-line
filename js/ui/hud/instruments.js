@@ -284,7 +284,7 @@
      其实飞行模型里没有推力，油门只决定一个目标速度，4% 就是慢车。
      减速板在物理上是开 / 关两态（油门低于 THR_IDLE 就全开），负数段只表示
      杆位，−5% 和 −25% 的减速效果一样。
-     两个分界点必须与 game.js 的 THR_IDLE / THR_MAX 一致（smoke 有断言）。 */
+     两个分界点必须与 Game 的 THR_IDLE / THR_MAX（js/engine/game/vars.js）一致（smoke 有断言）。 */
   $.THR_IDLE = 0.04;
   $.THR_MAX = 1.25;
 
