@@ -1907,7 +1907,7 @@ if (Ent && M3 && me && world) {
       const w4 = { particles: [], actors: [], missiles: [] };
       const m = {
         alive: true, pos: M3.clone(t.pos), prox: 28, dmg: 100,
-        owner: null, team: 0, w: { antiRadar: anti }
+        owner: null, team: 0, w: { tags: { antiRadar: anti } }
       };
       Ent.detonate(m, t, w4);
       return t.maxHp - t.hp;
