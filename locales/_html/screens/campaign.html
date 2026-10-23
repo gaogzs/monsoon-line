@@ -1,0 +1,21 @@
+<!-- ============ 屏幕：战役选择 ============ -->
+<!-- 标题与简报之间的一层。存在的理由是"以后会有别的战役"：
+     关卡怎么选属于简报页（那里才有目标、威胁与情报），
+     而"打的是哪一场仗"是更高一层的决定。
+     列表由 js/game.js 的 buildCampaignList() 按 CAMPAIGNS 生成，
+     这里只是一副空壳 —— 加新战役不需要动这个文件。 -->
+<section id="scr-campaign" class="screen">
+  <header class="bar">
+    <span class="bar-t">{{html.campaign.title}}</span>
+    <span class="bar-r">{{html.campaign.sub}}</span>
+  </header>
+
+  <div class="camp-wrap">
+    <div class="camp-hint">{{html.campaign.camp-hint}}</div>
+    <div class="camp-list" id="campList"></div>
+  </div>
+
+  <footer class="bar bottom">
+    <button class="btn" data-go="title">{{html.campaign.btn_title}}</button>
+  </footer>
+</section>

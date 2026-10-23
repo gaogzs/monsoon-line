@@ -1,0 +1,42 @@
+<!-- ============ 屏幕：机库 ============ -->
+<section id="scr-hangar" class="screen">
+  <header class="bar">
+    <span class="bar-t">{{html.hangar.title}}</span>
+    <span class="bar-r">{{html.hangar.sub}} <b id="callsign">VESPER-1</b></span>
+  </header>
+
+  <div class="hangar-grid">
+    <div class="ac-list" id="acList"></div>
+    <div class="ac-panel">
+
+      <div class="ac-main">
+        <div class="ac-name" id="acName">—</div>
+        <div class="ac-role" id="acRole">—</div>
+        <div class="stat" id="acStats"></div>
+        <div class="ac-desc" id="acDesc"></div>
+      </div>
+
+      <div class="ac-view">
+        <canvas id="hangar3d"></canvas>
+        <canvas id="planCv" width="640" height="440"></canvas>
+        <div class="ac-view-cap" id="planCap">—</div>
+      </div>
+
+      <div class="ac-weapons">
+        <div class="sp-head">{{html.hangar.sp-head}}</div>
+        <div class="hp-stores">
+          <div class="hp-groups" id="hpList"></div>
+          <div class="hp-picker" id="hpPicker"></div>
+          <div class="hp-nav" id="hpNav"></div>
+        </div>
+        <div class="ac-loadout" id="acLoadout"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="bar bottom">
+    <button class="btn" data-go="brief" id="btnHangarBack">{{html.hangar.btn_brief}}</button>
+    <button class="btn primary" id="btnLaunch">{{html.hangar.btnLaunch}}</button>
+  </footer>
+</section>

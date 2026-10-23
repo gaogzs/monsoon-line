@@ -4,9 +4,9 @@
  *
  * 这个项目没有浏览器可用，而"画风"这种东西光看代码判断不了。
  * 所以 tools/ 下的预览器需要一个能落盘的画布 —— 这一层就放这里，
- * 供 tools/render-ships.js 之类的工具共用。
+ * 供 tools/render/render-ships.js 之类的工具共用。
  *
- * 原来的实现在 tools/render-planform.js 里是内联的；那份保持原样不动
+ * 原来的实现在 tools/render/render-planform.js 里是内联的；那份保持原样不动
  * （它已经被验证过，没必要为了去重去动一个能跑的工具）。
  * 新增的预览工具从这里 require。
  */

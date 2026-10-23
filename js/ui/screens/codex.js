@@ -70,7 +70,7 @@
      正文整块 innerHTML 每次重建，逐个绑会漏、会重复绑；
      委托挂在容器上，重建后重新挂一次即可。
 
-     注意冒烟测试桩的合成事件没有 target（见 tools/smoke.js 的
+     注意冒烟测试桩的合成事件没有 target（见 tools/test/smoke.js 的
      makeEl().fire），所以断言里是手工构造带 target 的事件对象来测这条路径。 */
   function bindCodexUnits(el) {
     el.onclick = function (ev) {

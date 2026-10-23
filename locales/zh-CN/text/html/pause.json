@@ -1,0 +1,13 @@
+{
+  "html": {
+    "pause": {
+      "tab_main": "暂停",
+      "tab_settings": "设置",
+      "tab_help": "操作说明",
+      "dsub": "任务暂停 · 按 <kbd>H</kbd> 继续 · 设置改动即时生效",
+      "btnResume": "继续",
+      "btnAbort": "放弃任务",
+      "pauseSetReset": "恢复默认"
+    }
+  }
+}

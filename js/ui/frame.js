@@ -14,7 +14,7 @@
      整片机翼会明显变干净 —— 比数字更直观。
 
      坐标（含挂点高度）在 entities.js 的 Ent.storePos() 里，
-     离线预览器 tools/render-mounts.js 用的是同一份。
+     离线预览器 tools/render/render-mounts.js 用的是同一份。
      ============================================================ */
   function pushOneStore(a, g, pt, w) {
     var sc = MODELS.storeScale(w);

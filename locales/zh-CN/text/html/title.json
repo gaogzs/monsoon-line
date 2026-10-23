@@ -1,0 +1,22 @@
+{
+  "html": {
+    "title": {
+      "bootline": "&gt; TACNET 战术数据链 自检 ......... <span class=\"ok\">PASS</span>",
+      "bootline_2": "&gt; 相干测风激光 / 惯性混合定轨 ..... <span class=\"ok\">PASS</span>",
+      "bootline_3": "&gt; 调节场 第 7 号控制平台遥测 ...... <span class=\"warn\">信号中断</span>",
+      "bootline_4": "&gt; 电战机载数据库 DTC 加载 ......... <span class=\"ok\">v2078.03</span>",
+      "logo-cn": "季 风 线",
+      "logo-sub": "// 北纬十二度 · 2078 //",
+      "p": "公元 2078 年。人类没能阻止气候变化，但学会了给其中一个旋钮装上螺丝刀。",
+      "p_2": "<b>调节场</b> —— 一千四百个自主浮空单元，悬在十八到二十二公里的平流层里，\n       用凝结核播撒微调季风线的落雨位置。它救了很多人。",
+      "p_3": "而它的偏移量，<span class=\"red\">十六年来只朝一个方向拧</span>。",
+      "btn_campaign": "开始任务",
+      "btn_hangar": "机库 / HANGAR",
+      "btn_codex": "资料库 / CODEX",
+      "btn_settings": "设置",
+      "btn_help": "操作说明",
+      "btn_changelog": "更新记录",
+      "foot": "目前只支持键盘 + 鼠标游玩 · 点击任意处启用音频 · 建议全屏 (F11)"
+    }
+  }
+}

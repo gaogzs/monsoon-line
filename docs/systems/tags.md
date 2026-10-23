@@ -26,7 +26,7 @@
 
 ## 加一个标签
 
-1. 在 `js/core/tags.js` 里 `Tags.declare('名字', { owner: '…', doc: T('core.tags.名字.doc') })`，并在 `js/locales/zh-CN/core/tags.json` 里写那句话。
+1. 在 `js/core/tags.js` 里 `Tags.declare('名字', { owner: '…', doc: T('core.tags.名字.doc') })`，并在 `locales/zh-CN/text/core/tags.json` 里写那句话。
 2. 在需要它的数据文件里加 `tags: ['名字']`。
 3. 在机制代码里读 `x.tags.名字`。
 

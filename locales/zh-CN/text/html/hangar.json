@@ -1,0 +1,11 @@
+{
+  "html": {
+    "hangar": {
+      "title": "机 库 / HANGAR",
+      "sub": "作战编号",
+      "sp-head": "挂载点配置 / HARDPOINTS",
+      "btn_brief": "返回简报",
+      "btnLaunch": "出击 / SORTIE"
+    }
+  }
+}

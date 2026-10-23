@@ -25,12 +25,12 @@
 
 ```
 monsoon-line/
-├── index.html          所有屏幕的 DOM 结构（overlay）与脚本清单，游戏入口（本地双击启动器，保持单一入口）
+├── index.html          本地启动器（生成）：识别语言 → 重定向到对应的页面副本；双击入口始终是它
 ├── CHANGELOG.md        更新日志 —— 玩家在游戏内「更新记录」页看到的就是它
 ├── css/style.css       全部样式
-├── js/                 一个单位 / 一个关卡 / 一个界面一个文件（≈300 个），按"层"分目录，见下
+├── js/                 一个单位 / 一个关卡 / 一个界面一个文件（≈300 个），按"层"分目录，见下（文本不在这里，在 locales/）
 │   ├── core/           math3d、shading、registry（注册表与标签）、tags（标签清单）、
-│   │                   text（文本机制）、locales.gen（生成）、version / changelog（生成）
+│   │                   text（文本机制）、text.gen（生成）、version / changelog（生成）
 │   ├── data/           aircraft/ weapons/ ships/ platforms/ targets/ turret-guns/ callsigns/
 │   │                   一个单位一个文件；rules.js（挂载规则函数）、voices.js、zz-seal.js
 │   ├── models/         _lib.js（ModelLib 共享构建器）、aircraft/ ships/ targets/ platforms/ ordnance/
@@ -39,7 +39,7 @@ monsoon-line/
 │   ├── render/         render、render-gl、env/（RenderEnv）、planform/
 │   ├── ui/             hud/ screens/（各屏）、codex/、input、camera、frame、unitview、radio、sysnote
 │   ├── boot/           main.js（主循环、开机自检、初始化）、zz-api-game.js
-│   └── locales/        zh-CN/**/*.json —— 全部玩家可见文本，只有键与文本
+├── locales/            全部文本与页面：_html/（模板片段）、<语言>/text/（JSON）、<语言>/text.gen.js 与 index.html（生成）
 ├── docs/               你正在读的东西
 │   ├── README.md       文档索引、阅读顺序、常用命令
 │   ├── VERSIONING.md   版本号规则与发版流程
@@ -67,17 +67,17 @@ monsoon-line/
 ## 3. 模块划分与加载顺序（层 + 约定）
 
 **加载顺序只有一个权威来源：`index.html` 底部的 `<script>` 块**，它由
-`tools/gen-index.js` 生成，不手改。规则：
+`tools/build/gen-index.js` 生成，不手改。规则：
 
 1. 按固定的**层**：`core → data → models → missions → engine → render → ui → boot`；
    每个命名空间的 `_state.js`（只建一个空壳 `var NS = { $: {} }`）排在 `core` 之后、其余层之前，
    所以同一个命名空间的文件可以按职责放进不同的层。
 2. 层内：`_` 开头的文件（共享库、`_schema.js`）整层最先，`zz` 开头的（`zz-seal.js`、
    `zz-api.js`）整层最后，其余按目录与文件名字母序。
-3. `core/` 里有一份人工指定的先后：version、changelog、math3d、**text、locales.gen**、registry、tags
+3. `core/` 里有一份人工指定的先后：version、changelog、math3d、**text、text.gen**、registry、tags
    （文本机制与文本必须先于一切要写 `T('键')` 的文件）。
 
-加一个单位 = 新建一个文件 + `node tools/gen-index.js`。`smoke.js` 断言 `index.html`
+加一个单位 = 新建一个文件 + `node tools/build/gen-index.js`。`smoke.js` 断言 `index.html`
 与目录一致，忘了跑会在测试里炸，而不是在玩家屏幕上白屏。
 
 **注册表**（`core/registry.js`）：数据文件只写 `Registry.aircraft({ id, order, … })` 之类的调用；
@@ -99,7 +99,7 @@ monsoon-line/
 **标签**（`core/tags.js`）：单位的独有机制 = 数据里一个标签 + 机制代码认标签，
 机制代码里不出现具体单位 id。见 [systems/tags.md](systems/tags.md)。
 
-**文本**（`js/locales/`）：玩家可见的文字只在 JSON 里，脚本里只写 `T('键')`。
+**文本**（`locales/`）：玩家可见的文字只在 JSON 里，脚本里只写 `T('键')`。
 见 [systems/text.md](systems/text.md)。
 
 > 旧的单文件布局（`data.js` `models.js` `missions.js` `entities.js` `ai.js` `hud.js` `game.js`
@@ -132,7 +132,7 @@ title · campaign · brief · hangar · codex · settings · help · changelog �
   战役清单由 `CAMPAIGNS`（`js/missions/`）驱动，
   加新战役不需要动 `index.html`
 - **`changelog` 的内容一个字都不在界面代码里。** 它读全局 `CHANGELOG`
-  （`js/core/changelog.js`，由 `tools/release.js` 从根目录 `CHANGELOG.md` 生成），
+  （`js/core/changelog.js`，由 `tools/build/release.js` 从根目录 `CHANGELOG.md` 生成），
   所以发新版本不需要动界面。见 [6.9](#69-为什么更新日志要生成两次)
 
 **关卡索引只有一套**：`missionIdx` 始终是 `MISSIONS` 的全局下标，
@@ -233,7 +233,7 @@ requestAnimationFrame(loop)
 弹出红条。
 
 这是**开发环境没有 shell** 时的补偿手段：当时无法运行 node 做语法检查，
-只能让游戏自己报告。现在 `tools/smoke.js` 已经覆盖了这件事，
+只能让游戏自己报告。现在 `tools/test/smoke.js` 已经覆盖了这件事，
 但自检对最终用户仍然有价值（比如文件没下载全）。
 
 ### 6.2 为什么操作说明是 JS 生成的
@@ -316,7 +316,7 @@ requestAnimationFrame(loop)
 - **`js/core/changelog.js`** —— 给游戏读的。浏览器里没有 Markdown 解析器，
   而为了这一屏去装一个（哪怕是最小的）都违反"零依赖"这条底线。
 
-所以中间放一个 `tools/release.js`：它**读 Markdown、写 JS 对象**。
+所以中间放一个 `tools/build/release.js`：它**读 Markdown、写 JS 对象**。
 两边都是纯数据，没有一行渲染逻辑 —— 界面只负责把 `CHANGELOG.releases` 画出来。
 
 顺手它还解决了两件本来会反复出错的麻烦事：
@@ -326,10 +326,10 @@ requestAnimationFrame(loop)
 - **"这一版之后有哪些提交"不需要人记。** 每个版本条目里带一个
   `<!-- commit: xxx -->` 锚点，`release.js` 用 `git log <锚点>..HEAD`
   取新提交写成草稿。锚点就是"上一版发到哪儿"的记号。
-  版本号本身由人在命令里给（`node tools/release.js vX.Y.Z`），脚本只检查它比当前版本大。
+  版本号本身由人在命令里给（`node tools/build/release.js vX.Y.Z`），脚本只检查它比当前版本大。
 
 代价是**多了一份生成物要同步**，而生成物一定会有人忘了重新生成。
-所以 `tools/smoke.js` 里加了一条硬断言：把 `CHANGELOG.md` 现场解析一遍，
+所以 `tools/test/smoke.js` 里加了一条硬断言：把 `CHANGELOG.md` 现场解析一遍，
 和要求 `js/core/changelog.js` 逐字段相等 —— 忘了跑 `release.js` 会在测试里炸，
 而不是在玩家屏幕上显示一份过期的日志。
 
@@ -391,9 +391,9 @@ requestAnimationFrame(loop)
 | — | 飞控改为「最少时间转向」 | 原控制律用滚转角削弱俯仰，转向迟钝 |
 | — | 新增设置系统与暂停页签 | 音量、视角需要可调，且要能实时看到效果 |
 | — | 流程改为简报优先 | 机体选择应依据任务威胁 |
-| — | 新增 `tools/smoke.js` | 改动后需要自动验证 |
+| — | 新增 `tools/test/smoke.js` | 改动后需要自动验证 |
 | — | 机库新增俯视识别图（`planform.js`） | 三架机型光看文字分不出外形差异；顺带把挂载配置可视化 |
-| — | 新增 `tools/render-planform.js` | 本机无浏览器，"画风"必须肉眼确认 |
+| — | 新增 `tools/render/render-planform.js` | 本机无浏览器，"画风"必须肉眼确认 |
 | — | **挂载系统重构：分组挂载点 + 独立选装** | "固定机炮 + 一个特殊武器槽"让机库里的决定只有三选一；改成挂载点制后同一架机能有完全不同的任务配置。见 [loadout.md](systems/loadout.md) |
 | — | 基础短程弹改为可选项 | 它以前是默认自带的，等于白送一个武器槽 |
 | — | 修底噪声：LFO 直接调制 gain | `AudioParam` 的值 = 基础值 + 连入信号之和，基础值设 0 挡不住 LFO |
@@ -424,25 +424,25 @@ requestAnimationFrame(loop)
 | — | 文档补全：每个模块一份设计文档 | 之前只有 8 份，缺 math3d / models / entities / data / codex / missions / game / tools。补齐后 [docs/README.md](README.md) 给出阅读顺序 |
 | — | **新增 11 艘水面舰船**（模型 / 数据 / 图鉴 / 设定各一份） | 战役舞台是纯海域，而海面上在此之前只有浮台。四方与三个未参战国各自的船补上之后，"这场战争里海军到底在做什么"才有一个能看的答案 —— 也是"**排水量最大的船不属于任何交战方**"这条设定的落点。见 [SETTING.md 8.0.1](world/SETTING.md) |
 | — | **舰船先做出来、不进关卡**（`SHIPS` 表 + `preflight` 清单已就位，`missions.js` 未引用） | 船的几何、数据与资料库条目可以独立验证完（模型进自检、图鉴进冒烟测试），而"它们上场之后怎么动"是另一件事 —— 现有 `makeTarget` 只支持正弦漂移，40 节的快艇需要一套航路逻辑，那要单独设计。先做能独立完成的那一半 |
-| — | 新增 `tools/render-ships.js` + `tools/lib/raster.js` | 舰船外形必须肉眼确认，而新预览器**直接走游戏自己的 `models.js` + `render.js`**（投影、光照、画家算法、配色全部是实机那一套），比再造一个 2D 预览器可信。光栅器抽到 `lib/` 共用，但**没有去动**已经被验证过的 `render-planform.js` |
+| — | 新增 `tools/render/render-ships.js` + `tools/lib/raster.js` | 舰船外形必须肉眼确认，而新预览器**直接走游戏自己的 `models.js` + `render.js`**（投影、光照、画家算法、配色全部是实机那一套），比再造一个 2D 预览器可信。光栅器抽到 `lib/` 共用，但**没有去动**已经被验证过的 `render-planform.js` |
 | — | **图鉴新增单位详情页**（`js/unitview.js`）：实时旋转 3D 预览 + 矢量俯视图 + 设定全文 + 参数表 | 图鉴原来只有横向对照表，"这一型到底长什么样、当初为什么这么设计"读不到。25 个单位（14 机型 + 11 舰船）全部可点进去，**设定一个字都不新写** —— 直接复用 `data.js` 里已有的 `desc`。见 [unitview.md](systems/unitview.md) |
 | — | 详情页的 3D 预览**自带一份渲染代码**，不复用 `render.js` 的 `Renderer` | `Renderer` 是单例，而游戏主循环**在资料库页面里照样每帧跑** `Renderer.begin()`/`end()` —— 把单例指向预览 canvas，下一帧就会被清空。复用要么改主循环加例外、要么把 `Renderer` 重构为多实例，两样都不划算。代价（`LIGHT` 与亮度公式要跟着 render.js 改）写在 [unitview.md](systems/unitview.md#关键决策为什么不复用-renderjs-的-renderer) 里 |
-| — | 新增 `tools/render-units.js` + `tools/shot-unitview.js` | 详情页有**两件事**要肉眼确认，一件工具管不了：模型画得对不对（离屏 canvas，看不见 CSS）与布局对不对（只有真浏览器能算）。前者纯 node，后者交给无头 Chrome —— 本机有 Chrome 时用它，没有就只跑前者 |
+| — | 新增 `tools/render/render-units.js` + `tools/render/shot-unitview.js` | 详情页有**两件事**要肉眼确认，一件工具管不了：模型画得对不对（离屏 canvas，看不见 CSS）与布局对不对（只有真浏览器能算）。前者纯 node，后者交给无头 Chrome —— 本机有 Chrome 时用它，没有就只跑前者 |
 | — | **上下游补出完整的舰种谱系**（航母 / 巡洋舰 / 武库舰 / 护卫舰，共 +5 艘，合计 16 艘） | 原来两边各只有两三条船，"体系"这个词不成立。上游补上母舰（DB-11 的 desc 里那句"280 米浮岛平台"到这一版才终于有了实体）、防空巡洋舰与护卫舰；下游补上武库舰（312 个垂发井）与反舰巡洋舰。**两方用两种完全不同的方式做同一件事**：上游把飞机送上天的平台搬到海上，下游把几百枚反舰弹塞进一条不值钱的船体里 —— 见 [SETTING.md 8.0.1](world/SETTING.md) |
 | — | **新增战役选择层**（`CAMPAIGNS` + `#scr-campaign`） | "开始任务"原来直接进简报，等于把"打哪一场仗"和"这一场选哪一关"压在同一屏上。只有一场战役时无所谓，但已经确定以后会有别的战役 —— 那时再补这一层就要改所有返回按钮。选关仍留在简报页（那里才有目标/威胁/情报），战役只提供分组与进度。见 [6.7](#67-为什么标题与简报之间多了一层战役选择) |
 | — | 通关记录 `cleared` 从按下标改为按任务 `id` | 新战役的关卡是接着 `MISSIONS` 往后追加的，下标含义会漂移；按 id 记才不会出现"打了 A 关、B 关亮了"。见 [6.8](#68-为什么通关记录按任务-id-记不按下标) |
 | — | **齐射的每一发各自偏开出膛**（`salvoShots`：机头中线扇形展开 + 巢内横向错开） | 同一个点、同一个指向复制出来的三枚弹完全重叠，画面上只有一条烟迹，"按一下打三发"和"打一发"看不出区别 —— 齐射这个动作等于没有发生。角度那一半对有导引头的弹只能撑一两帧，所以出膛点也必须错开。见 [weapons.md](systems/weapons.md) |
 | — | **机炮加炮口散布**（角度量的高斯散布锥，远距离靠射速兜底） | 机炮原来是"每轴一个均匀随机数"的方块散布，等效 1σ 只有约 1.3 mrad —— 在最大射程上九成的弹都落进战斗机大小的靶，等于一束激光。改成圆形高斯散布锥、σ 提到 3.2 mrad：千米内仍能精确点射，最大射程上 1σ 长到 8.3 m（比飞机还大）成为一片面杀伤；那一片由 130 发/秒的射速填满，落靶率 33% 时每秒仍有四十多发命中，所以"极限距离点杀"依旧成立。见 [weapons.md](systems/weapons.md) 的「机炮散布」 |
 | — | **新增 `CHANGELOG.md` + 主菜单「更新记录」页** | 玩家从来不知道这游戏更新过什么 —— 版本戳只告诉他"部署的是哪一版"，不告诉他"这一版改了什么"。日志按提交里"换了一件事"的节点分成九个版本（v0.1.0 立项 → v1.0.0 正式发布），每个版本用开发者的口吻写一遍。见 [6.9](#69-为什么更新日志要生成两次) |
-| — | **更新日志生成两次**（`CHANGELOG.md` → `tools/release.js` → `js/changelog.js`） | 浏览器里没有 Markdown 解析器，而为了这一屏装一个（哪怕最小的）都违反"零依赖"。所以工具读 Markdown、写 JS 对象，两边都是纯数据，界面只负责画。见 [6.9](#69-为什么更新日志要生成两次) |
-| — | **新增 `docs/VERSIONING.md` + `tools/release.js`：提交自己给自己分配版本号** | 版本号原来只活在提交信息里，靠人记。现在每个版本条目带一个 `<!-- commit: xxx -->` 锚点，`release.js` 用 `git log <锚点>..HEAD` 取新提交、按提交信息判 major/minor/patch，然后把新条目追加到 `CHANGELOG.md` 顶部并刷新两个生成物。人只负责把工具生成的"待润色"标题改成人话 —— 版本号可以算，但"这批改动对玩家意味着什么"算不出来。工具只做机械的部分 |
-| — | **版本号改为手动指定**（`node tools/release.js vX.Y.Z`，去掉按提交前缀自动判大 / 中 / 小版本） | 提交前缀衡量的是"代码改了什么"，不是"对玩家算多大"：一个 `feat:` 可能只是一处调参，一串 `fix:` 加起来可能是一次手感重做。自动判出来的版本号总要人再改，不如直接由人定。脚本保留锚点、草稿、生成物，并拒绝不比当前版本大的版本号 |
+| — | **更新日志生成两次**（`CHANGELOG.md` → `tools/build/release.js` → `js/changelog.js`） | 浏览器里没有 Markdown 解析器，而为了这一屏装一个（哪怕最小的）都违反"零依赖"。所以工具读 Markdown、写 JS 对象，两边都是纯数据，界面只负责画。见 [6.9](#69-为什么更新日志要生成两次) |
+| — | **新增 `docs/VERSIONING.md` + `tools/build/release.js`：提交自己给自己分配版本号** | 版本号原来只活在提交信息里，靠人记。现在每个版本条目带一个 `<!-- commit: xxx -->` 锚点，`release.js` 用 `git log <锚点>..HEAD` 取新提交、按提交信息判 major/minor/patch，然后把新条目追加到 `CHANGELOG.md` 顶部并刷新两个生成物。人只负责把工具生成的"待润色"标题改成人话 —— 版本号可以算，但"这批改动对玩家意味着什么"算不出来。工具只做机械的部分 |
+| — | **版本号改为手动指定**（`node tools/build/release.js vX.Y.Z`，去掉按提交前缀自动判大 / 中 / 小版本） | 提交前缀衡量的是"代码改了什么"，不是"对玩家算多大"：一个 `feat:` 可能只是一处调参，一串 `fix:` 加起来可能是一次手感重做。自动判出来的版本号总要人再改，不如直接由人定。脚本保留锚点、草稿、生成物，并拒绝不比当前版本大的版本号 |
 | — | 版本戳从标题页左上角搬到右上角 | 左上角是开机自检那几行 `.boot` 的地盘，两者都绝对定位在同一个角落，字一直是叠着印出来的；加上版本号之后第一行变长，重叠更明显 |
-| — | **实体挂载对敌我 NPC 生效**（`npcFits` 第二张适配表 + `Ent.mountPlan()` / `buildNpcMounts()` + `launch()` 统一回写弹药池） | 上一版"挂架上的实物"只画玩家：下游弹的 `fits` 是空数组（语义是"上游拿不到实物"），被渲染当成"挂不上"过滤掉，敌机机翼永远是干净的；僚机倒是画得出来，却没有弹药池与发射槽，弹永远挂着不消失。现在两张适配表分开（玩家 `fits` / NPC `npcFits`）、NPC 按"吊舱先占、制式弹铺满剩下的组"分配，并统一回写弹药池 —— AI 射速不受影响（`s.shootT` 下限比槽冷却长）。**适配表没有删掉**：`pelican` / `quartz` / `a2` / `gal44` 只有机腹挂点，删了就等着看格斗弹长在预警机机腹上。吊舱与制式弹**共存**（吊舱从外侧/机腹往里占，把重挂点留给导弹；正序占位会让 `spray` 那种通用+机腹的机型一枚弹都画不出来）。见 [loadout.md](systems/loadout.md#npc-的挂载)；肉眼验证走新增的 `tools/render-mounts.js`（走真正的 `makeAircraft` + `pushStores` + `render.js`） |
+| — | **实体挂载对敌我 NPC 生效**（`npcFits` 第二张适配表 + `Ent.mountPlan()` / `buildNpcMounts()` + `launch()` 统一回写弹药池） | 上一版"挂架上的实物"只画玩家：下游弹的 `fits` 是空数组（语义是"上游拿不到实物"），被渲染当成"挂不上"过滤掉，敌机机翼永远是干净的；僚机倒是画得出来，却没有弹药池与发射槽，弹永远挂着不消失。现在两张适配表分开（玩家 `fits` / NPC `npcFits`）、NPC 按"吊舱先占、制式弹铺满剩下的组"分配，并统一回写弹药池 —— AI 射速不受影响（`s.shootT` 下限比槽冷却长）。**适配表没有删掉**：`pelican` / `quartz` / `a2` / `gal44` 只有机腹挂点，删了就等着看格斗弹长在预警机机腹上。吊舱与制式弹**共存**（吊舱从外侧/机腹往里占，把重挂点留给导弹；正序占位会让 `spray` 那种通用+机腹的机型一枚弹都画不出来）。见 [loadout.md](systems/loadout.md#npc-的挂载)；肉眼验证走新增的 `tools/render/render-mounts.js`（走真正的 `makeAircraft` + `pushStores` + `render.js`） |
 | — | **吊舱有了自己的模型 `MODELS.pod`**（短粗钝头 + 尾端散热格栅），9 件吊舱不再借用导弹外壳；挂点组新增可选字段 `hy`（吊挂高度） | 吊舱原来全是 `model: 'missile'`（`e4` / `l2` 连 model 都没写），于是"这架带了干扰吊舱"在画面上读不出来 —— 一张"导弹 + 吊舱"的预览图和一张"纯导弹"的预览图**字节相同**。换成独立剪影之后一眼可分。顺带查出一条一直存在的几何 bug：默认吊挂高度是按战斗机（机身深一米上下）定的，GAL-44 干扰机与石英预警机的机腹在 −2.60 m，吊舱按 −1.95 挂**整件埋进机身**，而吊舱正是那两型飞机唯一的外挂特征。修法是让挂点组自己带一个 `hy`，并给 `smoke.js` 加一条几何断言（挂载物顶部必须比挂点正下方的机体表面低至少 0.30 m）——把 hy 改回默认它真的会 FAIL |
 | — | **AI 开火时选弹**（`Ent.chooseWeapon` / `setWeapon`）+ **关卡可写逐组 NPC 挂载**（`spawnEnemy` 的 `o.loadout`） | 敌机到这一版为止只能挂一件制式弹（`special`），AI 开火段还写着 `kind === 'aam' && dist < 7200` 一刀切 —— 混挂既没法指定也没意义。现在：AI 每次开火前按**目标类别（对空 / 对面）+ 射程**挑一件（够得着的里面取射程最短的；无制导弹不参与，AI 没有投弹瞄准）；"谁能打谁"合并成唯一的 `Ent.weaponMatchesTarget`（玩家的 `targetMismatch` 也改读它），"设成当前武器"合并成唯一的 `Ent.setWeapon`（玩家换弹也走它）。关卡侧新增 `o.loadout: { 组id: 武器id }`，**上游 NPC 的每一条都必须符合该挂点的选项限制**（`fits` ∩ `canCarry`）——配错不崩，但会记进 `Ent.mountIssues`，`smoke.js` 断言它是空的；下游 NPC 不需要（单一制式弹 + `npcFits` 已经保证适配）。顺带接上一条缺了很久的行为：AI 以前完全看不见 `world.targets`，带对面弹的飞机现在会去挑面目标（现有 NPC 里没有一件对地弹，所以现有三关的行为零变化）。见 [missions.md](systems/missions.md#给-npc-设计挂载) |
 | — | **舰船进关卡并有航路**（`spawnShip` + `route`）、`timeLimit` 正式接入、地面/海面目标单独计分（`groundKilled`，每个 400） | 舰船先做出来、后上场的那一半补完；`timeLimit` 此前声明了却没人读；打设施在结算上原本等于没发生。见 [missions.md](systems/missions.md) |
-| — | 新增 `tools/probe-missions.js` | smoke 只证明关卡"跑得起来"，不证明"打得赢"：清空敌人后 `win()` 仍不成立的关卡要单独抓 |
+| — | 新增 `tools/test/probes/probe-missions.js` | smoke 只证明关卡"跑得起来"，不证明"打得赢"：清空敌人后 `win()` 仍不成立的关卡要单独抓 |
 | — | **修大气等温层常数** `62188.6` → `6341.6` | 原常数大了十倍，11–20 km 的密度几乎不变（18 km 仍是 0.325），然后在 20 km 处断崖式跌到 0.088。新常数取自 `9000 / ln(0.3639 / 0.08803)`，让这一段恰好在 20 km 接上第三段 —— 18 km 现在是 0.12 kg/m³（海平面的 9.9%），与设定集 7.1 表的相对密度 0.099 一致。整个"平流层作战"的手感建立在这条曲线上，见 [flight-model.md](systems/flight-model.md) |
 | — | **修导弹转弯耗能**：转弯前量偏差 | 原来在转完之后量 `want`，量到的是"还剩多少没转"，接近对准时趋近零 —— 急转末段几乎不掉速 |
 | — | **修挂载重量惩罚**：搬到 `stepAircraft` 开头 | 原来在姿态旋转之后才替换 `p`，俯仰 / 滚转惩罚从未生效，失速判定也用的是未打折的 `vStall`；机库面板显示的数字与手感对不上 |
@@ -463,7 +463,7 @@ requestAnimationFrame(loop)
 | — | **战报按击杀者分开记功**（`Ent.kill` 写 `killedBy`，`game.js` 的 `killCredit()` 归属）：僚机与友舰的击落合并成「友军击落」一行，不进综合评定（内部仍分 `wingKilled` / `shipKilled` 两个计数）；飞完航线离场的单位（`a.escaped`）不算击落 | 友舰会开火之后，"所有阵亡敌机都算玩家的"会让一场靠舰空弹守住的防御战刷出高评价；顺带修掉逃生的轰炸机被记成击落 |
 | — | **HUD 发射包线动态计算（阶段 5.4）**：`rmax` / `NEZ` 改用真实弹道（`Ent.envelopeRange` → `flyTo` 二分）动态算，把目标高度、相对速度、航向都吃进 `stepMissile` 的模拟；NEZ 按"目标掉头逃逸 / 最大航速"算，不再固定取射程 70%。机库（`Ent.displayRange`）与 AI（`aiReach` → `effRange`）读同一套结果 | 以前空空弹按经验公式、对地弹按"高度分档 × 0.7"，滑翔弹、高抛弹、冲压弹随高度变化的射程全算错 |
 | — | **精确光电制导高爆炸弹 PEJ-14 + 泪滴形瞄准圈（阶段 5.3 第 3 条）**：`pgb`（`ballistic` + `fin`、无 `glide`、`seeker: 'eo'`），弹翼全向修正（上下左右、只改方向不加能量）；HUD 用 `Ent.finFootprint`（沿各水平角 `flyTo` 二分"能命中"边界）画泪滴圈，目标套进圈内且锁定 = 必中 | 精确制导炸弹"圈内必中"的落子，区别于 GUT-9 滑翔锤（有 `glide`）与无制导集束弹 |
-| — | **`tools/smoke.js` 支持分段跑**（`--only` / `--skip` / `--list`） | 完整跑一次要几分钟；改某个子系统时只跑相关段，大阶段完成后再完整跑 |
+| — | **`tools/test/smoke.js` 支持分段跑**（`--only` / `--skip` / `--list`） | 完整跑一次要几分钟；改某个子系统时只跑相关段，大阶段完成后再完整跑 |
 
 ---
 
@@ -476,8 +476,8 @@ requestAnimationFrame(loop)
 3. 在 `js/data/` 的 `VOICES` 里加同名 `id` 的台词表，至少要有 `start`
 4. **把它的全局下标写进某个战役的 `missions` 数组**（见下一节）——
    漏了这一步，关卡会存在但永远选不到，`preflight()` 会报出来
-5. 跑 `node tools/smoke.js`——它会自动检查新任务的字段完整性；
-   再跑 `node tools/probe-missions.js`——确认清空敌人之后这一关真的能赢
+5. 跑 `node tools/test/smoke.js`——它会自动检查新任务的字段完整性；
+   再跑 `node tools/test/probes/probe-missions.js`——确认清空敌人之后这一关真的能赢
 
 `map` 里的坐标是**世界米**，相对进入点。绘图由 `drawMap()` 统一处理。
 
@@ -499,7 +499,7 @@ requestAnimationFrame(loop)
    将来才做的战役可以写成 `missions: []`，它会以"资料封存"的
    不可点卡片出现在列表里（那类卡片**不写地名与年份**，
    免得提前承诺还没定的设定）
-4. 跑 `node tools/smoke.js`：它检查每一关都恰好归属一个战役，
+4. 跑 `node tools/test/smoke.js`：它检查每一关都恰好归属一个战役，
    并断言"点进战役后简报页列出的关卡数 = 该战役的关卡数"
 
 建议把战役的中文名与英文代号也写进 `js/ui/codex/` 的「战役 / CAMPAIGN」条目，

@@ -22,7 +22,7 @@
 | 依赖 | `M3`（相机与向量）、`MODELS`、`PLANFORM`、`AIRCRAFT`、`SHIPS`、`WEAPONS`（只为了显示机炮名） |
 | 输出 | 全局 `var UnitView`，七个方法 |
 | DOM | 只**生成字符串**；插入由 `Game` 负责。挂载时只找 `#uvCanvas` / `#uvPlan` 两个 id |
-| 校验 | `tools/smoke.js` 里"单位详情页"一组断言（4 条） |
+| 校验 | `tools/test/smoke.js` 里"单位详情页"一组断言（4 条） |
 
 **顶层只做一件事**：`var LIGHT = M3.norm(...)`。其余对 `AIRCRAFT` / `SHIPS` / `MODELS`
 的引用全部在函数体里 —— 所以它可以安全地先于 `js/data/` 之外的东西求值，
@@ -270,9 +270,9 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 | `Game` | `buildCodex()` 生成并挂载（单位页调 `mount()`，带 `mount()` 的条目由条目自己挂）；`show()` 负责停；单位链接由 `bindCodexUnits()` 的事件委托接住；机库调 `mountModel()` + `composeLoadout()` |
 | `js/ui/codex/` | 三个图鉴的表格里输出 `<span class="cx-unit" data-unit="aircraft:frigatebird">`（`ship:` / `weapon:` 同理）；`s4` 条目的 `mount()` 直接调 `mountModel()` |
 | `css/style.css` | `.uv-*` 一族类 |
-| `tools/render-units.js` | 直接用 `renderModel()` 把 33 个单位各渲染一张 PNG |
-| `tools/shot-unitview.js` | 生成最小页面（含 `shading.js` / `render-gl.js`，swiftshader），交给无头 Chrome 截详情页的**布局**与 WebGL 预览 |
-| `tools/smoke.js` | 4 条断言：详情页可生成 / 俯视图分配 / 渲染器不抛异常 / 点击链路 |
+| `tools/render/render-units.js` | 直接用 `renderModel()` 把 33 个单位各渲染一张 PNG |
+| `tools/render/shot-unitview.js` | 生成最小页面（含 `shading.js` / `render-gl.js`，swiftshader），交给无头 Chrome 截详情页的**布局**与 WebGL 预览 |
+| `tools/test/smoke.js` | 4 条断言：详情页可生成 / 俯视图分配 / 渲染器不抛异常 / 点击链路 |
 
 ### 链接是怎么接上的
 
@@ -332,8 +332,8 @@ var hasPlan = (typeof PLANFORM !== 'undefined') && PLANFORM.planes && PLANFORM.p
 ## 相关工具
 
 ```bash
-node tools/render-units.js    # 用 renderModel() 把 33 个单位的 3D 预览落成 PNG
-node tools/shot-unitview.js   # 无头 Chrome 截详情页的布局（需要本机有 Chrome）
+node tools/render/render-units.js    # 用 renderModel() 把 33 个单位的 3D 预览落成 PNG
+node tools/render/shot-unitview.js   # 无头 Chrome 截详情页的布局（需要本机有 Chrome）
 ```
 
 前者验证**模型**画得对不对（走离屏 canvas，看不见 CSS），

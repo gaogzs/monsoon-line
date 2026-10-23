@@ -1,0 +1,11 @@
+{
+  "html": {
+    "debrief": {
+      "title": "战 果 评 定 / DEBRIEFING",
+      "btnNext": "下一任务 &gt;",
+      "btnRetry": "重新出击",
+      "btn_hangar": "机库",
+      "btn_title": "主菜单"
+    }
+  }
+}

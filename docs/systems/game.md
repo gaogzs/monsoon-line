@@ -25,7 +25,7 @@
 | `__world` | `__world()` | 返回当前 `world`，未开局为 `null` |
 | `__pushStores` | `__pushStores(a)` | 直接暴露内部的 `pushStores`：断言要能单独喂一架飞机进来，数它画了几个挂载 |
 
-后三个是**给 `tools/smoke.js` 做断言用的调试口**，不是玩法接口。局内状态全部藏在 IIFE 闭包里：`state / paused / world / player / mission / missionIdx / activeCampaign / selectedAC / loadouts / activeHpGroup / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared / S`。
+后三个是**给 `tools/test/smoke.js` 做断言用的调试口**，不是玩法接口。局内状态全部藏在 IIFE 闭包里：`state / paused / world / player / mission / missionIdx / activeCampaign / selectedAC / loadouts / activeHpGroup / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared / S`。
 
 ### `Radio` 的导出
 
@@ -94,7 +94,7 @@ function show(id) {
 `.nm` / `.st` 配了 `nowrap + ellipsis`，卡片再窄也不会折行。
 
 **索引只有一套。** `missionIdx` 始终是 `MISSIONS` 的全局下标，`startMission(idx)` 的语义
-和 `tools/smoke.js` 的 `Game.startMission(mi)` 都没变；`activeCampaign` 只决定
+和 `tools/test/smoke.js` 的 `Game.startMission(mi)` 都没变；`activeCampaign` 只决定
 “列哪几关”和“返回回哪一层”。战役 → 简报时若 `missionIdx` 不在本战役里就夹回首关，
 避免看到别人战役的简报。
 
@@ -473,7 +473,7 @@ var WD_LIMIT = 1.5;
 - `buildHelpHTML(forPause)` 返回**两种排版**：`true` 单栏（暂停菜单，`<h4>` + `<table>`）、`false` 双栏（独立手册，两个 `.help-col`）。早期两处是两份独立 HTML，改一个忘一个。
 - 机库是**唯一让玩家做长期规划的地方**，所以 `buildHangar()` 每次都重算：`resolveLoadout` / `loadoutMass` / `passiveEffects` → 六维条显示**挂载之后**的实际值（缩水段用暗红标出并写净损失）→ 挂载点编辑器 → 俯视图 `PLANFORM.draw()`。选机体时重置 `activeHpGroup`；`loadouts[ac.id]` 只在第一次访问时按 `defaultLoadout` 初始化，之后留着玩家的改动。
 - `buildBrief()` 末尾一定调 `drawMap(m)`；地图**不画陆地** —— 战役全在纯海域上进行，画岛等于承诺一片不存在的地形。`buildCodex()` 的条目支持 `build()` 动态生成，图鉴那几条必须动态出，否则改了 `js/data/` 文档就对不上。条目带 `mount()` 的，在 `innerHTML` 写进去之后再调（DOM 要先就位）—— `s4` 用它挂调节单元的 3D 预览。
-- `buildChangelog()` 只画不写：版本号与条目全在 `CHANGELOG`（`js/core/changelog.js`）里，而它是 `tools/release.js` 从根目录 `CHANGELOG.md` 生成的。**发新版本不需要改这个函数**，只改 `CHANGELOG.md` 再跑一次生成脚本。条目文本里的 `**强调**` 与 `` `代码` `` 由 `clInline()` 还原成 `<b>` / `<code>`，而且**先转义再还原** —— 顺序反过来的话，转义会把刚生成出来的标签一起逃掉。`js/core/changelog.js` 缺失时（开发中直接开 `index.html`）降级成一句提示，与版本戳同一种处理。
+- `buildChangelog()` 只画不写：版本号与条目全在 `CHANGELOG`（`js/core/changelog.js`）里，而它是 `tools/build/release.js` 从根目录 `CHANGELOG.md` 生成的。**发新版本不需要改这个函数**，只改 `CHANGELOG.md` 再跑一次生成脚本。条目文本里的 `**强调**` 与 `` `代码` `` 由 `clInline()` 还原成 `<b>` / `<code>`，而且**先转义再还原** —— 顺序反过来的话，转义会把刚生成出来的标签一起逃掉。`js/core/changelog.js` 缺失时（开发中直接开 `index.html`）降级成一句提示，与版本戳同一种处理。
 
 ---
 ## Radio：队列与字幕
@@ -521,7 +521,7 @@ var queue = [], timer = 0, box = null, live = [];
 4. **离开战斗不 `Radio.clear()` 就会残留字幕**，因为字幕淡出只由战斗循环里的 `Radio.update()` 推进。
 5. **暂停时只停 `update`**，所以暂停菜单里改设置能立刻看到效果；反过来，任何“在 `update` 里做的一次性初始化”在暂停期间不会发生。
 6. **方向键自由视角只在追尾机位有效**；**目标机位有目标时 FOV 写死 55、不读 `S.fov`**。
-7. **加力/减速板是瞬时态**：拿它们当稳态读数去测会得到假失败（`tools/smoke.js` 的引擎出力断言只用稳态档位）。
+7. **加力/减速板是瞬时态**：拿它们当稳态读数去测会得到假失败（`tools/test/smoke.js` 的引擎出力断言只用稳态档位）。
 8. **槽数组与挂载组的下标要自己维护**（`pushStores()` 里的 `used{}`）：槽数组按武器建、遍历按组走，两组挂同一种弹时若不自己累加起始下标，就会“四个挂架共用前两个槽”，打掉一个两组同时消失、后两个永不消失。发射那边是对的（`launch` 遍历整个 `slotCd[wid]`），**只有实体渲染会错位**。
 9. **`launch()` 兼容两种冷却形态**：`slotCd[wid]` 存在就走槽数组，不存在才退回 `actor.spCd`。AI 靠的就是后一条 —— 别把那个 `else if (actor.spCd > 0)` 删掉，否则 AI 会变成无冷却连射。
 10. **底部 `window.addEventListener('load', ...)` 必须最后加载**：`Game.init()` 第一件事就是 `preflight()` 检查所有全局模块，前面任何一个 `<script>` 没跑完都会报“核心模块 X 未加载”。**已知未释放**：`finish()` 之后 `world / player` 仍被闭包与 `debrief` 的渲染路径引用，只有 `#btnAbort` 会置空。

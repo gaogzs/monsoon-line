@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>季风线 · MONSOON LINE</title>
+<base href="../../">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<canvas id="cv"></canvas>
+
+<div id="radio"></div>
+
+<div id="sysnote"></div>
+
+<section id="scr-title" class="screen active">
+  
+  <div id="verStamp" class="ver-stamp"></div>
+
+  <div class="boot">
+    <div class="bootline">&gt; TACNET 战术数据链 自检 ......... <span class="ok">PASS</span></div>
+    <div class="bootline">&gt; 相干测风激光 / 惯性混合定轨 ..... <span class="ok">PASS</span></div>
+    <div class="bootline">&gt; 调节场 第 7 号控制平台遥测 ...... <span class="warn">信号中断</span></div>
+    <div class="bootline">&gt; 电战机载数据库 DTC 加载 ......... <span class="ok">v2078.03</span></div>
+  </div>
+
+  <h1 class="logo">MONSOON<span class="logo2">LINE</span></h1>
+  <div class="logo-cn">季 风 线</div>
+  <div class="logo-sub">// 北纬十二度 · 2078 //</div>
+
+  <div class="title-lore">
+    <p>公元 2078 年。人类没能阻止气候变化，但学会了给其中一个旋钮装上螺丝刀。</p>
+    <p><b>调节场</b> —— 一千四百个自主浮空单元，悬在十八到二十二公里的平流层里，
+       用凝结核播撒微调季风线的落雨位置。它救了很多人。</p>
+    <p>而它的偏移量，<span class="red">十六年来只朝一个方向拧</span>。</p>
+  </div>
+
+  <div class="menu">
+    <button class="btn primary" data-go="campaign">开始任务</button>
+    <button class="btn" data-go="hangar">机库 / HANGAR</button>
+    <button class="btn" data-go="codex">资料库 / CODEX</button>
+    <button class="btn" data-go="settings">设置</button>
+    <button class="btn" data-go="help">操作说明</button>
+    <button class="btn" data-go="changelog">更新记录</button>
+  </div>
+  <div class="foot">目前只支持键盘 + 鼠标游玩 · 点击任意处启用音频 · 建议全屏 (F11)</div>
+</section>
+
+<section id="scr-campaign" class="screen">
+  <header class="bar">
+    <span class="bar-t">作 战 战 区 / CAMPAIGN</span>
+    <span class="bar-r">分水方向 · 上游公约</span>
+  </header>
+
+  <div class="camp-wrap">
+    <div class="camp-hint">选择战役 —— 每个战役包含一组按顺序推进的任务。</div>
+    <div class="camp-list" id="campList"></div>
+  </div>
+
+  <footer class="bar bottom">
+    <button class="btn" data-go="title">返回主菜单</button>
+  </footer>
+</section>
+
+<section id="scr-hangar" class="screen">
+  <header class="bar">
+    <span class="bar-t">机 库 / HANGAR</span>
+    <span class="bar-r">作战编号 <b id="callsign">VESPER-1</b></span>
+  </header>
+
+  <div class="hangar-grid">
+    <div class="ac-list" id="acList"></div>
+    <div class="ac-panel">
+
+      <div class="ac-main">
+        <div class="ac-name" id="acName">—</div>
+        <div class="ac-role" id="acRole">—</div>
+        <div class="stat" id="acStats"></div>
+        <div class="ac-desc" id="acDesc"></div>
+      </div>
+
+      <div class="ac-view">
+        <canvas id="hangar3d"></canvas>
+        <canvas id="planCv" width="640" height="440"></canvas>
+        <div class="ac-view-cap" id="planCap">—</div>
+      </div>
+
+      <div class="ac-weapons">
+        <div class="sp-head">挂载点配置 / HARDPOINTS</div>
+        <div class="hp-stores">
+          <div class="hp-groups" id="hpList"></div>
+          <div class="hp-picker" id="hpPicker"></div>
+          <div class="hp-nav" id="hpNav"></div>
+        </div>
+        <div class="ac-loadout" id="acLoadout"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="bar bottom">
+    <button class="btn" data-go="brief" id="btnHangarBack">返回简报</button>
+    <button class="btn primary" id="btnLaunch">出击 / SORTIE</button>
+  </footer>
+</section>
+
+<section id="scr-brief" class="screen">
+  <header class="bar">
+    <span class="bar-t">作 战 简 报 / OPERATION BRIEFING</span>
+    <span class="bar-r" id="briefDate">2078.03.14</span>
+  </header>
+
+  <div class="brief-wrap">
+    <div class="brief-main">
+      <div class="msn-list" id="msnList"></div>
+      <div class="msn-no" id="bNo">OPERATION 01</div>
+      <h2 id="bName">—</h2>
+      <div class="msn-loc" id="bLoc">—</div>
+      <div class="msn-prose" id="bProse"></div>
+
+      <div class="msn-block">
+        <div class="blk-h">任务目标 / OBJECTIVES</div>
+        <ul id="bObj"></ul>
+      </div>
+      <div class="msn-block">
+        <div class="blk-h">已知威胁 / THREATS</div>
+        <ul id="bThreat" class="threat"></ul>
+      </div>
+    </div>
+    <div class="brief-side">
+      <canvas id="mapCv" width="360" height="360"></canvas>
+      <div class="intel" id="bIntel"></div>
+    </div>
+  </div>
+
+  <footer class="bar bottom">
+    <button class="btn" data-go="campaign">返回战役</button>
+    <button class="btn primary" data-go="hangar">下一步：按任务选择机体 &gt;</button>
+  </footer>
+</section>
+
+<section id="scr-debrief" class="screen">
+  <header class="bar"><span class="bar-t">战 果 评 定 / DEBRIEFING</span><span class="bar-r" id="dCallsign">VESPER-1</span></header>
+  <div class="debrief-wrap">
+    <div class="rank" id="dRank">S</div>
+    <h2 id="dTitle">MISSION COMPLETE</h2>
+    <div class="dsub" id="dSub"></div>
+    <table class="score" id="dTable"></table>
+    <div class="dquote" id="dQuote"></div>
+    <div class="menu">
+      <button class="btn primary" id="btnNext">下一任务 &gt;</button>
+      <button class="btn" id="btnRetry">重新出击</button>
+      <button class="btn" data-go="hangar">机库</button>
+      <button class="btn" data-go="title">主菜单</button>
+    </div>
+  </div>
+</section>
+
+<section id="scr-settings" class="screen">
+  <header class="bar">
+    <span class="bar-t">设 置 / SETTINGS</span>
+    <span class="bar-r">改动即时生效 · 自动保存</span>
+  </header>
+  <div class="set-wrap" id="setWrap"></div>
+  <footer class="bar bottom">
+    <button class="btn" id="setReset">恢复默认</button>
+    <button class="btn primary" id="setClose">返回</button>
+  </footer>
+</section>
+
+<section id="scr-codex" class="screen">
+  <header class="bar"><span class="bar-t">资 料 库 / CODEX</span><span class="bar-r">机密等级 · 公开发布版</span></header>
+  <div class="codex-wrap">
+    <nav class="codex-nav" id="codexNav"></nav>
+    <div class="codex-body" id="codexBody"></div>
+  </div>
+  <footer class="bar bottom"><button class="btn" data-go="title">返回</button></footer>
+</section>
+
+<section id="scr-help" class="screen">
+  <header class="bar"><span class="bar-t">飞 行 手 册 / FLIGHT MANUAL</span><span class="bar-r">上游公约全机型通用</span></header>
+  <div class="help-wrap" id="helpBody"></div>
+  <footer class="bar bottom"><button class="btn" data-go="title">返回</button></footer>
+</section>
+
+<section id="scr-changelog" class="screen">
+  <header class="bar">
+    <span class="bar-t">更 新 记 录 / CHANGELOG</span>
+    <span class="bar-r" id="clHead">—</span>
+  </header>
+  <div class="cl-wrap" id="clBody"></div>
+  <footer class="bar bottom"><button class="btn" data-go="title">返回</button></footer>
+</section>
+
+<div id="pause" class="overlay">
+  <div class="pause-box wide">
+    <h2>PAUSED</h2>
+
+    <div class="pause-tabs">
+      <button class="ptab on" data-ptab="main">暂停</button>
+      <button class="ptab" data-ptab="settings">设置</button>
+      <button class="ptab" data-ptab="help">操作说明</button>
+    </div>
+
+    <div class="pane on" id="pane-main">
+      <div class="dsub">任务暂停 · 按 <kbd>H</kbd> 继续 · 设置改动即时生效</div>
+      <div class="menu">
+        <button class="btn primary" id="btnResume">继续</button>
+        <button class="btn" id="btnAbort">放弃任务</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-settings">
+      <div class="set-wrap in-overlay" id="pauseSettings"></div>
+      <div class="menu" style="margin-top:14px">
+        <button class="btn" id="pauseSetReset">恢复默认</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-help">
+      <div class="minihelp" id="pauseHelp"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/core/version.js"></script>
+<script src="js/core/changelog.js"></script>
+<script src="js/core/math3d.js"></script>
+<script src="js/core/text.js"></script>
+<script src="locales/zh-CN/text.gen.js"></script>
+<script src="js/core/registry.js"></script>
+<script src="js/core/tags.js"></script>
+<script src="js/core/shading.js"></script>
+<script src="js/engine/ai/_state.js"></script>
+<script src="js/engine/entities/_state.js"></script>
+<script src="js/engine/game/_state.js"></script>
+<script src="js/render/env/_state.js"></script>
+<script src="js/render/planform/_state.js"></script>
+<script src="js/ui/hud/_state.js"></script>
+<script src="js/data/_lib.js"></script>
+<script src="js/data/_schema.js"></script>
+<script src="js/data/aircraft/_schema.js"></script>
+<script src="js/data/platforms/_schema.js"></script>
+<script src="js/data/ships/_schema.js"></script>
+<script src="js/data/targets/_schema.js"></script>
+<script src="js/data/turret-guns/_schema.js"></script>
+<script src="js/data/weapons/_schema.js"></script>
+<script src="js/data/rules.js"></script>
+<script src="js/data/voices.js"></script>
+<script src="js/data/aircraft/albatross.js"></script>
+<script src="js/data/aircraft/basalt.js"></script>
+<script src="js/data/aircraft/booby.js"></script>
+<script src="js/data/aircraft/boulder.js"></script>
+<script src="js/data/aircraft/datum.js"></script>
+<script src="js/data/aircraft/folded_wing.js"></script>
+<script src="js/data/aircraft/frigatebird.js"></script>
+<script src="js/data/aircraft/lodestone.js"></script>
+<script src="js/data/aircraft/pelican.js"></script>
+<script src="js/data/aircraft/petrel.js"></script>
+<script src="js/data/aircraft/quartz.js"></script>
+<script src="js/data/aircraft/sailfish.js"></script>
+<script src="js/data/aircraft/sandstone.js"></script>
+<script src="js/data/aircraft/schist.js"></script>
+<script src="js/data/aircraft/skua.js"></script>
+<script src="js/data/aircraft/spray.js"></script>
+<script src="js/data/aircraft/tideline.js"></script>
+<script src="js/data/callsigns/air.js"></script>
+<script src="js/data/callsigns/naval.js"></script>
+<script src="js/data/platforms/beacon.js"></script>
+<script src="js/data/platforms/breakwater.js"></script>
+<script src="js/data/platforms/cairn.js"></script>
+<script src="js/data/platforms/reed.js"></script>
+<script src="js/data/platforms/shoal.js"></script>
+<script src="js/data/platforms/sluice.js"></script>
+<script src="js/data/ships/ammonite.js"></script>
+<script src="js/data/ships/atoll.js"></script>
+<script src="js/data/ships/bluewhale.js"></script>
+<script src="js/data/ships/cameroceras.js"></script>
+<script src="js/data/ships/cross.js"></script>
+<script src="js/data/ships/daplu.js"></script>
+<script src="js/data/ships/diklo.js"></script>
+<script src="js/data/ships/dolphin.js"></script>
+<script src="js/data/ships/dunkleosteus.js"></script>
+<script src="js/data/ships/humpback.js"></script>
+<script src="js/data/ships/icecore.js"></script>
+<script src="js/data/ships/orca.js"></script>
+<script src="js/data/ships/seascorpion.js"></script>
+<script src="js/data/ships/skori.js"></script>
+<script src="js/data/ships/spermwhale.js"></script>
+<script src="js/data/ships/trilobite.js"></script>
+<script src="js/data/targets/cell.js"></script>
+<script src="js/data/targets/cmdpost.js"></script>
+<script src="js/data/targets/depot.js"></script>
+<script src="js/data/targets/radar.js"></script>
+<script src="js/data/targets/relay.js"></script>
+<script src="js/data/targets/sam.js"></script>
+<script src="js/data/targets/sower.js"></script>
+<script src="js/data/targets/station.js"></script>
+<script src="js/data/turret-guns/aa30.js"></script>
+<script src="js/data/turret-guns/ciws20.js"></script>
+<script src="js/data/turret-guns/lnchSam.js"></script>
+<script src="js/data/turret-guns/lnchSsm.js"></script>
+<script src="js/data/turret-guns/n120.js"></script>
+<script src="js/data/turret-guns/n50.js"></script>
+<script src="js/data/turret-guns/n75.js"></script>
+<script src="js/data/turret-guns/railSsm.js"></script>
+<script src="js/data/turret-guns/rotSam.js"></script>
+<script src="js/data/turret-guns/tail20.js"></script>
+<script src="js/data/turret-guns/tail20a.js"></script>
+<script src="js/data/turret-guns/vlsSam.js"></script>
+<script src="js/data/turret-guns/vlsSsm.js"></script>
+<script src="js/data/weapons/arm.js"></script>
+<script src="js/data/weapons/asl.js"></script>
+<script src="js/data/weapons/asl2.js"></script>
+<script src="js/data/weapons/cel1.js"></script>
+<script src="js/data/weapons/cel11.js"></script>
+<script src="js/data/weapons/cel2.js"></script>
+<script src="js/data/weapons/cel3.js"></script>
+<script src="js/data/weapons/cel7.js"></script>
+<script src="js/data/weapons/clb.js"></script>
+<script src="js/data/weapons/dec.js"></script>
+<script src="js/data/weapons/dl4.js"></script>
+<script src="js/data/weapons/dl6.js"></script>
+<script src="js/data/weapons/dl9.js"></script>
+<script src="js/data/weapons/drm.js"></script>
+<script src="js/data/weapons/e4.js"></script>
+<script src="js/data/weapons/ecm2.js"></script>
+<script src="js/data/weapons/hbh.js"></script>
+<script src="js/data/weapons/hbl.js"></script>
+<script src="js/data/weapons/hdp.js"></script>
+<script src="js/data/weapons/hos.js"></script>
+<script src="js/data/weapons/hva.js"></script>
+<script src="js/data/weapons/hwm.js"></script>
+<script src="js/data/weapons/irp.js"></script>
+<script src="js/data/weapons/kkv.js"></script>
+<script src="js/data/weapons/l2.js"></script>
+<script src="js/data/weapons/lcm.js"></script>
+<script src="js/data/weapons/mrm.js"></script>
+<script src="js/data/weapons/oep.js"></script>
+<script src="js/data/weapons/otr.js"></script>
+<script src="js/data/weapons/pgb.js"></script>
+<script src="js/data/weapons/qsr.js"></script>
+<script src="js/data/weapons/rkt.js"></script>
+<script src="js/data/weapons/sat.js"></script>
+<script src="js/data/weapons/srm.js"></script>
+<script src="js/data/weapons/ss6.js"></script>
+<script src="js/data/weapons/ssm.js"></script>
+<script src="js/data/weapons/swm.js"></script>
+<script src="js/data/weapons/trm.js"></script>
+<script src="js/data/weapons/v11.js"></script>
+<script src="js/data/weapons/v17.js"></script>
+<script src="js/data/weapons/v22.js"></script>
+<script src="js/data/weapons/v25.js"></script>
+<script src="js/data/weapons/v30.js"></script>
+<script src="js/data/weapons/v9.js"></script>
+<script src="js/data/weapons/vbn.js"></script>
+<script src="js/data/weapons/vgt.js"></script>
+<script src="js/data/weapons/vlar.js"></script>
+<script src="js/data/weapons/vsc.js"></script>
+<script src="js/data/weapons/vsr.js"></script>
+<script src="js/data/weapons/vzu.js"></script>
+<script src="js/data/weapons/wasp.js"></script>
+<script src="js/data/zz-seal.js"></script>
+<script src="js/models/_lib.js"></script>
+<script src="js/models/_passes.js"></script>
+<script src="js/models/platforms/_lib.js"></script>
+<script src="js/models/ships/_schema.js"></script>
+<script src="js/models/targets/_lib.js"></script>
+<script src="js/models/aircraft/albatross.js"></script>
+<script src="js/models/aircraft/basalt.js"></script>
+<script src="js/models/aircraft/booby.js"></script>
+<script src="js/models/aircraft/boulder.js"></script>
+<script src="js/models/aircraft/folded_wing.js"></script>
+<script src="js/models/aircraft/frigatebird.js"></script>
+<script src="js/models/aircraft/petrel.js"></script>
+<script src="js/models/aircraft/sailfish.js"></script>
+<script src="js/models/aircraft/sandstone.js"></script>
+<script src="js/models/aircraft/schist.js"></script>
+<script src="js/models/aircraft/skua.js"></script>
+<script src="js/models/aircraft/spray.js"></script>
+<script src="js/models/ordnance/bomb.js"></script>
+<script src="js/models/ordnance/missile.js"></script>
+<script src="js/models/ordnance/pod.js"></script>
+<script src="js/models/ordnance/store-lib.js"></script>
+<script src="js/models/platforms/beacon.js"></script>
+<script src="js/models/platforms/breakwater.js"></script>
+<script src="js/models/platforms/cairn.js"></script>
+<script src="js/models/platforms/reed.js"></script>
+<script src="js/models/platforms/shoal.js"></script>
+<script src="js/models/platforms/sluice.js"></script>
+<script src="js/models/ships/ammonite.js"></script>
+<script src="js/models/ships/atoll.js"></script>
+<script src="js/models/ships/bluewhale.js"></script>
+<script src="js/models/ships/cameroceras.js"></script>
+<script src="js/models/ships/cross.js"></script>
+<script src="js/models/ships/daplu.js"></script>
+<script src="js/models/ships/diklo.js"></script>
+<script src="js/models/ships/dolphin.js"></script>
+<script src="js/models/ships/dunkleosteus.js"></script>
+<script src="js/models/ships/humpback.js"></script>
+<script src="js/models/ships/icecore.js"></script>
+<script src="js/models/ships/orca.js"></script>
+<script src="js/models/ships/seascorpion.js"></script>
+<script src="js/models/ships/skori.js"></script>
+<script src="js/models/ships/spermwhale.js"></script>
+<script src="js/models/ships/trilobite.js"></script>
+<script src="js/models/ships/turrets.js"></script>
+<script src="js/models/targets/cell.js"></script>
+<script src="js/models/targets/cmdpost.js"></script>
+<script src="js/models/targets/depot.js"></script>
+<script src="js/models/targets/radar.js"></script>
+<script src="js/models/targets/relay.js"></script>
+<script src="js/models/targets/sam.js"></script>
+<script src="js/models/targets/sower.js"></script>
+<script src="js/models/targets/station.js"></script>
+<script src="js/models/zz-seal.js"></script>
+<script src="js/missions/_lib.js"></script>
+<script src="js/missions/_schema.js"></script>
+<script src="js/missions/campaigns.js"></script>
+<script src="js/missions/m1.js"></script>
+<script src="js/missions/m10.js"></script>
+<script src="js/missions/m11.js"></script>
+<script src="js/missions/m12.js"></script>
+<script src="js/missions/m2.js"></script>
+<script src="js/missions/m3.js"></script>
+<script src="js/missions/m4.js"></script>
+<script src="js/missions/m5.js"></script>
+<script src="js/missions/m6.js"></script>
+<script src="js/missions/m7.js"></script>
+<script src="js/missions/m8.js"></script>
+<script src="js/missions/m9.js"></script>
+<script src="js/missions/sk1.js"></script>
+<script src="js/missions/zz-seal.js"></script>
+<script src="js/engine/audio.js"></script>
+<script src="js/engine/ballistics.js"></script>
+<script src="js/engine/combat.js"></script>
+<script src="js/engine/loadout.js"></script>
+<script src="js/engine/route.js"></script>
+<script src="js/engine/turret.js"></script>
+<script src="js/engine/ai/brain.js"></script>
+<script src="js/engine/ai/steer.js"></script>
+<script src="js/engine/ai/tactics.js"></script>
+<script src="js/engine/ai/util.js"></script>
+<script src="js/engine/entities/aircraft.js"></script>
+<script src="js/engine/entities/damage.js"></script>
+<script src="js/engine/entities/ecm.js"></script>
+<script src="js/engine/entities/guns.js"></script>
+<script src="js/engine/entities/missile.js"></script>
+<script src="js/engine/entities/mounts.js"></script>
+<script src="js/engine/entities/particles.js"></script>
+<script src="js/engine/entities/physics.js"></script>
+<script src="js/engine/entities/radiation.js"></script>
+<script src="js/engine/entities/range.js"></script>
+<script src="js/engine/entities/targets.js"></script>
+<script src="js/engine/entities/warhead.js"></script>
+<script src="js/engine/game/combat.js"></script>
+<script src="js/engine/game/control.js"></script>
+<script src="js/engine/game/finish.js"></script>
+<script src="js/engine/game/launch.js"></script>
+<script src="js/engine/game/loadout.js"></script>
+<script src="js/engine/game/lock.js"></script>
+<script src="js/engine/game/mission-start.js"></script>
+<script src="js/engine/game/update.js"></script>
+<script src="js/engine/game/vars.js"></script>
+<script src="js/engine/game/world.js"></script>
+<script src="js/engine/ai/zz-api.js"></script>
+<script src="js/engine/entities/zz-api.js"></script>
+<script src="js/render/render-gl.js"></script>
+<script src="js/render/render.js"></script>
+<script src="js/render/env/build.js"></script>
+<script src="js/render/env/create.js"></script>
+<script src="js/render/env/shaders.js"></script>
+<script src="js/render/planform/paint.js"></script>
+<script src="js/render/planform/planes.js"></script>
+<script src="js/render/planform/stores.js"></script>
+<script src="js/render/env/zz-api.js"></script>
+<script src="js/render/planform/zz-api.js"></script>
+<script src="js/ui/codex/_lib.js"></script>
+<script src="js/ui/codex/_schema.js"></script>
+<script src="js/ui/camera.js"></script>
+<script src="js/ui/frame.js"></script>
+<script src="js/ui/hudfx.js"></script>
+<script src="js/ui/input.js"></script>
+<script src="js/ui/radio.js"></script>
+<script src="js/ui/sysnote.js"></script>
+<script src="js/ui/unitview.js"></script>
+<script src="js/ui/codex/entries/cmp1.js"></script>
+<script src="js/ui/codex/entries/cmp2.js"></script>
+<script src="js/ui/codex/entries/f1.js"></script>
+<script src="js/ui/codex/entries/f2.js"></script>
+<script src="js/ui/codex/entries/f3.js"></script>
+<script src="js/ui/codex/entries/f4.js"></script>
+<script src="js/ui/codex/entries/f5.js"></script>
+<script src="js/ui/codex/entries/f6.js"></script>
+<script src="js/ui/codex/entries/f7.js"></script>
+<script src="js/ui/codex/entries/inv1.js"></script>
+<script src="js/ui/codex/entries/inv2.js"></script>
+<script src="js/ui/codex/entries/inv3.js"></script>
+<script src="js/ui/codex/entries/s1.js"></script>
+<script src="js/ui/codex/entries/s2.js"></script>
+<script src="js/ui/codex/entries/s3.js"></script>
+<script src="js/ui/codex/entries/s4.js"></script>
+<script src="js/ui/codex/entries/s5.js"></script>
+<script src="js/ui/codex/entries/t1.js"></script>
+<script src="js/ui/codex/entries/t2.js"></script>
+<script src="js/ui/codex/entries/t3.js"></script>
+<script src="js/ui/codex/entries/t4.js"></script>
+<script src="js/ui/codex/entries/t5.js"></script>
+<script src="js/ui/codex/entries/w1.js"></script>
+<script src="js/ui/codex/entries/w2.js"></script>
+<script src="js/ui/hud/aids.js"></script>
+<script src="js/ui/hud/base.js"></script>
+<script src="js/ui/hud/instruments.js"></script>
+<script src="js/ui/hud/panels.js"></script>
+<script src="js/ui/hud/radar.js"></script>
+<script src="js/ui/hud/targeting.js"></script>
+<script src="js/ui/hud/text.js"></script>
+<script src="js/ui/screens/brief.js"></script>
+<script src="js/ui/screens/changelog.js"></script>
+<script src="js/ui/screens/codex.js"></script>
+<script src="js/ui/screens/hangar.js"></script>
+<script src="js/ui/screens/hardpoints.js"></script>
+<script src="js/ui/screens/nav.js"></script>
+<script src="js/ui/screens/pause.js"></script>
+<script src="js/ui/screens/settings.js"></script>
+<script src="js/ui/codex/zz-seal.js"></script>
+<script src="js/ui/hud/zz-api.js"></script>
+<script src="js/boot/main.js"></script>
+<script src="js/boot/zz-api-game.js"></script>
+</body>
+</html>

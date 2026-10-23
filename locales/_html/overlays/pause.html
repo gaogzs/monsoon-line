@@ -1,0 +1,31 @@
+<!-- ============ 暂停 ============ -->
+<div id="pause" class="overlay">
+  <div class="pause-box wide">
+    <h2>PAUSED</h2>
+
+    <div class="pause-tabs">
+      <button class="ptab on" data-ptab="main">{{html.pause.tab_main}}</button>
+      <button class="ptab" data-ptab="settings">{{html.pause.tab_settings}}</button>
+      <button class="ptab" data-ptab="help">{{html.pause.tab_help}}</button>
+    </div>
+
+    <div class="pane on" id="pane-main">
+      <div class="dsub">{{html.pause.dsub}}</div>
+      <div class="menu">
+        <button class="btn primary" id="btnResume">{{html.pause.btnResume}}</button>
+        <button class="btn" id="btnAbort">{{html.pause.btnAbort}}</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-settings">
+      <div class="set-wrap in-overlay" id="pauseSettings"></div>
+      <div class="menu" style="margin-top:14px">
+        <button class="btn" id="pauseSetReset">{{html.pause.pauseSetReset}}</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-help">
+      <div class="minihelp" id="pauseHelp"></div>
+    </div>
+  </div>
+</div>

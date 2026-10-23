@@ -17,7 +17,7 @@
 | 加载位置 | `index.html` 里紧随 `js/render/planform/` 之后、`js/data/` 之前 |
 | 依赖 | 静态条目零依赖；图鉴条目在 `build()` 里读 `AIRCRAFT` / `WEAPONS` / `SHIPS`（`WEAPONS` 已含补丁表注入的字段） |
 | 输出 | 全局 `var CODEX`（数组）；四个辅助函数 `_hpKind` `_capLabel` `_rngTxt` `_seekerLabel` 也挂在全局 |
-| 校验 | `tools/smoke.js` 会遍历所有 `typeof e.build === 'function'` 的条目并调用一次 |
+| 校验 | `tools/test/smoke.js` 会遍历所有 `typeof e.build === 'function'` 的条目并调用一次 |
 
 **加载顺序为什么重要**：js/ui/codex/ 先于 js/data/ 求值。`CODEX` 数组字面量本身不引用那些表，所以能安全求值；所有对 `AIRCRAFT` / `WEAPONS` 的引用都必须留在 `build()` 函数体内，等用户点开图鉴时才执行。源码注释把这条写得很明白：
 
@@ -316,7 +316,7 @@ for (const e of dyn) {
 | `unitview.js` | 图鉴里那两个 `cx-unit` 标记的落点：`Game` 的委托拿到 `data-unit` 后调 `UnitView.html()` / `mount()` 换成详情页。`s4` 的 `mount()` 另外直接调 `UnitView.mountModel()` 挂调节单元的 3D 预览。`.cx-unit` 的样式也在那一族里 |
 | `index.html` | 提供 `#scr-codex` / `#codexNav` / `#codexBody` 三个锚点，以及入口按钮 `data-go="codex"` |
 | `css/style.css` | `.cx-table` `.cx-title` `.cx-sub` `.cx-text` `.cx-note` `.cx-cat` `.cx-item` `.cx-fly`，以及 `<span class="am">` / `cy` / `rd` 三个强调色 |
-| `tools/smoke.js` | 断言动态条目可生成且 ≥200 字符；导航按钮 `data-go="codex"` → `scr-codex` |
+| `tools/test/smoke.js` | 断言动态条目可生成且 ≥200 字符；导航按钮 `data-go="codex"` → `scr-codex` |
 | `docs/world/SETTING.md` | 同源散文，但**没有代码绑定**，参数可能已漂移 |
 
 ## 本批更新

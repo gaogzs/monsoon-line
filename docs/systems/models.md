@@ -295,7 +295,7 @@ b.hull([
 | 目标受击半径 | `done(...)` 里的 `radius` **不生效**；设施看 `spawnTarget` 传的值，舰船看 `SHIPS[].radius` |
 | 圆柱 / 喷口圆周分段 | `tube(a, b, ra, rb, seg, ...)` 的 `seg`（常见 6 / 8 / 10 / 12） |
 | 海上平台大小 | `seaBase(b, w, d)` 的调用参数 |
-| 舰船外形肉眼检查 | `node tools/render-ships.js` → `tools/preview/ship-*.png`（走真正的 `render.js`） |
+| 舰船外形肉眼检查 | `node tools/render/render-ships.js` → `tools/render/out/ship-*.png`（走真正的 `render.js`） |
 | 新增一个模型 | 仿照现有的 `M.xxx = (function () { var b = new MB(); ...; return done(b, {...}); })()` |
 
 ## 易踩的坑与设计取舍

@@ -36,7 +36,7 @@
 
 **`shading.js` 是着色唯一来源**：光照方向 `LIGHT`、雾（900–9000 m，封顶 0.82，雾色 `[150,176,196]`）、
 `AMBIENT 0.44 / DIFFUSE 0.56 / DEGENERATE 0.62`、自发光封顶 1.5、16 档量化。
-`render.js` 与 `render-gl.js` 都读它 —— 改一处两边一起变。两条路径的画面差异由 `tools/probe-render.js` 盯着。
+`render.js` 与 `render-gl.js` 都读它 —— 改一处两边一起变。两条路径的画面差异由 `tools/render/probe-render.js` 盯着。
 
 ---
 
@@ -72,7 +72,7 @@ GL 内顺序：天空 + 海面 → 不透明模型 →（深度解析）→ 高�
 | `Renderer.setQuality(0\|1)` | 设置 显示→画面（`gfxQuality`）。0 = 标准：关软粒子 |
 | `Renderer.setGfx({ env, clouds, sheets, particles, soft })` | 单项开关，和旧画面并排对比用（控制台里调）。`env:false` = 天空 / 云 / 海面整层退回 2D |
 
-参数在 `shading.js` 的 `EARTH_R / SKY / SEA / CLOUD / SHEETS`。`tools/probe-render.js` 的 `env-*` 场景截新旧对比图（只报告）。
+参数在 `shading.js` 的 `EARTH_R / SKY / SEA / CLOUD / SHEETS`。`tools/render/probe-render.js` 的 `env-*` 场景截新旧对比图（只报告）。
 
 ---
 

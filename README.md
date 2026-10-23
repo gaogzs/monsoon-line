@@ -179,43 +179,31 @@ cd monsoon-line
 
 ```
 monsoon-line/
-├── index.html          游戏入口（双击即可运行）
+├── index.html          游戏入口（双击即可运行）：本地启动器，按语言重定向到对应的页面副本
 ├── CHANGELOG.md        更新日志（主菜单「更新记录」页读的就是它）
-├── css/
-│   └── style.css       界面样式
-├── js/
-│   ├── version.js      版本戳（自动生成，勿手改）
-│   ├── changelog.js    更新日志数据（自动生成，勿手改）
-│   ├── math3d.js       向量 / 罗德里格斯旋转 / 近平面裁剪 / 透视投影
-│   ├── shading.js      着色规则（2D 与 WebGL 共用的光照 / 雾 / 量化）
-│   ├── models.js       低多边形机体 / 水面舰船 / 地面目标几何
-│   ├── planform.js     机库与详情页的矢量俯视识别图
-│   ├── codex.js        游戏内资料库
-│   ├── data.js         机型 / 舰船 / 武器 / 挂载属性 / 呼号 / 无线电台词
-│   ├── audio.js        全程序化音效合成（WebAudio）
-│   ├── render.js       2D 画法：天空 / 地面 / 深度排序面绘制 / 粒子
-│   ├── render-gl.js    WebGL2 模型渲染（共用深度缓冲）
-│   ├── render-env.js   WebGL 环境层：天空 / 海面 / 云 / 粒子
-│   ├── combat.js       战斗部：近炸 / 爆炸伤害 / 爆炸特效
-│   ├── entities.js     飞行模型 / 动压缩放 / 导弹比例导引 / 挂载与匿踪汇总
-│   ├── turret.js       舰炮与近防炮
-│   ├── route.js        分段航线（关卡脚本用）
-│   ├── ai.js           追击转弯控制律 / 导弹规避 / 编队 / 舰船航海
-│   ├── hud.js          平显 / 雷达 / 锁定框 / 动压表 / RWR
-│   ├── hudfx.js        HUD 全屏滤镜：电子战干扰 / 受伤闪红
-│   ├── unitview.js     单位详情页：实时 3D 预览 / 俯视图 / 参数表
-│   ├── missions.js     关卡的战场生成与触发器
-│   └── game.js         状态机 / 主循环 / 无线电 / UI 绑定 / 机库
+├── css/style.css       界面样式
+├── locales/            全部文本与页面
+│   ├── _html/          页面模板片段（与语言无关）
+│   └── zh-CN/          text/（JSON 文本）· text.gen.js 与 index.html（生成的页面副本）
+├── js/                 游戏代码：一个单位 / 一个关卡 / 一个界面一个文件，按层分目录
+│   ├── core/           数学、着色、注册表与标签、文本机制、版本戳与更新日志（生成）
+│   ├── data/           机型 / 武器 / 舰船 / 平台 / 设施 / 呼号 / 台词
+│   ├── models/         低多边形机体 / 水面舰船 / 地面目标几何
+│   ├── missions/       关卡的战场生成与触发器（一关一个文件）、战役
+│   ├── engine/         实体与飞行模型 / AI / 战斗 / 舰炮 / 航线 / 音效 / 挂载 / Game 的世界侧
+│   ├── render/         2D 与 WebGL 渲染、环境层、机库俯视识别图
+│   ├── ui/             平显、各屏界面、资料库、输入、相机、单位详情页
+│   └── boot/           主循环、开机自检、初始化
 ├── docs/               文档（索引见 docs/README.md）
 │   ├── DESIGN.md       总设计文档：架构、决策理由、已知问题
 │   ├── VERSIONING.md   版本号规则
 │   ├── world/          世界设定（可脱离代码单独阅读）
-│   └── systems/        渲染 / 飞行模型 / 武器 / 挂载 / AI / HUD / 音效等
-└── tools/              冒烟测试、发版脚本、各类预览与探针
+│   └── systems/        渲染 / 飞行模型 / 武器 / 挂载 / AI / HUD / 文本 / 页面等
+└── tools/              test/（冒烟、快照、回放、探针）· build/（生成与发版）· render/（预览出图）· lib/
 ```
 
-`js/` 下的文件按 `index.html` 中的顺序用经典 `<script>` 标签加载，
-共享全局命名空间，因此无需任何打包工具。
+`js/` 下的文件由 `tools/build/gen-index.js` 的层规则排序，按顺序用经典 `<script>` 标签加载（顺序写在各语言的页面副本里），
+共享全局命名空间，因此无需任何打包工具。改了页面片段、文本或增删了 js 文件，跑一次 `node tools/build/gen-pages.js`。
 
 ---
 
@@ -238,7 +226,7 @@ monsoon-line/
 - **[更新日志](CHANGELOG.md)** —— 从立项（v0.1.0）到现在的每一个版本。游戏里也能看：
   主菜单 → **更新记录**
 - **[版本号规则](docs/VERSIONING.md)** —— 每一次改动怎么自己拿到版本号、
-  `node tools/release.js` 发一次版会做哪几件事
+  `node tools/build/release.js` 发一次版会做哪几件事
 - **[世界设定集](docs/world/SETTING.md)** —— 可以脱离代码单独阅读：
   世界线年表、调节场工作原理、四方势力、平流层作战、兵器谱系、术语表，
   以及一节 **「真实科学与虚构的边界」**（明确区分哪些是真实大气科学，哪些是编的）
@@ -251,7 +239,7 @@ monsoon-line/
 ## 开发
 
 ```bash
-node tools/smoke.js
+node tools/test/smoke.js
 ```
 
 这是项目唯一的自动化测试：用最小 DOM / Canvas / WebAudio 桩把所有脚本
@@ -261,7 +249,7 @@ node tools/smoke.js
 发一个新版本：
 
 ```bash
-node tools/release.js vX.Y.Z
+node tools/build/release.js vX.Y.Z
 ```
 
 版本号由人指定（规则见 [版本号规则](docs/VERSIONING.md)）。脚本会把这一批提交

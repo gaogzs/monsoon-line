@@ -1,0 +1,35 @@
+<!-- ============ 屏幕：任务简报 ============ -->
+<section id="scr-brief" class="screen">
+  <header class="bar">
+    <span class="bar-t">{{html.brief.title}}</span>
+    <span class="bar-r" id="briefDate">2078.03.14</span>
+  </header>
+
+  <div class="brief-wrap">
+    <div class="brief-main">
+      <div class="msn-list" id="msnList"></div>
+      <div class="msn-no" id="bNo">OPERATION 01</div>
+      <h2 id="bName">—</h2>
+      <div class="msn-loc" id="bLoc">—</div>
+      <div class="msn-prose" id="bProse"></div>
+
+      <div class="msn-block">
+        <div class="blk-h">{{html.brief.blk-h}}</div>
+        <ul id="bObj"></ul>
+      </div>
+      <div class="msn-block">
+        <div class="blk-h">{{html.brief.blk-h_2}}</div>
+        <ul id="bThreat" class="threat"></ul>
+      </div>
+    </div>
+    <div class="brief-side">
+      <canvas id="mapCv" width="360" height="360"></canvas>
+      <div class="intel" id="bIntel"></div>
+    </div>
+  </div>
+
+  <footer class="bar bottom">
+    <button class="btn" data-go="campaign">{{html.brief.btn_campaign}}</button>
+    <button class="btn primary" data-go="hangar">{{html.brief.btn_hangar}}</button>
+  </footer>
+</section>

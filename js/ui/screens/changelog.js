@@ -7,7 +7,7 @@
      更新记录页
 
      内容来自 js/changelog.js（全局 CHANGELOG），而那个文件由
-     tools/release.js 从根目录的 CHANGELOG.md 生成。
+     tools/build/release.js 从根目录的 CHANGELOG.md 生成。
      所以这里只负责画，版本号与条目一个字都不在这条代码里 ——
      以后发新版本不需要动这个函数。
      ============================================================ */
@@ -35,7 +35,7 @@
         !CHANGELOG.releases.length) {
       if (head) head.textContent = '未生成';
       body.innerHTML = '<div class="cl-empty">这一份还没生成更新记录。' +
-        '<br>在项目根目录跑一次 <b>node tools/release.js</b> 就有了。</div>';
+        '<br>在项目根目录跑一次 <b>node tools/build/release.js</b> 就有了。</div>';
       return;
     }
 
@@ -73,7 +73,7 @@
 
     /* 末尾挂一句"这一页怎么来的"，顺手把版本号规则的位置告诉下一个改代码的人。 */
     html += '<div class="cl-foot">版本号规则见 docs/VERSIONING.md —— ' +
-      '版本号发版时手动指定，由 tools/release.js 追加到这里。</div>';
+      '版本号发版时手动指定，由 tools/build/release.js 追加到这里。</div>';
 
     body.innerHTML = html;
   }

@@ -1,0 +1,17 @@
+<!-- ============ 屏幕：结算 ============ -->
+<section id="scr-debrief" class="screen">
+  <header class="bar"><span class="bar-t">{{html.debrief.title}}</span><span class="bar-r" id="dCallsign">VESPER-1</span></header>
+  <div class="debrief-wrap">
+    <div class="rank" id="dRank">S</div>
+    <h2 id="dTitle">MISSION COMPLETE</h2>
+    <div class="dsub" id="dSub"></div>
+    <table class="score" id="dTable"></table>
+    <div class="dquote" id="dQuote"></div>
+    <div class="menu">
+      <button class="btn primary" id="btnNext">{{html.debrief.btnNext}}</button>
+      <button class="btn" id="btnRetry">{{html.debrief.btnRetry}}</button>
+      <button class="btn" data-go="hangar">{{html.debrief.btn_hangar}}</button>
+      <button class="btn" data-go="title">{{html.debrief.btn_title}}</button>
+    </div>
+  </div>
+</section>

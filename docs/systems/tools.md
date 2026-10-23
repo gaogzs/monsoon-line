@@ -1,15 +1,33 @@
 # 工具链与测试
 
-代码：`tools/smoke.js`（唯一的自动化测试）· `tools/release.js` + `CHANGELOG.md` + `js/core/changelog.js`（发版与更新日志）
-· `tools/stamp-version.js` + `js/core/version.js`（版本戳）
-· `tools/render-planform.js`（离线机库俯视图预览）· `tools/render-ships.js`（离线舰船外形预览）
-· `tools/render-units.js`（离线单位 3D 预览）· `tools/shot-unitview.js`（无头 Chrome 截详情页布局）
+代码：`tools/test/smoke.js`（唯一的自动化测试）· `tools/build/release.js` + `CHANGELOG.md` + `js/core/changelog.js`（发版与更新日志）
+· `tools/build/stamp-version.js` + `js/core/version.js`（版本戳）
+· `tools/render/render-planform.js`（离线机库俯视图预览）· `tools/render/render-ships.js`（离线舰船外形预览）
+· `tools/render/render-units.js`（离线单位 3D 预览）· `tools/render/shot-unitview.js`（无头 Chrome 截详情页布局）
 · `tools/lib/raster.js`（几个预览器共用的光栅器 / Canvas 桩 / PNG 编码）
-· `tools/probe-missions.js`（逐关验证胜利条件可达）· `tools/render-mounts.js`（离线 NPC 挂载预览）
-· `tools/rename-aircraft.js`（一次性批量改名）
-· `tools/lib/sim.js`（后台模拟框架，v2.0.0）· `tools/probe-render.js`（WebGL / 2D 画面对比）· `tools/probe-balance.js`（难度回归）
+· `tools/test/probes/probe-missions.js`（逐关验证胜利条件可达）· `tools/render/render-mounts.js`（离线 NPC 挂载预览）
+· `tools/build/rename-aircraft.js`（一次性批量改名）
+· `tools/lib/sim.js`（后台模拟框架，v2.0.0）· `tools/render/probe-render.js`（WebGL / 2D 画面对比）· `tools/test/probes/probe-balance.js`（难度回归）
 
 ---
+
+
+## 目录分组（批次 1 之后）
+
+```
+tools/
+├── test/        测试与回归：smoke  snapshot-data  golden  golden-render  probe-perf  text-census  check-locales
+│   ├── probes/  各类探针：probe-balance / blast / ccip / ciws / envelope / footprint / gunlead / missions / range / turret
+│   └── baseline/  各基线（数据快照、黄金回放、画面回归、性能、中文字符串允许清单）
+├── build/       生成与发版：gen-index（脚本顺序）  gen-pages（页面副本与启动器）  gen-locales  fmt-locales  extract-text  extract-html（一次性）  release  stamp-version  rename-aircraft
+├── render/      预览出图：render-units / ships / planform / mounts  shot-unitview  probe-render；输出在 render/out/（gitignore）
+└── lib/         sim（后台模拟）  scripts（脚本清单）  strict-json  raster  root（仓库根路径）
+```
+
+旧路径 → 新路径：`tools/smoke.js` → `tools/test/smoke.js`，`tools/probe-*.js` → `tools/test/probes/`，
+`tools/baseline/` → `tools/test/baseline/`，`tools/release.js` 等 → `tools/build/`，
+`tools/render-*.js` / `shot-unitview.js` → `tools/render/`，`tools/preview/` → `tools/render/out/`。
+脚本里需要仓库根目录时一律 `require('…/lib/root').ROOT`，不再数 `..`。
 
 ## 为什么这个项目会有 tools/
 
@@ -17,7 +35,7 @@
 双击 `index.html` 就能玩。`tools/` 全是**开发期的旁路**，跑在 Node 里，
 产物不参与游戏运行（唯二的例外是 `js/core/version.js` 与 `js/core/changelog.js`——
 那两个是游戏真的要读的数据文件）。所以这里没有 npm script，
-一律 `node tools/xxx.js`。改完代码唯一必须做的事是 `node tools/smoke.js`。
+一律 `node tools/xxx.js`。改完代码唯一必须做的事是 `node tools/test/smoke.js`。
 
 | 工具 | 一句话职责 | 什么时候跑 |
 |---|---|---|
@@ -28,7 +46,7 @@
 | `probe-missions.js` | **逐关验证"清空敌人之后到底能不能赢"**，并检查 NPC 挂载问题 | 加了新关卡、改了胜负条件之后 |
 | `probe-turret.js` | 近防炮打 1.2 km 外横穿目标的命中率（直线 / 慢转 / 加速 / 乱机动），射界外不开火、转速受限；Dunkleosteus 贴近通场的掉血（直线 20–40、机动 ≤ 8） | 改了 `turret.js` 或 `TURRET_GUNS` 之后 |
 | `probe-blast.js` | 每种空空弹按 straight / gentle / hard / jink / max / flare 六档机动各打 N 发，统计命中率、平均伤害（占 `dmg` 比例）、起爆距离，与 `probe-blast.baseline.json` 对比 | 改了近炸 / 爆炸半径 / 导引之后 |
-| `release.js` | 按命令里给的版本号追加 `CHANGELOG.md` 草稿，生成 `js/core/changelog.js` 与 `js/core/version.js` | **每次发一个版本**（`node tools/release.js vX.Y.Z`） |
+| `release.js` | 按命令里给的版本号追加 `CHANGELOG.md` 草稿，生成 `js/core/changelog.js` 与 `js/core/version.js` | **每次发一个版本**（`node tools/build/release.js vX.Y.Z`） |
 | `stamp-version.js` | 只把上一次提交写进 `js/core/version.js`（版本号从 `CHANGELOG.md` 顶部读） | **每次 `git commit` 之前** |
 | `render-planform.js` | 把 `PLANFORM.draw()` 的输出落成 PNG | 改了机库俯视图数据/画法之后 |
 | `render-ships.js` | 用真正的 `js/models/` + `render.js` 把每艘舰船渲染成 PNG | 改了舰船模型之后 |
@@ -66,14 +84,14 @@ Sim.batch(seeds, scenario); Sim.stats(...);
 ### `probe-render.js` —— WebGL 与 2D 画面对比
 
 无头 Chrome（`--use-angle=swiftshader` 软件 GL）把固定场景（`wing-top` / `wing-low` / `fleet-fog` / `ship` / `aircraft-*`）
-用两条路径各画一张，左右并排，输出 `tools/preview/probe-render.png`。
+用两条路径各画一张，左右并排，输出 `tools/render/out/probe-render.png`。
 差异 = 任一通道差 > 24 的像素占比；**限 3%**，遮挡场景（`wing-top`）除外 —— 那正是迁移要修的，只报告不判失败。
 当前：非遮挡场景 ≤ 1.3%。
 
 ### `probe-balance.js` —— 难度回归
 
 ```bash
-node tools/probe-balance.js [--seeds 5] [--t 240] [--only m2]
+node tools/test/probes/probe-balance.js [--seeds 5] [--t 240] [--only m2]
 ```
 
 玩家无敌、不开火、不机动，量敌方行动本身的压力：`loseAt`、我方单位损失、剩余血量、航线动作次数（`onArrive` + `call` 段 + strike 发射数）。
@@ -98,7 +116,7 @@ node tools/probe-balance.js [--seeds 5] [--t 240] [--only m2]
 足够把新刷出来的增援 / 波次一并清掉；以代码为准。）
 
 ```
-node tools/probe-missions.js
+node tools/test/probes/probe-missions.js
 OK   0 m1   第一滴雨   OK     win@0.0s  lose@—  mount=0
 ...
 OK  10 sk1  第四周    OK     win@34.5s lose@—  mount=0
@@ -123,31 +141,31 @@ OK  10 sk1  第四周    OK     win@34.5s lose@—  mount=0
 
 ### `probe-blast.js` —— 近炸与溅射的分布
 
-靶机按脚本运动（不走 AI），新旧版本跑的是同一组交战。基线 `tools/probe-blast.baseline.json`
+靶机按脚本运动（不走 AI），新旧版本跑的是同一组交战。基线 `tools/test/probes/probe-blast.baseline.json`
 是 v1.13 改动前存的，`dmg` 记为武器 `dmg` 的比例，便于跨弹比较。
 
 ```
-node tools/probe-blast.js              跑一遍并和基线对比
-node tools/probe-blast.js --save       存为新基线
-node tools/probe-blast.js --n 80       每档发数（默认 120）
-node tools/probe-blast.js --only srm   只跑一种弹
-node tools/probe-blast.js --flare      投弹时机实验：srm 来袭，3000 / 1000 / 300 / 100 m 各投一组干扰弹
+node tools/test/probes/probe-blast.js              跑一遍并和基线对比
+node tools/test/probes/probe-blast.js --save       存为新基线
+node tools/test/probes/probe-blast.js --n 80       每档发数（默认 120）
+node tools/test/probes/probe-blast.js --only srm   只跑一种弹
+node tools/test/probes/probe-blast.js --flare      投弹时机实验：srm 来袭，3000 / 1000 / 300 / 100 m 各投一组干扰弹
 ```
 
 `--flare` 的期望：早投 ≈ 0 伤害、贴脸投 > 0、随距离单调（诱饵起爆的溅射）。
 
 ---
 
-## tools/smoke.js
+## tools/test/smoke.js
 
 ### 怎么运行
 
 ```bash
-node tools/smoke.js                       # 完整跑
-node tools/smoke.js --only 挂载系统        # 只跑「挂载系统」这一段
-node tools/smoke.js --only 挂载系统,干扰与机动   # 只跑这几段（逗号分隔）
-node tools/smoke.js --skip 舰船发射器,近防拦截   # 跳过这几段
-node tools/smoke.js --list                # 列出所有段名
+node tools/test/smoke.js                       # 完整跑
+node tools/test/smoke.js --only 挂载系统        # 只跑「挂载系统」这一段
+node tools/test/smoke.js --only 挂载系统,干扰与机动   # 只跑这几段（逗号分隔）
+node tools/test/smoke.js --skip 舰船发射器,近防拦截   # 跳过这几段
+node tools/test/smoke.js --list                # 列出所有段名
 ```
 
 没有环境变量、没有 watch 模式。它读 `index.html`、读 `js/*.js`，
@@ -156,11 +174,11 @@ node tools/smoke.js --list                # 列出所有段名
 **分段跑**：smoke 的断言分成「前置」+ 16 个可独立跑的段。「前置」（加载脚本 /
 初始化 / 导航 / 更新记录 / 完整流程 / 主循环）是后面所有断言的依赖，**始终执行**；
 其余各段按 `--only` / `--skip` 过滤。改某个子系统时只跑相关段能省掉大半时间，
-大阶段完成后再完整跑一遍（`node tools/smoke.js`）。
+大阶段完成后再完整跑一遍（`node tools/test/smoke.js`）。
 
 **已知的概率性失败**：「近防拦截」段的 `12 枚来袭一枚都没拦下` 依赖随机数。smoke 全程共用
 一条种子随机序列，前面各段多抽或少抽几个随机数（比如多加载一个脚本、调整段的顺序）就会改变
-这一段的结果，所以完整跑时偶尔失败、单独跑通常通过。遇到时先 `node tools/smoke.js --only 近防拦截`
+这一段的结果，所以完整跑时偶尔失败、单独跑通常通过。遇到时先 `node tools/test/smoke.js --only 近防拦截`
 重跑；单独也稳定失败才是真回归。（批次 1 重构时遇到过一次，golden 回放一致，单独跑通过。）
 
 ### 输出格式与退出码
@@ -305,7 +323,7 @@ function pump(frames) {
 
 下表按源码里的实际分组列出。括号内是该分组的**源码标记**——带 `==` 的是
 `console.log('\n== 组名 ==')` 打的章节标题，其余是分组注释
-`/* ---- 首句 … */`。**用它在 `tools/smoke.js` 里搜就知道对应哪段代码**
+`/* ---- 首句 … */`。**用它在 `tools/test/smoke.js` 里搜就知道对应哪段代码**
 （行号会随改动漂移，标记不会）：
 
 | 分组 | 在防什么回归 |
@@ -401,8 +419,8 @@ function pump(frames) {
 
 ### 为什么 `js/core/version.js` 是自动生成的
 
-它**只有 10 行**，第一行就写着"自动生成——不要手改"。它是 `tools/release.js`
-从 git 记录里写出来的（`tools/stamp-version.js` 调的也是同一个函数）：
+它**只有 10 行**，第一行就写着"自动生成——不要手改"。它是 `tools/build/release.js`
+从 git 记录里写出来的（`tools/build/stamp-version.js` 调的也是同一个函数）：
 
 ```js
 var BUILD_STAMP = {
@@ -427,9 +445,9 @@ var BUILD_STAMP = {
 两种跑法，产物是同一个文件：
 
 ```bash
-node tools/release.js vX.Y.Z  # 发版（版本号手动指定）：追加 CHANGELOG.md + 刷新两个生成物
-node tools/release.js         # 不发版，只刷新两个生成物
-node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md 顶部读）
+node tools/build/release.js vX.Y.Z  # 发版（版本号手动指定）：追加 CHANGELOG.md + 刷新两个生成物
+node tools/build/release.js         # 不发版，只刷新两个生成物
+node tools/build/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md 顶部读）
 ```
 
 **每次 `git commit` 之前跑一遍 `stamp-version.js`。** 输出形如
@@ -456,7 +474,7 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 
 ---
 
-## tools/release.js：发版与更新日志
+## tools/build/release.js：发版与更新日志
 
 ### 解决什么问题
 
@@ -476,7 +494,7 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 <!-- commit: 09c3686 -->
 ```
 
-**版本号由人在命令里给**：`node tools/release.js v1.11.0`（`v` 可省略）。
+**版本号由人在命令里给**：`node tools/build/release.js v1.11.0`（`v` 可省略）。
 `release.js` 读最上面那条的版本号与锚点，检查新版本号格式正确、比当前版本大，
 再用 `git log <锚点>..HEAD` 取新提交，按前缀分成「新增 / 调整 / 修复 / 文档」草稿。
 加 `--dry` 只预览不落盘；不带版本号只刷新两个生成物、不发版。
@@ -495,13 +513,13 @@ node tools/stamp-version.js   # 只刷时间戳（版本号仍从 CHANGELOG.md �
 
 ### 谁来保证生成物没忘
 
-`tools/smoke.js` 里加了一条硬断言：把 `CHANGELOG.md` 现场解析一遍，
+`tools/test/smoke.js` 里加了一条硬断言：把 `CHANGELOG.md` 现场解析一遍，
 和要求 `js/core/changelog.js` 逐字段相等。忘了跑 `release.js` 会在测试里炸，
 而不是在玩家屏幕上显示一份过期的日志。
 
 ---
 
-## tools/render-planform.js
+## tools/render/render-planform.js
 
 ### 解决什么问题
 
@@ -513,10 +531,10 @@ Canvas 2D 子集 + 光栅器 + PNG 编码器，直接把 `PLANFORM.draw()` 的�
 ### 怎么用
 
 ```bash
-node tools/render-planform.js
+node tools/render/render-planform.js
 ```
 
-不用参数，输出到 `tools/preview/`，命名 `机型ID-挂载.png`：
+不用参数，输出到 `tools/render/out/`，命名 `机型ID-挂载.png`：
 
 - `<id>-default.png` —— `ac.defaultLoadout`；`<id>-clean.png` —— 空挂载
 - `<id>-<武器键>.png` —— 把该武器**装满所有挂得下的挂点组**（`fillWith()`），
@@ -541,7 +559,7 @@ node tools/render-planform.js
 
 ---
 
-## tools/render-ships.js
+## tools/render/render-ships.js
 
 ### 解决什么问题
 
@@ -562,10 +580,10 @@ Renderer.init(桩 canvas) → setCamera() → pushModel(model) → flush()
 ### 怎么用
 
 ```bash
-node tools/render-ships.js
+node tools/render/render-ships.js
 ```
 
-不用参数，输出到 `tools/preview/`：
+不用参数，输出到 `tools/render/out/`：
 
 - `ship-<id>.png` —— 每艘一条，640×380，从右前上方 3/4 视角，
   相机距离按模型尺寸自适应（`frameCamera()`）
@@ -596,7 +614,7 @@ node tools/render-ships.js
 
 ---
 
-## tools/render-mounts.js
+## tools/render/render-mounts.js
 
 ### 解决什么问题
 
@@ -620,10 +638,10 @@ js/render/render.js         ← 真的投影 / 光照 / 画家算法
 ### 怎么用
 
 ```bash
-node tools/render-mounts.js
+node tools/render/render-mounts.js
 ```
 
-不用参数，输出 `tools/preview/mount-<机型>-<配置>.png`，620×360，
+不用参数，输出 `tools/render/out/mount-<机型>-<配置>.png`，620×360，
 右前上方 3/4（与图鉴详情页同一套角度）。十二个配置各自针对一条规则：
 
 | 图 | 验证什么 |
@@ -658,7 +676,7 @@ node tools/render-mounts.js
 
 ---
 
-## tools/render-units.js 与 tools/shot-unitview.js
+## tools/render/render-units.js 与 tools/render/shot-unitview.js
 
 这两个是**单位详情页**的验证工具。为什么要两个：详情页有两件事要肉眼确认，
 而它们需要的环境完全不同。
@@ -669,12 +687,12 @@ node tools/render-mounts.js
 | 靠什么 | 离屏 canvas + `lib/raster.js`（纯 node） | 真的无头 Chrome |
 | 看到的 | 3D 预览那一个矩形 | 整页 |
 | 依赖 | 无 | 本机装了 Chrome / Edge（或设 `CHROME_PATH`） |
-| 输出 | `tools/preview/unit-<air\|ship>-<id>.png`（25 张） | `tools/preview/shot-unit-<id>.png`（默认 4 张） |
+| 输出 | `tools/render/out/unit-<air\|ship>-<id>.png`（25 张） | `tools/render/out/shot-unit-<id>.png`（默认 4 张） |
 
 ### render-units.js
 
 ```bash
-node tools/render-units.js
+node tools/render/render-units.js
 ```
 
 它直接调 `UnitView.renderModel(cvs, model, yaw, pitch)` —— 就是详情页里那个
@@ -685,8 +703,8 @@ node tools/render-units.js
 ### shot-unitview.js
 
 ```bash
-node tools/shot-unitview.js              # 默认四个：有/无俯视图的飞机各一 + 两种舰船
-node tools/shot-unitview.js ship:bluewhale   # 指定单位（ship: 前缀表示舰船）
+node tools/render/shot-unitview.js              # 默认四个：有/无俯视图的飞机各一 + 两种舰船
+node tools/render/shot-unitview.js ship:bluewhale   # 指定单位（ship: 前缀表示舰船）
 ```
 
 v2.0.0 起最小页面额外加载 `shading.js` 与 `render-gl.js`，并给 Chromium 加 swiftshader 软件 GL 参数 ——
@@ -706,7 +724,7 @@ Chromium 的参数里有两个是必须的：
 
 ---
 
-## tools/rename-aircraft.js
+## tools/build/rename-aircraft.js
 
 ### 用途
 
@@ -719,7 +737,7 @@ Chromium 的参数里有两个是必须的：
 ### 怎么用
 
 ```bash
-node tools/rename-aircraft.js
+node tools/build/rename-aircraft.js
 ```
 
 无参数、**无 dry-run**、**直接原地写文件**。跑完打印每个被改文件的替换次数与合计
@@ -753,7 +771,7 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 | 干扰成功率容差 | `±0.05`（1500 次采样）/ `±0.045`（1200 次采样） |
 | 追尾镜头俯仰限位 | 追尾镜头那组的 `CAM_PITCH_LIM = 89 * Math.PI / 180`（复现自 `updateCamera`） |
 | 压力测试时长 | 每关 1800 帧、每机型 600 帧、每武器 400 帧 |
-| 预览图尺寸 / 输出目录 / 底板色 | `render-planform.js` 顶部 `W`/`H`、`OUT`（`tools/preview/`）、`BG` |
+| 预览图尺寸 / 输出目录 / 底板色 | `render-planform.js` 顶部 `W`/`H`、`OUT`（`tools/render/out/`）、`BG` |
 | 挂载预览的取景 / 那七个配置 | `render-mounts.js` 的 `AZ` `EL` `FOV` `MARGIN` 与 `CASES` |
 | 版本戳显示位置 | `index.html` 的 `<div id="verStamp">`，由 `Game` 的 `stampVersion()` 填 |
 | 更新记录页的样式 | `style.css` 的 `.cl-*`；数据在 `js/core/changelog.js`，条目文本由 `clInline()` 还原 `**粗**` / `` `代码` `` |
@@ -806,21 +824,22 @@ const re = new RegExp('(?<![A-Za-z0-9])' + a.replace('-', '\\-') + '(?![0-9])', 
 
 ## 批次 1（v3.0.0）新增的重构安全网
 
-重构最大的风险是"悄悄改了行为"，所以动手前先把现状冻结成基线（`tools/baseline/`），之后每一步都比对。
+重构最大的风险是"悄悄改了行为"，所以动手前先把现状冻结成基线（`tools/test/baseline/`），之后每一步都比对。
 **这些都是秒级的，日常优先用它们；`smoke.js` 完整跑要近二十分钟，只在必要时用 `--only 段名`。**
 
 | 命令 | 保证什么 |
 |---|---|
-| `node tools/snapshot-data.js [--write]` | 全部数据表、模型（顶点 / 面哈希、键序、不可枚举成员）、关卡、资料库逐条哈希，与基线逐条比对；函数按空白折叠后比较（缩进变化不算差异） |
-| `node tools/golden.js [--write] [--secs N] [--only 关]` | 固定种子，每关跑 N 秒，每秒对全体实体的 `pos / vel / hp / ammoPool` 取哈希，报第一个分歧的关卡与秒数 |
-| `node tools/golden-render.js [--write]` | 每关画 3 帧，把 2D 画布的全部绘制调用（方法名 + 两位小数的参数）取哈希。逻辑回放看不到的 HUD / UI 拆分靠它。基线来自重构前的 `backup/` |
-| `node tools/probe-perf.js [--write]` | 每关每帧耗时与实体峰值，与基线比较（只在同一台机器上有意义） |
-| `node tools/text-census.js [--check]` | 脚本里剩余的中文字符串；`--check` 对照允许清单，只许缩小 |
-| `node tools/gen-index.js [--check]` | 生成 / 检查 `index.html` 的 `<script>` 块 |
-| `node tools/gen-locales.js` · `fmt-locales.js` · `check-locales.js` · `extract-text.js` | 文本层，见 [text.md](text.md) |
+| `node tools/test/snapshot-data.js [--write]` | 全部数据表、模型（顶点 / 面哈希、键序、不可枚举成员）、关卡、资料库逐条哈希，与基线逐条比对；函数按空白折叠后比较（缩进变化不算差异） |
+| `node tools/test/golden.js [--write] [--secs N] [--only 关]` | 固定种子，每关跑 N 秒，每秒对全体实体的 `pos / vel / hp / ammoPool` 取哈希，报第一个分歧的关卡与秒数 |
+| `node tools/test/golden-render.js [--write]` | 每关画 3 帧，把 2D 画布的全部绘制调用（方法名 + 两位小数的参数）取哈希。逻辑回放看不到的 HUD / UI 拆分靠它。基线来自重构前的 `backup/` |
+| `node tools/test/probe-perf.js [--write]` | 每关每帧耗时与实体峰值，与基线比较（只在同一台机器上有意义） |
+| `node tools/test/text-census.js [--check]` | 脚本里剩余的中文字符串；`--check` 对照允许清单，只许缩小 |
+| `node tools/build/gen-pages.js [--check]` | 从模板片段 + 文本生成各语言页面副本与启动器 `index.html`；`--check` 供 smoke 用 |
+| `node tools/build/gen-index.js` | 只打印脚本加载顺序（权威在这里，页面与所有工具都从它取） |
+| `node tools/build/gen-locales.js` · `fmt-locales.js` · `check-locales.js` · `extract-text.js` | 文本层，见 [text.md](text.md) |
 
-两个小开关：`LEGACY_TAGS=1 node tools/snapshot-data.js` 把标签还原成旧的布尔字段再比，用来核对"除迁移外一字不差"；
-快照里计划内的改动写在 `tools/snapshot-data.js` 顶部注释里。
+两个小开关：`LEGACY_TAGS=1 node tools/test/snapshot-data.js` 把标签还原成旧的布尔字段再比，用来核对"除迁移外一字不差"；
+快照里计划内的改动写在 `tools/test/snapshot-data.js` 顶部注释里。
 
 `tools/lib/scripts.js` 是脚本加载顺序的**唯一读取入口**（`loadOrder()` / `pick()` / `preview()`），
 `smoke`、`sim`、`render-*`、`probe-render`、`shot-unitview`、`rename-aircraft` 都用它，不再各写正则；

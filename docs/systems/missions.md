@@ -94,7 +94,7 @@
 写错了**不会崩**：那一组空着，同时在 `Ent.mountIssues` 里记一条人话，
 并在控制台 `console.warn` 一次。`smoke.js` 跑完所有任务后断言这份清单
 是空的 —— 所以"配错了但没人发现"这条路是堵死的。
-`node tools/render-mounts.js` 能把结果落成图，肉眼确认挂的是不是你想要的那些。
+`node tools/render/render-mounts.js` 能把结果落成图，肉眼确认挂的是不是你想要的那些。
 
 ```js
 // 一架用**上游武器**的 NPC 敌机（"上游 NPC"说的是它读哪张武器表，不是阵营）
@@ -494,7 +494,7 @@ spawn()
    而这是最容易漏掉、也最难在运行时看出来的一步。
 6. `spawn()` 里调一次 `spawnCellField(w, {xs, zs})` 铺调节单元（每一关都有），
    `smoke.js` 会查它有没有、数量是否在 9–60 之间。
-7. 跑 `node tools/smoke.js`：它会自动加载全部脚本、跑十一关各 240 帧，检查 NaN、卡死与异常，
+7. 跑 `node tools/test/smoke.js`：它会自动加载全部脚本、跑十一关各 240 帧，检查 NaN、卡死与异常，
    并断言战役覆盖率与"战役内关卡数"。
 8. 开机自检（`Game` `preflight()`）会检查：`spawn/tick/win/lose` 都是函数、
    `VOICES[id]` 存在、每关恰好归属一个战役。它**不检查**

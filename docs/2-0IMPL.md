@@ -1,5 +1,8 @@
 # 2.0 实施计划
 
+> **路径说明**：本文写于 tools 分组之前，文中的 `tools/xxx.js` 现在在子文件夹里（`tools/test/`、`tools/test/probes/`、`tools/build/`、`tools/render/`），对照表见 [systems/tools.md](systems/tools.md)。
+
+
 对应 [2-0PLAN.md](2-0PLAN.md)。本文是落地方案：分阶段、每阶段独立发布、每步都能玩能验。数值都是**起步值**，以各阶段的探针脚本实测为准再调。
 
 已定的决策：

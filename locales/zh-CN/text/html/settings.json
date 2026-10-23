@@ -1,0 +1,10 @@
+{
+  "html": {
+    "settings": {
+      "title": "设 置 / SETTINGS",
+      "sub": "改动即时生效 · 自动保存",
+      "setReset": "恢复默认",
+      "setClose": "返回"
+    }
+  }
+}

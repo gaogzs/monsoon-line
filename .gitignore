@@ -42,9 +42,9 @@ out/
 .vite/
 
 # ---------------------------------------------------------------
-# 工具生成的预览图（用 node tools/render-planform.js 随时可以重出）
+# 工具生成的预览图（用 node tools/render/render-planform.js 随时可以重出）
 # ---------------------------------------------------------------
-tools/preview/
+tools/render/out/
 
 # ---------------------------------------------------------------
 # 临时文件
@@ -55,3 +55,6 @@ tools/preview/
 *.rej
 
 .claude
+
+# 开发用伪语言页面（node tools/build/gen-pages.js --pseudo 生成）
+locales/pseudo/

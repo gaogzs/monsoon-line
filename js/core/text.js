@@ -1,7 +1,7 @@
 /* ============================================================
    text.js —— 文本机制（docs/POST2-0IMPL.md 1.9.4）
 
-   文本只放在 js/locales/<语言>/ 下的 JSON 里；怎么读、怎么拼、怎么回退
+   文本只放在 locales/<语言>/text/ 下的 JSON 里；怎么读、怎么拼、怎么回退
    全在这个文件里。数据与脚本里只写键：
 
      T('aircraft.frigatebird.desc')            取文本
@@ -9,8 +9,8 @@
      T.pick('radio.fox.variants', rng)         叶子是数组时随机挑一条
      T.has(key)    Text.keys(prefix)    Text.unused()
 
-   JSON 在 file:// 下读不了，所以 tools/gen-locales.js 把它们合并成一个
-   js/core/locales.gen.js（内容就是一句 Text.load(...)），index.html 里按普通
+   JSON 在 file:// 下读不了，所以 tools/build/gen-locales.js 把它们合并成
+   locales/<语言>/text.gen.js（内容就是一句 Text.load(...)），页面副本里按普通
    <script> 加载。URL 带 ?lang=pseudo 时每条文本包成 ⟦…⟧ 并拉长 30%，
    用来目视找漏迁的字符串与排版溢出。
    ============================================================ */
@@ -24,14 +24,15 @@ var Text = (function () {
   var used = {};              // 被取过的键（开发用）
   var missing = [];
 
+  /* 当前语言：页面副本（locales/<语言>/index.html）在 <html lang> 里写死；
+     ?lang=pseudo 另外打开运行时的伪语言（开发用，静态 html 文本要用 gen-pages --pseudo 才包得到） */
   try {
+    var l = (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang) || '';
+    if (l === 'pseudo') pseudo = true;           // locales/pseudo/index.html：开发用，静态文本在构建时已包好
+    else if (l) cur = l;
     var q = (typeof location !== 'undefined' && location.search) || '';
     if (/[?&]lang=pseudo\b/.test(q)) pseudo = true;
-    else {
-      var m = /[?&]lang=([\w-]+)/.exec(q);
-      if (m) cur = m[1];
-    }
-  } catch (e) { /* 没有 location（后台模拟） */ }
+  } catch (e) { /* 没有 document / location（后台模拟） */ }
 
   /** 把嵌套对象展开成点号键。叶子只能是字符串或字符串数组 */
   function flatten(tree, prefix, out) {
@@ -129,7 +130,7 @@ var Text = (function () {
       if (t) t.forEach(function (v, k) { if (!prefix || k.indexOf(prefix) === 0) out.push(k); });
       return out;
     },
-    /** 从没被取过的键（开发用，tools/check-locales.js 靠它找死文本） */
+    /** 从没被取过的键（开发用，tools/test/check-locales.js 靠它找死文本） */
     unused: function () { return api.keys().filter(function (k) { return !used[k]; }); },
     get missing() { return missing; },
     flatten: flatten

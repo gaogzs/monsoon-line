@@ -423,7 +423,7 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 这条以前只对 `passive` 吊舱成立，于是 ZUN-4 开一次机就会在翼下消失一个
 冷却周期，看起来像被扔掉了。
 
-肉眼验证走 `node tools/render-mounts.js`（把十二个代表性配置落成 PNG，
+肉眼验证走 `node tools/render/render-mounts.js`（把十二个代表性配置落成 PNG，
 走的是真正的 `makeAircraft` + `pushStores` + `render.js`），见
 [tools.md](tools.md#toolsrender-mountsjs)。
 
@@ -678,7 +678,7 @@ cd[wid] = slots.map(剩余 => 1 - clamp(剩余 / w.cd, 0, 1));
 2. 在 `STORE_ATTR` 里加 `fits` / `perPoint` / `mass`
 3. 在 `STORE_COOLDOWN` 里加 `cd`（`smoke.js` 会检查）
 4. 需要的话加进某个机型的 `defaultLoadout`
-5. 跑 `node tools/smoke.js`
+5. 跑 `node tools/test/smoke.js`
 
 **别忘第 3 步。** 漏了不会崩，但那个武器永远不会出现在任何下拉框里。
 

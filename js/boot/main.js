@@ -196,8 +196,8 @@
   /* ============================================================
      主菜单左上角的版本戳
 
-     内容来自 js/version.js —— 那个文件由 tools/release.js（发版）
-     或 tools/stamp-version.js（只刷时间）从 git 记录生成。
+     内容来自 js/version.js —— 那个文件由 tools/build/release.js（发版）
+     或 tools/build/stamp-version.js（只刷时间）从 git 记录生成。
 
      为什么需要它：浏览器缓存、GitHub Pages 的重建延迟、推送失败，
      这三件事从画面上完全看不出来。而时间戳变了就说明新 commit

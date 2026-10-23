@@ -1,7 +1,7 @@
 # 机库俯视识别图
 
 数据 `js/render/planform/`· 调用点 `Game` 的 `buildHangar()`
-与 `HUD` 的 `drawStores()` · 预览器 `tools/render-planform.js`
+与 `HUD` 的 `drawStores()` · 预览器 `tools/render/render-planform.js`
 
 ---
 
@@ -284,10 +284,10 @@ sweepLabel: '可变后掠 11°–35°'
 ## 预览器
 
 这台开发机没有浏览器，"画风"这种东西光看代码判断不了。
-所以有 `tools/render-planform.js`（640 × 440）：
+所以有 `tools/render/render-planform.js`（640 × 440）：
 
 ```bash
-node tools/render-planform.js     # 输出到 tools/preview/*.png
+node tools/render/render-planform.js     # 输出到 tools/render/out/*.png
 ```
 
 它实现了一个最小的 Canvas 2D 子集（路径、描边、`quadraticCurveTo`、

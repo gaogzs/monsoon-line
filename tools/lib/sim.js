@@ -36,7 +36,7 @@ function makeRng(seed) {
   };
 }
 
-/* trace 给定一个数组时，每个 2D 绘制调用 / 属性赋值都记进去（画面回归基线用，tools/golden-render.js） */
+/* trace 给定一个数组时，每个 2D 绘制调用 / 属性赋值都记进去（画面回归基线用，tools/test/golden-render.js） */
 function fmtArg(v) {
   if (typeof v === 'number') return String(Math.round(v * 100) / 100);
   if (typeof v === 'string') return JSON.stringify(v);

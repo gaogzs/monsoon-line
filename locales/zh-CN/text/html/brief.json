@@ -1,0 +1,11 @@
+{
+  "html": {
+    "brief": {
+      "title": "作 战 简 报 / OPERATION BRIEFING",
+      "blk-h": "任务目标 / OBJECTIVES",
+      "blk-h_2": "已知威胁 / THREATS",
+      "btn_campaign": "返回战役",
+      "btn_hangar": "下一步：按任务选择机体 &gt;"
+    }
+  }
+}

@@ -28,19 +28,19 @@
 ## 常用命令
 
 ```bash
-node tools/smoke.js --only 段名      # 冒烟测试很慢（完整跑近二十分钟），日常分段跑；--list 看段名
-node tools/snapshot-data.js         # 数据 / 模型快照比对（秒级，重构安全网）
-node tools/golden.js                # 黄金回放：逻辑逐秒比对
-node tools/golden-render.js         # 画面回归：绘制调用逐帧比对
-node tools/gen-index.js             # 加 / 删 js 文件之后重新生成 index.html 的脚本块
-node tools/gen-locales.js           # 改了 js/locales 下的 JSON 之后重新生成 locales.gen.js
-node tools/probe-missions.js        # 可完成性探针：清空敌人后逐关验证能否取胜（改关卡后跑）
-node tools/release.js vX.Y.Z        # 发版：版本号手动指定 + 追加更新日志
-node tools/stamp-version.js         # 只刷新标题页的版本戳时间（提交前跑）
-node tools/render-planform.js       # 导出机库俯视图 PNG（本机没浏览器时看画风）
-node tools/render-ships.js          # 导出舰船外形 PNG（走游戏自己的渲染管线）
-node tools/render-units.js          # 导出单位详情页的 3D 预览 PNG
-node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要本机有 Chrome）
+node tools/test/smoke.js --only 段名      # 冒烟测试很慢（完整跑近二十分钟），日常分段跑；--list 看段名
+node tools/test/snapshot-data.js         # 数据 / 模型快照比对（秒级，重构安全网）
+node tools/test/golden.js                # 黄金回放：逻辑逐秒比对
+node tools/test/golden-render.js         # 画面回归：绘制调用逐帧比对
+node tools/build/gen-pages.js             # 加 / 删 js 文件、改页面片段或文本之后：重新生成页面副本与启动器（先跑 gen-locales）
+node tools/build/gen-locales.js           # 改了 js/locales 下的 JSON 之后重新生成 text.gen.js
+node tools/test/probes/probe-missions.js        # 可完成性探针：清空敌人后逐关验证能否取胜（改关卡后跑）
+node tools/build/release.js vX.Y.Z        # 发版：版本号手动指定 + 追加更新日志
+node tools/build/stamp-version.js         # 只刷新标题页的版本戳时间（提交前跑）
+node tools/render/render-planform.js       # 导出机库俯视图 PNG（本机没浏览器时看画风）
+node tools/render/render-ships.js          # 导出舰船外形 PNG（走游戏自己的渲染管线）
+node tools/render/render-units.js          # 导出单位详情页的 3D 预览 PNG
+node tools/render/shot-unitview.js         # 无头 Chrome 截详情页布局（需要本机有 Chrome）
 ```
 
 ---
@@ -64,6 +64,7 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 | [systems/modules.md](systems/modules.md) | **模块公开接口表**与旧文件 → 新位置对照（批次 1 重构后从这里找代码） |
 | [systems/tags.md](systems/tags.md) | 机制标签清单与规则 |
 | [systems/text.md](systems/text.md) | 文本层：JSON 规范、键名规则、生成步骤、伪语言 |
+| [systems/pages.md](systems/pages.md) | 页面副本与启动器：模板片段、占位语法、加一种语言 |
 
 
 | 文档 | 对应源码 | 内容 |
@@ -108,10 +109,10 @@ node tools/shot-unitview.js         # 无头 Chrome 截详情页布局（需要�
 
 ## 另一条约定
 
-`tools/smoke.js` 是这个项目唯一的自动化测试。改完代码之后跑一下：
+`tools/test/smoke.js` 是这个项目唯一的自动化测试。改完代码之后跑一下：
 
 ```bash
-node tools/smoke.js
+node tools/test/smoke.js
 ```
 
 它用最小 DOM / Canvas / WebAudio 桩把所有脚本加载起来，跑一遍开机自检，

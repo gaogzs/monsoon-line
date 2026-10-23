@@ -288,7 +288,7 @@
      hardpointGroups 的 pts 只有 (x, y)，对应机体的(横向, 前后)，
      **没有高度** —— 所以按挂点类型补一个默认吊挂高度：翼下吊挂比翼尖低、
      机腹最低。放在这里而不是 game.js，是为了让离线预览器
-     （tools/render-mounts.js）用同一份坐标，不然那几张图就没有意义了。
+     （tools/render/render-mounts.js）用同一份坐标，不然那几张图就没有意义了。
 
      默认值是按**战斗机**（机身深一米上下）定的。大型机体不行：
      ROK-44 干扰机与石英预警机的机腹在 -2.6 m，吊舱按 -1.95 挂会整件
@@ -298,7 +298,7 @@
   $.STORE_HY = { tip: -0.35, heavy: -1.35, light: -1.15, belly: -1.95 };
 
   /* 竖直射线穿模型：(x, z) 处最低的那层表面的 y；打不到给 null。
-     与 tools/smoke.js 的 surfaceUnderModel 同一个算法（三角扇 + 重心坐标）。 */
+     与 tools/test/smoke.js 的 surfaceUnderModel 同一个算法（三角扇 + 重心坐标）。 */
   function surfaceBelow(m, px, pz) {
     var best = null;
     for (var fi = 0; fi < m.f.length; fi++) {

@@ -1,5 +1,8 @@
 # 2.x 后续实施计划（POST 2.0）
 
+> **路径说明**：本文写于 tools 分组之前，文中的 `tools/xxx.js` 现在在子文件夹里（`tools/test/`、`tools/test/probes/`、`tools/build/`、`tools/render/`），对照表见 [systems/tools.md](systems/tools.md)。
+
+
 对应 [POST2-0PLAN.md](POST2-0PLAN.md)（草稿，保持原样不动）。写法沿用 [2-0IMPL.md](2-0IMPL.md)：分批次、每批独立发布、每步都能玩能验。数值都是**起步值**，以各批次的探针脚本实测为准再调。
 
 文中涉及代码位置的行号取自 v2.5.2 的当前代码，仅作定位用，实施时以代码为准。已定的决策与提案的处理方式汇总在第 13 节。

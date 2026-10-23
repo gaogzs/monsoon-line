@@ -1,6 +1,6 @@
 # 文本层（Text）
 
-玩家可见的文字只存在于 `js/locales/<语言>/**/*.json`。机制只在 `js/core/text.js`；数据和脚本里只写键：
+玩家可见的文字只存在于 `locales/<语言>/text/**/*.json`。机制只在 `js/core/text.js`；数据和脚本里只写键：
 
 ```js
 T('aircraft.frigatebird.desc')           // 取文本
@@ -10,7 +10,7 @@ T.pick('radio.fox.variants', rng)        // 叶子是数组时随机挑一条
 
 ## JSON 规范
 
-- 只有键和文本：没有脚本、没有注释、没有函数。2 空格缩进，UTF-8，结尾换行（`node tools/fmt-locales.js` 一键整理）。
+- 只有键和文本：没有脚本、没有注释、没有函数。2 空格缩进，UTF-8，结尾换行（`node tools/build/fmt-locales.js` 一键整理）。
 - 多级键用嵌套存，脚本读取后展平成点号键。**只认键，不认文件名**：加载时递归读全部 `*.json` 合并；
   同一个叶子出现在两个文件里 = 错误（报出两个文件名）；同一对象的不同叶子分在两个文件里是允许的。
 - 叶子类型：字符串，或字符串数组（同一事件的多个说法）。其它类型一律报错。
@@ -22,7 +22,7 @@ T.pick('radio.fox.variants', rng)        // 叶子是数组时随机挑一条
 ## 为什么要有一个生成步骤
 
 `file://` 下浏览器不允许脚本读本地 JSON，而项目的底线是"双击 `index.html` 就能玩"。所以
-`node tools/gen-locales.js` 把全部 JSON 合并成 `js/core/locales.gen.js`（一句 `Text.load(...)`），
+`node tools/build/gen-locales.js` 把全部 JSON 合并成 `locales/<语言>/text.gen.js`（一句 `Text.load(...)`），
 `index.html` 里按普通 `<script>` 加载。这与 `CHANGELOG.md → js/core/changelog.js` 同一个套路：
 生成物提交进仓库，`smoke.js` 断言它与现场重新生成的结果一致。
 
@@ -30,11 +30,11 @@ T.pick('radio.fox.variants', rng)        // 叶子是数组时随机挑一条
 
 | 命令 | 作用 |
 |---|---|
-| `node tools/gen-locales.js [--check]` | 合并 JSON → `locales.gen.js`；`--check` 只检查 |
-| `node tools/fmt-locales.js` | 规范化全部 JSON；遇到重复键等直接报错（`tools/lib/strict-json.js`） |
-| `node tools/check-locales.js` | 脚本里静态写出的 `T('键')` 必须存在；没有脚本引用的键给警告；生成物同步 |
-| `node --expose-internals tools/extract-text.js [--write]` | 从脚本里提取中文字符串 → JSON，并把字面量换成 `T('键')`（借用 Node 内置的 acorn） |
-| `node tools/text-census.js [--check]` | 统计脚本里剩余的中文字符串；`--check` 对照允许清单（`tools/baseline/text-census.json`，只许缩小） |
+| `node tools/build/gen-locales.js [--check]` | 合并 JSON → `text.gen.js`；`--check` 只检查 |
+| `node tools/build/fmt-locales.js` | 规范化全部 JSON；遇到重复键等直接报错（`tools/lib/strict-json.js`） |
+| `node tools/test/check-locales.js` | 脚本里静态写出的 `T('键')` 必须存在；没有脚本引用的键给警告；生成物同步 |
+| `node --expose-internals tools/build/extract-text.js [--write]` | 从脚本里提取中文字符串 → JSON，并把字面量换成 `T('键')`（借用 Node 内置的 acorn） |
+| `node tools/test/text-census.js [--check]` | 统计脚本里剩余的中文字符串；`--check` 对照允许清单（`tools/test/baseline/text-census.json`，只许缩小） |
 
 `?lang=pseudo`：每条文本包成 `⟦…⟧` 并拉长 30%，用来目视找漏迁的字符串与排版溢出。缺键返回 `⟦键⟧` 并记入 `Text.missing`，
 smoke 断言它为空。
@@ -46,11 +46,11 @@ smoke 断言它为空。
 
 ## 键是机器起的
 
-`tools/extract-text.js` 按"文件 + 所在属性 / 函数 + 序号"起键（如 `ui.hud.panels.drawWeaponPanel.s3`），
+`tools/build/extract-text.js` 按"文件 + 所在属性 / 函数 + 序号"起键（如 `ui.hud.panels.drawWeaponPanel.s3`），
 单位文件按单位（`weapons.srm.desc`）。想起更好的名字可以直接改：JSON 与脚本里的 `T('…')` 同步改即可，
 `check-locales.js` 会报没对上的。
 
-## 范围之外
+## 页面里的静态文字
 
-`index.html` 里的静态文本**暂时不动**：它之后要单独模块化 / 脚本化，不同语言直接加载各自的 html 副本；
-作为本地启动器的 `index.html` 保持单一入口。
+`index.html` 里的静态文字（标题页、各屏标题与按钮、暂停菜单…）也在文本层里：键以 `html.` 开头（`locales/zh-CN/text/html/*.json`），
+页面模板片段里写 `{{html.屏.名字}}`，由 `tools/build/gen-pages.js` 在构建期填进各语言的页面副本。见 [pages.md](pages.md)。

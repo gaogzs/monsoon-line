@@ -426,7 +426,7 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
 
 /* ============================================================
    更新记录
-   数据来自 js/changelog.js（由 tools/release.js 从 CHANGELOG.md 生成）。
+   数据来自 js/changelog.js（由 tools/build/release.js 从 CHANGELOG.md 生成）。
    排版按"一条版本一根竖线"来：当前版本那根线是琥珀色，其余是冷灰。
    ============================================================ */
 .cl-wrap{ flex:1 1 auto; overflow-y:auto; min-height:0; padding:24px 44px 40px; }

@@ -299,14 +299,14 @@ CEL 系机炮每门都是 1950 发/分（原 3900，已减半；相对原来的 
 每秒仍有十来发落在目标身上，**极限距离依旧是可以点杀的**，只是不再是一束激光。
 
 这就是这条平衡的边界：`spread` 再往上调约 20%（σ ≈ 3.8 mrad），
-2600 m 上的落靶率就跌破 25%，`tools/smoke.js` 的那两条断言会先失败 ——
+2600 m 上的落靶率就跌破 25%，`tools/test/smoke.js` 的那两条断言会先失败 ——
 "远距离的大范围散布靠射速弥补"这句话，在那里开始不成立。
 
 **④（附注）AI 不受这条影响。** `AI` 的开火条件是瞄准误差
 `off < gunCone × 3.2`，量级是 5–9°，比几千分之一弧度的散布大两个
 数量级 —— 敌机的命中率由它自己的瞄准精度决定，不是由散布决定。
 
-散点验证在 `tools/smoke.js`：300 m 与最大射程各抽 800 发量落点，
+散点验证在 `tools/test/smoke.js`：300 m 与最大射程各抽 800 发量落点，
 四条断言 —— 近距 1σ ≤ 1.5 m、远距 1σ ≥ 4 m、远距落靶率 ≥ 25%、
 以及把落靶率折成 `dmg/s` 后要能在 1.25 秒内打掉最硬的一架
 （250 hp 的 G-6）。
@@ -485,7 +485,7 @@ dmg × k × warheadK × (antiRadar && 正在辐射 ? 2 : 1);   // direct 单位 
   拖尾粒子，继承 30% 弹速；落地 = 半球 + 0.6×blast 水柱；子母弹 = 6–10 团错时小爆（粒子 `delay`）；blast 0 只在直接命中时白闪。
   按粒子数（650 / 800）与距离（6 / 12 km）降级。`Ent.spawnParticle` 新增 `streak` / `delay`，`render.js` 画拖尾。
 - 图鉴 `inv2` 有「引信 / 爆炸半径」列（`js/ui/codex/` `_fuzeTxt` / `_blastTxt`），详情页 `weaponParams` 有同名两行。
-- 调参后看分布：`node tools/probe-blast.js`（见 [tools.md](tools.md)）。
+- 调参后看分布：`node tools/test/probes/probe-blast.js`（见 [tools.md](tools.md)）。
 - **设施 / 舰船走 `hitTarget`**：`Game` 启动时 `Ent.setTargetHitHandler()` 注册自己的
   `hitTarget`，范围伤害打地面目标都经它结算（击毁进 `groundKilled`、误击调节单元记处罚）。
   没注册时（工具脚本）退回 `hp -= dmg` + `killGround`。
@@ -564,7 +564,7 @@ m.decoy = { p, v, t0, p2: chance * 0.5 };   // 骗走它的那团诱饵云
     IR 弹那边靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
   - 现在 `spoofed` 只在 `reLockT > 0` 期间生效：`irAcquire` 跳过它，
     告警 / 来袭标记据它继续报警。盲飞期一过就没有任何作用。
-  - 断言见 `tools/smoke.js`「诱饵只买到一段时间」。
+  - 断言见 `tools/test/smoke.js`「诱饵只买到一段时间」。
 - **告警与来袭标记不只看 `m.target`。** 判据是
   "当前锁定本机"**或**"刚被本机诱饵骗掉、`reLockT > 0`、且仍在本机 3600 m 内"
   （`Game` 的导弹告警音、`HUD` 的 `drawIncomingMissiles`）。
@@ -578,7 +578,7 @@ m.decoy = { p, v, t0, p2: chance * 0.5 };   // 骗走它的那团诱饵云
 
 > 雷达弹曾经平均**更容易**被骗（`flare` 是逐个手调的）。现在雷达弹走
 > `js/data/` 的 `FLARE_RD` 表，空空雷达弹整体低于红外弹均值，
-> 由 `tools/smoke.js`「箔丝有效」断言守着。
+> 由 `tools/test/smoke.js`「箔丝有效」断言守着。
 
 ### 定向能拦截（GUS-2）
 
@@ -643,7 +643,7 @@ if (!(Math.random() < chance)) continue;
    `STORE_COOLDOWN` 里给 `cd`（后者 `smoke.js` 会检查）
 6. 制导弹要进 `MISSILE_LEAD`（`smoke.js` 会检查）
 7. 把键名加进 `Game` 的 `preflight()` 检查列表
-8. 跑 `node tools/smoke.js`
+8. 跑 `node tools/test/smoke.js`
 
 **别忘第 7 步**——自检列表是手工维护的，漏了不会报错，
 但那个武器永远不会出现在自检里。

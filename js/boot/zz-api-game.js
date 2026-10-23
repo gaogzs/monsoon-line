@@ -4,7 +4,7 @@
 
   Game.init = $.init;
   Game.startMission = $.startMission;
-  // 调试/测试接口：把内部状态露出来，tools/smoke.js 靠它做断言
+  // 调试/测试接口：把内部状态露出来，tools/test/smoke.js 靠它做断言
   Game.__player = function () { return $.player; };
   Game.__world = function () { return $.world; };
   // 实体挂载的渲染：断言要能单独喂一架飞机进来数它画了几个挂载
@@ -13,7 +13,7 @@
   Game.__updateTargets = $.updateTargets;
   // 后台模拟（tools/lib/sim.js）：只推进游戏逻辑，不渲染
   Game.__update = function (dt) { if ($.state === 'playing' && $.world && $.player) $.update(dt); };
-  // 画面回归（tools/golden-render.js）：只画一帧，不推进逻辑
+  // 画面回归（tools/test/golden-render.js）：只画一帧，不推进逻辑
   Game.__render = function () { $.render(); };
   Game.__updateLock = $.updateLock;
   Game.__cycleTarget = $.cycleTarget;

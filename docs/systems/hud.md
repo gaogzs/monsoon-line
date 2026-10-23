@@ -189,7 +189,7 @@ var s = M3.project(cam, p.pos + dir * 24000);
 加力与减速板都是**瞬时态**：`Game` 里不给输入时，
 `throttle > 1.0` 会每帧向军推回落（`dt * 1.6`）、
 `throttle < THR_IDLE` 会向慢车回升。所以**拿它们当"稳定读数"去测会测出假失败**
-（见 `tools/smoke.js` 里那条引擎出力断言，它只敢用稳态档位）。
+（见 `tools/test/smoke.js` 里那条引擎出力断言，它只敢用稳态档位）。
 
 ### 动压表（本作特有，右下）
 
@@ -705,11 +705,11 @@ ctx.strokeText(t, x, y);
 
 ## 无制导落点标记（CCIP，5.5）
 
-`drawCcip`：当前武器是无制导对地弹（炸弹 / 火箭）时，每 0.1 s 用 `Ent.naturalPoint`（与 `stepMissile` 同一套积分）前推到落地，画 pipper + 落点线；有 `cluster` / `blast` 的画爆炸半径地面椭圆；落点在屏外时在安全矩形边缘画方向箭头；锁定 / 选中的地面目标落进半径内变红。不与精确制导炸弹的泪滴圈同时出现。探针 `tools/probe-ccip.js`。
+`drawCcip`：当前武器是无制导对地弹（炸弹 / 火箭）时，每 0.1 s 用 `Ent.naturalPoint`（与 `stepMissile` 同一套积分）前推到落地，画 pipper + 落点线；有 `cluster` / `blast` 的画爆炸半径地面椭圆；落点在屏外时在安全矩形边缘画方向箭头；锁定 / 选中的地面目标落进半径内变红。不与精确制导炸弹的泪滴圈同时出现。探针 `tools/test/probes/probe-ccip.js`。
 
 ## 机炮提前量准星（真实弹道）
 
-`drawLeadReticle` 读 `Ent.gunLead`：用 `Ballistics.step`（与 `fireGunFrom` 同一套：载机速度叠加、重力、阻力）迭代反解机头方向，按线段取最近接近点避免量化误差。预测点 = 机头沿解算方向在目标距离处的点。以前是“目标位置 + 速度 × 距离/初速”，漏掉载机速度与重力下坠。探针 `tools/probe-gunlead.js`（新解算 36/36 命中，旧估算 9/36）。AI 的 `leadTo` 还是旧的直线估算（带 0.85 的保守系数），未改。
+`drawLeadReticle` 读 `Ent.gunLead`：用 `Ballistics.step`（与 `fireGunFrom` 同一套：载机速度叠加、重力、阻力）迭代反解机头方向，按线段取最近接近点避免量化误差。预测点 = 机头沿解算方向在目标距离处的点。以前是“目标位置 + 速度 × 距离/初速”，漏掉载机速度与重力下坠。探针 `tools/test/probes/probe-gunlead.js`（新解算 36/36 命中，旧估算 9/36）。AI 的 `leadTo` 还是旧的直线估算（带 0.85 的保守系数），未改。
 
 ## 本批更新
 

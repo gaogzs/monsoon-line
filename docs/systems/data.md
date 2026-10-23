@@ -19,7 +19,7 @@
 | 加载位置 | `index.html` 里紧随 `js/ui/codex/` 之后、`Ent` 之前（`version.js` 不计入模块表） |
 | 模块形式 | 经典 `<script>` + 全局 `var`，没有 `export`、没有构造函数 |
 | 依赖 | **零**。只用到 `Math`（`45 * Math.PI / 180` 这类） |
-| 谁在这里校验 | **没有**。校验在 `Game` 的 `preflight()` 与 `tools/smoke.js` |
+| 谁在这里校验 | **没有**。校验在 `Game` 的 `preflight()` 与 `tools/test/smoke.js` |
 
 **加载顺序是契约的一部分**：`js/ui/codex/` 在 `js/data/` 之前求值，所以 js/ui/codex/ 里凡是要读 `AIRCRAFT` / `WEAPONS` 的代码，必须包在函数体里等 `build()` 被调用时才求值。这也是图鉴条目写成 `build: function () {...}` 而不是静态字符串的原因。
 
@@ -171,7 +171,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 
 | 字段 | 类型 | 含义 | 谁在读 |
 |---|---|---|---|
-| `id` | string | 内部键，**同时是 `MODELS` 的键与预览图文件名** | `inv3`、`tools/render-ships.js` |
+| `id` | string | 内部键，**同时是 `MODELS` 的键与预览图文件名** | `inv3`、`tools/render/render-ships.js` |
 | `model` | string | `MODELS` 的键（当前 16 条与 `id` 一一对应，但保留这个字段以便多艘复用同一模型）；**`spawnShip` 按它查表** | `spawnShip`、`inv3`、渲染 |
 | `hull` | string | 军舰的级名或船名（`虎鲸级` / `蓝鲸级` / `MV SOUTHERN CROSS`）；任务简报与台词里的舰船称呼必须取自这里。上下游军舰不挂字母数字编号 | `inv3` |
 | `name` / `cn` | string | 英文舰名 / 中文舰名 | `inv3` |
@@ -536,7 +536,7 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
     删了不会立刻报错，只会显示 `undefined`；`hp` / `radius` / `value` / `label` 则被 `spawnShip`
     读进关卡，改了会直接改变战斗。`spawnShip` 查不到 `model` 会**静默回退 `SHIPS[0]`**（逆戟鲸），
     与 `makeAircraft` 回退 `AIRCRAFT[0]` 是同一类坑。
-11. **`SHIPS[].id` 同时被 `tools/render-ships.js` 当作输出文件名**（`ship-<id>.png`）。
+11. **`SHIPS[].id` 同时被 `tools/render/render-ships.js` 当作输出文件名**（`ship-<id>.png`）。
     改 `id` 会让旧预览图变成孤儿 —— 重跑一次预览器即可，但别以为文件名是自动的。
 12. **`SHIPS[].speed` 是节、`route.speed` 是米/秒**，`spawnShip` 不换算。把表值直接抄进 `route` 会让船快将近一倍。
 
@@ -551,10 +551,10 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | `js/missions/` | `Ent.makeAircraft` 传 `type`；用 `downstreamCallsign()` 取敌机呼号；`spawnShip()` 按 `model` 读 `SHIPS` |
 | `AI` | 读 `AIRCRAFT[].ceiling` |
 | `js/render/planform/` / `HUD` | 读 `hardpointGroups` 画俯视图与挂载条 |
-| `tools/smoke.js` | 从 `index.html` 解析加载顺序，然后对上述各表做一致性断言 |
-| `tools/render-ships.js` | 读 `SHIPS`（取模型列表与舰名）与 `MODELS`（取几何）渲染预览图 |
+| `tools/test/smoke.js` | 从 `index.html` 解析加载顺序，然后对上述各表做一致性断言 |
+| `tools/render/render-ships.js` | 读 `SHIPS`（取模型列表与舰名）与 `MODELS`（取几何）渲染预览图 |
 
-**改数据后必跑 `node tools/smoke.js`**；它会在浏览器之外把整个游戏加载一遍，专门抓"引用不存在的数据"这类静默错误。
+**改数据后必跑 `node tools/test/smoke.js`**；它会在浏览器之外把整个游戏加载一遍，专门抓"引用不存在的数据"这类静默错误。
 
 ## 本批更新
 

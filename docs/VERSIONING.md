@@ -26,8 +26,8 @@ v 1 . 2 . 3
 
 | 位置 | 内容 | 谁写 |
 |---|---|---|
-| `CHANGELOG.md` 每节标题 | `## [v1.0.0] 2026-10-15 · 正式发布` | `tools/release.js`（版本号是你在命令里给的） |
-| `js/core/version.js` | `BUILD_STAMP.version` | `tools/release.js`（顺带重算时间戳） |
+| `CHANGELOG.md` 每节标题 | `## [v1.0.0] 2026-10-15 · 正式发布` | `tools/build/release.js`（版本号是你在命令里给的） |
+| `js/core/version.js` | `BUILD_STAMP.version` | `tools/build/release.js`（顺带重算时间戳） |
 
 ---
 
@@ -47,9 +47,9 @@ v 1 . 2 . 3
 ## 3. 命令
 
 ```bash
-node tools/release.js v1.11.0          # 发 v1.11.0
-node tools/release.js v1.11.0 --dry    # 只打印将要写入什么，不落盘
-node tools/release.js                  # 不发版，只重新生成两个生成物
+node tools/build/release.js v1.11.0          # 发 v1.11.0
+node tools/build/release.js v1.11.0 --dry    # 只打印将要写入什么，不落盘
+node tools/build/release.js                  # 不发版，只重新生成两个生成物
 ```
 
 带版本号时按顺序做四件事：
@@ -84,7 +84,7 @@ js/core/version.js      ← 由工具生成，主菜单左上角的版本戳读�
    一次改动往往拆成五六个提交（"加功能" → "修它" → "再修它" → "补文档"）。
    玩家不需要看你的返工过程，合并成一句"新增战役选择层"就够了
 
-`tools/release.js` 生成的条目里会插一条
+`tools/build/release.js` 生成的条目里会插一条
 `<!-- TODO: 合并同类项，改成一句人话 -->` 提示你。看到它就说明还没润色。
 
 > **为什么不做成全自动**："这批改动对玩家意味着什么"算不出来 ——

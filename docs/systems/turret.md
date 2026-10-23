@@ -1,6 +1,6 @@
 # 旋转炮塔
 
-代码：`js/engine/turret.js` · 数据：`js/data/` 的 `TURRET_GUNS` / `SHIP_MOUNTS`（并入 `SHIPS[].mounts`）、`AIRCRAFT[].mounts` · 模型：`js/models/` 的 `tur50 / tur75 / tur120`（带 `r` 的是下游涂装）· 探针：`tools/probe-turret.js`
+代码：`js/engine/turret.js` · 数据：`js/data/` 的 `TURRET_GUNS` / `SHIP_MOUNTS`（并入 `SHIPS[].mounts`）、`AIRCRAFT[].mounts` · 模型：`js/models/` 的 `tur50 / tur75 / tur120`（带 `r` 的是下游涂装）· 探针：`tools/test/probes/probe-turret.js`
 
 来源：docs/2-0IMPL.md 阶段 3（v2.2）。
 
@@ -69,7 +69,7 @@
 
 角速度缺省（rad/s）：ciws20 2.2、aa30 1.6、tail20 1.4、n50 1.0、n75 0.7、n120 0.45。
 
-## 命中率（`node tools/probe-turret.js`）
+## 命中率（`node tools/test/probes/probe-turret.js`）
 
 近防炮打 1.2 km 外横穿的目标，250 m/s，每种 30 s × 4 个种子（探针里临时去掉 `airRange`，考的是瞄准算法本身）：
 

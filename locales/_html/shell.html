@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{html.shell.title}}</title>
+<base href="{{base}}">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<canvas id="cv"></canvas>
+
+{{> overlays/radio}}
+
+{{> overlays/sysnote}}
+
+{{> screens/title}}
+
+{{> screens/campaign}}
+
+{{> screens/hangar}}
+
+{{> screens/brief}}
+
+{{> screens/debrief}}
+
+{{> screens/settings}}
+
+{{> screens/codex}}
+
+{{> screens/help}}
+
+{{> screens/changelog}}
+
+{{> overlays/pause}}
+
+<!-- ============ 脚本 ============ -->
+{{scripts}}
+</body>
+</html>
