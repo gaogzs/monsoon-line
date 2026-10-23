@@ -10,9 +10,9 @@ locales/
 │   ├── screens/  title campaign hangar brief debrief settings codex help changelog .html
 │   └── overlays/ radio sysnote pause .html
 └── zh-CN/                          一种语言一个目录（以后加 en/ 同构）
-    ├── text/**.json                文本（含 html/*.json：页面里的静态文字）
+    ├── text/**.json                文本（含 text/html/*.json：页面里的静态文字）
     ├── text.gen.js                 生成：该语言的 Text.load(...)
-    └── index.html                  生成：该语言的页面副本
+    └── html/index.html             生成：该语言的页面副本（页面单独一个文件夹）
 ```
 
 ## 为什么是"副本"
@@ -26,7 +26,7 @@ locales/
 |---|---|
 | `{{> screens/title}}` | 插入片段 `locales/_html/screens/title.html` |
 | `{{scripts}}` | 脚本块：顺序来自 `tools/build/gen-index.js`，语言包 `locales/zh-CN/text.gen.js`（回退语言，始终加载）紧跟 `js/core/text.js`，非 zh-CN 语言再加载自己的 |
-| `{{lang}}` `{{base}}` | `<html lang>` 与 `<base href="../../">`（副本在 `locales/<语言>/` 下，`<base>` 让 `css/` `js/` 路径照旧写） |
+| `{{lang}}` `{{base}}` | `<html lang>` 与 `<base href="../../../">`（副本在 `locales/<语言>/` 下，`<base>` 让 `css/` `js/` 路径照旧写） |
 | `{{html.屏.名字}}` | 文本，取自 `locales/<语言>/text/html/*.json`；值里可以带内联标记（`<b>` `<span class="ok">` …） |
 
 写在片段里的 HTML 注释是给开发者看的，不进生成的页面。非回退语言缺某个键时回退到 zh-CN 并警告；回退语言也缺则报错。
@@ -34,7 +34,7 @@ locales/
 ## 启动器
 
 `index.html` 是生成物（`tools/build/gen-pages.js`），极简：按顺序决定语言 —— `?lang=` → `localStorage['ml.lang']`
-→ 浏览器语言 → 默认 zh-CN，然后 `location.replace('locales/<语言>/index.html' + 查询串 + 锚点)`。
+→ 浏览器语言 → 默认 zh-CN，然后 `location.replace('locales/<语言>/html/index.html' + 查询串 + 锚点)`。
 带 `<noscript>` 与 `<meta refresh>` 兜底。可用语言列表由 `gen-pages` 扫描 `locales/*/text/` 写入。
 游戏内的语言切换界面还没做（启动器已经会读 `ml.lang`，到加第二种语言时在设置页里写它即可）。
 
@@ -44,7 +44,7 @@ locales/
 node tools/build/gen-locales.js        # 改了 locales/**/text 下的 JSON 之后：重新生成 text.gen.js
 node tools/build/gen-pages.js          # 改了模板片段、文本、或增删了 js 文件之后：重新生成页面副本与启动器
 node tools/build/gen-pages.js --check  # 只检查（smoke 与 CI 用）
-node tools/build/gen-pages.js --pseudo # 另生成 locales/pseudo/index.html：静态文本也包成 ⟦…⟧（gitignore，仅开发）
+node tools/build/gen-pages.js --pseudo # 另生成 locales/pseudo/html/index.html：静态文本也包成 ⟦…⟧（gitignore，仅开发）
 ```
 
 生成物（`text.gen.js`、各语言 `index.html`、启动器 `index.html`）都提交进仓库，`smoke.js` 断言它们与现场重新生成的一致，

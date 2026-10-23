@@ -19,7 +19,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = require('../lib/root').ROOT;
-const HTML_PATH = path.join(ROOT, 'locales', 'zh-CN', 'index.html');   // 页面副本（由 tools/build/gen-pages.js 生成）
+const HTML_PATH = path.join(ROOT, 'locales', 'zh-CN', 'html', 'index.html');   // 页面副本（由 tools/build/gen-pages.js 生成）
 const htmlSrc = fs.readFileSync(HTML_PATH, 'utf8');
 
 /* 加载顺序来自 tools/build/gen-index.js（层规则），不手工维护 ——
@@ -184,7 +184,7 @@ function makeEl(tag, id) {
 }
 
 /* ============================================================
-   从页面副本 locales/zh-CN/index.html 建立元素注册表
+   从页面副本 locales/zh-CN/html/index.html 建立元素注册表
    ============================================================ */
 const html = htmlSrc;
 
@@ -774,7 +774,7 @@ if (!badStore) ok('全部武器都有挂载属性');
 }
 
 // 文本层（docs/POST2-0IMPL.md 1.9）：
-//   · locales.gen.js 与 JSON 一致，脚本里静态写出的 T('键') 都存在
+//   · 各语言的 text.gen.js 与 JSON 一致，脚本里静态写出的 T('键') 都存在
 //   · 脚本里的中文字符串不许超出允许清单（tools/test/baseline/text-census.json，只许缩小）
 //   · 运行到这里为止没有取过缺失的键
 {

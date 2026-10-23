@@ -4,7 +4,7 @@
  *
  * file:// 下浏览器读不了本地 JSON，所以把 locales/<语言>/text/ 下全部 JSON
  * 合并成一个脚本文件，内容就是一句 Text.load(...)。每种语言一个生成物，
- * 页面副本（locales/<语言>/index.html）直接加载它。和 CHANGELOG.md →
+ * 页面副本（locales/<语言>/html/index.html）直接加载它。和 CHANGELOG.md →
  * js/core/changelog.js 同一个套路：生成物提交进仓库，smoke 断言它与现场
  * 重新生成的结果一致。
  *

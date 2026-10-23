@@ -28,9 +28,9 @@ monsoon-line/
 ├── index.html          本地启动器（生成）：识别语言 → 重定向到对应的页面副本；双击入口始终是它
 ├── CHANGELOG.md        更新日志 —— 玩家在游戏内「更新记录」页看到的就是它
 ├── css/style.css       全部样式
-├── js/                 一个单位 / 一个关卡 / 一个界面一个文件（≈300 个），按"层"分目录，见下（文本不在这里，在 locales/）
+├── js/                 一个单位 / 一个关卡 / 一个界面一个文件（≈300 个），按"层"分目录（文本不在这里，在 locales/）
 │   ├── core/           math3d、shading、registry（注册表与标签）、tags（标签清单）、
-│   │                   text（文本机制）、text.gen（生成）、version / changelog（生成）
+│   │                   text（文本机制）、version / changelog（生成）
 │   ├── data/           aircraft/ weapons/ ships/ platforms/ targets/ turret-guns/ callsigns/
 │   │                   一个单位一个文件；rules.js（挂载规则函数）、voices.js、zz-seal.js
 │   ├── models/         _lib.js（ModelLib 共享构建器）、aircraft/ ships/ targets/ platforms/ ordnance/
@@ -38,47 +38,51 @@ monsoon-line/
 │   ├── engine/         entities/ ai/ game/（Game 的世界侧）、loadout、combat、turret、route、ballistics、audio
 │   ├── render/         render、render-gl、env/（RenderEnv）、planform/
 │   ├── ui/             hud/ screens/（各屏）、codex/、input、camera、frame、unitview、radio、sysnote
-│   ├── boot/           main.js（主循环、开机自检、初始化）、zz-api-game.js
-├── locales/            全部文本与页面：_html/（模板片段）、<语言>/text/（JSON）、<语言>/text.gen.js 与 index.html（生成）
+│   └── boot/           main.js（主循环、开机自检、初始化）、zz-api-game.js
+├── locales/            全部文本与页面，见 systems/text.md、systems/pages.md
+│   ├── _html/          页面模板片段（与语言无关）：shell.html、screens/、overlays/
+│   └── zh-CN/          一种语言一个目录
+│       ├── text/       JSON 文本（含 text/html/：页面里的静态文字）
+│       ├── text.gen.js 生成：该语言的 Text.load(...)
+│       └── html/       生成：该语言的页面副本 index.html
 ├── docs/               你正在读的东西
 │   ├── README.md       文档索引、阅读顺序、常用命令
 │   ├── VERSIONING.md   版本号规则与发版流程
 │   ├── world/          世界设定（可单独阅读）
 │   └── systems/        各子系统设计说明；modules.md 是模块公开接口表
-├── backup/             批次 1 重构前的整份代码，只作对照参考（不进游戏）
+├── backup/             批次 1 重构前的整份代码，只作对照参考（不进游戏、不进版本控制）
 └── tools/
-    ├── smoke.js            冒烟测试（很慢；日常用 --only 分段）
-    ├── snapshot-data.js    数据 / 模型快照：重构前后逐条哈希比对
-    ├── golden.js           黄金回放：固定种子每关跑 20 s，逐秒哈希全体实体状态
-    ├── golden-render.js    画面回归：每关画 3 帧，哈希全部 2D 绘制调用
-    ├── probe-perf.js       性能探针；text-census.js 中文字符串普查与允许清单
-    ├── gen-index.js        生成 index.html 的 <script> 块
-    ├── gen-locales.js / fmt-locales.js / check-locales.js / extract-text.js   文本层工具
-    ├── release.js          发版：版本号手动指定 + 追加 CHANGELOG.md + 生成 js/core/changelog.js
-    ├── stamp-version.js    只刷新 js/core/version.js 的时间戳（提交前跑）
-    ├── render-*.js / shot-unitview.js   预览器（PNG / 无头 Chrome）
-    ├── probe-*.js          各种探针（可完成性、平衡、射程……）
-    ├── lib/                sim.js（后台模拟）、scripts.js（脚本清单）、strict-json.js、raster.js
-    └── baseline/           各基线（数据快照、黄金回放、画面回归、性能、中文字符串允许清单）
+    ├── test/           测试与回归
+    │   ├── smoke.js  snapshot-data.js  golden.js  golden-render.js  probe-perf.js  text-census.js  check-locales.js
+    │   ├── probes/     各类探针（可完成性、平衡、射程、近防……）
+    │   └── baseline/   各基线（数据快照、黄金回放、画面回归、性能、中文字符串允许清单）
+    ├── build/          生成与发版
+    │   ├── gen-index.js    脚本加载顺序（唯一权威）      gen-pages.js    页面副本与启动器
+    │   ├── gen-locales.js  fmt-locales.js  extract-text.js  extract-html.js（一次性）
+    │   └── release.js  stamp-version.js  rename-aircraft.js
+    ├── render/         预览出图：render-*.js、shot-unitview.js、probe-render.js；输出在 render/out/
+    └── lib/            sim（后台模拟）、scripts（脚本清单）、strict-json、raster、root
 ```
 
 ---
 
 ## 3. 模块划分与加载顺序（层 + 约定）
 
-**加载顺序只有一个权威来源：`index.html` 底部的 `<script>` 块**，它由
-`tools/build/gen-index.js` 生成，不手改。规则：
+**加载顺序只有一个权威来源：`tools/build/gen-index.js` 的层规则**；各语言页面副本
+（`locales/<语言>/html/index.html`）里的 `<script>` 块由 `tools/build/gen-pages.js` 按它生成，不手改。规则：
 
 1. 按固定的**层**：`core → data → models → missions → engine → render → ui → boot`；
    每个命名空间的 `_state.js`（只建一个空壳 `var NS = { $: {} }`）排在 `core` 之后、其余层之前，
    所以同一个命名空间的文件可以按职责放进不同的层。
 2. 层内：`_` 开头的文件（共享库、`_schema.js`）整层最先，`zz` 开头的（`zz-seal.js`、
    `zz-api.js`）整层最后，其余按目录与文件名字母序。
-3. `core/` 里有一份人工指定的先后：version、changelog、math3d、**text、text.gen**、registry、tags
+3. `core/` 里有一份人工指定的先后：version、changelog、math3d、**text**、registry、tags；
+   语言包 `locales/zh-CN/text.gen.js`（以及页面自己的语言）紧跟 `text.js`
    （文本机制与文本必须先于一切要写 `T('键')` 的文件）。
 
-加一个单位 = 新建一个文件 + `node tools/build/gen-index.js`。`smoke.js` 断言 `index.html`
-与目录一致，忘了跑会在测试里炸，而不是在玩家屏幕上白屏。
+加一个单位 = 新建一个文件 + `node tools/build/gen-pages.js`。`smoke.js` 断言页面副本
+与目录、模板、文本一致，忘了跑会在测试里炸，而不是在玩家屏幕上白屏。
+页面与启动器见 [systems/pages.md](systems/pages.md)。
 
 **注册表**（`core/registry.js`）：数据文件只写 `Registry.aircraft({ id, order, … })` 之类的调用；
 每层最后的 `zz-seal.js` 调一次 seal，生成消费者代码读的全局（`AIRCRAFT` `SHIPS` `PLATFORMS`

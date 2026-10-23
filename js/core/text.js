@@ -24,11 +24,11 @@ var Text = (function () {
   var used = {};              // 被取过的键（开发用）
   var missing = [];
 
-  /* 当前语言：页面副本（locales/<语言>/index.html）在 <html lang> 里写死；
+  /* 当前语言：页面副本（locales/<语言>/html/index.html）在 <html lang> 里写死；
      ?lang=pseudo 另外打开运行时的伪语言（开发用，静态 html 文本要用 gen-pages --pseudo 才包得到） */
   try {
     var l = (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang) || '';
-    if (l === 'pseudo') pseudo = true;           // locales/pseudo/index.html：开发用，静态文本在构建时已包好
+    if (l === 'pseudo') pseudo = true;           // locales/pseudo/html/index.html：开发用，静态文本在构建时已包好
     else if (l) cur = l;
     var q = (typeof location !== 'undefined' && location.search) || '';
     if (/[?&]lang=pseudo\b/.test(q)) pseudo = true;

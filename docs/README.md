@@ -33,7 +33,7 @@ node tools/test/snapshot-data.js         # 数据 / 模型快照比对（秒级�
 node tools/test/golden.js                # 黄金回放：逻辑逐秒比对
 node tools/test/golden-render.js         # 画面回归：绘制调用逐帧比对
 node tools/build/gen-pages.js             # 加 / 删 js 文件、改页面片段或文本之后：重新生成页面副本与启动器（先跑 gen-locales）
-node tools/build/gen-locales.js           # 改了 js/locales 下的 JSON 之后重新生成 text.gen.js
+node tools/build/gen-locales.js           # 改了 locales/<语言>/text 下的 JSON 之后重新生成 text.gen.js
 node tools/test/probes/probe-missions.js        # 可完成性探针：清空敌人后逐关验证能否取胜（改关卡后跑）
 node tools/build/release.js vX.Y.Z        # 发版：版本号手动指定 + 追加更新日志
 node tools/build/stamp-version.js         # 只刷新标题页的版本戳时间（提交前跑）
