@@ -96,3 +96,4 @@ for (const r of rows) {
 }
 console.log('\n' + (bad.length ? '问题：\n  ' + bad.join('\n  ')
   : '全部 ' + rows.length + ' 关：清空敌人后都能取胜，且没有 NPC 挂载问题'));
+process.exitCode = bad.length ? 1 : 0;      // 有关卡打不赢 / 抛异常 / NPC 挂载写错 → 非零，可当门禁

@@ -10,9 +10,15 @@
  * 分组：
  *   速度   ssm 原速 / 改到 900 m/s 的快弹，单枚来袭
  *   齐射   1 / 2 / 4 枚同时来，看过载（门数少于来袭数时多出来的直接突防）
- *   压制   2 枚来袭，宿主 suppressed = 0 / 0.25 / 0.5，拦截率应单调下降
+ *   压制   2 枚来袭，宿主 suppressed = 0 / 0.5 / 1，拦截率应单调下降
  *
- * 计划里的估算：600 m/s 单门约 36%，900 m/s 约 20%（两门会更高）。以实测为准调 P_BASE。
+ * 计划里的估算：600 m/s 单门约 36%，900 m/s 约 20%（两门会更高）。实测（P_BASE = 0.08）只有 15% / 5%
+ * 左右 —— 那是游戏平衡的问题，不归本探针管；本探针只验**趋势**：过载会拉低拦截率、压制会拉低拦截率。
+ *
+ * 压制一组的稳定性：单次掷骰概率乘 (1 − 0.6 × 压制度)、火控确认时间乘 (1 + 压制度)，效应是真实的，
+ * 但基础拦截率只有个位数百分比，要把噪声压下去就得加样本。所以这一组 ① 档位拉开到 0 / 0.5 / 1，
+ * ② 来袭弹从 3600 m 起（近防 3000 m 才接手，前面那段飞行对结果没有贡献，省掉能快一倍多），
+ * ③ 次数 ×6，并且各档用同一批种子（公共随机数，降低方差）。
  *
  * 用法：node tools/test/probes/probe-ciws.js [每组次数，缺省 40]
  */
@@ -41,9 +47,10 @@ function run(seed, opt) {
   if (opt.speed) w.speed = opt.speed;
   // 从 8 km 外、扇面散开的方位来（齐射时各弹错开一点方位）
   const base = Math.random() * Math.PI * 2;
+  const R0 = opt.dist || 8000;
   for (let i = 0; i < opt.n; i++) {
     const a = base + (i - (opt.n - 1) / 2) * 0.12;
-    const p = V.V(Math.sin(a) * 8000, 30, Math.cos(a) * 8000);
+    const p = V.V(Math.sin(a) * R0, 30, Math.cos(a) * R0);
     world.missiles.push(G.Ent.makeMissile({
       weapon: 'ssm', team: 1, pos: p, fwd: V.norm(V.sub(ship.pos, p)), speed: w.speed * 0.9, target: ship
     }));
@@ -69,7 +76,7 @@ function group(name, opt) {
   let icpt = 0, hit = 0, miss = 0, tot = 0;
   const runs = N * (opt.k || 1);
   for (let s = 1; s <= runs; s++) {
-    const r = run(s * 7919 + (opt.seed || 0), opt);
+    const r = run(s * 7919 + (opt.seed || 0), opt);        // 同一 seed 参数的各组共用同一批种子
     icpt += r.icpt; hit += r.hit; miss += r.miss; tot += opt.n;
   }
   const pct = x => (100 * x / tot).toFixed(0).padStart(3) + '%';
@@ -85,16 +92,15 @@ console.log('\n齐射（过载）');
 const v1 = group('1 枚', { n: 1, seed: 2 });
 group('2 枚', { n: 2, seed: 3 });
 const v4 = group('4 枚', { n: 4, seed: 4 });
-console.log('\n电子战压制（2 枚来袭，次数 ×3）');
-// 压制每档只差 15% 的单次概率，样本要大才看得出趋势：这一组跑 3 倍次数
-const s0 = group('suppressed 0', { n: 2, sup: 0, seed: 5, k: 3 });
-const s1 = group('suppressed 0.25', { n: 2, sup: 0.25, seed: 5, k: 3 });
-const s2 = group('suppressed 0.5', { n: 2, sup: 0.5, seed: 5, k: 3 });
+console.log('\n电子战压制（2 枚来袭，3600 m 起，次数 ×6，各档同一批种子）');
+const s0 = group('suppressed 0', { n: 2, sup: 0, seed: 5, k: 6, dist: 3600 });
+const s1 = group('suppressed 0.5', { n: 2, sup: 0.5, seed: 5, k: 6, dist: 3600 });
+const s2 = group('suppressed 1', { n: 2, sup: 1, seed: 5, k: 6, dist: 3600 });
 
 const bad = [];
 if (!(v4 < v1)) bad.push('齐射 4 枚的拦截率没有低于单枚（过载没体现）');
-// 中间一档允许 5% 的统计误差；两端必须明显拉开
-if (!(s0 > s2 + 0.03 && s1 <= s0 + 0.05 && s1 >= s2 - 0.05)) bad.push('拦截率没有随压制单调下降');
+// 两端必须明显拉开；中间一档夹在两端之间，允许 3% 的统计误差
+if (!(s0 > s2 + 0.03 && s1 <= s0 + 0.03 && s1 >= s2 - 0.03)) bad.push('拦截率没有随压制单调下降（' + [s0, s1, s2].map(x => (100 * x).toFixed(1) + '%').join(' / ') + '）');
 console.log('');
 if (bad.length) { bad.forEach(b => console.log('✗ ' + b)); process.exitCode = 1; }
 else console.log('✓ 过载与压制的趋势正确');

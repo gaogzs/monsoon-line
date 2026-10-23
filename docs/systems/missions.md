@@ -158,14 +158,15 @@ spawnEnemy(w, {
 `setWingCmd()` / `Radio`）：30 km 搜敌 → 方位通报 → 我方调度僚机 /
 敌方给下游分配目标 → 被 `suppressed` 压住时沉默。
 
-- **m1** 放了一架上游 `J-2 鹈鹕`（team 0，`label: 'SEXTANT'`）—— 无线电里
+- **m1** 放了一架上游 `J-2 鹈鹕`（team 0，`label: 'SEXTANT'`，在后方约 34 km、6000 m 来回盘旋）—— 无线电里
   报了整场战役方位的那个人从此有了实体
 - **m3** 放了一架下游 `ROK-2 石英`（team 1），以及一架 `ROK-44 磁石` 干扰机：
   后者走 `jammerRoute`（`_lib.js`；m5、m7 同；现为 `Route.plan([goto, loiter], {jam})`，整条航线随队干扰）：飞到站位点后在两点间盘旋、不退场；玩家一方任何单位
   （飞机或舰船 / 设施）进入干扰半径（12 km）就开机（`js/engine/ai/` 的 `jamAuto`）。
   一波 30 s，强度从 1 线性降到 0.6（`openEcm` 的 `wave` 选项，不走"被对抗掉"曲线），隔 3 s 重开回满。
   m3 的磁石贴着 16 000 m 升限飞（15 800 m），在 18–19 km 主战场下方约 3 km
-- **m12** 再放一架鹈鹕（team 0，`SEXTANT`），敌方预警机的 `aewDown` 是该关的阶段事件
+- **m12** 不放我方鹈鹕，只有敌方石英预警机（team 1），它被打掉时置 `aewDown`，是该关的阶段事件
+- **sk1** 同 m1 放一架我方鹈鹕（team 0，`SEXTANT`，z −30 km 处盘旋）
 
 ### 各关兵力：敌方一律是下游
 
@@ -175,16 +176,18 @@ spawnEnemy(w, {
 | 关卡 | 敌方飞机（team 1） | 其他 |
 |---|---|---|
 | m1 | ROK-27 测绘机 ×5（`dl6`）· VAC-14 护航 ×2（`vbn`）· ROK-27 ×2（`dl6` + `pods: ['vzu']`） | 我方鹈鹕预警机；群岛国 tideline（team 2） |
-| m2 | ROK-40 轰炸机 ×2（`special: null`，`onArrive` 结算）· 伏击 GAL-31 / ROK-27 · 石英预警机 | 防空浮台 `dl9`；巡逻舰；我方驱逐舰虎鲸带 `ss6` |
-| m3 | GAL-31 王牌**冬港**（`spawnWinterport`）· 护航 GAL-31 ×2（`dl4` + `vbn`）、ROK-27 ×2 · 运输 GAL-31（`null`）· ROK-44（`vsc`）· 石英 | 群岛国 DJACU 浪花（team 2，`otr`） |
-| m4 | ROK-27（`vsr` + `dl6`）×2 · VAC-14（`vgt` + `vbn`） | 我方护卫舰海豚带 `ss6`；三条民用船（team 2） |
-| m5 | 截击编队 GAL-31 / ROK-27 · ROK-40（`vsr`）· ROK-44（`vsc`） | **准绳 SKORI**（`team: 2` + `friendlyAsset`，误伤扣分）；MERLI / 标杆（team 2） |
-| m6 | GAL-31（`dl4`）×4 · ROK-27（`dl6`，隔一架带 `vzu`）×4 · 石英 | — |
-| m7 | ROK-27（`dl6`）· ROK-44（`vsc`） | 舰船 `dl9` |
-| m8 | VAC-14（`vgt` + `vbn`）×5 · ROK-27（`vsr` + `dl6`）· ROK-40（`vsr`）×2 · GAL-31 / VAC-14 掩护 · 石英 | 上游编队（team 0）：座头鲸 / 抹香鲸带 `ss6`，蓝鲸 `weapon: null` |
-| m10 | ROK-27（`dl6` + `vzu`）· ROK-27（`vsr` + `dl6`）· VAC-14（`vgt` + `vbn`） | 登陆舰 / 护航舰 `dl9` |
-| m12 | 冬港（`spawnWinterport`，同 m3）· 两层护航 GAL-31 / ROK-27（轻型带 `vzu`）· 石英 | 指挥舰 `dl9` |
-| sk1 | 机型池 `['schist','schist','basalt','sandstone']`，按 `SK_FITS` 配弹 | 鹈鹕（team 0）；tideline（team 2） |
+| m2 | ROK-40 轰炸机 ×2（`special: null`，`onArrive` 结算）· 伏击 6 架（GAL-31 ×4：`dl4` + `vbn`，ROK-27 ×2：`dl6`；地面测控平台全灭后才出现）· 石英预警机 | 防空浮台 `dl9`；下游菊石 / 三叶虫各一条（巡航）；我方驱逐舰虎鲸带 `ss6` |
+| m3 | GAL-31 王牌**冬港**（`spawnWinterport`，播撒机剩 ≤4 架时进场）· 护航 GAL-31 ×2（`dl4` + `vbn`）、ROK-27 ×2（一架带 `vzu`，一架 `dl4` + `dl6`）· 播撒机 GAL-31 ×8（`null`）· ROK-44（`vsc`）· 石英 | 群岛国 DJACU 浪花（team 2，`otr`） |
+| m4 | ROK-27（`vsr` + `dl6`）×2 · VAC-14（`vgt` + `vbn`） | 下游舰 5 艘（房角石 / 邓氏鱼 / 菊石 ×2 / 三叶虫，房角石与一条菊石静止）+ 雷达浮台 ×2；我方护卫舰海豚带 `ss6`；三条民用船（team 2） |
+| m5 | 截击编队 GAL-31 ×1（`dl4` + `vbn`）+ ROK-27 ×2 · ROK-40（`vsr`，沿航线过境后离场）· ROK-44（`vsc`） | **准绳 SKORI**（`team: 2` + `friendlyAsset`，误伤扣分）；MERLI / 标杆（team 2） |
+| m6 | GAL-31（`dl4` + `vbn`，标记 `veteran`）×4 · ROK-27（`dl6`，隔一架带 `vzu`）×4 · 石英 | — |
+| m7 | ROK-27（`dl6`）×1 · ROK-44（`vsc`） | 邓氏鱼（`dl9`，巡航）；登陆舰海蝎 ×2（无武器，hp 500） |
+| m8 | 第一波：VAC-14（`vgt` + `vbn`）×5 · ROK-27（`vsr` + `dl6`）×1 · ROK-40（`vsr`）×2 · 护航 GAL-31 ×2 + VAC-14 ×2 · 石英。第二波（第一波的攻击机 / 轰炸机打光，或开场 150 s 后，先到者）：从东面（x ≈ 26 km）进场的 ROK-40 ×2 + ROK-27（`vsr` + `dl6`）×2，另有 GAL-31 ×2 掩护 | 上游编队（team 0）：座头鲸（`baseTarget`）/ 抹香鲸带 `ss6`，蓝鲸 `weapon: null` |
+| m9 | GAL-31（`dl4` + `vbn`）×2 · VAC-14（`vbn`）×2 · 石英；水面：菊石 ×3 + 三叶虫 ×2（team 1，炮击编队） | 我方补给平台 ×3（`spawnPlatform`，team 0：防波堤 ×2 hp 800、浅滩站 hp 650） |
+| m10 | ROK-27（`dl6` + `vzu`）· ROK-27（`vsr` + `dl6`）· VAC-14（`vgt` + `vbn`） | 登陆舰海蝎 ×3、护卫舰菊石 ×2（`dl9`）、三叶虫 ×4 |
+| m11 | GAL-31（`dl4` + `vbn`）×2 · VAC-14（`vgt` + `vbn`）×2 · 石英；水面：房角石（`ssmK 0.2`）+ 菊石 ×4 + 三叶虫 ×6（team 1） | 我方舰队（team 0）：抹香鲸（旗舰）、虎鲸 ×2、海豚 ×2，全带 `ss6` |
+| m12 | 冬港（`spawnWinterport`，同 m3，skill 0.98）· 护航 6 架（左右各 3：GAL-31 ×3 `dl4` + `vbn`、ROK-27 ×3 `dl6` + `vzu`）· 石英 | 指挥舰邓氏鱼 `dl9` |
+| sk1 | 机型池 `['schist','schist','basalt','sandstone']`，按 `SK_FITS` 配弹；6 批共 2/2/3/4/5/6 架 | 鹈鹕（team 0）；tideline（team 2） |
 
 `spawnWinterport(w, {x, y, z, skill})`（`_lib.js`）是 m3 与 m12 共用的冬港生成器：GAL-31、`loadout: {A:'dl4', B:'vbn'}`、
 `phys` 覆盖（"人比飞机快"）、`isAce` / `bigTarget`、写入 `w.ace`。
@@ -201,7 +204,7 @@ v1.4.1 起，几个从未进过关卡的单位作为**环境**放进了战场，
 | 关卡 | 单位 |
 |---|---|
 | m1 | 群岛国 `tideline` XAMSI「潮线」（`behavior: 'recon'`）+ 巡逻艇 `daplu`「屿」 |
-| m4 | 三条中立国民用船：`cross` 南十字、`icecore` 冰芯、`atoll` 环礁（沿航路巡航） |
+| m4 | 三条中立国民用船：`cross` 南十字、`icecore` 冰芯（沿航路巡航）、`atoll` 环礁（停泊不动） |
 | m5 | 管理局勤务机 `datum` MERLI「水准」（沿单元编组巡视）+ 测量船 `diklo`「标杆」 |
 
 这是"不做中立识别机制"下唯一干净的安排：要么能打、要么不在交战语法里，
@@ -225,10 +228,10 @@ MERLI 的活是**巡视检查单元状态**：`route: { wps, wpIdx: 0, wp, alt, 
 - 单元：`ttype: 'air'`、`model: 'cell'`、`hp: 400`、`radius: 34`、`drift: 14`、`team: 2`、`friendlyAsset`
 - 推进 `w.targets` 和 `w.cells`；返回 `[{x, y, z}]`（各组中心与基准高度，m5 用它铺 MERLI 的航线）
 
-| 关卡 | m1 | m2 | m3 | m4 | m5 | m6 | m7 | m8 | m10 | m12 | sk1 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 编组 | 1 | 2 | 1 | 2 | 4 | 2 | 2 | 2 | 2 | 4 | 4 |
-| 单元 | 9 | 18 | 9 | 18 | 36 | 18 | 18 | 18 | 18 | 36 | 36 |
+| 关卡 | m1 | m2 | m3 | m4 | m5 | m6 | m7 | m8 | m10 | m12 | sk1 | m9 | m11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 编组 | 1 | 2 | 1 | 2 | 4 | 2 | 2 | 2 | 2 | 4 | 4 | 4 | 4 |
+| 单元 | 9 | 18 | 9 | 18 | 36 | 18 | 18 | 18 | 18 | 36 | 36 | 36 | 36 |
 
 几十个单元的代价由三处裁剪兜住：`js/ui/frame.js` 不画 30 km 外的（`CELL_DRAW_RANGE2`）、
 HUD 不标 10 km 外的（`js/ui/hud/radar.js` 的 `farCell()`，罗盘 / 雷达 / 目标框都一样）、`scanShot` 先比高度差再求交。
@@ -311,12 +314,13 @@ HUD 不标 10 km 外的（`js/ui/hud/radar.js` 的 `farCell()`，罗盘 / 雷达
 | `flags` | 全部关卡 | 自由字典，一次性触发 |
 | `baseTarget` / `baseHpFull` | m2、m8 | 必须保护的前进基地 / 浮岛；`baseHpFull` 写入后无人读取 |
 | `baseWarnT` | m2 | 低血量反复提醒的节流计时 |
-| `dangerAltitude` | m2 / m4 / m5 / m7 / m10 | 低于此高度可躲地面雷达（`js/engine/game/combat.js` 的 `updateTargets` 读）；**默认 1500**，m7 设 1500、m4/m5 设 2600/1800 |
+| `dangerAltitude` | m2 / m4 / m5 / m7 / m10 | 低于此高度可躲地面雷达（`js/engine/game/combat.js` 的 `updateTargets` 读）；**默认 1500**，m2 / m7 设 1500，m4 / m5 / m10 设 2600 / 1800 / 2000 |
 | `detected` | m2 / m4 / m5 / m7 / m10 | 被雷达照射；防空阵地开火的前置条件。**由任务脚本自己写**（一帧延迟） |
 | `cells[]` | 全部关卡 | 调节单元（`spawnCellField`），与 `targets[]` 是同一批对象 |
-| `ace` / `aceSpawned` | m3、m12 | 王牌冬港（m3 与 m12 各一次） |
-| `guarded[]` | m8 | 必须保护的上游编队（沉任一即判负） |
-| `skQueue` / `skBatch` | sk1 | 随机遭遇的六个批次（`spawn()` 一次性生成） |
+| `ace` | m3、m12 | 王牌冬港（`spawnWinterport` 写入；m3 在播撒机剩 ≤4 架时进场并置 `w.aceSpawned`，m12 开场就在） |
+| `guarded[]` | m8、m9、m11 | m8：抹香鲸与蓝鲸（沉任一即判负，座头鲸另由 `baseTarget` 判）；m9：三座补给平台（全毁判负）；m11：只含旗舰 |
+| `fleet` / `flagship` / `myFleet` / `arsenal` / `assetFull` | m9（`fleet` `flagship` `assetFull`）、m11（`fleet` `flagship` `myFleet` `arsenal`） | 敌方舰队（`fleet`，全灭 / 撤出即胜）、敌旗舰（m9）/ 我方旗舰（m11）、我方舰队、房角石、平台总血量 |
+| `skQueue` / `skBatch` | sk1 | 随机遭遇的六个批次（`spawn()` 里一次性掷好；各批飞机由 `tick()` 按顺序放出，不再掷骰） |
 | `timeLimit` / `timeLeft` | `newWorld()` | 关卡时限；`startMission` 从 `mission.timeLimit` 落进来；归零时主循环播一句"时间到"并 `finish(false)` |
 | `groundKilled` | `newWorld()`，`Ent.killGround` 累加 | 被摧毁的地面/海面目标数（结算单列一行，`js/engine/game/finish.js` 的 `finish()` 里 `gk * 400`；低于一架飞机的 1000，免得"打不还手的设施"成为刷分捷径） |
 | `friendlyLoss` | `js/engine/game/combat.js` 的 `hitTarget` 写、`finish()` 读 | 误伤扣分（玩家打掉 `friendlyAsset` 一次 +1） |
@@ -359,22 +363,22 @@ E = x·cosθ + z·sinθ;  N = −x·sinθ + z·cosθ;   // θ = axis
 |---|---|---|---|
 | 起点 | 5200 m，距编队 34 km | 9000 m，距雷达网 30 km | 18 000 m，加力 |
 | 核心机制 | **反舰**：舰船首次成为主角 | **压制**：打雷达 / 防空 / 干扰机 | 高空拦截第二梯队 |
-| 首次登场 | 5 型舰船 + `sat`/`v22`；敌机带 `vsr`/`vgt` 来打船 | 管理局「准绳」（中立）+ ROK-40 挂 `vsr` | 高空的 GAL-31 ×4 + ROK-27 ×4 |
+| 首次登场 | 5 艘舰船（房角石 / 邓氏鱼 / 菊石 ×2 / 三叶虫）+ 雷达浮台 ×2；敌机带 `vsr`/`vgt` 来打船 | 管理局「准绳」（中立）+ ROK-40 挂 `vsr` | 高空的 GAL-31 ×4 + ROK-27 ×4 |
 | 唯一失败条件 | 玩家阵亡 | 玩家阵亡 | 玩家阵亡 |
 
 | | m7 雾里 | m8 燧石 | m10 登陆窗口 | m12 指挥所 |
 |---|---|---|---|---|
 | 起点 | 2200 m（云下） | 6000 m，背对编队 | 4800 m，**时限 300 s** | 17 000 m，加力 |
 | 核心机制 | 低云 / 低空暴露 | 保卫舰群（敌机真的来炸船） | 时间窗 | 斩指挥链 |
-| 首次登场 | `seascorpion`/`cameroceras` 舰船 | `humpback`/`spermwhale`/`bluewhale`/`orca`（带 `ss6` 自卫）+ 敌 VAC-14 / ROK-27 / ROK-40 攻击队 | 登陆舰航路 + 双层空中掩护 | **冬港**再登场（同一架 GAL-31，`spawnWinterport`） |
+| 首次登场 | `seascorpion` 登陆舰 + `dunkleosteus` 巡洋舰（防空圈） | `humpback`/`spermwhale`/`bluewhale`/`orca`（带 `ss6` 自卫）+ 敌 VAC-14 / ROK-27 / ROK-40 攻击队，**第二波**从东面再来一轮 | 登陆舰航路 + 双层空中掩护 | **冬港**再登场（同一架 GAL-31，`spawnWinterport`） |
 | 失败条件 | 玩家阵亡 | 玩家阵亡，或编队任意一舰被击沉 | 玩家阵亡，或**超时**（火网展开） | 玩家阵亡 |
 
 | | m9 补给线（v2.3） | m11 舷对舷（v2.3） |
 |---|---|---|
-| 起点 | 5000 m，平台群正前方 | 6000 m，我方编队后方 |
-| 核心机制 | **资产保卫**：敌舰停在约 6–7 km 外炮击三座补给平台 | **舰队对决**：两支编队从射程外对向接近，在约 8 km 处对峙 |
-| 首次登场 | 海上平台（`spawnPlatform`：防波堤 ×2、浅滩站）作为保护目标 | 双方舰对舰反舰弹互射、近防拦截；房角石二号舰 |
-| 特殊规则 | 击沉编队长或三艘后其余撤退（撤出 26 km 算胜）；平台受损 75 / 50 / 25% 时报告 | 敌舰对舰火力 `prefer` 我方旗舰；旗舰受损 75 / 50 / 25% 时报告 |
+| 起点 | 5000 m / 360 m/s，平台群正前方约 9 km | 6000 m / 380 m/s，我方编队后方约 6 km |
+| 核心机制 | **资产保卫**：敌舰停在约 6–7 km 外炮击三座补给平台 | **舰队对决**：两支编队从射程外对向接近，在约 8.5 km 处对峙 |
+| 首次登场 | 海上平台（`spawnPlatform`：防波堤 ×2、浅滩站）作为保护目标 | 双方舰对舰反舰弹互射、近防拦截；房角石二号舰（进 16 km 就停船齐射）|
+| 特殊规则 | 击沉编队长或五艘里沉三艘后其余撤退（撤到 z ≥ 26 km 算胜；全沉也算胜）；平台受损 75 / 50 / 25% 时报告 | 敌舰对舰火力 `prefer` 我方旗舰；旗舰受损 75 / 50 / 25% 时报告 |
 | 失败条件 | 玩家阵亡，或三座平台全毁 | 玩家阵亡，或旗舰「抹香鲸」沉没 |
 
 > **id、编号与数组下标**：v2.3 把这两关按日期插进战役 1，`id` 和 `OPERATION` 编号都按游玩顺序重排（原 m9 登陆窗口 → m10，原 m10 指挥所 → m12）。它们在 `MISSIONS` 里的 `order` 仍然排在末尾（`m9`=120、`m11`=130，下标 11、12），游玩顺序只由 `campaigns.js` 里 `cmp1` 的 `missions` 决定：`['m1', …, 'm8', 'm9', 'm10', 'm11', 'm12']`（封存后是下标数组 `[0, …, 7, 11, 8, 12, 9]`）。
@@ -388,7 +392,7 @@ E = x·cosθ + z·sinθ;  N = −x·sinθ + z·cosθ;   // θ = axis
 
 **m4–m12** 的共同点：战场尺度进一步拉大（进入点到目标 18–34 km），舰船与设施成为可打击目标，`world.groundKilled` 与限时机制开始被使用。
 
-**sk1 第四周**：随机遭遇。六个批次，每次进入时机型 / 数量 / 方位全部重掷（`M3.pick` + `M3.rnd`），**只出战机**。随机只发生在 `spawn()` 里一次，`tick()` 只读 `w.skQueue` —— 逐帧掷骰会让目标数抖动，也会让冒烟测试不可复现。
+**sk1 第四周**：随机遭遇。六个批次，每次进入时机型 / 技能 / 高度 / 进场方位重掷（`M3.pick` + `M3.rnd`；各批数量固定 2/2/3/4/5/6 架），**只出战机**；开场 3 s 后放第一批，之后每批全灭并过 6 s 冷却才放下一批，从 16 km 外朝原点进场。随机只发生在 `spawn()` 里一次，`tick()` 只读 `w.skQueue` —— 逐帧掷骰会让目标数抖动，也会让冒烟测试不可复现。
 
 ---
 
@@ -426,7 +430,7 @@ if (!w.flags.tallyDone && w.time > 6) {
 
 `flags` 不分区、不清理，**加新键时必须用独一无二的名字**（引擎自己也在用 `flags.allyDown` / `flags.timeUp`）。
 
-任务里已经用掉的 `flags` 键（节选）：m1 `killed / tallyDone / k1 / k2 / k3 / lowQ`；m2 `ambushDone / baseHit / baseLow / baseLost / relayDown / spotted`；m3 `dropped / aceSpawned / aceP2 / aceKilled`；m4 `spotted / hubHit`；m5 `spotted / radarDown`；m6 `contact / highQ / halfDone`；m7 `spotted / landersDown`；m8 `fleetHit / shipLost`；m10 `warned / lastOne`；m12 `contact / aewDown / cpDown / aceP2 / aceKilled`；sk1 `skCool`。
+任务里已经用掉的 `flags` 键（节选）：m1 `killed / tallyDone / k1…k5（击落第 n 架测绘机；1–3 各有台词）/ lowQ`；m2 `ambushDone / baseHit / baseLow / baseLost / relayDown / spotted`；m3 `dropped / aceDone / aceP2 / aceKilled`（另有 `w.aceSpawned`，不在 flags 里）；m4 `spotted / hubHit`（`shipLost` 只初始化、无人读）；m5 `spotted / radarDown`；m6 `contact / highQ / halfDone`；m7 `spotted / landersDown`；m8 `fleetHit / shipLost / wave2`；m9 `assetMark / retreat`；m10 `warned / lastOne`；m11 `arsenalHold / closeIn / flagMark / contact`；m12 `contact / aewDown / cpDown / aceP2 / aceKilled`；sk1 `skCool`。
 （引擎自己的两个：`allyDown`、`timeUp`。）
 
 ---
@@ -435,7 +439,7 @@ if (!w.flags.tallyDone && w.time > 6) {
 
 ```
 spawn()
- ├ 玩家 (0,1400,-4000) + 2 架僚机
+ ├ 玩家 (0,1400,-16000) + 2 架僚机
  ├ 3 座浮空中继平台（model relay, hp260, y4000, drift9）
  ├ 2 座地面测控平台（model radar, ground）
  ├ 4 座防空浮台（model sam, weapon dl9, fireCd rnd(3,8)）
@@ -446,7 +450,7 @@ spawn()
  ├ 统计存活 relay / radar / sam，拼 objectiveSub
  ├ 基地血量：baseHit 台词 → <55% 且 baseWarnT≤0 时 baseLow + 14 s 节流 → 被毁 baseLost
  ├ w.detected = player.pos.y > 1500 && player.alive；首次 true 播 spotted
- └ 地面测控平台全灭 → 播 radarDown，从南边生成 4 架截击机（2×GAL-31 高空 + 2×ROK-27），播 ambush
+ └ 地面测控平台全灭 → 播 radarDown，在 z=24000（+z 一侧）生成 6 架截击机（GAL-31 ×4：3 架 7600 m + 1 架 17500 m；ROK-27 ×2，3200 m），播 ambush
 
 防空浮台开火（`js/engine/game/combat.js` updateTargets）
  └ 前置：w.detected（或贴脸 5.2 km 目视）→ 发射 dl9 追踪玩家
@@ -490,11 +494,11 @@ spawn()
 
 13. **`m1.lose()` 只判玩家阵亡。** 僚机全灭不会失败（只会在主循环里触发一次 `allyDown` 台词）。
 
-14. **我方设施必须显式 `team: 0`。** `AI` 的 `nearestSurfaceTarget` 判据是 `t.team === a.team || t.team > 1` —— 漏写会让**下游带对地弹的飞机把友方设施当目标打**。m2 的前进基地、m4 的护卫舰、m5 的布缆船、m8 的整个上游编队都靠这一条。
+14. **我方设施必须显式 `team: 0`。** `AI` 的 `nearestSurfaceTarget` 判据是 `t.team === a.team || t.team > 1` —— 漏写会让**下游带对地弹的飞机把友方设施当目标打**。m2 的前进基地与虎鲸、m4 的护卫舰、m8 的整个上游编队、m11 的整支我方舰队都靠这一条（m5 的布缆船「准绳」是 `team: 2` 的中立单位，不在此列）。
 
 15. **舰船的 `ttype` 用 `'ground'`，不要新造 `'ship'`。** 渲染（`js/ui/frame.js`）按 `MODELS[t.model]` 查表，`ttype` 只影响 HUD 文案（`'air'` → 浮空平台，其余 → 地面设施）与受损下沉分支。舰船不下沉，所以不能写 `'air'`。
 
-16. **对地攻击要安排在低一些的高度。** 从 5 km 平飞打 6 km 外的海面目标，`vgt` 会在离目标还有几百米的地方到期（动力段撑不住）。3 km 上下进入才打得中 —— m8 的鲣鸟攻击机就压在 2.6–3 km。m8 的 ROK-40 用 `strike` 段（`rangeK 0.8`、alt 4500），进 `Ent.aiReach` 才放 BOX-14；旧的 `bomberRelease`（舰前约 9 km 定点放弹，够不着）已删除。详见 [loadout.md](loadout.md#npc-的挂载)。
+16. **对地攻击要安排在低一些的高度。** 从 5 km 平飞打 6 km 外的海面目标，`vgt` 会在离目标还有几百米的地方到期（动力段撑不住）。3 km 上下进入才打得中 —— m8 的 VAC-14 攻击机就压在 2.6–3 km。m8 的 ROK-40 用 `strike` 段（`rangeK 0.8`、alt 4500），进 `Ent.aiReach` 才放 BOX-14；旧的 `bomberRelease`（舰前约 9 km 定点放弹，够不着）已删除。详见 [loadout.md](loadout.md#npc-的挂载)。
 
 17. **随机波次不要在 `tick()` 里掷骰。** `sk1` 的六个批次在 `spawn()` 里一次性生成（`M3.pick` + `M3.rnd`），`tick()` 只读 `w.skQueue`。逐帧掷骰会让目标数抖动，也会让冒烟测试失去可复现性。
 
@@ -537,7 +541,7 @@ spawn()
 | 必须保护的东西 | `w.baseTarget`（m2）与 `lose()` |
 | 雷达探测高度下限 | m2 `tick()` 里的 `player.pos.y > 1500` 与 `w.dangerAltitude` |
 | 伏击触发条件 | m2 `tick()` 里 `sites === 0 && !w.flags.ambushDone` |
-| 王牌出场条件 | m3 `tick()` 里 `sowers <= 3` |
+| 王牌出场条件 | m3 `tick()` 里 `sowers <= 4` |
 | 王牌死战阈值 | m3 `tick()` 里 `w.ace.hp < w.ace.maxHp * 0.5` |
 | 播撒机投放警告高度 | m3 `tick()` 里的 `s.pos.y < 16000` |
 | 播撒机逃跑判定高度 | m3 `lose()` 里的 `s.pos.y < 14000` |

@@ -81,7 +81,7 @@ ctrl = clamp(k, lo, 1.0);
 
 `ctrl` 只看动压，而同一高度下动压只跟空速有关 —— 于是"哪架飞机在高空更好使"
 实际上被"谁飞得快"单方面决定了。D-14 旗鱼号称平流层之王，极速却比
-F-9 海燕慢 54 m/s，在 20 公里上操控反而不如它。设定和数值脱节。
+F-9 海燕慢 74 m/s，在 20 公里上操控反而不如它。设定和数值脱节。
 
 把曲线的两端交给机型之后，两架就能各占一头：
 
@@ -95,7 +95,7 @@ F-9 海燕慢 54 m/s，在 20 公里上操控反而不如它。设定和数值�
 
 | 空速 | 动压 | 旗鱼 ctrl | 海燕 ctrl |
 |---|---|---|---|
-| 620 m/s | 16 919 Pa（16.92 kPa） | 0.77 | **1.00** |
+| 640 m/s | 18 029 Pa（18.03 kPa） | 0.82 | **1.00** |
 | 400 m/s | 7 042 Pa（7.04 kPa） | **0.34** | 0.43 |
 | 200 m/s | 1 761 Pa（1.76 kPa） | **0.34** | 0.13 |
 
@@ -113,12 +113,12 @@ HUD 上的 `Q` 表显示 kPa，`q < 12 kPa` 时告警（`HUD` 的
 
 | | vMax | vMil | vStall | accel | decel | pitch | roll | yaw | hp | ctrlFull | ctrlFloor |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| DB-11 军舰鸟 | 510 | 372 | 105 | 26 | 40 | 0.76 | 3.0 | 0.30 | 130 | 22000 | 0.13 |
-| D-14 旗鱼 | 566 | 448 | 122 | 33 | 36 | 0.80 | 3.4 | 0.28 | 92 | 22000 | **0.34** |
-| G-6 鲣鸟 | 340 | 295 | 88 | 18 | 44 | 0.62 | 2.2 | 0.34 | 250 | 22000 | 0.13 |
-| F-9 海燕 | 620 | 500 | 138 | 34 | 32 | 0.48 | 2.2 | 0.24 | 110 | **16500** | 0.13 |
-| D-21 贼鸥 | 540 | 430 | 118 | 26 | 36 | 0.66 | 3.1 | 0.26 | 96 | 22000 | 0.13 |
-| D-33 信天翁 | 470 | 380 | 96 | 24 | 42 | 0.80 | 3.6 | 0.36 | 118 | 22000 | 0.13 |
+| DB-11 军舰鸟 | 510 | 372 | 105 | 26 | 40 | 0.76 | 2.34 | 0.30 | 130 | 22000 | 0.13 |
+| D-14 旗鱼 | 566 | 448 | 122 | 33 | 36 | 0.80 | 2.65 | 0.28 | 92 | 22000 | **0.34** |
+| G-6 鲣鸟 | 340 | 295 | 88 | 18 | 44 | 0.62 | 1.72 | 0.34 | 250 | 22000 | 0.13 |
+| F-9 海燕 | 640 | 500 | 138 | 34 | 32 | 0.48 | 1.72 | 0.24 | 110 | **16500** | 0.13 |
+| D-21 贼鸥 | 540 | 430 | 118 | 26 | 36 | 0.66 | 2.42 | 0.26 | 96 | 22000 | 0.13 |
+| D-33 信天翁 | 470 | 380 | 96 | 24 | 42 | 0.80 | 2.81 | 0.36 | 118 | 22000 | 0.13 |
 
 单位：m/s、m/s²、rad/s。`ctrlFull` 缺省 22 000，`ctrlFloor` 缺省 0.13。
 注意 `yaw` 这一列只被 `ctrlFactor` 之外的通用 `ctrl` 缩放，
@@ -146,6 +146,8 @@ dRoll  = p.roll  * clamp(ctrl * 1.8, 0.28, 1) * dt * (1 + (gl - 1) * 0.45);
 dYaw   = p.yaw   * ctrl * dt;
 ```
 
+（滚转还带一点惯性，见下面「应用到基向量」。）
+
 三个要点：
 
 - **俯仰权限不对称**：推杆效率只有拉杆的一半（`PITCH_DOWN_K = 0.5`）。
@@ -153,7 +155,7 @@ dYaw   = p.yaw   * ctrl * dt;
   方向的失速边界也来得更早。取 0.5 而不是现实的约 1/3，是因为
   1/3 会让俯冲攻击这个基本战术变得过于笨重。
 - **滚转有下限**：`ctrl` 衰减时滚转只能掉到 `0.28` 倍、
-  且满权限下还有 1.8 倍增益 —— 高空滚得动是游戏性要求。
+  `ctrl` 到 `1/1.8 ≈ 0.56` 就已经满额 —— 高空滚得动是游戏性要求。
 - **高 G 只放大玩家**：`gLoad` 由 `Game` 的 `controlPlayer()`（`engine/game/control.js`）设置
   （按 G 键，上限 `HIG_MAX`，在 `engine/game/vars.js`；`stepAircraft` 里另有 2.3 的钳制作兜底），AI 不设，所以 `gl = 1`。俯仰放大得比滚转多。
 
@@ -161,9 +163,14 @@ dYaw   = p.yaw   * ctrl * dt;
 
 ```js
 if (pIn) { ang = -dPitch * pIn; a.fwd = rotAxis(a.fwd, a.right, ang); a.up = rotAxis(a.up, a.right, ang); }
-if (rIn) { ang = -dRoll  * rIn; a.right = rotAxis(a.right, a.fwd, ang); a.up = rotAxis(a.up, a.fwd, ang); }
+rTarget = rIn * dRoll / dt;                                   // 滚转带惯性：角速度向目标值指数逼近
+a.rollRate += (rTarget - a.rollRate) * min(1, dt / 0.14);     // 时间常数 0.14 s
+if (|a.rollRate| > 1e-4) { ang = -a.rollRate * dt; a.right = rotAxis(a.right, a.fwd, ang); a.up = rotAxis(a.up, a.fwd, ang); }
 if (yIn) { ang =  dYaw   * yIn; a.fwd = rotAxis(a.fwd, a.up, ang); a.right = rotAxis(a.right, a.up, ang); }
 ```
+
+滚转的惯性（`rollRate`）是后加的：以前输入多少当帧就转多少，手感发飘；
+现在推杆后要一瞬才滚到满速，松杆后也要一瞬才停住。
 
 **符号为什么是负的**：绕 `right` 正向旋转会让机头向下
 （`forward` 从 `(0,0,1)` 变成 `(0,-sinθ,cosθ)`），所以"抬头"要取负；
@@ -207,12 +214,12 @@ a.pos += a.vel * dt;
   现在剩余推力随 `(v/vTarget)²` 渐弱，平飞极速不变，
   但爬升和急转能把平衡速度真的压下去。
 - **重力**：以前是 `vTarget -= fwd.y * 52`，垂直爬升只少 52 m/s 目标速度、
-  可以无限爬。现在是真实的 `G·sinγ`，垂直爬升的平衡速度约为平飞的 82%
-  （D-14 加力 566 → 约 463 m/s），推重比低的 G-6 更明显。
+  可以无限爬。现在是真实的 `G·sinγ`，垂直爬升的平衡速度约为平飞的 83%
+  （D-14 加力 566 → 约 469 m/s，实测 3 km 竖直爬升），推重比低的 G-6 更明显（340 → 约 234，约 69%）。
 - **转弯掉速**：`wTurn` 是本帧实际的俯仰 + 偏航角速度（rad/s）。
   乘上 `ctrl`，动压越高、拉出的过载越大、掉得越多；动压掉光后转不动，
   也就不怎么掉了 —— 持续满杆转弯会自然收敛到角点速度附近。
-  实测：D-14 加力、3 km、满杆 10 s，566 → 约 210 m/s。
+  实测：D-14 加力、3 km、满杆拉杆 10 s，566 → 约 226 m/s。
 - 高空推力以 11 km 密度归一化，在对流层顶连续；20 km ≈ 0.35，
   最低保底 0.20 —— 自适应循环发动机的物理依据见
   [world/SETTING.md](../world/SETTING.md) 的发动机一节。
@@ -247,11 +254,11 @@ a.sweep = clamp((a.speed - 170) / 250, 0, 1);   // 0 = 展开，1 = 后掠
 渲染时 `pushModel()`（`js/render/`）按 `opts.sweep` 在**展开位**与**后掠位**两套顶点之间
 插值（模型数据里的 `morph.map / spread / swept`）。
 
-机翼角度与翼尖位置在 `js/models/aircraft/frigatebird.js`（**下面的 `sweepPt` 参数与翼尖坐标是旧版数值，模型后来加大了翼展（`R_SPAN = 8.0`）并改过弦长，当前为 `sweepPt(20, 2.8, 2.0)` / `sweepPt(62, 2.2, 1.4)`，表中翼尖 / 翼展数字待重算**）：
+机翼角度与翼尖位置在 `js/models/aircraft/frigatebird.js`（`R_SPAN = 8.0`，枢轴 `PIVOT = (1.2, -0.16, 1.0)`）：
 
 ```js
-sweepPt(20, 2.2, 1.6)   // 展开位，翼尖 (7.4, -1.3)
-sweepPt(62, 1.7, 1.1)   // 后掠位，翼尖 (4.3, -4.8)
+sweepPt(20, 2.8, 2.0)   // 展开位，翼尖 (8.7, -1.7)
+sweepPt(62, 2.2, 1.4)   // 后掠位，翼尖 (5.0, -6.1)
 ```
 
 即 **20° → 62°**，和 F-14 的 20° → 68° 同一量级。因为机翼是
@@ -259,15 +266,15 @@ sweepPt(62, 1.7, 1.1)   // 后掠位，翼尖 (4.3, -4.8)
 
 | 状态 | sweep | 翼尖 x | 翼展（2×翼尖 x） | 后掠角 |
 |---|---|---|---|---|
-| 展开 | 0.00（≤170 m/s） | 7.4 | 14.8 m | 20° |
-| 中间 | 0.60（320 m/s） | 5.5 | 11.1 m | 顶点插值，无单一角度 |
-| 后掠 | 1.00（≥420 m/s） | 4.3 | 8.6 m | 62° |
+| 展开 | 0.00（≤170 m/s） | 8.7 | 17.4 m | 20° |
+| 中间 | 0.60（320 m/s） | 6.5 | 12.9 m | 顶点插值，无单一角度 |
+| 后掠 | 1.00（≥420 m/s） | 5.0 | 9.9 m | 62° |
 
-翼尖位移 `|(7.4,-1.3) − (4.3,-4.8)| ≈ 4.7 m`（模型元数据 `span: 15.2`）。
+（`R_SPAN = 8.0`、枢轴 x = 1.2，翼尖 x = 1.2 + 8·cos 角；翼展按翼尖弦线中心算，不含弦角外伸，含弦角的最大顶点 |x| 是 9.2 / 5.9 m。）
+翼尖位移 `|(8.7,-1.7) − (5.0,-6.1)| ≈ 5.7 m`（模型元数据 `span: 17.6`）。
 
-> 上一版本这里写的是"翼展 15.6 m → 10.1 m、翼尖位移 5.0 m、
-> 中间位 45°"，在 `js/models/` 里找不到出处；现按 `sweepPt`
-> 的实际参数改。中间位的翼展是**顶点线性插值**的结果，
+> 更早的版本写过"翼展 15.6 m → 10.1 m、翼尖位移 5.0 m、中间位 45°"（在 `js/models/` 里找不到出处），
+> 以及"14.8 m → 8.6 m"（那是 `R_SPAN` 还是 6.6 时的值）；现按 `sweepPt` 的实际参数核对过（翼尖 x = 1.2 + 8·cos 角，已用 `MODELS.frigatebird` 元数据交叉检查）。中间位的翼展是**顶点线性插值**的结果，
 > 把它读成某个固定后掠角是不对的。
 
 两组点必须差得够大才看得见。早先那版实际只差 18°（2.6° → 20.5°），
@@ -324,12 +331,26 @@ NPC 由 `Ent` 的 `buildNpcMounts()`（`entities/mounts.js`）按 `mountPlan()` 
 
 1. **舵效雪上加霜**：`ctrl *= 0.34`
 2. **低头力矩**：`y > 60` 时按失速深度施加自动低头
+3. **失速下沉**（`a.sink`）：速度不再永远沿着机头 —— 见下
 
 ```js
 var st = (vStall - speed) / vStall;      // 0..1
-var angS = 0.55 * st * dt;
+var angS = 1.2 * st * dt;
 a.fwd = rotAxis(a.fwd, a.right, +angS);  // 正角 = 绕 right 正转 = 机头向下
 a.up  = rotAxis(a.up,  a.right, +angS);
+```
+
+低头力矩系数以前是 0.55：最深失速也只有十几度每秒，飞控一顶就顶住了，机头能一直竖着。
+现在加大一倍多（1.2），深失速时玩家和飞控都压不住，机头自然往下掉。
+
+**失速下沉**：以前 `vel = fwd × speed`，而 `speed` 有 `0.42·vStall` 的下限 ——
+机头朝上失速时飞机会以四十多 m/s 一直"爬"上去。现在失速时升力 ∝ `(v/vStall)²`
+托不住的那部分重力，累积成一个独立的竖直下沉速度（上限 `STALL_SINK_MAX = 140` m/s）：
+
+```js
+if (stall && y > 2) sink = min(140, sink + G * (1 - (speed/vStall)²) * dt);
+else                sink *= exp(-dt / 0.9);       // 改出后约一秒并回航迹
+vel = fwd * speed;  vel.y -= sink;
 ```
 
 不做"完全失控"——这是街机游戏，玩家应该被惩罚但不该被缴械。
@@ -344,7 +365,7 @@ if (a.pos.y > 23000) {                              // 硬天花板
   a.fwd = norm(V(a.fwd.x, min(a.fwd.y, -0.02), a.fwd.z));   // 强制机头朝下
   orthonormalize 重建基
 }
-if (a.pos.y <= 2) { a.pos.y = 2; kill(a, world, true); }    // 撞海
+if (a.pos.y <= groundY(x, z) + 2) { a.pos.y = groundY + 2; kill(a, world, true); }   // 撞海 / 撞地（海面 groundY = 0）
 ```
 
 ---
@@ -356,30 +377,39 @@ if (a.pos.y <= 2) { a.pos.y = 2; kill(a, world, true); }    // 撞海
 ```js
 speed: o.speed || 120,          // launch() 传的是载机速度 + 70
 vel:   (w.tags.ballistic || w.burn) ? norm(fwd) * speed : (0,0,0),
-life:  w.vsLife, age: 0, dmg: w.dmg, turn: w.turn, prox: w.prox,
-seekerOn: true, lostTime: 0,
-seekers: w.tags.twinSeeker ? 2 : 1, dewRolled: null
+life:  w.vsLife, age: 0, dmg: w.dmg, turn: w.turn, fuze: Combat.spec(w).fuze,
+seekerOn: true, lostTime: 0, reLockT: 0, decoyTries: 0,
+seekers: w.tags.twinSeeker ? 2 : 1, dewRolled: null,
+launchT: o.launchT || 0, pitchOver: launchT > 0       // 舰船发射器的出膛助推段
 ```
 
-`age > life` 就消失（总寿命，不是动力段）。**无动力弹的初速必须在这里给**：
+`age > life`（总寿命 `vsLife`，不是动力段）就**在空中自爆**（`killMissile`，会起爆 —— 以前是哑弹）；
+无动力弹与火箭（`tags.ballistic` / `w.burn`）不按寿命自爆，重力迟早让它们落地。**无动力弹的初速必须在这里给**：
 无动力弹的速度完全靠 `vel` 自己累积，初值给 0 的话它是"从空中静止开始往下掉"，
 扔出去的动能全丢了。
 
 ### 动力段
 
+有发动机的弹（不是 `ballistic`、没有 `burn`）：
+
 ```js
-powered = age < effectiveLife(w, m.pos.y)
-if (powered) m.speed = min(m.speed + w.boost*dt,
-                           w.speed * (1 + max(0, (12000 - y)/60000)));
-else         m.speed = max(m.speed - 140*dt, 170);
+powered = age < effectiveLife(w, y)
+rhoR    = highAltImmune ? min(1, airDensity(y) / RHO0) : 0;        // 只有 SPO-9 有低空惩罚
+if (powered) m.speed = min(m.speed + w.boost * (1 - 0.45 * rhoR) * dt,
+                           w.speed * (1 + 0.1 * clamp((y - 4000) / 12000, 0, 1)));
+else         m.speed = max(m.speed - 140 * airDragK(y) * dt, 170);   // 滑翔掉速，下限 170
 ```
 
-注意速度上限不再有低空加成（稠密空气里极速更低不更高）：当前写法是
-`w.speed × (1 + 0.1 × clamp((y − 4000) / 12000, 0, 1))`，即 4–16 km 线性爬到最多 +10%。
-（以下的代码块是早期写法，保留作为推导背景；以 `missile.js` 为准。）
+- 速度上限**没有低空加成**（稠密空气里极速更低不更高）：`w.speed × (1 + 0.1 × clamp((y − 4000) / 12000, 0, 1))`，
+  即 4–16 km 线性爬到最多 +10%。
+- **滑翔掉速随密度**：基准 140 m/s² 乘 `airDragK(y)`，
+  `airDragK = clamp(ρ(y) / ρ(7 km), 0.4, 1.4)`（`physics.js`，以中空 7 km 为 1，低空放大、高空缩小）。
+  早期写法是固定 `140`，高空与低空掉得一样快，已不是现行写法。
+- `highAltImmune`（SPO-9）的"大舵面是低空负担"现在只落在**动力段推力**上：`× (1 − 0.45·ρ/ρ₀)`，海平面推力只剩 55%；
+  滑翔掉速已经由 `airDragK` 统一处理，不再单列 `rhoR` 项。
 
 `effectiveLife(w, y)`（`entities/range.js`）对**冲压弹**（`scramjet: true`）特殊处理，
-现在随密度**连续**变化：10–16 km 满额；16 km → 26 km 按平滑曲线降到 24%（下限 1.2 s）；
+随密度**连续**变化：10–16 km 满额；16 km → 26 km 按平滑曲线（`1 − 0.76·u²(3−2u)`）降到 24%（下限 1.2 s）；
 低于 10 km 从 80% 线性回到 100%（海平面阻力大、烧得更快）。
 CLA-17 的 10 秒动力段在 26 km 以上缩到约 2.4 秒，这就是"高空缺氧降级"。
 
@@ -387,18 +417,25 @@ CLA-17 的 10 秒动力段在 26 km 以上缩到约 2.4 秒，这就是"高空�
 
 ```js
 m.vel.y -= G * dt;
-dragK = BOMB_DRAG(0.00006) * airDensity(y) * |vel|;     // 与动压同量级，常量在 physics.js
+if (w.burn && age < w.burn) m.vel += fwd * w.boost * dt;       // 火箭：前 burn 秒多一份沿弹轴的推力（PEJ-6 0.7 s）
+if (w.glide && !m.glideOff)                                    // 滑翔弹（GUT-9）的升力：垂直于速度、铅垂面内向上
+  lift = min(w.glide * BOMB_DRAG * ρ * v², G * hSpeed / v);    //   封顶 g·cosγ，只托住重力的法向分量
+dragK = BOMB_DRAG * ρ(y) * |vel|;                              // BOMB_DRAG = 0.00006，常量在 physics.js
 m.vel *= max(0.2, 1 - dragK*dt);
 m.speed = |m.vel|;
 ```
 
+滑翔弹（`w.glide` = 升阻比，GUT-9 为 2.5）高空稀薄升力小、先自由下落，进了稠密空气才滑得起来。
 弹体姿态跟着速度矢量走（自由落体是"跟着速度矢量"的，不是昂着头的）。
+
+带弹翼的无动力制导弹（`w.fin`，GUT-9 / PEJ-14）还有一条侧向修正，见下面「转弯能力」之后的说明。
 
 ### 导引品质：`lead` 字段
 
 ```js
 tGo  = dist / max(60, m.speed);
 lead = (w.lead === undefined) ? 0.6 : w.lead;      // 0 .. 1
+if (t.ecm) lead *= 1 - ECM_LEAD_K * min(1, t.ecm);  // 目标的 ECM 压低预测，ECM_LEAD_K = 0.6
 aim  = target.pos + target.vel * tGo * lead;
 desired = normalize(aim - m.pos);
 ```
@@ -413,6 +450,8 @@ desired = normalize(aim - m.pos);
 | `mrm` CLA-4 | 0.78 | 主动雷达中距弹 |
 | `otr` TOR-1 | 0.32 | 群岛国的旧货 |
 | `hos` TOR-6 | **0.30** | 全表最低，离轴角换来的代价 |
+
+表里只列了几枚有代表性的；全部制导弹的 `lead` 以 `WEAPONS` 为准（实测范围 0.30–0.90，缺省 0.6）。
 
 **这个数字比转弯率更能体现导引能力**。一枚转弯率一般但预测准的弹，
 打机动目标反而比一枚只会死咬尾巴的灵活弹更管用：
@@ -434,17 +473,17 @@ maxTurn = m.turn * tf * dt;
 B = M3.turnToward(m.fwd, m.up, desired, maxTurn);
 ```
 
-**海平面时 `turnFactor = 1`；15 km 约 0.40；从约 18 km（密度 9.9%，
-`sqrt(0.0985) ≈ 0.31`）起就被 0.34 的下限兜住**，
-所以 18 km 以上函数实际返回 **0.34**。
+**海平面时 `turnFactor = 1`；5 km 约 0.78；11 km 约 0.55；15 km 约 0.40；从约 17 km（密度约 11.6%，
+`sqrt(0.1155) ≈ 0.34`）起就被 0.34 的下限兜住**（18 km 处 `sqrt(0.0985) ≈ 0.31`，已经低于下限），
+所以 17 km 以上函数实际返回 **0.34**。
 一枚海平面 2.45 rad/s 的格斗弹（SUT-11），在 20 km 只剩约 0.83 rad/s
 （2.45 × 0.34；desc 里的转弯率现在由 `{{turn}}` 模板从数据生成）——**这就是"高空导弹退化成一门有制导的炮"的实现**。
 
 `highAltImmune` 标签（只有 `hva` SPO-9）把下限抬到 0.78：舵面比同级大一倍，
 "过载不随空气变稀而崩塌"。这是"高空拦截弹"在这个游戏里唯一说得通的定义。
 
-代价在低空：动力段推力 ×(1 − 0.45·ρ/ρ₀)、滑翔掉速 ×(1 + 0.6·ρ/ρ₀)，
-即海平面推力只剩 55%、滑翔阻力 ×1.6，两万米以上几乎不受影响。
+代价在低空：动力段推力 ×(1 − 0.45·ρ/ρ₀)，即海平面推力只剩 55%，两万米以上几乎不受影响
+（滑翔掉速那一项已并入所有弹通用的 `airDragK`，见「动力段」）。
 
 `turnFactor` 对所有弹无条件应用（旧的 `highAltScale` 标注字段已删除）。
 
@@ -455,12 +494,29 @@ var want  = M3.angleBetween(m.fwd, desired);           // 本帧需要转过的�
 B = M3.turnToward(m.fwd, m.up, desired, maxTurn);      // 然后才转
 var used  = min(want, maxTurn) / max(1e-5, dt);        // 实际转弯率 rad/s
 var load  = clamp(used / 3.0, 0, 1);
-if (!w.tags.ballistic) m.speed = max(170, m.speed - load * 62 * dt);
+if (!w.tags.ballistic) m.speed = max(170, m.speed - load * 62 * airDragK(y) * dt);
 ```
 
-**无动力制导弹（`tags.ballistic`，GUT-9 / PEJ-30）**导引转的是**速度矢量**：
-`vel = fwd × |vel|`，保持速率，不吃这条能量消耗（能量只来自投放初速与重力）。
-以前只转了 `fwd`、位置却按 `vel` 积分，等于"有制导"的炸弹全是自由落体。
+转弯掉速的基准 62 m/s² 同样乘 `airDragK(y)`（0.4–1.4，7 km 为 1）：低空稠密、诱导阻力大，高空掉得少。
+
+**无动力制导弹（`tags.ballistic` 且有制导，GUT-9 / PEJ-14）**不吃这条能量消耗（能量只来自投放初速与重力），
+导引改的是**速度矢量**。以前只转了 `fwd`、位置却按 `vel` 积分，等于"有制导"的炸弹全是自由落体。
+现在分两种：
+
+- 无 `fin` 的：`vel = fwd × |vel|`，保持速率。
+- 带弹翼（`w.fin`，GUT-9 为 25、PEJ-14 为 10）的：弹翼产生受动压限制的侧向加速度，只改方向不加能量：
+
+  ```js
+  aFin  = w.fin * (ρ / RHO0) * (v / 250)²;                 // 侧向加速度上限
+  dvFin = min(|perp|, aFin * dt);                          // perp = 期望速度 − 实际速度 在垂直弹道方向的分量
+  speed = max(0, v - dvFin * FIN_BLEED);                   // FIN_BLEED = 0.3：每 1 m/s 侧向修正耗 0.3 m/s 速率
+  ```
+
+  有 `glide` 的（GUT-9）往上托只靠升阻比那份升力，弹翼不再往上修（只留横向分量），往下修则卸掉升力（`glideOff`）；
+  无 `glide` 的（PEJ-14 精确制导炸弹）弹翼是全向的，上下左右都能修。
+  修正耗速按弹翼真正用了多少力算，不按机头转角（机头永远追不上重力，按转角算滑翔弹会一路持续掉速）。
+
+`PEJ-30`、`PEJ-9`、`PEJ-4`、`PEJ-22` 是无制导弹（`unguided`），不走导引。
 
 **高抛（`w.loft = {alt, dive}`，GUT-25 / BOX-14）**：对地面目标、水平距离 > `dive` 时，
 瞄准点抬到目标上方 `min(alt, 水平距离 × 0.4)`，末段才俯冲。
@@ -486,7 +542,7 @@ else            { m.lostTime = 0; ...绕轴转向... }
 
 即目标偏出 **±77°**（`hobs` 标签的弹取 max(77°, 锁定锥)，TOR-6 / GIR-9）持续 **0.5 秒** → 丢失。
 
-雷达弹的 `reAcquire` 标签（CLA-4 等，见 `missile.js` 注释）：丢失目标后
+雷达弹的 `reAcquire` 标签（CLA-4 等）：丢失目标后
 搜索 **2.6 km** 内、锁定锥内最近的敌机重新锁定。红外弹不看这个字段，走 `irAcquire()`
 自主寻的（对地红外弹只在 `world.targets` 里找）。两条路**共用盲飞计时 `m.reLockT`**：被诱饵骗走后的这段时间里
 谁都不能重锁，过了之后欺骗源也**可以**被重新咬住。
@@ -501,19 +557,27 @@ else            { m.lostTime = 0; ...绕轴转向... }
 载机机头与目标夹角必须小于 `LASER_CONE = 25°`。照射断了弹**不消失**，
 带着已有速度和弹道继续自由落体。
 
-**当前没有任何武器使用 `seeker: 'laser'`**（PEJ-30 已改成 `eo` 光电制导），
+**当前没有任何武器使用 `seeker: 'laser'`**（核对 `WEAPONS`：现有 `ir` / `radar` / `eo`（PEJ-14）/ 无导引头四种；PEJ-30 现为无制导），
 所以整条路径是休眠的；机制本身完整，将来给某件弹填上 `'laser'` 即可。
 
 ### 命中与近炸
 
+起爆判定在 `entities/warhead.js`，每帧按"本帧弹相对目标的线段"求**最近点**
+（700 m/s 的弹一帧走 12 m，只看端点会从目标身边穿过去）：
+
 ```js
-if (dist < m.prox + 6) detonate(m, t, world);
-detonate: explode(...); SFX.boom(0.75);
-          if (t.alive && dist(t.pos, m.pos) < m.prox + 14) damage(t, m.dmg, ...);
+// fuzeCheck(m, t)：对自己的目标
+gap = |最近点| - 目标半径;                      // 飞机半径 HIT_R_AIR = 7.5 m，目标物用 t.radius（缺省 8）
+if (gap < CONTACT) detonate(满伤，direct = t);   // CONTACT = 1.5 m：撞上
+else if (m.fuze > 0 && gap < m.fuze && 最近点落在本帧内) detonate(在最近点，无 direct);
+// contactScan(m, dt)：对所有非己方、非自身目标的飞机与目标物
+//   碰炸：任何对象，gap < CONTACT；近炸：只对敌方飞机，需已解保 age ≥ 0.6 s、目标在引信锥 110° 内
 ```
 
-近炸不会直接秒杀，而是造成 `dmg` 伤害；只有目标仍在 `prox + 14` 内
-才真正扣血。这避免了"擦过就算命中"。
+近炸（`fuze`，导弹数据里按武器配，如 CLA-4 18 m、CLA-12 27 m）起爆点放在最近点；
+伤害不再是单点 `dmg`，而是 `Combat.blast` 的**面杀伤**：爆炸半径 `blast` 内每个非同队单位按
+`(1 − x)²` 衰减（`core` 内满伤），直接命中的那个单位不看距离、满伤。
+这避免了"擦过就算命中"，也让爆炸会波及旁边的人。
 
 ### 尾迹
 
@@ -536,19 +600,20 @@ detonate: explode(...); SFX.boom(0.75);
 
 ```js
 b.prev = b.pos;                    // 供渲染画曳光线段
-b.vel.y -= G * dt;                 // 只有重力，忽略空气阻力
-b.pos += b.vel * dt;
+Ballistics.step(b, dt);            // 重力 × b.grav；有 b.drag 才有空气阻力（k·ρ/ρ0·|v|·v，Heun 积分）
 b.life -= dt;                      // life = gunRange / w.speed
 ```
+
+航空机炮（CEL 系）数据里没有 `drag`，仍然只有重力；炮塔用炮（`TURRET_GUNS`）才带阻力，见 [turret.md](turret.md)。
 
 `fireGun()` 按射速节流：`rps = w.rpm / 60`，`gunTimer = 1 / rps`；
 一轮打 `max(1, round(rps * 0.033))` 发（约 1/30 秒的量），
 从左右炮口交替出膛，初速是 `dir * w.speed + a.vel`（继承载机速度）。
 子弹寿命由**射程**算出，18 km 以上改用 `highRange`。
 
-命中检测用 `M3.raySphere(prev, dir, target, r)` 对**上一帧到当前帧的线段**
-求交——子弹速度 1100 m/s，60 fps 下每帧走 18 m，点检测会漏掉目标。
-飞机命中半径 7.5 m，目标物用 `t.radius`。
+命中检测（`Game` 的 `scanShot`，`engine/game/combat.js`）用 `M3.raySphere(prev, dir, target, r)` 对**上一帧到当前帧的线段**
+求交——CEL-3 子弹速度 1100 m/s，60 fps 下每帧走 18 m，点检测会漏掉目标。
+飞机命中半径 `HIT_R_AIR = 7.5 m`，目标物用 `t.radius`；带战斗部的炮弹（舰炮，`blast > 0`）命中后走 `Ent.detonateShell` 起爆。
 
 **注意**：`fireGun()` 用 `gunTimer` 按射速节流，不要每帧无条件调用。
 
@@ -581,16 +646,18 @@ if (!(Math.random() < chance)) continue;
 | 操纵面权限阈值（22 kPa / 0.13） | `physics.js` 的 `ctrlFactor()`；机型覆盖看 `js/data/aircraft/` 的 `ctrlFull` / `ctrlFloor` |
 | 满权限滚转倍率与下限（1.8 / 0.28） | `entities/aircraft.js` 的 `stepAircraft()` 的 `dRoll` |
 | 推杆权限（0.5） | `stepAircraft()` 的 `PITCH_DOWN_K` |
-| 高 G 倍率上限（2.3） | `stepAircraft()` 的 `gl` 钳制 |
+| 高 G 倍率上限（按 G 键为 `HIG_MAX = 1.90`；`gl` 钳制 2.3） | `engine/game/vars.js` 的 `HIG_MAX`；`stepAircraft()` 的 `gl` 钳制 |
 | 导弹过载衰减下限（0.34 / 0.78） | `physics.js` 的 `turnFactor()`、`missile.js` 的 `highAltImmune` 分支 |
-| 导弹转弯掉速（62 / 170 下限） | `missile.js` 的 `stepMissile()` 的能量消耗段 |
+| 导弹转弯掉速（62 × `airDragK` / 170 下限）、滑翔掉速（140 × `airDragK`） | `missile.js` 的 `stepMissile()`；`airDragK` 在 `physics.js`（7 km 为 1，夹在 0.4–1.4） |
 | 飞机转弯掉速（0.20） | `physics.js` 的 `TURN_BLEED` |
+| 无动力弹阻力 / 弹翼耗速（0.00006 / 0.3） | `physics.js` 的 `BOMB_DRAG` / `FIN_BLEED` |
+| 激光照射锥（25°，休眠分支） | `physics.js` 的 `LASER_CONE` |
 | 推力渐弱区间（1.0） | `physics.js` 的 `THRUST_TAPER` |
 | 高空推力衰减曲线（ρ 比的 0.75 次幂） | `stepAircraft()` 里 `y > 11000` 那段 |
 | 实时过载（G 表） | `stepAircraft()` 末尾的 `a.gNow`；HUD 在 `ui/hud/` 动压框右侧 |
 | 速度钳位（0.42·vStall – 1.12·vMax） | `stepAircraft()` 的最后一行 |
 | 硬天花板（23 000 m） | `stepAircraft()` 的 `pos.y > 23000` |
 | 机型性能 | `js/data/aircraft/<id>.js` 的 `phys` 字段 |
-| 失速惩罚（×0.34、低头 0.55） | `stepAircraft()` 的失速段 |
+| 失速惩罚（×0.34、低头 1.2、下沉上限 140 m/s） | `stepAircraft()` 的失速段 |
 | 导弹提前量折扣 | `js/data/weapons/<id>.js` 的 `lead`（缺省 0.6） |
 | 可变后掠翼曲线与角度 | `stepAircraft()` 的 `sweep`、`js/models/` 里军舰鸟模型的 `sweepPt()` |

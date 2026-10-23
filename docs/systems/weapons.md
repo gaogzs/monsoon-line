@@ -191,7 +191,7 @@ desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派�
 | `dl6` | BIN-6 燧火 | ir | 780 | 190 | 4.5 / 10 | 2.05 | 3600 | 26 | 0.35 | 14 | 20 / 2 | 0.48 | 4.4 | 0① |
 | `dl9` | BAD-9 高墙 | radar | 940 | 320 | 9.0 / 22 | 1.50 | 9000 | 48 | 0.60 / 0.42 | 24 | 36 / 4 | 0.80 | 14 | 0① |
 | `vbn` | BIN-9 双生 | ir | 780 | 300 | 4.0 / 10 | 2.10 | 4200 | 42 | 0.58 | 12 | 18 / 2 | 0.66 | 8 | 0① |
-| `otr` | TOR-1 旧锭 | ir | 620 | 200 | 3.0 / 7 | 1.35 | 3000 | 30 | 0.86 | 18 | 28 / 8 | 0.32 | 6 | 0① |
+| `otr` | TOR-1 旧锭 | ir | 620 | 200 | 3.0 / 7 | 1.35 | 3000 | 32 | 0.86 | 18 | 28 / 8 | 0.32 | 6 | 0① |
 | `ss6` | FAN-6 海墙 | radar | 960 | 330 | 9.5 / 22 | 1.45 | 9500 | 46 | 0.58 / 0.42② | 24 | 36 / 4 | 0.80 | 15 | 0① |
 | `drm` | TOR-3 雏矢 | ir | 760 | 180 | 4.5 / 12 | 1.75 | 4200 | 30 | 0.38 | 12 | 18 / 2 | 0.38 | 4.8 | 0①（僚机专用，`target: 'any'`） |
 
@@ -312,8 +312,8 @@ CEL 系机炮每门都是 1950 发/分（原 3900，已减半；相对原来的 
 
 散点验证在 `tools/test/smoke.js`：300 m 与最大射程各抽 800 发量落点，
 四条断言 —— 近距 1σ ≤ 1.5 m、远距 1σ ≥ 4 m、远距落靶率 ≥ 25%、
-以及把落靶率折成 `dmg/s` 后要能在 1.25 秒内打掉最硬的一架
-（250 hp 的 G-6）。
+以及把落靶率折成 `dmg/s` 后要能在 5 秒内打掉最硬的一架
+（250 hp 的 G-6；原为 1.25 秒，射速降为原来的 1/4 后量尺放宽 ×4）。
 
 ---
 
@@ -347,16 +347,18 @@ if (player.ewPower > 0) {
 if (player.emcon) lockDist *= 0.5;               // EMCON-Δ：雷达关机，只剩被动手段
 ```
 
-**对空与对面是两套完全不同的判据**：
+**对空与对面是两套不同的判据**：
 
 ```js
-if (w.target === 'air') ok = dist < lockDist && off < cone;     // 导引头：距离 + 离轴角
-else { dep = -dir.y;  ok = dist < lockDist * 1.35 && dep > -0.10; }  // 火控投放包线：距离 + 俯角
+if (Ent.targetClass(w, t) === 'air') ok = dist < lockDist && off < cone;   // 导引头：距离 + 离轴角
+else if (w.target === 'any') ok = dist < lockDist && lockOff < cone;       // TOR-3 对地一侧：不乘 1.35、不看俯角
+else { dep = -dir.y;  ok = dist < lockDist * 1.35 && dep > -0.10 && lockOff < cone; }  // 火控投放包线：距离 + 俯角 + 水平方位
 ```
 
-对面弹**没有锥角这回事**：飞机不必把机头对准浮台，火控要算的是
-"这一下能不能扔到"。以前两个分支的代码一模一样，等于拿导引头的
-逻辑去锁海面。
+对面弹的方位只量**水平方位**（`Ent.lockOff`，世界垂直方向不算，与 AI、航线 `strike` 同一规则），
+不再单看俯角（以前正后方的目标也锁得上）；距离放宽到 `lockDist × 1.35`，
+目标不能高过机头（`dep > -0.10`）。火控要算的是"这一下能不能扔到"，
+不是导引头视场。以前两个分支的代码一模一样，等于拿导引头的逻辑去锁海面。
 
 锁定速率按导引方式分档（单位是"每秒完成几成"的倒数）：
 
@@ -478,11 +480,13 @@ dmg × k × warheadK × (antiRadar && 正在辐射 ? 2 : 1);   // direct 单位 
 
 | 档 | 弹 | fuze | blast | core |
 |---|---|---|---|---|
-| 格斗弹 | srm trm hos qsr swm wasp v11 v9 dl6 vbn | round(旧 prox × 0.6) | fuze + 6 | 2 |
+| 格斗弹 | srm drm trm hos qsr swm wasp v11 v9 dl6 vbn | round(旧 prox × 0.6) | fuze + 6 | 2 |
 | 中程 | mrm dl4 v17 dl9 ss6 | × 0.7 | + 12 | 4 |
 | 重型 | arm vlar hva | × 0.8 | + 22 | 7 |
 | 例外 | otr | 18 | 28 | 8（dmg 30→32：老弹跟踪差，补偿） |
-| 对地 | rkt 14/4；clb 60/60、v30 80/80（只伤地面）；asl v25 vgt 30/8；asl2 lcm 45/10；sat v22 vsr 20/6 | — | 见左 | 见左 |
+| 例外 | hwm | 22 | 60 | 10（以 mrm 为母型的重战斗部，打编队） |
+| 例外 | kkv | 0 | 0 | 0（动能杀伤，仅直接命中） |
+| 对地 | rkt 14/4；clb 60/60、v30 80/80（只伤地面）；asl v25 vgt 30/8；asl2 lcm 45/10；sat v22 vsr ssm 20/6；pgb 40/10；hbl 24/6；hbh 110/45 | — | 见左 | 见左 |
 
 - **特效 `Combat.blastFx`**：火球半径 clamp(0.35×blast, core, 0.5×blast) 且 ≥ 4；Fibonacci 球面破片壳（drag 3.5，飞到 ≈ blast）+
   拖尾粒子，继承 30% 弹速；落地 = 半球 + 0.6×blast 水柱；子母弹 = 6–10 团错时小爆（粒子 `delay`）；blast 0 只在直接命中时白闪。
@@ -670,7 +674,7 @@ if (!(Math.random() < chance)) continue;
 | 衰减曲线 / 飞机受害半径 / 直接命中距离 | `js/engine/combat.js` `falloffK` / `HIT_R_AIR` / `CONTACT` |
 | 爆炸特效与预算 | `js/engine/combat.js` `blastFx` / `BLAST_FX` |
 | 干扰弹冷却与粒子数 | `Ent` `breakLock()`（`js/engine/entities/warhead.js`） |
-| 定向能拦截窗口折算（1.2 s） | `Game` `updateDEW()`（`js/engine/game/combat.js`） |
+| 定向能拦截（每枚来袭弹只掷一次骰，`dewRolled`） | `Game` `updateDEW()`（`js/engine/game/combat.js`） |
 
 ## 地形高度钩子（为陆地做准备）
 

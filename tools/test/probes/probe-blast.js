@@ -16,6 +16,7 @@
 
    用法：
      node tools/test/probes/probe-blast.js              跑一遍并和基线对比
+     node tools/test/probes/probe-blast.js --max-dev 0.15   偏差超过 15% 退出码 1（缺省只报告）
      node tools/test/probes/probe-blast.js --save       把这一遍存为基线（tools/test/probes/probe-blast.baseline.json）
      node tools/test/probes/probe-blast.js --n 80       每档发数（默认 120）
      node tools/test/probes/probe-blast.js --only srm   只跑一种弹
@@ -27,6 +28,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = require('../../lib/root').ROOT;
 const BASELINE = path.join(__dirname, 'probe-blast.baseline.json');
+const MAXDEV = (() => { const i = process.argv.indexOf('--max-dev'); return i >= 0 ? +process.argv[i + 1] : null; })();
 
 const args = process.argv.slice(2);
 const SAVE = args.includes('--save');
@@ -200,6 +202,9 @@ for (const id of ids) {
   }
 }
 if (base) console.log('\n非干扰弹档的最大伤害偏差：' + (worst * 100).toFixed(0) + '%');
+/* --max-dev X：偏差超过 X（如 0.15 = 15%）退出码 1。默认只报告 —— 改物理调参时偏差本来就是预期的，
+   想把它当"行为没变"的门禁时才加这个开关 */
+if (base && MAXDEV !== null && worst > MAXDEV) { console.log('✗ 偏差 ' + (worst * 100).toFixed(0) + '% 超过 --max-dev ' + (MAXDEV * 100).toFixed(0) + '%'); process.exitCode = 1; }
 if (SAVE) {
   fs.writeFileSync(BASELINE, JSON.stringify(out, null, 1) + '\n');
   console.log('\n已存为基线：' + path.relative(ROOT, BASELINE));

@@ -51,7 +51,7 @@
 
 现有 **61** 个键：飞机 13 · 浮空目标 2 · 海上/地面设施 5 · **水面舰船 16** · 固定海上平台 6（`shoal` `breakwater` `sluice` `reed` `cairn` `beacon`，各带一个不可枚举的 `<id>_wreck` 残骸）· 炮塔零件 16（`tur50/75/120[r]_base/_gun`、`lnch[r]_base/_gun`，见 [turret.md](turret.md)）· 弹药 3。
 另有 6 个不可枚举成员：`TURRET_SPEC` `composeTurrets` `round` `store` `storeDrop` `storeScale`。
-下表只列飞机 / 目标 / 舰船 / 弹药，其中 `span` / `len` 可能落后于代码，以各文件里 `done(b, {…})` 的值为准（`frigatebird` 的 span 已按代码改为 17.6）：
+下表列飞机 / 目标 / 舰船 / 平台 / 弹药，`span` / `len` / `radius` 已用 `MODELS` 运行时对象逐项核对过（以各文件里 `done(b, {…})` 的值为准；炮塔零件与 `_wreck` 残骸不带 `span` / `len`）：
 
 | key | 名称 / 类别 | span | len | 元数据 | 备注 |
 |---|---|---|---|---|---|
@@ -91,6 +91,12 @@
 | `cross` | MV「南十字」重货船（南回契约） | 27.4 | 178 | `ground` `sea` | `radius: 54`，集装箱 |
 | `icecore` | R/V「冰芯」水文调查船（高纬联合） | 17.4 | 92 | `ground` `sea` | `radius: 30`，A 型吊架 |
 | `atoll` | OSV「环礁」观察船（环外共同体） | 11.4 | 56 | `ground` `sea` | `radius: 18` |
+| `shoal` | 浅滩站（上游公约）导管架防空平台 | 36 | 36 | `ground` `sea` | `radius: 30`，雷达罩 + 垂发 + 两座近防 |
+| `breakwater` | 防波堤（上游公约）半潜补给平台 | 56 | 60 | `ground` `sea` | `radius: 40` |
+| `sluice` | 闸口（下游同盟）重型炮台平台 | 50 | 50 | `ground` `sea` | `radius: 36`，前后两座 120 炮 |
+| `reed` | 芦苇（下游同盟）轻型哨戒平台 | 18 | 20 | `ground` `sea` | `radius: 14` |
+| `cairn` | 石堆（分水群岛国）改装钻井平台 | 48 | 48 | `ground` `sea` | `radius: 36` |
+| `beacon` | 航标（调节场管理局）无人测量 / 中继平台 | 12 | 12 | `ground` `sea` | `radius: 10` |
 | `missile` | 导弹小模型 | 1.3 | 3.4 | — | 兜底模型（见下） |
 | `bomb` | 炸弹小模型 | 1.4 | 2.2 | — | |
 | `pod` | 吊舱小模型（干扰 / 光电 / 对抗） | 1.1 | 2.9 | — | 挂载物里**唯一不是弹药**的东西：短、粗、钝头，尾端散热格栅 |
@@ -219,7 +225,7 @@ for (var side = 0; side < 2; side++) {
     morphSwept.push([/* SW[k2] 或镜像 */]);
   }
 }
-return done(b, { span: 15.2, len: 20.5,
+return done(b, { span: 17.6, len: 20.5,
   morph: { map: morphMap, spread: morphSpread, swept: morphSwept } });
 ```
 
@@ -237,10 +243,9 @@ a.sweep = M3.clamp((a.speed - 170) / 250, 0, 1);
 **为什么重做过**：先前那版只差 18°（2.6° → 20.5°），翼尖后移 2.7 米，
 在 15 米翼展上几乎看不出来——注释里却写着"差异足够明显"，是注释骗了自己。
 现在按真实机构重做，取 20° → 62°，和 F-14 的 20° → 68° 同一量级：
-当时 `R_SPAN = 6.6`，按公式算出的翼尖 x 是 7.402 / 4.298，即翼展 **14.8 m → 8.6 m**
-（`frigatebird.js` 注释里的 7.4 / 4.3 与 14.8 / 8.6 就是这两个值）。后来为了舰载低速升力把
-`R_SPAN` 加大到 8.0、弦长也加了，现在翼尖 x 约 8.7 / 5.0（翼展约 17.4 → 9.9 m，`done` 里的
-`span` 记 17.6），**代码里那段注释的数字没跟着更新**。
+当时 `R_SPAN = 6.6`，翼展 **14.8 m → 8.6 m**。后来为了舰载低速升力把 `R_SPAN` 加大到 8.0、弦长也加了，
+现在翼尖 x = 1.2 + 8·cos 角 ≈ 8.7 / 5.0，即翼展 **17.4 m → 9.9 m**（`done` 里的 `span` 记 17.6）；
+`frigatebird.js` 里的那段注释已改成这组数。
 
 ### 海上平台底座 `seaBase(b, w, d)`
 
@@ -327,9 +332,8 @@ b.hull([
    但**增删机翼顶点**必须同步维护 `morphMap` / `morphSpread` / `morphSwept` 三者。
 2. **顶点是共享的。** 一个顶点被 4 个面引用是常态；`morph` 覆盖它等于同时动 4 个面。想只动一个面就得补一个独立顶点。
 3. **`span` / `len` 是没人读的元数据。** 没有代码消费 `MODELS[x].span`；
-   `js/render/planform/` 用的是自己 `PLANFORM.planes` 里的尺寸。而且 `frigatebird` 的 `span: 17.6`
-   与公式算出的实际翼展（展开约 17.4 / 后掠约 9.9）、文件里旧注释的 14.8 / 8.6，
-   以及 `DESIGN.md` 变更记录里的"15.6 → 10.1 m"互相对不上，改之前先确认以哪个为准。
+   `js/render/planform/` 用的是自己 `PLANFORM.planes` 里的尺寸。`frigatebird` 的 `span: 17.6`
+   介于公式算出的展开翼展 17.4 与含弦角的 18.4 之间，只是个大概值，别拿它当精确数。
 4. **`air` / `ground` / `sea` / `radius` 不会自动传到目标对象上。**
    `makeTarget()` 只从传入的 `o` 读 `radius` / `ground`；`js/missions/**` 对设施是把
    `radius: 30`、`ground: true` 这类值**手抄**进 `spawnTarget(...)` 的，

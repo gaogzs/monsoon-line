@@ -46,7 +46,7 @@
 | `TURRET_GUNS` | 对象 | 13 键 | 炮塔 / 发射架（见 [turret.md](turret.md)） |
 | `TARGETS` | 对象 | 8 键（按模型名） | `Ent`（`isHard` / `gunResistK` / 目标标签） |
 | `CALLSIGN` | 对象 | 6 键 | `Game`、`js/missions/` |
-| `CS_DOWNSTREAM` | 数组 | 78 条 `{cn,en}`（`callsigns/air.js`） | `js/missions/` |
+| `CS_DOWNSTREAM` | 数组 | 77 条 `{cn,en}`（`callsigns/air.js`） | `js/missions/` |
 | `downstreamCallsign(i)` / `squadCallsign(sq, n)` | 函数（`callsigns/air.js`） | — | `js/missions/`（`CS_RESERVED` 是不再发给小队的保留词；舰船的海军呼号池在 `callsigns/naval.js`） |
 | `missileRange(w)` | 函数（`rules.js`） | — | 目前只剩兼容 / 探针使用（见 [weapons.md](weapons.md)） |
 | `canCarry(ac,w)` | 函数（`rules.js`） | — | `Game`、`preflight`、`Ent` |
@@ -157,8 +157,8 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
   heavy −1.35 / belly −1.95）。默认值是按**战斗机**（机身深一米上下）定的，
   大型机体会把挂载物埋进机身：ROK-44 干扰机与石英预警机的机腹在 −2.60 m，
   用默认的 −1.95 等于整件看不见。**改了模型就要重新量一遍** ——
-  `tools/test/smoke.js` 有一条几何断言盯着它（挂载物顶部必须比挂点正下方的机体
-  表面低至少 0.30 m）
+  `tools/test/smoke.js` 有一条几何断言盯着它（挂载物顶部不能高出挂点正下方的机体下表面
+  0.01 m 以上，否则算"埋进机体"；也不能比下表面低 0.25 m 以上，否则算"悬在半空"）
 - 完整语义（`kind` 适配、`perPoint`、被动吊舱、能力门槛）见 [loadout.md](loadout.md)
 
 ---
@@ -444,7 +444,7 @@ var tAcc = Math.min(w.life, Math.max(0, (w.speed - v0) / w.boost));
 
 `var c = CS_DOWNSTREAM[i % CS_DOWNSTREAM.length]; return c.cn + ' ' + c.en;`
 
-**78 条循环取用，越界不报错而是回绕**。`js/missions/` 里用的是固定下标（0、5、9、15、17…），给某个编队加编号时要留意别撞到别人的号段。
+**77 条循环取用，越界不报错而是回绕**。`js/missions/` 里用的是固定下标（0、5、9、15、17…），给某个编队加编号时要留意别撞到别人的号段。
 
 ---
 
@@ -476,7 +476,7 @@ if (!v || !v[evt]) return;      // 找不到就静默返回
 
 ### 事件名与触发点
 
-> 触发处一栏里的 "M1 `tick`" 指对应的 `js/missions/m1.js`（现在一关一个文件）；这一栏没有逐项重新核对。
+> 触发处一栏里的 "M1 `tick`" 指对应的 `js/missions/m1.js`（现在一关一个文件）。**下表已按代码逐项核对**：每个任务文件里 `w.radio.play('<id>', '<事件>')` 的事件名与 `VOICES` 里定义的事件一一对应，没有"触发了但没台词"的；`start` 与 `allyDown` 由 `Game` 统一触发（`Radio.play($.mission.id, …)`）。
 
 | 任务 | 事件键 | 触发处 |
 |---|---|---|
@@ -535,7 +535,7 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | 舰船炮位 / 发射器 | 舰船文件的 `mounts` / `launchers`（`_m()` / `_L()`，射界常量 `ARC_*` 在 `data/_lib.js`） |
 | 炮口位置 | 机型文件的 `muzzle` |
 | 无人机身份 | 机型文件的 `tags: ['unmanned']` |
-| 下游呼号池 | `CS_DOWNSTREAM`（78 条，`callsigns/air.js`，越界回绕） |
+| 下游呼号池 | `CS_DOWNSTREAM`（77 条，`callsigns/air.js`，越界回绕） |
 | 无线电台词 | `VOICES[任务id][事件名]`（`js/data/voices.js`） |
 | **舰船的吨位 / 尺寸 / 舰种 / 要害 / 交战数值** | **`SHIPS`（16 条，`spawnShip` 按 `model` 查表）** |
 | 某关里某条船的位置 / 航路 / 阵营 / 武器 | `js/missions/` 里那次 `spawnShip` 调用（`route.speed` 是 m/s） |
