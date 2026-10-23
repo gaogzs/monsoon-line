@@ -41,7 +41,7 @@
 
 `drag` 是海平面的 1/m 阻力系数，按 `k × ρ/ρ0 × |v|·v` 作用在炮弹上（`js/engine/ballistics.js`，Heun 积分；火控也用同一份积分解仰角）。航空机炮（CEL 系）没写 `drag`，仍然只有重力。
 
-13 种炮塔用炮里另外 6 种是发射架（`kind: 'launcher'`）：
+13 种炮塔用炮里，除上面 7 种炮，另外 6 种是发射架（`kind: 'launcher'`）：
 
 | id | 弹 `weapon` | cd | ammo | loft | launchSpeed | 备注 |
 |---|---|---|---|---|---|---|
