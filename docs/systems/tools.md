@@ -89,7 +89,7 @@ Sim.batch(seeds, scenario, opt); Sim.stats(xs);       // 多种子批跑（每�
 |---|---|
 | `node tools/test/snapshot-data.js [--write] [--verbose]` | 数据表（`AIRCRAFT` `SHIPS` `WEAPONS` `TARGETS` `CODEX` …）、全部 3D 模型（顶点 / 面哈希、键序、不可枚举成员如炮塔规格与残骸）、关卡，逐条哈希，与 `baseline/data.json` 逐条比对；函数按空白折叠后比较（缩进变化不算差异）；条目顺序也比（机库、图鉴顺序靠它）。有差异列出 `+ / - / ~ 表.条目`，退出码 1 |
 | `node tools/test/golden.js [--write] [--secs N] [--only 关]` | 固定种子 7、玩家无敌，每关跑 N 秒（缺省 20），每秒对全体实体的 `pos / vel / hp / ammoPool` 等取哈希，与 `baseline/golden.json` 比，报第一个分歧的关卡与秒数。`--only` 可给 `MISSIONS` 下标或关卡 id。**别带 `--only` 写基线**：`--write` 会把只含那一关的结果整份覆盖进去 |
-| `node tools/test/golden-render.js [--write]` | 逻辑回放看不到 HUD / UI 的拆分，所以每关推进到 1.5 / 3 / 5 秒各画一帧，把 2D 画布的全部绘制调用（方法名 + 两位小数的参数）取哈希，与 `baseline/golden-render.json` 比。基线来自重构前的原版代码（`backup/`，只作对照、不进版本库） |
+| `node tools/test/golden-render.js [--write]` | 逻辑回放看不到 HUD / UI 的拆分，所以每关推进到 1.5 / 3 / 5 秒各画一帧，把 2D 画布的全部绘制调用（方法名 + 两位小数的参数）取哈希，与 `baseline/golden-render.json` 比。基线最初来自重构前的原版代码（`backup/`，只作对照、不进版本库），v3.0.1 之后因"HUD 罗盘跟镜头方位"的有意改动重存过一次，所以现在它代表的是**当前行为**而不是原版 |
 | `node tools/test/probe-perf.js [--secs N] [--write]` | 每关每帧耗时（平均 / p99）与实体峰值；`--write` 存 `baseline/perf.json`，不写时只打印相对基线的总耗时百分比，**不判失败**。数值随机器而异，只在同一台机器上比 |
 | `LEGACY_TAGS=1 node tools/test/snapshot-data.js` | 把标签还原成旧的布尔字段再比，用来核对"除迁移外一字不差"；快照里计划内的改动写在 `snapshot-data.js` 顶部注释里 |
 

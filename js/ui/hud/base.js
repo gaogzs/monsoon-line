@@ -92,7 +92,7 @@
     }
 
     $.drawConeCue(ctx, W, H, cam, p);       // 视场圈最底层：其它 UI 都叠在它上面
-    $.drawCompass(ctx, W, H, p, world, S);
+    $.drawCompass(ctx, W, H, p, world, S, cam);
     $.drawPitchLadder(ctx, W, H, cam, p, S);
     $.drawBoresight(ctx, W, H, p);
     $.drawTapes(ctx, W, H, p, S);

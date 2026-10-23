@@ -9,7 +9,7 @@
      顺带把任务目标的方位也标上去 —— 否则在开阔空域找浮空平台
      只能靠雷达盲猜。
      ============================================================ */
-  function drawCompass(ctx, W, H, p, world, S) {
+  function drawCompass(ctx, W, H, p, world, S, cam) {
     if (S && S.compass === false) return;
 
     var cx = W / 2;
@@ -19,16 +19,21 @@
     var spanDeg = 100;                       // 指南针显示的总方位范围
     var degPerPx = spanDeg / (halfW * 2);
 
-    // 水平分量过小时（接近垂直姿态）航向没有意义，直接用上一帧的近似值
-    var hl = Math.sqrt(p.fwd.x * p.fwd.x + p.fwd.z * p.fwd.z);
-    var hdg = p.heading === undefined ? 0 : p.heading;
+    /* 罗盘跟着**镜头**转，不是跟机头：自由视角 / 鼠标引导时，镜头朝哪边、罗盘中央就是哪个方位。
+       水平分量过小时（镜头接近垂直）方位没有意义，沿用上一帧的值。机头航向另算一份留在 p.heading
+       （别的地方读它），不再用来画罗盘。 */
+    var fw = (cam && cam.fwd) || p.fwd;
+    var hl = Math.sqrt(fw.x * fw.x + fw.z * fw.z);
+    var hdg = p.compassHdg === undefined ? 0 : p.compassHdg;
     if (hl > 0.03) {
-      hdg = Math.atan2(p.fwd.x / hl, p.fwd.z / hl) * 180 / Math.PI;
+      hdg = Math.atan2(fw.x / hl, fw.z / hl) * 180 / Math.PI;
     }
     hdg = ((hdg % 360) + 360) % 360;
-    p.heading = hdg;
+    p.compassHdg = hdg;
+    var nl = Math.sqrt(p.fwd.x * p.fwd.x + p.fwd.z * p.fwd.z);
+    if (nl > 0.03) p.heading = ((Math.atan2(p.fwd.x / nl, p.fwd.z / nl) * 180 / Math.PI) % 360 + 360) % 360;
     /* 罗盘读的是**真方位**：世界 +z 不一定指北，每一关在 mission.axis 里
-       声明 +z 的真方位（见 missions.js 开头的说明）。p.heading 仍保留世界航向。 */
+       声明 +z 的真方位（见 js/missions/_schema.js 开头的说明）。p.heading 仍保留世界航向。 */
     var axis = (world && world.axis) || 0;
     hdg = (hdg + axis) % 360;
 
