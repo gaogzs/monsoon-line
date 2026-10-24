@@ -13,6 +13,7 @@
 > | `targeting.js` | `drawTargets`、`drawLockBox`、`drawConeCue`、`drawLeadReticle`、`drawAllyMark` / `drawPlainMark`、`drawLaserStatus` |
 > | `aids.js` | `drawCcip`、`drawFootprint`、`computeEnvelope` / `computeNEZ`、`offscreenRect` / `edgePoint` / `drawOffscreen` |
 > | `panels.js` | `drawWeaponPanel`、`drawAlerts`（`ALERT_ORDER`）、`drawStores`、`drawFriendlyShots`、`drawIncomingMissiles`、`drawTargetBearing`、`drawObjective` |
+> | `ghosts.js` | 电磁干扰下的假目标与身份乱码（2.3b）：`ghostStep`、`drawGhosts`、`ghostBlips`、`glitch` |
 > | `text.js` | `text()`、`isLightCol`、`banner()`、`hitMark()` |
 > | `zz-api.js` | 公开接口：`HUD.draw / banner / hitMark / computeNEZ / computeEnvelope / radarXY / offscreenRect / drawAlerts / ALERT_ORDER / thrPercent / THR_IDLE / THR_MAX / GREEN / AMBER / CY / RED` |
 >
@@ -706,6 +707,16 @@ ctx.strokeText(t, x, y);
 | 颜色 | `js/ui/hud/base.js` 顶部 `GREEN / AMBER / CY / RED / DIM` |
 
 各行所在文件见开头的文件表（`drawTapes` / `thrTape` 在 `instruments.js`，`drawRadar` / `drawPitchLadder` / `farCell`（`CELL_HUD_RANGE2`）在 `radar.js`，`offscreenRect` / `edgePoint` 在 `aids.js`，`drawAlerts` 在 `panels.js`，`hmiLayout` 在 `base.js`）。
+
+## 电磁干扰下的假目标与身份乱码（`ghosts.js`，2.3b）
+
+触发源与无线电乱码相同：玩家的 `suppressed`（`< 0.05` 完全没有）。**纯显示层**：假目标不进 `world.actors` / `world.targets`，不能被 Tab 选中、不能被锁定、不能被击中，不影响 AI 与胜负。
+
+- **闪烁带**：真目标在 `Ent.jamRanges(s, false)` 的 `hide` 之外根本不画，所以假目标只放在 `[clear × 1.02, hide]` 内（共用同一个函数）。`s → 1` 时带很窄，假目标贴得很近。
+- **生成**：`ghostStep(world, p)` 每帧推进，目标数 `round(k × 8)`，寿命 2–6 s，缓慢漂移，方位偏向真实敌方所在的半球（只读位置）；到期、飞出闪烁带、玩家飞近到 `clear + 600 m`、干扰解除都会渐隐 0.5 s（飞近时先消散，所以玩家永远走不到假目标跟前）。
+- **显示**：主屏幕与真目标走同一条路径（`drawPlainMark` / `drawOffscreen`），闪烁占空比与真目标一致；雷达里按同一规则加噪声（丢点概率 `k × 0.55`、抖动 `k × 9` px），三角由 `enemyTri` 画（真敌机共用）。
+- **身份乱码**：`drawPlainMark` 在目标处于闪烁带（`Ent.jamState === 'flicker'`）时，第 1、2 行（型号 / 舰级、呼号，设施只有名字时那一行）换成同形状乱码（字母换字母、数字换数字、汉字换汉字、符号不动），第 3 行距离保持真实；`GHOST_GLITCH_HZ = 4` 刷新，每个框自己的相位。进到 `clear` 以内真目标的身份才恢复可读。
+- 全部走私有 PRNG（不碰 `Math.random`），不进黄金回放；雷达噪声沿用原来的 `Math.random`（原本如此）。
 
 ## 全屏滤镜（`js/ui/hudfx.js`，v1.13.2）
 

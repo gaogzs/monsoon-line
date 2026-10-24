@@ -4155,6 +4155,59 @@ if (Ent && M3 && me && world) {
     else ok('无线电乱码：garble 性质成立，被压制时指令不生效、解除后恢复');
   }
 
+  /* ---- 电磁干扰下的假目标与身份乱码（2.3b） ----
+     k=0 没有假目标；k 增大假目标数不减；全部落在闪烁带 [clear, hide] 内；
+     不进 world.actors / world.targets，Tab 与锁定碰不到；glitch 保形（字母换字母、数字换数字、
+     汉字换汉字、符号不动）；带假目标 / 乱码画一遍 HUD 不抛。 */
+  {
+    const G17 = sandbox.Game, H17 = sandbox.HUD, E17 = sandbox.Ent, M17 = sandbox.M3;
+    const bad = [];
+    G17.startMission(0);
+    const p17 = G17.__player(), w17 = G17.__world();
+    const peak = {};
+    for (const k of [0, 0.04, 0.3, 0.7, 1.0]) {
+      p17.suppressed = k; w17.time = 0; H17.__ghostStep(w17, p17);
+      let mx = 0;
+      const r = k >= 0.05 ? E17.jamRanges(k, false) : null;
+      for (let i = 0; i < 60 * 20; i++) {
+        w17.time = i / 60; H17.__ghostStep(w17, p17);
+        const gs = H17.__ghosts();
+        mx = Math.max(mx, gs.filter(g => !g.dying).length);
+        for (const g of gs) {
+          const d = M17.dist(p17.pos, g.pos);
+          if (r && !g.dying && (d < r.clear || d > r.hide * 1.0001)) bad.push('k=' + k + ' 假目标在闪烁带之外：' + d.toFixed(0) + ' m');
+          if (w17.actors.indexOf(g) >= 0 || (w17.targets || []).indexOf(g) >= 0) bad.push('假目标不该进 actors / targets');
+        }
+      }
+      peak[k] = mx;
+    }
+    if (peak[0] !== 0 || peak[0.04] !== 0) bad.push('k < 0.05 时不该有假目标：' + JSON.stringify(peak));
+    if (!(peak[0.3] <= peak[0.7] && peak[0.7] <= peak[1.0] + 1)) bad.push('假目标数应随 k 增大不减：' + JSON.stringify(peak));
+    if (!(peak[1.0] > 0)) bad.push('k=1 时一个假目标都没有');
+    p17.suppressed = 0;
+    for (let i = 0; i < 60; i++) { w17.time += 0.05; H17.__ghostStep(w17, p17); }
+    if (H17.__ghosts().length) bad.push('解除干扰后假目标应全部渐隐消失');
+    // glitch 保形
+    const src17 = 'DB-11 护卫 FLINT-3';
+    for (let t = 0; t < 5; t++) {
+      const g = H17.glitch(src17, t * 0.3, 0.4);
+      if (g.length !== src17.length) bad.push('glitch 改变了长度：' + g);
+      for (let i = 0; i < src17.length; i++) {
+        const a = src17[i], b = g[i];
+        const cls = c => /[A-Z]/.test(c) ? 'U' : /[0-9]/.test(c) ? 'D' : /[\u4e00-\u9fff]/.test(c) ? 'H' : c;
+        if (cls(a) !== cls(b)) bad.push('glitch 改变了字符类型：' + a + '→' + b);
+      }
+    }
+    // 带假目标 / 乱码的整帧 HUD 不抛
+    try {
+      p17.suppressed = 0.7;
+      for (let i = 0; i < 90; i++) { w17.time += 0.05; G17.__render(); }
+    } catch (e) { bad.push('带假目标渲染 HUD 抛异常：' + e.message); }
+    p17.suppressed = 0;
+    if (bad.length) bad.slice(0, 8).forEach(fail);
+    else ok('假目标：k=0 没有、随 k 增多、都在闪烁带内、不进逻辑列表；乱码保形；整帧 HUD 不抛');
+  }
+
   /* ---- 地面/海面目标计分 ----
 
      `world.killed` 只统计 team===1 的飞机，设施与舰船从不进那个数。

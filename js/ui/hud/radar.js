@@ -111,6 +111,14 @@
     return { x: cx + rx / range * R, y: cy - ry / range * R, out: d > range };
   }
 
+  // 敌机的红色三角光点（真敌机与假目标共用）
+  function enemyTri(ctx, x, y) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - 4.5); ctx.lineTo(x + 4, y + 3.5); ctx.lineTo(x - 4, y + 3.5);
+    ctx.closePath(); ctx.fill();
+  }
+  $.enemyTri = enemyTri;
+
   function drawBlips(ctx, cx, cy, R, range, p, world) {
     var i, s;
 
@@ -150,11 +158,11 @@
       if (friendly) {
         ctx.beginPath(); ctx.arc(s.x, s.y, 2.8, 0, Math.PI * 2); ctx.fill();
       } else {
-        ctx.beginPath();
-        ctx.moveTo(s.x, s.y - 4.5); ctx.lineTo(s.x + 4, s.y + 3.5); ctx.lineTo(s.x - 4, s.y + 3.5);
-        ctx.closePath(); ctx.fill();
+        enemyTri(ctx, s.x, s.y);
       }
     }
+    // 电磁干扰下的假目标（ghosts.js）：与真敌机同一个三角、同一套噪声
+    $.ghostBlips(ctx, cx, cy, R, range, p, jam, world);
     // 任务目标
     if (world.targets) {
       for (i = 0; i < world.targets.length; i++) {

@@ -1,7 +1,7 @@
 (function (HUD) {
   'use strict';
   var $ = HUD.$;
-  $.drawLeadReticle = drawLeadReticle; $.drawTargets = drawTargets; $.drawLaserStatus = drawLaserStatus; $.drawConeCue = drawConeCue; $.pointInPolygon = pointInPolygon;
+  $.drawLeadReticle = drawLeadReticle; $.drawTargets = drawTargets; $.drawLaserStatus = drawLaserStatus; $.drawConeCue = drawConeCue; $.pointInPolygon = pointInPolygon; $.drawPlainMark = drawPlainMark;
 
   /* ============================================================
      机炮提前量准星
@@ -99,7 +99,8 @@
            两份标签叠在一起反而谁都读不清。未锁定画基础框。
            中立（team 2）用灰色 —— 它不是敌人，红色会让人想去打它。 */
         if (isLock) drawLockBox(ctx, s, t, p, dist, world);
-        else drawPlainMark(ctx, s, t, dist, t.team > 1);
+        else drawPlainMark(ctx, s, t, dist, t.team > 1,
+          Ent.jamState(p, t) === 'flicker' ? { time: world.time || 0, phase: t.jamPhase } : null);
       }
     }
   }
@@ -216,7 +217,11 @@
      红框旁边照样写清"谁在开、开的是什么" —— 一眼扫过去也要能
      判断该先打谁。标签只在较近时才画，否则满屏都是字。
      ============================================================ */
-  function drawPlainMark(ctx, s, t, dist, neutral) {
+  /* glitch：{ time, phase } —— 目标在电磁干扰的闪烁带里（真假一视同仁）时传入，
+     型号 / 舰级 / 呼号 / 设施名换成同形状的乱码，距离保持真实（2.3b） */
+  function drawPlainMark(ctx, s, t, dist, neutral, glitchInfo) {
+    var gl = glitchInfo ? function (str) { return $.glitch(str, glitchInfo.time, glitchInfo.phase); }
+      : function (str) { return str; };
     var isGnd = t.kind === 'target';
     var sz = isGnd ? 8 : 11;
 
@@ -244,7 +249,7 @@
 
     // 地面设施只有名字，没有呼号也没有机型
     if (isGnd && !t.shipClass) {
-      $.text(ctx, t.label || t.name || T('ui.hud.targeting.drawPlainMark.s1'),
+      $.text(ctx, gl(t.label || t.name || T('ui.hud.targeting.drawPlainMark.s1')),
         s.x + sz + 7, s.y - sz + 8, col, $.FS, 'left');
       $.text(ctx, distTxt, s.x + sz + 7, s.y - sz + 21, dim, $.FS, 'left');
       return;
@@ -254,8 +259,8 @@
        第二行呼号（风味信息，压暗），最后一行距离。以前呼号在前。 */
     /* 两支海军的船同一格式：第一行舰级，第二行呼号 */
     var acTxt = t.ac ? (t.ac.name + ' ' + t.ac.cn) : (t.shipClass || null);
-    var line1 = acTxt || t.label || t.name || '';
-    var line2 = acTxt && t.label ? t.label : null;
+    var line1 = gl(acTxt || t.label || t.name || '');
+    var line2 = acTxt && t.label ? gl(t.label) : null;
 
     var tx = s.x + sz + 7, ty = s.y - sz + 8;
     $.text(ctx, line1, tx, ty, col, $.FS, 'left');

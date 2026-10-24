@@ -17,5 +17,9 @@
   HUD.GREEN = $.GREEN;
   HUD.AMBER = $.AMBER;
   HUD.CY = $.CY;
+  // 假目标：smoke 要单独推进它、读它的状态
+  HUD.__ghostStep = $.ghostStep;
+  HUD.__ghosts = function () { return $.ghosts; };
+  HUD.glitch = $.glitch;
   HUD.RED = $.RED;
 })(HUD);

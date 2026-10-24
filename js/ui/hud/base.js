@@ -101,6 +101,7 @@
     $.drawEnginePanel(ctx, W, H, p);
     $.drawThreatRing(ctx, W, H, p, world);
     $.drawTargets(ctx, W, H, cam, p, world);
+    $.drawGhosts(ctx, W, H, cam, p, world);   // 电磁干扰下的假目标（纯显示层）
     $.drawLaserStatus(ctx, W, H, p, world);
     $.drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
     $.drawCcip(ctx, W, H, cam, p);          // 无制导炸弹 / 火箭的预计落点（CCIP）
