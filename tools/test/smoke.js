@@ -778,6 +778,31 @@ if (!badStore) ok('全部武器都有挂载属性');
   else ok('战斗机各多一对挂点（playerOnly）：组数 / 偶数点 / NPC 跳过 / 玩家默认空，十型全部符合');
 }
 
+/* 重型轰炸机 ROK-40 重做（2.5）：机体 58 × 54 m、命中半径 11.5（其余飞机缺省 7.5）、
+   4 组 8 点（A1 A2 弹舱前后、B1 B2 翼下内外）、间距 ≥ 3 m；关卡里的逐组 loadout 用 B1 且没有 NPC 挂载问题。 */
+{
+  const bad = [];
+  const ac = sandbox.AIRCRAFT.find(x => x.id === 'boulder'), m = sandbox.MODELS.boulder;
+  if (!m || Math.abs(m.len - 58) > 0.01 || Math.abs(m.span - 54) > 0.01) bad.push('boulder 模型尺寸应为 58 × 54：' + (m && m.len) + ' × ' + (m && m.span));
+  if (ac.hitR !== 11.5) bad.push('boulder 的 hitR 应为 11.5：' + ac.hitR);
+  const ids = ac.hardpointGroups.map(g => g.id).join(',');
+  if (ids !== 'A1,A2,B1,B2') bad.push('boulder 的挂点组应为 A1,A2,B1,B2：' + ids);
+  for (const g of ac.hardpointGroups) if (g.pts.length !== 2) bad.push('boulder 的组 ' + g.id + ' 应是一对');
+  const A1 = ac.hardpointGroups[0].pts[0], A2 = ac.hardpointGroups[1].pts[0];
+  if (Math.abs(A1.y - A2.y) < 3) bad.push('弹舱前后两对间距应 ≥ 3 m：' + Math.abs(A1.y - A2.y));
+  const Ec = sandbox.Ent, Cc = sandbox.Combat;
+  const bm = Ec.makeAircraft({ type: 'boulder', team: 1, x: 0, y: 5000, z: 0, speed: 250, special: 'vsr', loadout: { B1: 'vsr' } });
+  const fg = Ec.makeAircraft({ type: 'frigatebird', team: 1, x: 0, y: 5000, z: 0, speed: 250 });
+  if (Cc.radiusOf(bm) !== 11.5 || Cc.radiusOf(fg) !== Cc.HIT_R_AIR) bad.push('Combat.radiusOf 应读 hitR（boulder 11.5，战斗机 ' + Cc.HIT_R_AIR + '）：' + Cc.radiusOf(bm) + ' / ' + Cc.radiusOf(fg));
+  const plan = Ec.mountPlan(bm);
+  if (plan[2] !== 'vsr' || plan.filter(Boolean).length !== 1) bad.push('boulder { B1: vsr } 的挂载计划不对：' + JSON.stringify(plan));
+  if (Ec.mountIssues.length) bad.push('boulder 挂载有问题：' + Ec.mountIssues.join('；'));
+  Ec.clearMountIssues();
+  // 实弹覆盖（弹丸判定读 a.hitR）由 smoke 的"机炮抗性"段负责，这里只验证半径读取
+  if (bad.length) bad.forEach(fail);
+  else ok('ROK-40 重做：58 × 54 m、hitR 11.5、挂点 A1 A2 B1 B2、loadout B1 挂得上');
+}
+
 /* 挂载弹体的翼面必须与弹体相接（2.2b）：翼片的根部到弹轴的径向距离不得比六边形截面的
    边心距（0.866 r）更远 —— 否则翼片悬在弹体外面，远看像"悬浮"的翼片。
    只求视觉相接，允许翼根穿入弹体内部。 */

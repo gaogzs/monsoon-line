@@ -126,7 +126,7 @@ Registry.mission({
       ac: 'boulder',
       x: 12000, y: 12000, z: 34000,
       fwd: M3.V(-1, 0, 0), speed: 250,
-      special: 'vsr', loadout: { B: 'vsr' },
+      special: 'vsr', loadout: { B1: 'vsr' },
       skill: 0.4, callsign: downstreamCallsign(14)
     });
     cruise.bigTarget = true;

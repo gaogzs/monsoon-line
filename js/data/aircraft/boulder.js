@@ -35,12 +35,21 @@ Registry.aircraft({
   /* 无武装。理由与做法见上面那段注释 —— 这不是漏写。 */
   gun: null,
   maxLoad: 22000,
+  /* 命中半径（米）：所有飞机缺省 7.5（Combat.HIT_R_AIR）。重型轰炸机机体大得多
+     （58 × 54 m），再用 7.5 会显得"贴着机翼打不中"，所以放大到 11.5；hp 不动，
+     靠更大的靶面自然变脆。quartz / lodestone 共用这个机体，但它们各有自己的数据，
+     没写就仍是 7.5。 */
+  hitR: 11.5,
+  /* 弹舱 4 点（沿机身前后两对）+ 翼下 4 点（发动机内外各一对）。
+     2.5 之前是 A 弹舱一对 / B 翼下一对；关卡里的 loadout 同步改成 B1（见 m5 / m8）。 */
   hardpointGroups: [
-    { id: 'A', label: T('aircraft.boulder.hardpointGroups.i0.label'), kind: 'belly', expose: 0, hy: -2.30, pts: [{ x: 1.6, y: -2.2 }, { x: -1.6, y: -2.2 }] },
-    { id: 'B', label: T('aircraft.boulder.hardpointGroups.i1.label'), kind: 'heavy', pts: [{ x: 6.0, y: -1.5 }, { x: -6.0, y: -1.5 }] }
+    { id: 'A1', label: T('aircraft.boulder.hardpointGroups.i0.label'), kind: 'belly', expose: 0, hy: -2.65, pts: [{ x: 1.0, y: 5.0 }, { x: -1.0, y: 5.0 }] },
+    { id: 'A2', label: T('aircraft.boulder.hardpointGroups.i1.label'), kind: 'belly', expose: 0, hy: -2.65, pts: [{ x: 1.0, y: -2.0 }, { x: -1.0, y: -2.0 }] },
+    { id: 'B1', label: T('aircraft.boulder.hardpointGroups.i2.label'), kind: 'heavy', pts: [{ x: 5.4, y: 0.0 }, { x: -5.4, y: 0.0 }] },
+    { id: 'B2', label: T('aircraft.boulder.hardpointGroups.i3.label'), kind: 'heavy', pts: [{ x: 13.5, y: 0.2 }, { x: -13.5, y: 0.2 }] }
   ],
   defaultLoadout: {},
   /* ROK-40 的尾炮：没有实体，从尾锥射出，管后半球。它本身没有前射机炮（gun: null） */
-  mounts: [_m('tail', 'tail20a', [0, 0.4, -22.2], Math.PI,
+  mounts: [_m('tail', 'tail20a', [0, 0.4, -32.2], Math.PI,
     { yawMin: -1.5, yawMax: 1.5, pitchMin: -0.9, pitchMax: 0.9 }, null, 'aa')]
 });

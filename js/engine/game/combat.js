@@ -26,7 +26,7 @@
       for (j = 0; j < $.world.actors.length; j++) {
         var a = $.world.actors[j];
         if (!a.alive || a.team === b.team) continue;
-        var t = M3.raySphere(prev, dir, a.pos, Combat.HIT_R_AIR);
+        var t = M3.raySphere(prev, dir, a.pos, a.hitR || Combat.HIT_R_AIR);
         if (t >= 0 && t <= segLen) {
           if (b.owner && b.owner.isPlayer) {
             $.world.hitsLanded++;

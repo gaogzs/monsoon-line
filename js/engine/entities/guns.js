@@ -58,10 +58,11 @@
   function shellFuze(b, world) {
     if (!b.alive || !(b.fuze > 0)) return false;
     var p0 = b.prev, d = M3.sub(b.pos, p0), dd = M3.dot(d, d);
-    var acts = world.actors, R = Combat.HIT_R_AIR;
+    var acts = world.actors;
     for (var i = 0; i < acts.length; i++) {
       var a = acts[i];
       if (!a.alive || a.team === b.team) continue;
+      var R = a.hitR || Combat.HIT_R_AIR;
       var rel = M3.sub(a.pos, p0);
       var s = dd > 1e-9 ? M3.clamp(M3.dot(rel, d) / dd, 0, 1) : 0;
       var cp = M3.add(p0, M3.mul(d, s));

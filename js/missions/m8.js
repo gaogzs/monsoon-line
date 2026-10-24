@@ -13,7 +13,7 @@ function m8Wave2(w) {
       ac: bomber ? 'boulder' : 'schist',
       x: 26000, y: bomber ? 5000 : 2800, z: -4000 + i * 3000,
       fwd: M3.V(-1, 0, 0), speed: bomber ? 250 : 300,
-      special: 'vsr', loadout: bomber ? { B: 'vsr' } : { A: 'vsr', B: 'dl6' },
+      special: 'vsr', loadout: bomber ? { B1: 'vsr' } : { A: 'vsr', B: 'dl6' },
       skill: bomber ? 0.3 : 0.6,
       callsign: bomber ? squadCallsign(40, i + 1) : squadCallsign(41 + i, 1)
     });
@@ -138,7 +138,7 @@ Registry.mission({
         ac: 'boulder',
         x: (i - 0.5) * 5000, y: 5000, z: 26000,
         fwd: M3.V(0, 0, -1), speed: 250,
-        special: 'vsr', loadout: { B: 'vsr' },
+        special: 'vsr', loadout: { B1: 'vsr' },
         skill: 0.3,
         callsign: squadCallsign(46, i + 1)
       });

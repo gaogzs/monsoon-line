@@ -61,7 +61,7 @@ var Combat = (function () {
   }
 
   function radiusOf(e) {
-    return e.kind === 'target' ? (e.radius || 8) : HIT_R_AIR;
+    return e.kind === 'target' ? (e.radius || 8) : (e.hitR || HIT_R_AIR);
   }
 
   /* 起爆：弹体就地结束，按战斗部结算一片。

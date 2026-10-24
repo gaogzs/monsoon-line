@@ -103,6 +103,7 @@ var CALLSIGN = {
 | `variableSweep` | bool | — | 只有 `frigatebird` 有；`Ent` 据此做变后掠翼插值 |
 | `tags` | string[] | — | 机制标签，注册时展开成 `{名: true}`，实体创建时带到 `a.tags`；目前只有 `folded_wing` 写了 `['unmanned']`（无人僚机，原来的 `isDrone`） |
 | `muzzle` | `[x, y, z]` | — | 炮管口的机体坐标（x 取绝对值，左右各一），写了就按它出膛（`Ent.gunMuzzle`，原来的 `GUN_MUZZLE` 表）；目前只有 `booby` 写了 |
+| `hitR` | number | — | 命中半径（米），缺省 7.5（`Combat.HIT_R_AIR`）；机炮弹丸判定（`scanShot`）、近炸弹 / 引信、爆炸衰减（`Combat.radiusOf`）都读 `a.hitR`。目前只有 `boulder`（ROK-40）写了 11.5：机体 58 × 54 m 再用 7.5 会显得"贴着机翼打不中"，hp 不动，靠更大的靶面自然变脆 |
 | `gunResist` | number | — | 机炮抗性（小口径航炮伤害减免比例，`Ent.gunResistK`）；`boulder` 0.15、`pelican` / `lodestone` / `quartz` 0.05，其余缺省 = 0 |
 | `mounts` | 数组 | — | 机上炮塔 / 炮位（目前只有 `boulder`），写法同舰船的 `mounts` |
 | `stats` | 对象 | ✅ | 机库六维条；键见下，缺某个维度会算出 `NaN` 宽度 |

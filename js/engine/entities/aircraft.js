@@ -38,6 +38,7 @@
       nick: ac.nick,
       alive: true,
       isPlayer: !!o.isPlayer,
+      hitR: ac.hitR,               // 命中半径（米），缺省用 Combat.HIT_R_AIR（7.5）；重型轰炸机更大
       tags: ac.tags,               // 机制标签（unmanned …），见 js/core/tags.js
 
       pos: M3.V(o.x || 0, o.y || 3000, o.z || 0),
