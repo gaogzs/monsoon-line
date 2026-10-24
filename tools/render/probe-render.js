@@ -18,6 +18,7 @@
  *   env-high     20 km 俯看（海面往下弯、高空云片）
  *   env-cloud    贴着一层积云飞（云团遮挡、软边）
  *   env-blast    飞机背后的爆炸（应被机身挡住）
+ *   env-tracer   飞机背后的曳光弹（2.2d：应被机身挡住；右侧一发不被挡，作对照）
  * 其余场景两边都关掉 WebGL 环境层，只比模型。
  *
  * "差异"= 两边颜色差超过 24（0–255 每通道最大值）的像素占比。遮挡场景（wing-top）
@@ -107,6 +108,12 @@ ${tags}
   var blast = [];
   Ent.explode(blast, M3.V(0, 3000, 60), 1.6, 26);
   for (var bi = 0; bi < 6; bi++) Ent.stepParticles(blast, 0.05);
+  /* 曳光弹（frame.js 的 tracerParticles 同一形状）：沿机身正后方一发（被挡），右侧另一发（不被挡） */
+  function tracerP(x, y, z, col) {
+    return { alive: true, delay: 0, life: 1, life0: 1, alpha: 0.92, color: col, size: 0.3,
+      grow: false, pos: M3.V(x, y, z), vel: M3.V(0, 0, 30 / 0.03), streak: true };
+  }
+  var tracers = [tracerP(0, 3000, 40, '#ffe496'), tracerP(14, 3003, 60, '#ffe496')];
   SC.push(
     { id: 'env-low', env: true, fn: function () { look(M3.V(0, 300, 0), M3.V(400, 900, 3000)); } },
     { id: 'env-high', env: true, fn: function () {
@@ -122,6 +129,11 @@ ${tags}
       look(M3.V(-6, 3004, -24), M3.V(0, 3000, 60));
       pushPlane(plane('basalt', O, M3.V(0, 0, 1)));
       Renderer.drawParticles(blast);
+    } },
+    { id: 'env-tracer', env: true, fn: function () {
+      look(M3.V(-6, 3004, -24), M3.V(0, 3000, 60));
+      pushPlane(plane('basalt', O, M3.V(0, 0, 1)));
+      Renderer.drawParticles(tracers);
     } }
   );
 
@@ -168,7 +180,7 @@ function main() {
   fs.writeFileSync(html, page());
   const url = 'file:///' + html.replace(/\\/g, '/');
   const common = ['--headless=new', '--hide-scrollbars', '--no-sandbox', '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader', '--allow-file-access-from-files', '--window-size=990,3700', '--virtual-time-budget=6000'];
+    '--enable-unsafe-swiftshader', '--allow-file-access-from-files', '--window-size=990,4100', '--virtual-time-budget=6000'];
   spawnSync(chrome, common.concat(['--screenshot=' + png.replace(/\\/g, '/'), url]), { stdio: 'ignore' });
   const dom = spawnSync(chrome, common.concat(['--dump-dom', url]), { encoding: 'utf8' });
   const m = /RESULT (\{.*?\})<\/title>/.exec(dom.stdout || '');

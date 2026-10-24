@@ -3,7 +3,7 @@
 代码：`js/render/render.js`（2D 层 + 画家算法兜底） · `js/render/render-gl.js`（模型的 WebGL2 渲染，v2.0.0 起） · `js/render/env/`（WebGL 环境层：天空 / 海面 / 云 / 粒子，v2.1.0 起） · `js/core/shading.js`（着色规则，唯一一份） · 相机与投影数学在 `js/core/math3d.js`
 
 > **v2.0.0 起模型改走 WebGL2**（docs/2-0IMPL.md 阶段 2.5）。**v2.1.0 起天空、海面、云、粒子也进了 WebGL**（2.5.9，见下面"WebGL 环境层"），
-> 与模型共用一个深度缓冲。曳光、HUD 仍是 Canvas 2D。下文"天空与太阳""云""地面""粒子"几节描述的是 **2D 回退**的画法。
+> 与模型共用一个深度缓冲。曳光在 WebGL 粒子开着时也是拖尾粒子（参与深度测试），HUD 仍是 Canvas 2D。下文"天空与太阳""云""地面""粒子"几节描述的是 **2D 回退**的画法。
 > 下文的画家算法 / 补接缝 / 近平面裁剪描述的是 **2D 兜底路径**，仍然存在、仍然正确。
 
 `js/render/render.js` 是一个 IIFE，只导出一个 `Renderer` 单例。它不认识实体、任务、HUD，
@@ -61,7 +61,7 @@
 | 高空云片 | 12.6 km、17.4 km 两层（`SHEETS`），逐像素求视线与水平面交点，fbm 噪声，x 向拉长成卷云丝；穿过时不糊脸 |
 | 粒子 | `drawParticles()` 在 GL 下只收集（须在 `flush()` 之前调），flush 时实例化画：小圆片 / 破片短线，加色混合，**测深度不写深度** —— 飞机背后的爆炸会被机身挡住。规则与 2D 相同（`delay`、`grow`、`streak` 30 ms） |
 | 地球曲率 | 主画面的模型 / 粒子 / 云贴片按离镜头的水平距离下沉 d²/(2R)（`uCurve`），和球面海面同一个弧度 —— 否则 10 km 外的船会浮在海上约 8 m。3D 预览不弯 |
-| 曳光 | 刻意留在 2D 层，画在一切之上（被机翼挡住反而看不清弹道） |
+| 曳光 | WebGL 粒子开着时：每发子弹转成一个拖尾粒子（`frame.js` 的 `tracerParticles`，vel = 方向 × 尾长 / 0.03），与模型、海面做深度测试，山后 / 机身后的子弹被挡掉；否则退回 2D 画布（`drawTracers`，没有深度，画在一切之上）。两条路径共用 `tracerGeom`；选路径看 `Renderer.glParticles()` |
 | 抖动 | 整张图铺满屏幕，抖动改为移动投影中心 `cx/cy`（不能平移图片，边上会露空） |
 | 噪声精度 | 相机 xz 先对 `PERIOD = 40960` 取余再进着色器；所有噪声尺度都整除它，取余跳变时无缝 |
 
@@ -279,7 +279,8 @@ pushModel() × N        ← 只收集，不绘制（GL 路径转给 RenderGL.pus
 Renderer.drawParticles(world.particles)   ← 2D：直接画；GL 环境层：只收集
 Renderer.flush()       ← 2D：排序 + 绘制全部面；GL：渲染离屏画布并 drawImage
 
-drawTracers()          ← `js/ui/frame.js` 自己的曳光弹，画在一切之上
+tracerParticles() → drawParticles   ← WebGL：曳光弹作为拖尾粒子，在 flush 之前交（参与深度测试）
+drawTracers()          ← 2D 回退：`js/ui/frame.js` 的曳光弹，画在一切之上
 Renderer.end()                            ← ctx.restore()
 
 HUD.draw(world, player, 0, S)             ← 在 restore 之后，所以 HUD 不跟着抖

@@ -99,11 +99,12 @@
     }
     Renderer.drawParticles($.world.particles);
     Renderer.drawParticles(Ent.flashRings($.world));
+    /* 曳光弹：WebGL 粒子开着时变成拖尾粒子，与模型 / 海面做深度测试（山后、机身后的子弹被挡掉）；
+       否则退回 2D 画布（没有深度，画在整幅画面之上）。2-0IMPL 2.2d */
+    var tracerGL = Renderer.glParticles();
+    if (tracerGL) Renderer.drawParticles(tracerParticles());
     Renderer.flush();
-
-    // 曳光弹画在模型之上并用加色混合 —— 弹道本来就该是亮线，
-    // 被机翼挡掉反而看不清楚（所以 WebGL 下也留在 2D 层）
-    drawTracers();
+    if (!tracerGL) drawTracers();
     Renderer.end();
 
     // HUD
@@ -167,6 +168,85 @@
      所以开火除了声音之外看不到任何东西。这里按上一帧到当前帧的
      线段画成曳光，并用加色混合让它发光。
      ============================================================ */
+  /* 一发子弹的曳光几何（2D 画布与 WebGL 粒子两条路径共用，数值不能各抄一份）：
+     { dirv, trailLen, wMul, mine, bDist } 或 null（在相机后面） */
+  function tracerGeom(b, cam) {
+    var head = M3.project(cam, b.pos);
+    if (!head) return null;
+
+    /* 曳光长度**按距离自适应**，让屏幕上的角长度保持恒定。
+
+       原来固定 13 米（也与"上一帧位置"解耦，避免高射速下弹丸首尾
+       相接连成一根面条）。近处刚好，但到 1500 米外投影只有 0.5° ——
+       看起来就是一颗缓慢移动的小点，玩家会以为"弹速很慢"。
+       实际上 30mm 的炮口初速是 1020 m/s，一点都不慢。
+
+       尾迹取 dist × 0.045，对应屏幕上约 2.6° 的角长度，
+       从 300 米到 2000 米都一样显眼。上限 90 米防止近处拉成面条。 */
+    var dirv = M3.norm(b.vel);
+    var bDist = M3.dist(b.pos, cam.pos);
+    /* 航空机炮：随距离衰减，但比真实透视慢 —— 屏幕上的角长度按 1/√距离 缩小（真实是 1/距离）。
+       290 m 内维持 13 m；更远世界长度按 √距离 增长，1.5 km 外约 30 m，上限 90 m。
+       以前是角长度恒定（dist × 0.045），远处一串弹和眼前一样长 */
+    var trailLen = Math.min(90, 13 * Math.sqrt(Math.max(290, bDist) / 290));
+    /* 中大口径炮弹（> 30 mm）不做角长度自适应：长度、粗细都是世界尺寸，
+       近大远小 —— 否则几公里外的一发炮弹在屏幕上和眼前的一样大 */
+    /* 炮塔打出来的弹（近防炮、遥控炮、尾炮）也按世界尺寸画：它们大多是远处的旁观者，
+       按角长度自适应会让几公里外的一串近防炮弹粗得不合常理。玩家 / 僚机的航炮仍自适应 —— 那是瞄准用的 */
+    var cal = b.cal || 20, big = cal > 30 || !!b.turret;
+    if (big) trailLen = (cal > 30 ? 16 : 10) * Math.sqrt(cal / 20);
+    /* 尾巴不越过炮口，并且接在**当前**炮口上。
+       刚出膛的子弹在生成那一帧就已经飞出去十几米，飞机也往前走了 ——
+       若按世界坐标里的出膛点截，曳光会从炮口前方凭空出现；
+       若不截，13 米的最短尾迹会伸回机身里，看着像从机腹打出来。
+       所以尾巴长度取"子弹到当前炮口沿弹道的距离"：第一帧可伸，之后只截。 */
+    if (b.owner && b.owner.alive && b.side !== undefined) {
+      var mzNow = Ent.gunMuzzle(b.owner, b.side);
+      var ahead = M3.dot(M3.sub(b.pos, mzNow), dirv);
+      /* 只有出膛**第一帧**的子弹才接回炮口（补上它生成那一帧飞出去的空当）。
+         以前是"离炮口 60 米以内都接"—— 机头一转，前两三帧的子弹也被
+         硬连到新的炮口位置，扫出一把斜着的长线。之后的子弹只截不伸。 */
+      var young = (b.steps || 0) <= 1;
+      if (ahead > 0 && (young || ahead < trailLen)) trailLen = ahead;
+    }
+
+    // 航空机炮的粗细同样慢衰减：√(400 / 距离)，最细保留 0.6 倍
+    var wMul = M3.clamp(Math.sqrt(400 / Math.max(1, bDist)), 0.6, 1);
+    /* 炮弹 / 炮塔弹：曳光光晕半径按口径取世界尺寸（75 mm ≈ 0.55 m，20 mm ≈ 0.2 m），
+       投影后不小于约 0.6 px —— 远处是一道细亮线，不会消失 */
+    if (big) wMul = Math.max(0.5, cam.focal * (cal > 30 ? 0.28 : 0.2) * Math.sqrt(cal / 20) / Math.max(1, bDist));
+    return { dirv: dirv, trailLen: trailLen, wMul: wMul, bDist: bDist, mine: !!($.player && b.team === $.player.team) };
+  }
+
+  /* WebGL 路径：把子弹变成"拖尾粒子"交给粒子管线，于是曳光与模型、海面做深度测试
+     （山后、机身后的子弹被挡掉）。粒子的拖尾是 vel × 0.03，所以 vel = 方向 × 尾长 / 0.03；
+     size 取世界半径，使 focal × size / z 等于原来的线宽像素（lineWidth / 0.9）。 */
+  function tracerParticles() {
+    var cam = Renderer.getCam(), out = [];
+    if (!cam || !$.world) return out;
+    for (var i = 0; i < $.world.bullets.length; i++) {
+      var b = $.world.bullets[i];
+      if (!b.alive) continue;
+      var g = tracerGeom(b, cam);
+      if (!g) continue;
+      var lw = (g.mine ? 1.35 : 1.15) * g.wMul;
+      var size = lw * g.bDist / (cam.focal * 0.9);
+      out.push({
+        alive: true, delay: 0, life: 1, life0: 1, alpha: g.mine ? 0.92 : 0.85,
+        color: g.mine ? '#ffe496' : '#ff9458', size: size, grow: false,
+        pos: b.pos, vel: M3.mul(g.dirv, g.trailLen / 0.03), streak: true
+      });
+      // 弹头亮点
+      out.push({
+        alive: true, delay: 0, life: 1, life0: 1, alpha: 1,
+        color: g.mine ? '#fffad7' : '#ffc496', size: (g.mine ? 1.25 : 1.0) * g.wMul * g.bDist / cam.focal, grow: false,
+        pos: b.pos, vel: null, streak: false
+      });
+    }
+    return out;
+  }
+
+  // 2D 回退路径：画在整幅画面之上（没有深度；WebGL 粒子关闭时才走这里）
   function drawTracers() {
     if (!$.world || !$.world.bullets.length) return;
     var cam = Renderer.getCam();
@@ -180,55 +260,13 @@
     for (var i = 0; i < $.world.bullets.length; i++) {
       var b = $.world.bullets[i];
       if (!b.alive) continue;
-
+      var g = tracerGeom(b, cam);
+      if (!g) continue;
       var head = M3.project(cam, b.pos);
-      if (!head) continue;
-
-      /* 曳光长度**按距离自适应**，让屏幕上的角长度保持恒定。
-
-         原来固定 13 米（也与"上一帧位置"解耦，避免高射速下弹丸首尾
-         相接连成一根面条）。近处刚好，但到 1500 米外投影只有 0.5° ——
-         看起来就是一颗缓慢移动的小点，玩家会以为"弹速很慢"。
-         实际上 30mm 的炮口初速是 1020 m/s，一点都不慢。
-
-         尾迹取 dist × 0.045，对应屏幕上约 2.6° 的角长度，
-         从 300 米到 2000 米都一样显眼。上限 90 米防止近处拉成面条。 */
-      var dirv = M3.norm(b.vel);
-      var bDist = M3.dist(b.pos, cam.pos);
-      /* 航空机炮：随距离衰减，但比真实透视慢 —— 屏幕上的角长度按 1/√距离 缩小（真实是 1/距离）。
-         290 m 内维持 13 m；更远世界长度按 √距离 增长，1.5 km 外约 30 m，上限 90 m。
-         以前是角长度恒定（dist × 0.045），远处一串弹和眼前一样长 */
-      var trailLen = Math.min(90, 13 * Math.sqrt(Math.max(290, bDist) / 290));
-      /* 中大口径炮弹（> 30 mm）不做角长度自适应：长度、粗细都是世界尺寸，
-         近大远小 —— 否则几公里外的一发炮弹在屏幕上和眼前的一样大 */
-      /* 炮塔打出来的弹（近防炮、遥控炮、尾炮）也按世界尺寸画：它们大多是远处的旁观者，
-         按角长度自适应会让几公里外的一串近防炮弹粗得不合常理。玩家 / 僚机的航炮仍自适应 —— 那是瞄准用的 */
-      var cal = b.cal || 20, big = cal > 30 || !!b.turret;
-      if (big) trailLen = (cal > 30 ? 16 : 10) * Math.sqrt(cal / 20);
-      /* 尾巴不越过炮口，并且接在**当前**炮口上。
-         刚出膛的子弹在生成那一帧就已经飞出去十几米，飞机也往前走了 ——
-         若按世界坐标里的出膛点截，曳光会从炮口前方凭空出现；
-         若不截，13 米的最短尾迹会伸回机身里，看着像从机腹打出来。
-         所以尾巴长度取"子弹到当前炮口沿弹道的距离"：第一帧可伸，之后只截。 */
-      if (b.owner && b.owner.alive && b.side !== undefined) {
-        var mzNow = Ent.gunMuzzle(b.owner, b.side);
-        var ahead = M3.dot(M3.sub(b.pos, mzNow), dirv);
-        /* 只有出膛**第一帧**的子弹才接回炮口（补上它生成那一帧飞出去的空当）。
-           以前是"离炮口 60 米以内都接"—— 机头一转，前两三帧的子弹也被
-           硬连到新的炮口位置，扫出一把斜着的长线。之后的子弹只截不伸。 */
-        var young = (b.steps || 0) <= 1;
-        if (ahead > 0 && (young || ahead < trailLen)) trailLen = ahead;
-      }
-      var tail = M3.project(cam, M3.sub(b.pos, M3.mul(dirv, trailLen)));
+      var tail = M3.project(cam, M3.sub(b.pos, M3.mul(g.dirv, g.trailLen)));
       if (!tail) tail = head;
+      var mine = g.mine, wMul = g.wMul;
 
-      var mine = $.player && b.team === $.player.team;
-
-      // 航空机炮的粗细同样慢衰减：√(400 / 距离)，最细保留 0.6 倍
-      var wMul = M3.clamp(Math.sqrt(400 / Math.max(1, bDist)), 0.6, 1);
-      /* 炮弹 / 炮塔弹：曳光光晕半径按口径取世界尺寸（75 mm ≈ 0.55 m，20 mm ≈ 0.2 m），
-         投影后不小于约 0.6 px —— 远处是一道细亮线，不会消失 */
-      if (big) wMul = Math.max(0.5, cam.focal * (cal > 30 ? 0.28 : 0.2) * Math.sqrt(cal / 20) / Math.max(1, bDist));
       ctx.strokeStyle = mine ? 'rgba(255,228,150,0.92)' : 'rgba(255,148,88,0.85)';
       ctx.lineWidth = (mine ? 1.35 : 1.15) * wMul;
       ctx.beginPath();

@@ -638,6 +638,8 @@ var Renderer = (function () {
     setMode: setMode, usingGL: usingGL, setGfx: setGfx, setQuality: setQuality,
     begin: begin, end: end, pushModel: pushModel, flush: flush,
     drawParticles: drawParticles, addShake: addShake,
+    /* 粒子此刻走 WebGL（参与深度测试）吗？曳光弹据此选路径：是 → 拖尾粒子，否 → 2D 画布 */
+    glParticles: function () { return !!(envGL && gfx.particles && !flushed); },
     line: line, rect: rect, circle: circle, ring: ring, text: text,
     get W() { return W; }, get H() { return H; },
     get ctx() { return ctx; }

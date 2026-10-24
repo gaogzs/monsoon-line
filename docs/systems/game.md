@@ -23,7 +23,7 @@
 | 结算 | `engine/game/finish.js` | `finish(win)`、`combatEvents`、`killCredit`、`friendlyLosses` |
 | 输入 / 选目标 / 发射键 | `ui/input.js` | `bindInput`、`cycleTarget`、`rankTargets`、`fireSpecial`、`cycleSpecial`、`setWingCmd`、`toggleEmcon`、`updateTargetKey` |
 | 相机 | `ui/camera.js` | `updateCamera`、出画处理（`frameDeficit` / `softClampFrame` / `stepFrameExtra`）、`camPitchFor` |
-| 画一帧 | `ui/frame.js` | `render()`、`pushStores` / `pushOneStore`、`drawTracers` |
+| 画一帧 | `ui/frame.js` | `render()`、`pushStores` / `pushOneStore`、`tracerGeom` / `tracerParticles` / `drawTracers` |
 | 屏幕切换 | `ui/screens/nav.js` | `show` / `hideAll` / 指针锁定 |
 | 设置与手册 | `ui/screens/settings.js` | `SET_GROUPS` / `DEFAULTS` / `KEYMAP` / `TIPS` / `GUIDE`、`loadSettings` / `saveSettings`、`buildSettingsInto` / `buildHelpHTML` |
 | 机库 | `ui/screens/hangar.js` + `hardpoints.js` | `$.hangarView`、`buildHangar(view)`、`buildHardpointEditor(ac, lo, view)` |
@@ -204,7 +204,7 @@ hits / banner 计时衰减
 ```
 Renderer.begin()
 pushModel 目标物（MODELS[t.model]；30 km 外的调节单元跳过）→ 飞机（含 sweep）→ pushStores(a) → 导弹 → Renderer.flush()
-drawTracers()                     ← Game 自己的曳光，加色混合，画在模型之上
+曳光：WebGL 粒子开着 → tracerParticles() 交给 drawParticles（flush 之前，参与深度测试）；否则 flush 之后 drawTracers()（2D 加色，画在模型之上）
 Renderer.drawParticles(world.particles);  Renderer.end()
 HUD.draw(world, player, 0, S)     ← 在 end() 之后，所以不跟着抖；dt 传的是 0（渲染不推进 HUD 的计时）
 banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”已移进 HUD 告警栈）
@@ -212,7 +212,7 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 
 调节单元每关 9–54 个、大多在远处，`render()` 对带 `cullFar` 标签的目标（见 [tags.md](tags.md)）用 `CELL_DRAW_RANGE2`（30 km 的平方）把远的直接跳过 —— 雾里一个点，画了也看不见。HUD 那边另有一道 10 km 的 `farCell()`（`ui/hud/radar.js`，见 [hud.md](hud.md)）。
 
-曳光长度按距离自适应（`min(90, max(13, bDist * 0.045))`）—— 固定 13 米在 1500 米外只有 0.5°，看起来像“弹速很慢”。
+曳光长度按距离自适应（`tracerGeom`：`min(90, 13 × √(max(290, bDist) / 290))`；大口径 / 炮塔弹取世界尺寸）—— 固定 13 米在 1500 米外只有 0.5°，看起来像“弹速很慢”。
 
 ---
 ## 世界生命周期
@@ -577,7 +577,7 @@ var queue = [], timer = 0, box = null, live = [];
 | 字幕停留 / 队列上限 / 台词间隔 | `Radio.push()` 的 `5.6` / `4`、`Radio.update()` 的 `1.4` |
 | 粒子数量上限 | `compact()` 里的 `900` |
 | 挂架高度 / 实体缩放 | `STORE_HY` / `pushOneStore()` 里的 `0.85` |
-| 曳光长度与宽度 | `drawTracers()` 里的 `0.045 / 13 / 90`、`1600` |
+| 曳光长度与宽度 | `tracerGeom()` 里的 `13 / 290 / 90`、`wMul` |
 | 设置项清单 | `ui/screens/settings.js` 的 `SET_GROUPS`（同 [hud.md](hud.md#各项)） |
 | 文件位置 | 上表参数所在函数见前面“职责 → 文件”（`loop` / `preflight` 在 `boot/main.js`，`controlPlayer` 在 `control.js`，`updateLock` 在 `lock.js`，`finish` 在 `finish.js`，`updateCamera` 在 `ui/camera.js`，`drawTracers` / `pushOneStore` 在 `ui/frame.js`，`STORE_HY` 在 `js/engine/entities/mounts.js`，`compact` / `watchdog` 在 `update.js`） |
 
