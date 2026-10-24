@@ -174,7 +174,7 @@
      结算
      ============================================================ */
   function finish(win) {
-    if (win) $.cleared[MISSIONS[$.missionIdx].id] = true;
+    if (win) { $.cleared[MISSIONS[$.missionIdx].id] = true; $.saveGame(); }
     SFX.silence();
     $.state = 'debrief';
     SFX[win ? 'fanfare' : 'fail']();

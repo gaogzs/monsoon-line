@@ -192,6 +192,7 @@
 
     card.onclick = function () {
       lo[g.id] = wid;
+      $.saveGame();          // 机库里改挂载就存档（engine/game/save.js）
       SFX.click();
       view.rebuild();
     };

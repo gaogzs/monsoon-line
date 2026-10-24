@@ -20,7 +20,8 @@
 | 发射 | `engine/game/launch.js` | `launch`、`fireEcm`、`salvoShots`、`vsSkill` |
 | 战斗结算 | `engine/game/combat.js` | `scanShot`、`resolveBullets`、`hitTarget`、`updateTargets`、`updateDEW` |
 | 每帧推进 | `engine/game/update.js` | `update(dt)`、`watchdog`、`compact` |
-| 结算 | `engine/game/finish.js` | `finish(win)`、`combatEvents`、`killCredit`、`friendlyLosses` |
+| 结算 | `engine/game/finish.js` | `finish(win)`、`beginFail` / `endFail` / `failReason`（失败停留画面）、`combatEvents`、`killCredit`、`friendlyLosses` |
+| 存档 | `engine/game/save.js` | `loadSave`、`saveGame`、`sanitizeLoadout`（键 `monsoonline.save.v1`） |
 | 输入 / 选目标 / 发射键 | `ui/input.js` | `bindInput`、`cycleTarget`、`rankTargets`、`fireSpecial`、`cycleSpecial`、`setWingCmd`、`toggleEmcon`、`updateTargetKey` |
 | 相机 | `ui/camera.js` | `updateCamera`、出画处理（`frameDeficit` / `softClampFrame` / `stepFrameExtra`）、`camPitchFor` |
 | 画一帧 | `ui/frame.js` | `render()`、`pushStores` / `pushOneStore`、`tracerGeom` / `tracerParticles` / `drawTracers` |
@@ -254,6 +255,14 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 4. 初始镜头 `camFwd = p.fwd`、`camUp = (0,1,0)`、`camPos = p.pos + (0, 30, -110)`；`Radio.clear()` → `Radio.play(mission.id, 'start')`；横幅 `banner = { t: 3.4, ... }`。
 5. `hideAll(); state = 'playing'; paused = false;` 摘掉暂停层，`p.target = null`。
 
+### 存档（2.6）
+`engine/game/save.js`。设置早就持久化了（`monsoonline.settings.v1`，`settings.js`）；这里只补两样，存进另一个键 `monsoonline.save.v1`，内容 `{ v: 1, cleared, loadouts }`：
+
+- `cleared`：`{ 关卡 id: true }`，`finish(true)` 写、简报页 / 战役选择页读。按 id 记，下标重排不受影响。
+- `loadouts`：`{ 机型 id: { 组 id: 武器 id | null } }`，机库里点选挂载时写（`hardpoints.js`）。
+- `loadSave()` 在 `init` 里紧跟 `loadSettings()`；`saveGame()` 在 `finish(true)` 与机库改挂载时调。两者都包在 try / catch 里，无痕模式、禁用存储、坏 JSON、不认识的版本号都静默降级、不抛。
+- **读取时逐组校验**（`sanitizeLoadout`）：缺的组（旧存档里没有 2.4 新加的那一对）取 `defaultLoadout`；引用了已被移除的武器、挂点类型不适配（`Ent.fitsKind`）、机体能力不够（`canCarry`）、或是机炮的，都回退默认；明确选的"空置"（`null`）保留。不存在的关卡 / 机型直接丢弃。
+
 ### 失败：`beginFail` / `endFail`（2.1）
 `engine/game/finish.js`。失败（被击毁、坠毁、关卡条件、时限）**先停在游戏画面上**：
 
@@ -267,7 +276,7 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 ### `finish(win)`
 `engine/game/finish.js`。
 
-- `if (win) cleared[MISSIONS[missionIdx].id] = true;` —— **`cleared` 是本次会话内的对象，刷新页面就丢**（见 [DESIGN.md §8](../DESIGN.md#8-已知问题与待改进) 第 5 条），但键已经改成 `mission.id` 而不是下标：新战役的关卡是接着 `MISSIONS` 追加的，按下标记会让进度错位；`buildMissionList()` 与 `buildCampaignList()` 都读它显示“已完成”。
+- `if (win) { cleared[MISSIONS[missionIdx].id] = true; saveGame(); }` —— **`cleared` 现在会存档**（2.6，见下面「存档」一节），键已经改成 `mission.id` 而不是下标：新战役的关卡是接着 `MISSIONS` 追加的，按下标记会让进度错位；`buildMissionList()` 与 `buildCampaignList()` 都读它显示“已完成”。
 - 结算数值当场算：
 
   ```js

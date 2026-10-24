@@ -368,7 +368,7 @@ requestAnimationFrame(loop)
    菜单里应该单独支持
 3. **结算后 `world` 未释放**：`finish()` 后 `player`/`world` 仍持有引用，
    连续玩多关会累积内存
-4. **只有一个存档点**：`cleared` 记录在内存里，刷新页面就丢
+4. ~~**只有一个存档点**：`cleared` 记录在内存里，刷新页面就丢~~ **已解决（2.6）**：`cleared` 与机库挂载 `loadouts` 存进 `localStorage['monsoonline.save.v1']`（`js/engine/game/save.js`，格式 `{ v: 1, cleared, loadouts }`），读写都静默降级；存下来的挂载读取时逐组校验，不合法的回退默认。仍然没有"多个存档位"和进行中的关卡存档
 
 > 原第 3 条"任务目标缺少屏幕内指示"已解决：`HUD` 的 `drawOffscreen()`
 > 把屏外目标钉在安全矩形边上，已锁定目标另有专属提示（v1.4.0）。

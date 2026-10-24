@@ -233,6 +233,7 @@
     // 设置必须在任何渲染/音频之前载入
     $.S = $.loadSettings();
     $.applyAudioSettings();
+    $.loadSave();           // 已完成的关卡与机库挂载（设置之外的那一份存档，见 engine/game/save.js）
 
     $.cv = document.getElementById('cv');
     Renderer.init($.cv);

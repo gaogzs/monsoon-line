@@ -8,6 +8,9 @@
   Game.__player = function () { return $.player; };
   Game.__world = function () { return $.world; };
   Game.__failing = function () { return $.failing; };
+  // 存档（engine/game/save.js）：断言要能读写 cleared / loadouts 的引用并直接调存取
+  Game.__saveState = function () { return { cleared: $.cleared, loadouts: $.loadouts, key: $.SAVE_KEY }; };
+  Game.__save = { load: function () { return $.loadSave(); }, save: function () { $.saveGame(); } };
   Game.__setWingCmd = function (c) { return $.setWingCmd(c); };
   // 实体挂载的渲染：断言要能单独喂一架飞机进来数它画了几个挂载
   Game.__pushStores = $.pushStores;

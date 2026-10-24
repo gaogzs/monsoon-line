@@ -803,6 +803,52 @@ if (!badStore) ok('全部武器都有挂载属性');
   else ok('ROK-40 重做：58 × 54 m、hitR 11.5、挂点 A1 A2 B1 B2、loadout B1 挂得上');
 }
 
+/* 存档（2.6）：cleared 与 loadouts 的存取往返；坏数据 / 未知版本 / 没有 localStorage 时不抛；
+   存下来的挂载引用了不存在的武器 / 挂不上的组 / 缺的组时回退到默认。 */
+{
+  const bad = [];
+  const Gs = sandbox.Game, st = Gs.__saveState(), LS = sandbox.localStorage;
+  const fm = sandbox.AIRCRAFT.find(a => a.id === 'frigatebird');
+  const reset = () => { for (const k in st.cleared) delete st.cleared[k]; for (const k in st.loadouts) delete st.loadouts[k]; };
+  reset();
+  // ① 往返
+  st.cleared.m1 = true;
+  st.loadouts.frigatebird = Object.assign(sandbox.Loadout.defaults(fm), { A: null });
+  Gs.__save.save();
+  reset();
+  if (!Gs.__save.load()) bad.push('读档应当返回 true');
+  if (st.cleared.m1 !== true) bad.push('cleared 没能往返');
+  if (!st.loadouts.frigatebird || st.loadouts.frigatebird.A !== null) bad.push('loadouts 没能往返（明确选的"空置"丢了）：' + JSON.stringify(st.loadouts.frigatebird));
+  // ② 不合法的条目回退默认
+  reset();
+  LS.setItem(st.key, JSON.stringify({ v: 1, cleared: { nope: true, m2: 'yes' },
+    loadouts: { frigatebird: { A: 'nonexistent', B: 'cel3', Z: 'srm', C: null }, ghost: { A: 'srm' } } }));
+  Gs.__save.load();
+  const def = sandbox.Loadout.defaults(fm), got = st.loadouts.frigatebird;
+  if (st.cleared.nope || st.cleared.m2) bad.push('不存在的关卡 / 非 true 的值不该进 cleared：' + JSON.stringify(st.cleared));
+  if (!got || got.A !== def.A) bad.push('不存在的武器应回退默认：A=' + (got && got.A));
+  if (got && got.B !== def.B) bad.push('机炮不能挂在挂点上，应回退默认：B=' + got.B);
+  if (got && 'Z' in got) bad.push('不存在的组不该出现');
+  if (got && got.C !== null) bad.push('明确选的空置应保留：C=' + got.C);
+  if (got && got.D !== null) bad.push('旧存档里缺的新组（2.4 的 D）应取默认 null：D=' + got.D);
+  if (st.loadouts.ghost) bad.push('不存在的机型不该进 loadouts');
+  // ③ 坏数据 / 未知版本 / 存储不可用
+  reset();
+  LS.setItem(st.key, '{这不是 json');
+  try { if (Gs.__save.load() !== false) bad.push('坏 JSON 应返回 false'); } catch (e) { bad.push('坏 JSON 抛了：' + e.message); }
+  LS.setItem(st.key, JSON.stringify({ v: 2, cleared: { m1: true } }));
+  Gs.__save.load();
+  if (st.cleared.m1) bad.push('未知版本号应当忽略');
+  const g0 = LS.getItem, s0 = LS.setItem;
+  LS.getItem = () => { throw new Error('denied'); };
+  LS.setItem = () => { throw new Error('denied'); };
+  try { Gs.__save.load(); Gs.__save.save(); } catch (e) { bad.push('localStorage 不可用时不该抛：' + e.message); }
+  LS.getItem = g0; LS.setItem = s0;
+  reset();
+  if (bad.length) bad.forEach(fail);
+  else ok('存档：cleared / loadouts 往返；坏 JSON、未知版本、存储不可用都不抛；不合法的挂载回退默认');
+}
+
 /* 挂载弹体的翼面必须与弹体相接（2.2b）：翼片的根部到弹轴的径向距离不得比六边形截面的
    边心距（0.866 r）更远 —— 否则翼片悬在弹体外面，远看像"悬浮"的翼片。
    只求视觉相接，允许翼根穿入弹体内部。 */

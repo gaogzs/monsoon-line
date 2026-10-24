@@ -657,6 +657,8 @@ ctx.strokeText(t, x, y);
 `localStorage` 键 `monsoonline.settings.v1`。读写都包在 try/catch 里，
 无痕模式或禁用存储时静默降级到默认值。
 
+设置之外的**游戏存档**是另一个键：`monsoonline.save.v1`（已完成的关卡 + 机库挂载，见 [game.md](game.md) 的「存档」一节）。
+
 **改设置项名称时记得升版本号**，否则老存档里的值会被静默丢弃
 （`loadSettings()` 只接受 `DEFAULTS` 里存在的键）。
 
