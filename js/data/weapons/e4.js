@@ -5,7 +5,7 @@ Registry.weapon({
   model: 'pod',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-  dmg: 0, ammo: 99, salvo: 0, flare: 1.0,
+  dmg: 0,salvo: 0, flare: 1.0,
   target: 'none', duration: 6.0, lockReduce: 0.40,
   desc: T('weapons.e4.desc'),
   stat: { dmg: 0.0, spd: 0.0, trn: 0.0, rng: 0.0, ecm: 1.0 },

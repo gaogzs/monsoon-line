@@ -7,7 +7,7 @@ Registry.weapon({
   id: 'clb', name: 'PEJ-9', cn: T('weapons.clb.cn'), kind: 'bomb',
   model: 'bomb',
   speed: 300, life: 12.0, vsLife: 24.0,
-  dmg: 118, ammo: 2, salvo: 1, blast: 60, blastCore: 60, blastAir: false,
+  dmg: 118,salvo: 1, blast: 60, blastCore: 60, blastAir: false,
   /* cluster = 覆盖半径（米），blast 与它同值、blastCore = blast（平伤）、
      blastAir: false（子弹药往下撒，打不到天上）。落地或撞上设施时，
      半径内所有水面/地面目标都吃满额伤害（combat.js 的 Combat.blast）。

@@ -25,7 +25,7 @@ Registry.weapon({
      我先前把"无制导"当成了"无动力"，把推进也删了，那是错的：
      没发动机的是滑翔弹和激光制导炸弹，不是火箭。 */
   boost: 520, burn: 0.7,      // 推力只持续 burn 秒，之后和炸弹一样走重力 + 阻力
-  dmg: 22, ammo: 28, salvo: 7, blast: 14, blastCore: 4,
+  dmg: 22,salvo: 7, blast: 14, blastCore: 4,
   target: 'ground',
   desc: T('weapons.rkt.desc'),
   stat: { dmg: 0.22, spd: 0.34, trn: 0.10, rng: 0.16, ecm: 1.00 },

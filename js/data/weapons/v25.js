@@ -4,7 +4,7 @@ Registry.weapon({
   model: 'missile',
   speed: 730, boost: 120, life: 14.0, vsLife: 50.0,
   turn: 0.62, seeker: 'radar', lockCone: 45 * Math.PI / 180, lockDist: 8000,
-  dmg: 175, ammo: 10, salvo: 1, flare: 0.80, blast: 30, blastCore: 8,
+  dmg: 175,salvo: 1, flare: 0.80, blast: 30, blastCore: 8,
   target: 'ground',
   /* 攻顶：水平距离 > dive 时瞄准点抬高 alt 米，末段俯冲（entities.js） */
   loft: { alt: 1500, dive: 2800 },

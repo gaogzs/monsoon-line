@@ -4,7 +4,7 @@ Registry.weapon({
   model: 'missile',
   speed: 740, boost: 190, life: 4.2, vsLife: 11.0,
   turn: 1.70, seeker: 'ir', lockCone: 30 * Math.PI / 180, lockDist: 4000,
-  dmg: 24, ammo: 12, salvo: 3, flare: 0.40, fuze: 10, blast: 16, blastCore: 2,
+  dmg: 24,salvo: 3, flare: 0.40, fuze: 10, blast: 16, blastCore: 2,
   target: 'air',
   desc: T('weapons.qsr.desc'),
   stat: { dmg: 0.26, spd: 0.46, trn: 0.64, rng: 0.34, ecm: 0.22 },

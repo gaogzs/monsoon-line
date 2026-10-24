@@ -5,7 +5,7 @@ Registry.weapon({
   id: 'hbh', name: 'PEJ-22', cn: T('weapons.hbh.cn'), kind: 'bomb',
   model: 'bomb',
   speed: 280, life: 12.0, vsLife: 24.0,
-  dmg: 420, ammo: 1, salvo: 1, blast: 110, blastCore: 45,
+  dmg: 420,salvo: 1, blast: 110, blastCore: 45,
   target: 'ground',
   desc: T('weapons.hbh.desc'),
   stat: { dmg: 1.00, spd: 0.10, trn: 0.00, rng: 0.20, ecm: 1.0 },

@@ -11,7 +11,7 @@ Registry.weapon({
   model: 'bomb',
   speed: 320, life: 14.0, vsLife: 26.0,
   turn: 0.55, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 35000,   // 按高空（8–12 km、300 m/s 左右）投放的滑翔距离定；低空投放够不着这么远
-  dmg: 150, ammo: 4, salvo: 1, blast: 30, blastCore: 8,
+  dmg: 150,salvo: 1, blast: 30, blastCore: 8,
   /* flare 是"被干扰弹骗到的概率"，它属于**导引头**，不属于发动机。
      滑翔锤没有发动机，但有红外导引头 —— 所以 flare 该留。
      （我上一轮按 unguided 删除制导类字段时把它一起删了，那是错的。） */

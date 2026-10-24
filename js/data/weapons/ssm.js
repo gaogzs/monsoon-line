@@ -8,7 +8,7 @@ Registry.weapon({
      16 km 发射的弹在离目标约 2.8 km 处掉到 170 m/s、寿命到期自爆 */
   speed: 620, boost: 160, life: 40.0, vsLife: 50.0,
   turn: 0.60, seeker: 'radar', lockCone: 30 * Math.PI / 180, lockDist: 16000,
-  dmg: 260, ammo: 4, cd: 6, salvo: 1, flare: 0.70, blast: 20, blastCore: 6,
+  dmg: 260,cd: 6, salvo: 1, flare: 0.70, blast: 20, blastCore: 6,
   target: 'ship',
   boostT: 1.2,
   loft: { alt: 600, dive: 3000 },

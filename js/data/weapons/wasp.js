@@ -5,7 +5,7 @@ Registry.weapon({
   model: 'missile',
   speed: 860, boost: 260, life: 4.8, vsLife: 12.0,
   turn: 2.15, seeker: 'ir', lockCone: 36 * Math.PI / 180, lockDist: 5200,
-  dmg: 38, ammo: 3, salvo: 1, flare: 0.36, fuze: 13, blast: 19, blastCore: 2,
+  dmg: 38,salvo: 1, flare: 0.36, fuze: 13, blast: 19, blastCore: 2,
   target: 'air',
   /* 原文"推力更猛、加速更快"与数据相反（boost 260 < 锥刺的 280）。
      它真正快的是**最高速**（860 > 790）与锁定距离。 */

@@ -7,7 +7,7 @@ Registry.weapon({
   model: 'missile',
   speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
   turn: 1.75, seeker: 'ir', lockCone: 28 * Math.PI / 180, lockDist: 4200,
-  dmg: 30, ammo: 30, salvo: 1, flare: 0.38, fuze: 12, blast: 18, blastCore: 2,
+  dmg: 30,salvo: 1, flare: 0.38, fuze: 12, blast: 18, blastCore: 2,
   target: 'any',
   fits: [], perPoint: 15, mass: 60,
   npcFits: ['light', 'heavy'],

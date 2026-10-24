@@ -5,7 +5,7 @@ Registry.weapon({
   model: 'pod',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-  dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0,
+  dmg: 0, cd: 0, salvo: 0, flare: 1.0,
   target: 'none',
   lockRangeBonus: 0.45,
   /* 被动测距：用光电方式锁定时不辐射，对方的 RWR 收不到告警。

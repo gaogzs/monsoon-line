@@ -5,7 +5,7 @@ Registry.weapon({
   model: 'missile',
   speed: 900, boost: 200, life: 8.0, vsLife: 20.0,
   turn: 1.45, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 8600,
-  dmg: 40, ammo: 4, salvo: 1, flare: 0.30, fuze: 18, blast: 30, blastCore: 4,
+  dmg: 40,salvo: 1, flare: 0.30, fuze: 18, blast: 30, blastCore: 4,
   target: 'air',
   /* 原句是"不吃干扰弹"。那是假的 —— 干扰弹是热焰弹与箔丝一起投放的，
      箔丝专门骗雷达导引头，CLA-4 一样会被骗。

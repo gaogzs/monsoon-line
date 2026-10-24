@@ -6,7 +6,7 @@ Registry.weapon({
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
   /* 没有充能储备：每拦截一次，这个吊舱的发射槽进入 cd 秒冷却，
      冷却条画在右下角的挂载缩略图里（和导弹同一套 slotCd）。 */
-  dmg: 0, ammo: 99, salvo: 0, flare: 1.0,
+  dmg: 0,salvo: 0, flare: 1.0,
   target: 'none',
   interceptRange: 1200, interceptCone: 35 * Math.PI / 180,
   interceptChance: 0.55, highAltChance: 0.35,

@@ -18,7 +18,7 @@ Registry.weapon({
   model: 'pod',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-  dmg: 0, ammo: 0, cd: 0, salvo: 0, flare: 1.0,
+  dmg: 0, cd: 0, salvo: 0, flare: 1.0,
   target: 'none',
   lockResist: 0.30,
   /* 原文"拖曳式诱饵"—— 代码里它只有 lockResist，并不会把来袭弹引开。

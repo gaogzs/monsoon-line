@@ -269,7 +269,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `id` | 内部键的副本 | 目前没被代码读，只是照应 |
 | `name` / `cn` | 制式编号 / 中文代号 | 直接显示，缺了 `undefined` |
 | `kind` | 见上表 | 决定几乎所有分支 |
-| `ammo` / `cd` / `salvo` | 单点库存基准 / **每个发射槽的装填时间（秒）** / 一次扳机打出几发 | `cd` 现在就写在武器文件里（原来由 `STORE_COOLDOWN` 覆盖）；`smoke.js` 要求玩家可挂的非被动武器 `cd ≥ 1` |
+| `cd` / `salvo` | **每个发射槽的装填时间（秒）** / 一次扳机打出几发 | `cd` 现在就写在武器文件里（原来由 `STORE_COOLDOWN` 覆盖）；`smoke.js` 要求玩家可挂的非被动武器 `cd ≥ 1`。**导弹 / 炸弹 / 吊舱没有 `ammo` 字段**：弹数 = 挂点数 × `perPoint`，玩家与敌机同一套规则；只有机炮（`cel*`）写 `ammo`（总发数） |
 | `prox` | 近炸半径（米） | 命中判定用 |
 | `target` | `air` / `ground` / `ship` / `none` / `any` | `updateLock` 按**目标类别**（`Ent.targetClass`）分"对空导引头"与"对面投放包线"两套判据。`any`（TOR-3）对空对地都能锁，锁定距离一样，目标是什么就按什么判 |
 | `desc` | 简介（可含 HTML） | 机库卡片、图鉴 |

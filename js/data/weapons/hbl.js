@@ -6,7 +6,7 @@ Registry.weapon({
   id: 'hbl', name: 'PEJ-4', cn: T('weapons.hbl.cn'), kind: 'bomb',
   model: 'bomb',
   speed: 300, life: 12.0, vsLife: 24.0,
-  dmg: 70, ammo: 8, salvo: 1, blast: 24, blastCore: 6,
+  dmg: 70,salvo: 1, blast: 24, blastCore: 6,
   target: 'ground',
   desc: T('weapons.hbl.desc'),
   stat: { dmg: 0.30, spd: 0.18, trn: 0.00, rng: 0.40, ecm: 1.0 },

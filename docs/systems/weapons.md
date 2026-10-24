@@ -71,7 +71,7 @@ e4 → 干扰    l2 → 光      dl4 → 远   dl6 → 之间 / 近   dl9 → �
   turn,                      // 最大转向率 rad/s（海平面）
   seeker,                    // ir | radar | eo | laser | none（无制导弹无此字段）
   lockCone, lockDist,        // 锁定锥角（弧度）与最大锁定距离（米）
-  dmg, ammo, cd, salvo,      // 伤害 / 备弹 / 冷却 / 一次按键打出的发数
+  dmg, cd, salvo,            // 伤害 / 冷却 / 一次按键打出的发数（弹数不在这里：= 挂点数 × attr.perPoint；只有机炮才写 ammo）
   flare,                     // 被干扰弹骗到的概率 0..1，越高越好骗
   fuze,                      // 近炸触发半径（米，量到目标表面）；0 / 缺省 = 只有触发引信
   blast, blastCore,          // 爆炸半径 / 满伤半径（米，量到受害者表面）；blast 0 = 无溅射

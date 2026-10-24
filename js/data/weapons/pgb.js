@@ -11,7 +11,7 @@ Registry.weapon({
   model: 'bomb',
   speed: 300, life: 12.0, vsLife: 24.0,
   turn: 0.30, seeker: 'eo', lockCone: 30 * Math.PI / 180, lockDist: 12000,
-  dmg: 165, ammo: 2, salvo: 1, flare: 0, blast: 40, blastCore: 10,
+  dmg: 165,salvo: 1, flare: 0, blast: 40, blastCore: 10,
   target: 'ground', fin: 10,
   desc: T('weapons.pgb.desc'),
   stat: { dmg: 0.60, spd: 0.18, trn: 0.18, rng: 0.40, ecm: 1.0 },

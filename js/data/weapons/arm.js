@@ -5,7 +5,7 @@ Registry.weapon({
   model: 'missile',
   speed: 880, boost: 190, life: 7.5, vsLife: 18.0,
   turn: 1.35, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 9500,
-  dmg: 52, ammo: 2, salvo: 1, flare: 0.35, fuze: 22, blast: 44, blastCore: 7,
+  dmg: 52,salvo: 1, flare: 0.35, fuze: 22, blast: 44, blastCore: 7,
   target: 'air',
   /* 反辐射：对**正在辐射**的**空中**目标伤害翻倍（判据见 entities.js 的
      isRadiating）—— 未被压哑的预警机、开机中的干扰吊舱。

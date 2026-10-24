@@ -5,7 +5,7 @@ Registry.weapon({
   model: 'missile',
   speed: 480, boost: 140, life: 10.0, vsLife: 22.0,
   turn: 0.90, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 9000,
-  dmg: 340, ammo: 2, salvo: 1, flare: 0.75, blast: 45, blastCore: 10,
+  dmg: 340,salvo: 1, flare: 0.75, blast: 45, blastCore: 10,
   target: 'ground',
   /* 侵彻：对加固目标（标签 hard，见 js/data/targets/）不打折，见 entities.js 的 warheadK */
   desc: T('weapons.asl2.desc'),
