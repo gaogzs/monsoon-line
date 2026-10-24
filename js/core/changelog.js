@@ -2,9 +2,31 @@
    由 tools/build/release.js 从 CHANGELOG.md 写出，每次发版后重新生成。
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
-  "current": "v3.1.13",
-  "generated": "2026-10-24T17:48:49+09:00",
+  "current": "v3.1.14",
+  "generated": "2026-10-24T17:52:29+09:00",
   "releases": [
+    {
+      "version": "v3.1.14",
+      "date": "2026-10-24",
+      "title": "下游战斗机补到四对",
+      "tag": "小版本",
+      "commit": "b8268f3",
+      "lead": "下游的 GAL-31（重型截击机）和 ROK-27（多用途战斗机）再各加一对挂点，补到 4 对，和上游规模对齐：GAL-31 加机身内侧的重挂点，ROK-27 加翼尖外侧的轻挂点。同样只给玩家用，敌机不使用，关卡难度不变。轻型攻击机 VAC-14 载重上限低，仍是 3 对。",
+      "sections": [
+        {
+          "h": "新增",
+          "items": [
+            "basalt 增加机身内侧重挂点 D，schist 增加翼尖外侧轻挂点 D（playerOnly）"
+          ]
+        },
+        {
+          "h": "调整",
+          "items": [
+            "smoke 的战斗机清单与 playerOnly 组数同步"
+          ]
+        }
+      ]
+    },
     {
       "version": "v3.1.13",
       "date": "2026-10-24",
