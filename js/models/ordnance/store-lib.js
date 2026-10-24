@@ -31,13 +31,16 @@ Registry.modelGroup({
       if (lk.boost) b.tube(V(ox, oy, z0), V(ox, oy, z0 + L * 0.22), r * 1.12, r * 1.12, 6, C.grey2, C.darker);
 
       var f = lk.fin, fs = Math.max(r * 2.6, 0.22);
-      function cross(za, zb, span, lead) {
+      /* 翼根埋进弹体：弹体是 6 段的六边形截面，边心距只有 0.866r，翼根放在 r 上就会悬在
+         平面之上（左右两片恰好落在顶点，上下两片有 0.134r 的缝）。所以翼根取 root（缺省 0.75r），
+         翼尖仍在 r + span。翼片是薄的二维片，埋进去之后任何角度都看不到缝（2.2b）。 */
+      function cross(za, zb, span, lead, root) {
         // 四片十字翼：za 前缘根部，zb 后缘根部，span 翼展，lead 翼尖后退量
-        var s = r + span;
-        b.wing(V(ox + r, oy, za), V(ox + s, oy, za - lead), V(ox + s, oy, zb), V(ox + r, oy, zb), C.grey);
-        b.wing(V(ox - r, oy, za), V(ox - s, oy, za - lead), V(ox - s, oy, zb), V(ox - r, oy, zb), C.grey);
-        b.wing(V(ox, oy + r, za), V(ox, oy + s, za - lead), V(ox, oy + s, zb), V(ox, oy + r, zb), C.grey);
-        b.wing(V(ox, oy - r, za), V(ox, oy - s, za - lead), V(ox, oy - s, zb), V(ox, oy - r, zb), C.grey);
+        var s = r + span, q = root === undefined ? r * 0.75 : root;
+        b.wing(V(ox + q, oy, za), V(ox + s, oy, za - lead), V(ox + s, oy, zb), V(ox + q, oy, zb), C.grey);
+        b.wing(V(ox - q, oy, za), V(ox - s, oy, za - lead), V(ox - s, oy, zb), V(ox - q, oy, zb), C.grey);
+        b.wing(V(ox, oy + q, za), V(ox, oy + s, za - lead), V(ox, oy + s, zb), V(ox, oy + q, zb), C.grey);
+        b.wing(V(ox, oy - q, za), V(ox, oy - s, za - lead), V(ox, oy - s, zb), V(ox, oy - q, zb), C.grey);
       }
       if (f === 'strake') {
         cross(oz + L * 0.10, oz - L * 0.22, fs * 0.55, L * 0.12);   // 长边条
@@ -45,13 +48,13 @@ Registry.modelGroup({
       } else if (f === 'cruise') {
         // 平直大弹翼（左右一对）+ 小尾翼
         var ws = L * 0.34;
-        b.wing(V(ox + r, oy + r * 0.6, oz + L * 0.06), V(ox + r + ws, oy + r * 0.6, oz - L * 0.02),
-          V(ox + r + ws, oy + r * 0.6, oz - L * 0.10), V(ox + r, oy + r * 0.6, oz - L * 0.10), C.grey);
-        b.wing(V(ox - r, oy + r * 0.6, oz + L * 0.06), V(ox - r - ws, oy + r * 0.6, oz - L * 0.02),
-          V(ox - r - ws, oy + r * 0.6, oz - L * 0.10), V(ox - r, oy + r * 0.6, oz - L * 0.10), C.grey);
+        b.wing(V(ox + r * 0.5, oy + r * 0.6, oz + L * 0.06), V(ox + r + ws, oy + r * 0.6, oz - L * 0.02),
+          V(ox + r + ws, oy + r * 0.6, oz - L * 0.10), V(ox + r * 0.5, oy + r * 0.6, oz - L * 0.10), C.grey);
+        b.wing(V(ox - r * 0.5, oy + r * 0.6, oz + L * 0.06), V(ox - r - ws, oy + r * 0.6, oz - L * 0.02),
+          V(ox - r - ws, oy + r * 0.6, oz - L * 0.10), V(ox - r * 0.5, oy + r * 0.6, oz - L * 0.10), C.grey);
         cross(z0 + L * 0.12, z0, r * 1.4, L * 0.06);
       } else if (f === 'bomb') {
-        cross(z0 + L * 0.14, z0, r * 0.9, L * 0.06);
+        cross(z0 + L * 0.14, z0, r * 0.9, L * 0.06, r * 0.25);       // 尾锥处半径只有 0.35–0.7r，翼根取 0.25r
       } else {
         cross(oz + L * 0.02, oz - L * 0.08, r * 1.1, L * 0.03);     // 小中翼
         cross(z0 + L * 0.12, z0, r * 1.7, L * 0.06);                // 尾舵

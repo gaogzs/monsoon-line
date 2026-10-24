@@ -741,6 +741,32 @@ for (const k in WEAPONS) {
 }
 if (!badStore) ok('全部武器都有挂载属性');
 
+/* 挂载弹体的翼面必须与弹体相接（2.2b）：翼片的根部到弹轴的径向距离不得比六边形截面的
+   边心距（0.866 r）更远 —— 否则翼片悬在弹体外面，远看像"悬浮"的翼片。
+   只求视觉相接，允许翼根穿入弹体内部。 */
+{
+  const bad = [];
+  let n = 0;
+  for (const k in WEAPONS) {
+    const w = WEAPONS[k];
+    if (!w.look || w.look.nest || w.kind === 'gun') continue;
+    const m = sandbox.MODELS.round(w);
+    const r = (w.look.rdia || w.look.dia) / 2;
+    let wings = 0;
+    for (const f of m.f) {
+      if (f.i.length !== 4 || (f.c !== sandbox.ModelLib.C.grey && f.c !== sandbox.ModelLib.C.navy)) continue;
+      wings++;
+      let root = 1e9;
+      for (const vi of f.i) root = Math.min(root, Math.hypot(m.v[vi].x, m.v[vi].y));
+      if (root > 0.87 * r + 1e-6) bad.push(k + ' 翼根离弹轴 ' + (root / r).toFixed(2) + 'r');
+    }
+    if (!wings) bad.push(k + ' 没找到翼面（检查断言本身）');
+    n++;
+  }
+  if (bad.length) fail('挂载弹体有翼片悬在弹体外：' + bad.slice(0, 6).join('；'));
+  else ok('挂载弹体 ' + n + ' 种，翼根全部埋进弹体（≤ 0.87r）');
+}
+
 // 可发射的武器必须有飞行参数。
 // PEJ-30 曾经是 speed:0 / life:99 —— 那样它在游戏里根本不往前走。
 // 注意排除吊舱：ECM 与 DEW 不发射实体，没有 speed/life 是正常的。
