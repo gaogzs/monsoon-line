@@ -230,6 +230,6 @@ Registry.mission({
       var s = w.actors[i];
       if (s.alive && s.model === 'sower' && s.pos.y < 14000) escaped++;
     }
-    return escaped >= 2;
+    return escaped >= 2 && Mission.fail(w, 'm3.sowerEscaped');
   }
 });

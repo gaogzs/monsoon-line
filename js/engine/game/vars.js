@@ -4,6 +4,11 @@
   $.state = 'title';
   $.paused = false;
 
+  /* 失败后的停留画面（state 仍是 'playing' 的子状态）：{ t0, hold, fail }，
+     beginFail 写、endFail 清。非空时世界继续模拟、输入冻结，几秒后或点"结束"才进结算页。 */
+  $.failing = null;
+  $.FAIL_HOLD_S = 5;
+
   $.world = null;
   $.player = null;
   $.mission = null;

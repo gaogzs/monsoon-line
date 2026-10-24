@@ -1976,7 +1976,10 @@ if (Ent && M3 && me && world) {
     res.forEach((r, i) => {
       if (r.steadyBank > prevB + 2) bad.push('稳态坡度不单调：' + rates[i] + '°/s 时 ' + r.steadyBank.toFixed(0) + '°，比更慢的拖动还小');
       prevB = r.steadyBank;
-      if (r.steadyErr > 1.0) bad.push(rates[i] + '°/s 持续转弯时机头误差 ' + r.steadyErr.toFixed(2) + '°（前馈没生效）');
+      /* 拖动方向是左下方：目标离机头不到 ~80° 时玩家的飞控走"推杆 + 偏航"，不翻转
+         （见 steer.js 的 STEER_ROLL_ENTER）。推杆权限只有拉杆的一半，所以最快的拖动
+         （25°/s）追得上但略有滞后；其余速率仍要求 ≤ 1° */
+      if (r.steadyErr > (rates[i] >= 25 ? 4.5 : 1.0)) bad.push(rates[i] + '°/s 持续转弯时机头误差 ' + r.steadyErr.toFixed(2) + '°（前馈没生效）');
       if (r.maxRJump > 0.5) bad.push(rates[i] + '°/s 时滚转杆量单帧跳变 ' + r.maxRJump.toFixed(2));
       if (Math.abs(r.endBank) > 8) bad.push(rates[i] + '°/s 拖完停住 3 s 后仍带 ' + r.endBank.toFixed(0) + '° 坡度（没有改平）');
     });
@@ -3985,9 +3988,13 @@ if (Ent && M3 && me && world) {
     w1.timeLimit = 1;
     w1.timeLeft = 1;
     for (let f = 0; f < 63 * 2; f++) pump(1);
+    // 失败先停在游戏画面上（failing），FAIL_HOLD_S 之后才进结算页
+    if (!G14.__failing()) bad.push('1 秒时限的关卡跑到 2 秒应当已经进入失败停留画面');
+    if (activeScreen() === 'scr-debrief') bad.push('失败停留期间不该已经进了结算页');
+    for (let f = 0; f < 63 * 12 && activeScreen() !== 'scr-debrief'; f++) pump(1);
     if (activeScreen() !== 'scr-debrief') {
-      bad.push('1 秒时限的关卡跑到 2 秒仍未结算，当前屏幕 ' + activeScreen());
-    }
+      bad.push('失败停留超过 12 秒仍未进结算页，当前屏幕 ' + activeScreen());
+    } else if (!byId.get('dReason').textContent) bad.push('结算页没有填失败原因 #dReason');
 
     // ② 没有时限的关卡：跑够同样时间不该被时限判负，而且 HUD 不画读秒
     G14.startMission(0);
@@ -4002,6 +4009,82 @@ if (Ent && M3 && me && world) {
 
     if (bad.length) bad.forEach(fail);
     else ok('关卡时限：声明 timeLimit 的关卡到点判负，未声明的关卡不受影响');
+  }
+
+  /* ---- 失败原因 / 停留画面 / 失败无线电（2.1） ----
+
+     死因（Ent.kill 写 player.deathCause）、关卡失败原因（Mission.fail 写 w.fail）、
+     fail.json 里每个失败键都有 reason / sub / who / radio，玩家活着时输入冻结、
+     点"结束"立即结算、H / Esc 视为"结束"。 */
+  {
+    const G15 = sandbox.Game, Ent15 = sandbox.Ent;
+    const bad = [];
+    const toDebrief = () => { for (let f = 0; f < 63 * 14 && activeScreen() !== 'scr-debrief'; f++) pump(1); };
+
+    // ① 每个 Mission.fail 用到的键、加上通用键，都在文本里有完整一套
+    const fs15 = require('fs'), path15 = require('path');
+    const keys = new Set(['timeUp']);
+    for (const f of fs15.readdirSync(path15.join(ROOT, 'js/missions'))) {
+      const src = fs15.readFileSync(path15.join(ROOT, 'js/missions', f), 'utf8');
+      let m; const re = /Mission\.fail\(\s*w\s*,\s*'([^']+)'/g;
+      while ((m = re.exec(src))) keys.add(m[1]);
+    }
+    for (const k of keys) {
+      for (const part of ['reason', 'sub', 'who', 'radio']) {
+        if (!sandbox.T.has('fail.' + k + '.' + part)) bad.push('失败原因 ' + k + ' 缺 fail.' + k + '.' + part);
+      }
+      if (sandbox.T.has('fail.' + k + '.radio') && !sandbox.T.all('fail.' + k + '.radio').length) bad.push('失败原因 ' + k + ' 的台词为空');
+    }
+    for (const t of ['gun', 'missile', 'blast', 'script', 'crash-ground', 'crash-sea', 'unknown']) {
+      for (const part of ['reason', 'sub', 'sub_by', 'sub_weapon', 'sub_unknown']) {
+        if (!sandbox.T.has('fail.death.' + t + '.' + part)) bad.push('死因 ' + t + ' 缺 ' + part);
+      }
+    }
+
+    // ② 被机炮打死：死因、结算页文字
+    G15.startMission(0);
+    let p = G15.__player(), w = G15.__world();
+    const foe = w.actors.find(a => a.team === 1);
+    Ent15.damage(p, 1e6, w, foe, { weapon: 'CEL-3', kind: 'gun' });
+    if (!p.deathCause || p.deathCause.type !== 'gun' || p.deathCause.weapon !== 'CEL-3' || !p.deathCause.by) {
+      bad.push('机炮击毁的 deathCause 不对：' + JSON.stringify(p.deathCause));
+    }
+    pump(3);
+    if (!G15.__failing()) bad.push('玩家阵亡后没有进入失败停留画面');
+    else if (G15.__failing().fail.sub.indexOf('CEL-3') < 0) bad.push('失败详情没有写出武器：' + G15.__failing().fail.sub);
+    toDebrief();
+    if (activeScreen() !== 'scr-debrief') bad.push('玩家阵亡后没有进结算页');
+
+    // ③ 没有来源的伤害 → unknown；撞海 → crash-sea
+    G15.startMission(0);
+    p = G15.__player(); w = G15.__world();
+    Ent15.damage(p, 1e6, w, null);
+    if (!p.deathCause || p.deathCause.type !== 'unknown') bad.push('无来源击毁应记 unknown：' + JSON.stringify(p.deathCause));
+    G15.startMission(0);
+    p = G15.__player(); w = G15.__world();
+    p.pos.y = -50;
+    pump(3);
+    if (!p.deathCause || p.deathCause.type !== 'crash-sea') bad.push('撞海应记 crash-sea：' + JSON.stringify(p.deathCause));
+
+    // ④ 关卡条件失败：m2 基地失守，玩家活着 → 输入冻结，点"结束"立刻结算
+    G15.startMission(1);
+    p = G15.__player(); w = G15.__world();
+    w.baseTarget.alive = false;
+    pump(3);
+    const fl = G15.__failing();
+    if (!fl || fl.fail.key !== 'm2.baseLost') bad.push('m2 基地失守应记 m2.baseLost：' + (fl && fl.fail.key));
+    else {
+      if (!p.alive) bad.push('基地失守时玩家不该死');
+      sandbox.Game.$ && 0;
+      const hold = fl.hold;
+      if (!(hold >= 5)) bad.push('FAIL_HOLD_S 不得短于 5 秒：' + hold);
+      byId.get('btnFailEnd').onclick();
+      if (activeScreen() !== 'scr-debrief') bad.push('点"结束"后应立即进结算页');
+      else if (byId.get('dReason').textContent.indexOf('基地') < 0) bad.push('结算页原因应写基地失守：' + byId.get('dReason').textContent);
+    }
+
+    if (bad.length) bad.forEach(fail);
+    else ok('失败原因：死因记录、关卡失败键与文本、停留画面、点结束结算都对');
   }
 
   /* ---- 地面/海面目标计分 ----

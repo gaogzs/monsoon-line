@@ -90,6 +90,7 @@
     if (S && S.hudOpacity !== undefined) {
       ctx.globalAlpha = M3.clamp(S.hudOpacity / 100, 0.15, 1);
     }
+    if (HUD.dim) ctx.globalAlpha *= 1 - 0.6 * HUD.dim;      // 失败停留画面：压暗（frame.js 写）
 
     $.drawConeCue(ctx, W, H, cam, p);       // 视场圈最底层：其它 UI 都叠在它上面
     $.drawCompass(ctx, W, H, p, world, S, cam);

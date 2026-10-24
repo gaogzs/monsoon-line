@@ -305,11 +305,14 @@
     document.getElementById('setClose').onclick = function () { SFX.click(); $.show('title'); };
     document.getElementById('setReset').onclick = function () { SFX.click(); $.resetSettings(); };
     document.getElementById('pauseSetReset').onclick = function () { SFX.click(); $.resetSettings(); };
+    document.getElementById('btnFailEnd').onclick = function () { SFX.click(); $.endFail(); };
     document.getElementById('btnResume').onclick = function () { $.togglePause(); };
     document.getElementById('btnAbort').onclick = function () {
       SFX.click();
       $.paused = false;
       document.getElementById('pause').classList.remove('on');
+      $.failing = null;
+      document.getElementById('failing').classList.remove('on');
       SFX.silence(); SFX.warning(false); SFX.gun(false);
       $.player = null; $.world = null;
       $.show('brief');

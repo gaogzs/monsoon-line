@@ -1,0 +1,139 @@
+{
+  "fail": {
+    "title": "任务失败",
+    "timeUp": {
+      "reason": "任务超时",
+      "sub": "时限已到，任务目标没有完成",
+      "who": "SEXTANT",
+      "radio": [
+        "时限到了。任务中止。",
+        "全体返航。"
+      ]
+    },
+    "m2": {
+      "baseLost": {
+        "reason": "前进基地失守",
+        "sub": "基地结构被炸毁",
+        "who": "SEXTANT",
+        "radio": [
+          "基地已经失去。任务中止。"
+        ]
+      }
+    },
+    "m3": {
+      "sowerEscaped": {
+        "reason": "播撒机突破",
+        "sub": "两架以上播撒机降到 14 km 以下，投放已经开始",
+        "who": "SEXTANT",
+        "radio": [
+          "两架以上已经降到十四千米以下。投放开始了。",
+          "那条线……保不住了。"
+        ]
+      }
+    },
+    "m8": {
+      "guardLost": {
+        "reason": "被护卫目标沉没",
+        "sub": "护卫的浮岛编队里有一艘沉了",
+        "who": "SEXTANT",
+        "radio": [
+          "编队折了一艘。任务中止。"
+        ]
+      },
+      "baseLost": {
+        "reason": "前进基地失守",
+        "sub": "基地结构被炸毁",
+        "who": "SEXTANT",
+        "radio": [
+          "基地没有了。浮岛的警报全响了。"
+        ]
+      }
+    },
+    "m9": {
+      "guardLost": {
+        "reason": "被护卫目标全灭",
+        "sub": "最后一个被护卫目标已被击毁",
+        "who": "SEXTANT",
+        "radio": [
+          "护航对象全部失联。任务中止。"
+        ]
+      }
+    },
+    "m11": {
+      "flagshipLost": {
+        "reason": "旗舰沉没",
+        "sub": "舰队旗舰已被击沉",
+        "who": "SEXTANT",
+        "radio": [
+          "旗舰沉了。……这一仗我们输了。"
+        ]
+      }
+    },
+    "death": {
+      "gun": {
+        "reason": "被击落",
+        "sub": "被 {{by}} 的 {{weapon}} 击毁",
+        "sub_by": "被 {{by}} 击毁",
+        "sub_weapon": "被 {{weapon}} 击毁",
+        "sub_unknown": "来源不明的火力"
+      },
+      "missile": {
+        "reason": "被导弹击毁",
+        "sub": "被 {{by}} 的 {{weapon}} 击毁",
+        "sub_by": "被 {{by}} 的导弹击毁",
+        "sub_weapon": "被 {{weapon}} 击毁",
+        "sub_unknown": "来源不明的导弹"
+      },
+      "blast": {
+        "reason": "被炮弹击毁",
+        "sub": "被 {{by}} 的 {{weapon}} 击毁",
+        "sub_by": "被 {{by}} 的炮弹击毁",
+        "sub_weapon": "被 {{weapon}} 击毁",
+        "sub_unknown": "来源不明的炮弹"
+      },
+      "script": {
+        "reason": "被击毁",
+        "sub": "被 {{by}} 击毁",
+        "sub_by": "被 {{by}} 击毁",
+        "sub_weapon": "飞机被毁",
+        "sub_unknown": "飞机被毁"
+      },
+      "crash-ground": {
+        "reason": "撞地",
+        "sub": "飞机撞上地面",
+        "sub_by": "被 {{by}} 打伤后撞上地面",
+        "sub_weapon": "被 {{weapon}} 打伤后撞上地面",
+        "sub_unknown": "飞机撞上地面"
+      },
+      "crash-sea": {
+        "reason": "坠海",
+        "sub": "飞机栽进了海里",
+        "sub_by": "被 {{by}} 打伤后栽进了海里",
+        "sub_weapon": "被 {{weapon}} 打伤后栽进了海里",
+        "sub_unknown": "飞机栽进了海里"
+      },
+      "unknown": {
+        "reason": "飞机损毁",
+        "sub": "飞机损毁",
+        "sub_by": "飞机损毁",
+        "sub_weapon": "飞机损毁",
+        "sub_unknown": "飞机损毁"
+      },
+      "radio": {
+        "shot": [
+          "{{player}} 被击落了！",
+          "长机中弹了！{{player}}！",
+          "{{player}} 没了！"
+        ],
+        "ground": [
+          "{{player}} 撞地了！",
+          "长机撞地！{{player}}！"
+        ],
+        "sea": [
+          "{{player}} 栽进海里了！",
+          "长机坠海了！{{player}}！"
+        ]
+      }
+    }
+  }
+}

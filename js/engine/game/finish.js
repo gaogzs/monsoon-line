@@ -2,6 +2,7 @@
   'use strict';
   var $ = Game.$;
   $.combatEvents = combatEvents; $.killCredit = killCredit; $.finish = finish;
+  $.failReason = failReason; $.beginFail = beginFail; $.endFail = endFail;
 
   /* 消化 world.events：HIT / INTERCEPTED 提示，我方舰船替玩家拦下导弹的无线电 */
   function combatEvents(killedNow) {
@@ -74,6 +75,102 @@
   }
 
   /* ============================================================
+     失败：原因、停留画面、失败无线电（docs/POST2-0IMPL.md 2.1）
+     ============================================================ */
+  var failSeed = 1;
+  function failRnd() {                      // 私有 PRNG：不碰 Math.random，不扰动黄金回放
+    failSeed = (failSeed * 1664525 + 1013904223) >>> 0;
+    return failSeed / 4294967296;
+  }
+
+  /* 把"这局为什么输"整理成 { key, reason, sub, who, lines }。
+       关卡条件失败：w.fail = { key, params }（Mission.fail 写的）→ fail.<key>.*
+       时限到：fail.timeUp
+       玩家阵亡：player.deathCause → fail.death.<type>.*，无线电由 beginFail 另配
+     lines 是文字数组（没有说话人）。 */
+  function failReason() {
+    var w = $.world, p = $.player;
+    if (!p.alive) {
+      var dc = p.deathCause || { type: 'unknown', by: null, weapon: null };
+      var base = 'fail.death.' + (T.has('fail.death.' + dc.type + '.reason') ? dc.type : 'unknown');
+      var sk = dc.by && dc.weapon ? '.sub' : dc.by ? '.sub_by' : dc.weapon ? '.sub_weapon' : '.sub_unknown';
+      return {
+        key: 'death.' + dc.type, death: dc.type,
+        reason: T(base + '.reason'),
+        sub: T(base + sk, { by: dc.by || '', weapon: dc.weapon || '' }),
+        who: null, lines: []
+      };
+    }
+    var key = w.fail ? w.fail.key : (w.timeLimit > 0 && w.timeLeft <= 0 ? 'timeUp' : null);
+    if (!key || !T.has('fail.' + key + '.reason')) {
+      return { key: key || 'unknown', reason: T('fail.title'), sub: '', who: null, lines: [] };
+    }
+    var par = (w.fail && w.fail.params) || {};
+    return {
+      key: key,
+      reason: T('fail.' + key + '.reason', par),
+      sub: T('fail.' + key + '.sub', par),
+      who: T.has('fail.' + key + '.who') ? T('fail.' + key + '.who') : null,
+      lines: T.has('fail.' + key + '.radio') ? T.all('fail.' + key + '.radio', par) : []
+    };
+  }
+
+  /* 活着的僚机（优先）或预警机，用来喊"长机被击落"；都不在返回 null，不虚构说话人 */
+  function failSpeaker() {
+    var w = $.world, i, a;
+    for (var n = 2; n <= 3; n++) {
+      for (i = 0; i < w.actors.length; i++) {
+        a = w.actors[i];
+        if (a.alive && a.team === 0 && a.label === CALLSIGN['wing' + n]) return { who: a.label, cls: 'ally' };
+      }
+    }
+    for (i = 0; i < w.actors.length; i++) {
+      a = w.actors[i];
+      if (a.alive && a.aewc && a.team === 0) return { who: CALLSIGN.awacs, cls: 'cmd' };
+    }
+    return null;
+  }
+
+  function beginFail() {
+    if ($.failing) return;
+    var fr = failReason(), w = $.world, lines = [], i;
+    if (fr.death) {
+      var sp = failSpeaker();
+      if (sp) {
+        var grp = fr.death === 'crash-ground' ? 'ground' : fr.death === 'crash-sea' ? 'sea' : 'shot';
+        lines.push({ who: sp.who, cls: sp.cls, tx: T.pick('fail.death.radio.' + grp, failRnd, { player: CALLSIGN.player }), gap: 0.8, nogarble: true });
+      }
+      // 关卡自己写的"长机失联"收尾台词（VOICES.<关>.lose，各关一条）
+      var v = VOICES[$.mission.id];
+      if (v && v.lose) for (i = 0; i < v.lose.length; i++) lines.push({ who: v.lose[i].who, cls: v.lose[i].cls, tx: v.lose[i].tx, gap: v.lose[i].gap, nogarble: true });
+    } else {
+      for (i = 0; i < fr.lines.length; i++) {
+        lines.push({ who: fr.who, cls: 'cmd', tx: fr.lines[i], gap: i === fr.lines.length - 1 ? 0.6 : 1.1, nogarble: true });
+      }
+    }
+    for (i = 0; i < lines.length; i++) Radio.raw(lines[i]);
+    var total = 0;
+    for (i = 0; i < lines.length; i++) total += (lines[i].gap === undefined ? 1.4 : lines[i].gap);
+    var hold = Math.max($.FAIL_HOLD_S, total + 1);
+
+    $.failing = { t0: w.time, hold: hold, fail: fr };
+    document.getElementById('failReason').textContent = fr.reason;
+    document.getElementById('failSub').textContent = fr.sub;
+    document.getElementById('failing').classList.add('on');
+    $.releasePointer();
+    SFX.gun(false);
+    SFX.warning(false);
+    SFX.fail();
+  }
+
+  function endFail() {
+    if (!$.failing) return;
+    document.getElementById('failing').classList.remove('on');
+    finish(false);
+    $.failing = null;
+  }
+
+  /* ============================================================
      结算
      ============================================================ */
   function finish(win) {
@@ -107,6 +204,9 @@
     rk.className = 'rank' + (rank === 'S' ? ' s' : (rank === 'A' ? ' a' : (rank === 'F' ? ' f' : '')));
 
     document.getElementById('dTitle').textContent = win ? 'MISSION COMPLETE' : 'MISSION FAILED';
+    var fr = win ? null : ($.failing && $.failing.fail) || failReason();
+    document.getElementById('dReason').textContent = fr ? fr.reason : '';
+    document.getElementById('dReasonSub').textContent = fr ? fr.sub : '';
     document.getElementById('dSub').textContent = $.mission.no + '  ' + $.mission.name + '  //  ' + $.mission.en;
     document.getElementById('dCallsign').textContent = CALLSIGN.player;
 

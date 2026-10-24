@@ -193,12 +193,31 @@
     $.world.killed = k;
     $.combatEvents(killedNow);
 
+    /* 玩家受击台词（VOICES.<关>.playerHit，目前只有 m1 写了）：血量掉了且没死，25 s 限频一次 */
+    var f2 = $.world.flags2, php = $.player.hp;
+    if ($.player.alive && f2.hpSeen !== undefined && php < f2.hpSeen - 1 &&
+        $.world.time - (f2.hitRadioT === undefined ? -99 : f2.hitRadioT) > 25) {
+      f2.hitRadioT = $.world.time;
+      Radio.play($.mission.id, 'playerHit');
+    }
+    f2.hpSeen = php;
+
     // 胜负
     /* 时限判负在同一处兜住：声明了 timeLimit 的关卡不需要在自己的 lose()
        里再写一遍倒计时判断，避免十个关卡十种写法。 */
-    if ($.world.timeLimit > 0 && $.world.timeLeft <= 0) { $.finish(false); return; }
-    if ($.mission.lose($.world)) { $.finish(false); return; }
-    if ($.mission.win($.world)) { $.finish(true); return; }
+    /* 失败不直接结算：先 beginFail —— 停在游戏画面上，弹失败提示、播失败无线电，
+       FAIL_HOLD_S 之后（或点"结束"）才进结算页。停留期间世界照常推进、相机照常跟，
+       所以这里不能 return 跳过后面的 updateCamera；也不再判胜负。 */
+    if ($.failing) {
+      if ($.world.time - $.failing.t0 >= $.failing.hold) $.endFail();
+    } else if ($.world.timeLimit > 0 && $.world.timeLeft <= 0) {
+      $.beginFail();
+    } else if ($.mission.lose($.world)) {
+      $.beginFail();
+    } else if ($.mission.win($.world)) {
+      $.finish(true); return;
+    }
+    if ($.state !== 'playing') return;      // endFail 已经进了结算页
 
     // 僚机损失台词
     if (!$.world.flags.allyDown && $.world.wings[3] && !$.world.wings[3].alive) {

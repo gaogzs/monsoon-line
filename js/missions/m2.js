@@ -285,7 +285,7 @@ Registry.mission({
     if (!w.player.alive) return true;
     /* 基地没了就算输 —— 哪怕中继网已经拆干净了。
        这是这一关唯一"必须保护"的东西，也是轰炸机存在的全部理由。 */
-    if (w.baseTarget && !w.baseTarget.alive) return true;
+    if (w.baseTarget && !w.baseTarget.alive) return Mission.fail(w, 'm2.baseLost');
     return false;
   }
 });

@@ -38,7 +38,8 @@
             break;
           }
           b.alive = false;
-          Ent.damage(a, b.dmg * Ent.gunResistK(a, b), $.world, b.owner);
+          Ent.damage(a, b.dmg * Ent.gunResistK(a, b), $.world, b.owner,
+            { weapon: (b.gw && (b.gw.name || b.gw.id)) || null, kind: 'gun' });
           Ent.spawnParticle($.world.particles, b.pos, M3.V(0, 0, 0), 0.22, 1.4, '#ffdd88', { grow: true });
           SFX.hit();
           break;

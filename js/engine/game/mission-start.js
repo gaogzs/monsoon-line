@@ -67,7 +67,9 @@
     $.hideAll();
     $.state = 'playing';
     $.paused = false;
+    $.failing = null;
     document.getElementById('pause').classList.remove('on');
+    document.getElementById('failing').classList.remove('on');
 
     // 选择初始目标
     p.target = null;

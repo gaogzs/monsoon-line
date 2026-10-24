@@ -416,7 +416,8 @@ startMission(idx)
    **随机内容也必须在 `spawn()` 里做完**（`sk1` 的六个批次就是这么来的），`tick()` 只读结果。
 2. **`tick()` 不返回值。** 它只写 `w`：更新 `objectiveSub`、置 `flags`、播台词、动态 `spawnEnemy`。
 3. **`win()` / `lose()` 每帧都调，且 `lose` 先判。** 两边同时满足时以失败收场。必须返回布尔值——`preflight()` 会检查它们是函数，但不会检查返回值。
-   **时限不需要写在 `lose()` 里**：主循环在 `mission.lose()` 之前先判 `world.timeLimit > 0 && world.timeLeft <= 0`。
+   **时限不需要写在 `lose()` 里**：主循环在 `mission.lose()` 之前先判 `world.timeLimit > 0 && world.timeLeft <= 0`（原因键 `fail.timeUp`）。
+   **`lose()` 为真时要说明原因**：玩家阵亡不用管（死因由 `Ent.kill` 记在 `player.deathCause`）；关卡自己的失败条件用 `return Mission.fail(w, '关.键')`（`js/missions/_lib.js`，写 `w.fail = { key, params }` 并返回 true），并在 `locales/zh-CN/text/fail.json` 里写 `fail.<关>.<键>` 的 `reason`（结算页大字）、`sub`（详情）、`who`（说话人）、`radio`（失败无线电，字符串数组）。smoke 会校验每个 `Mission.fail` 用到的键文本齐全。
 4. **结算后主循环不再调用 `tick/win/lose`**（`state` 变成 `debrief`），所以看门狗、状态推进都停了，不用怕"结算时的静止"被误判。
 
 `flags` 的用法是"一次性触发"模式，全项目统一：

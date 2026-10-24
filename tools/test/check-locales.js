@@ -31,12 +31,16 @@ function collect() {
   vm.runInContext(src, sb);
   const keys = new Set(sb.Text.keys());
   const used = new Set();
-  const re = /\bT(?:\.pick)?\(\s*'([^']+)'/g;
+  const re = /\bT(?:\.(?:pick|all|has))?\(\s*'([^']+)'(\s*\+)?/g;
   for (const f of Scripts.loadOrder()) {
     if (/text\.gen\.js$|core\/text\.js$/.test(f)) continue;
     const text = fs.readFileSync(path.join(Scripts.ROOT, f), 'utf8');
     let m;
     while ((m = re.exec(text))) {
+      if (m[2]) {          // T('fail.' + key)：动态拼接，字面量部分当前缀，该前缀下的键都算被引用
+        for (const k of keys) if (k.indexOf(m[1]) === 0) used.add(k);
+        continue;
+      }
       used.add(m[1]);
       if (!keys.has(m[1])) out.errors.push(f + ' 引用了不存在的文本键：' + m[1]);
     }

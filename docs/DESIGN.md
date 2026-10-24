@@ -131,6 +131,7 @@ title · campaign · brief · hangar · codex · settings · help · changelog �
   早先的写法让任何拼错的 `data-go` 值都静默跳回标题页，出问题时
   完全看不出哪里错了。现在未知值什么也不做
 - `playing` 不是 DOM 屏幕，所有 overlay 都会被隐藏
+- **`failing` 是 `playing` 的子状态**（不是新的 `state` 值）：`Game.failing = { t0, hold, fail }` 非空时，世界继续模拟、输入冻结、HUD 压暗，弹出失败提示；`FAIL_HOLD_S`（起步 5 s，不短于失败台词时长）之后或点"结束"才 `finish(false)` 进 `debrief`
 - **`campaign` 是标题与简报之间的一层。** 它决定"打的是哪一场仗"，
   而"选哪一关"留在简报页（那里才有目标、威胁与情报）。
   战役清单由 `CAMPAIGNS`（`js/missions/`）驱动，

@@ -188,6 +188,8 @@ Registry.mission({
     return true;
   },
   lose: function (w) {
-    return !w.player.alive || !w.flagship.alive;
+    if (!w.player.alive) return true;
+    if (!w.flagship.alive) return Mission.fail(w, 'm11.flagshipLost');
+    return false;
   }
 });

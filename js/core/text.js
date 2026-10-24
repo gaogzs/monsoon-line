@@ -7,6 +7,7 @@
      T('aircraft.frigatebird.desc')            取文本
      T('fail.m2.baseLost', { n: 3 })           文本里的 {{n}} 从第二个参数里按点号路径取值
      T.pick('radio.fox.variants', rng)         叶子是数组时随机挑一条
+     T.all('fail.m2.baseLost.radio')           叶子是数组时取全部（依次播的台词）
      T.has(key)    Text.keys(prefix)    Text.unused()
 
    JSON 在 file:// 下读不了，所以 tools/build/gen-locales.js 把它们合并成
@@ -117,6 +118,15 @@ var Text = (function () {
     var s = v[Math.floor((rng || Math.random)() * v.length)];
     if (ctx !== undefined) s = fill(s, ctx, key);
     return decorate(s);
+  };
+  /** 叶子是数组时取全部（按顺序，逐条填占位符）；是单个字符串时返回只含它的数组 */
+  T.all = function (key, ctx) {
+    var v = lookup(key);
+    if (v === undefined) return [T(key)];
+    used[key] = true;
+    var arr = Array.isArray(v) ? v : [v], out = [];
+    for (var i = 0; i < arr.length; i++) out.push(decorate(ctx !== undefined ? fill(arr[i], ctx, key) : arr[i]));
+    return out;
   };
   T.has = function (key) { return lookup(key) !== undefined; };
 

@@ -240,9 +240,9 @@ Registry.mission({
     if (!w.player.alive) return true;
     /* 编队里任意一条沉了就算输 —— 这是这一关存在的全部理由。 */
     for (var i = 0; i < w.guarded.length; i++) {
-      if (w.guarded[i] && !w.guarded[i].alive) return true;
+      if (w.guarded[i] && !w.guarded[i].alive) return Mission.fail(w, 'm8.guardLost');
     }
-    if (w.baseTarget && !w.baseTarget.alive) return true;
+    if (w.baseTarget && !w.baseTarget.alive) return Mission.fail(w, 'm8.baseLost');
     return false;
   }
 });

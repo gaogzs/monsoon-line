@@ -162,6 +162,6 @@ Registry.mission({
   lose: function (w) {
     if (!w.player.alive) return true;
     for (var i = 0; i < w.guarded.length; i++) if (w.guarded[i].alive) return false;
-    return true;
+    return Mission.fail(w, 'm9.guardLost');
   }
 });

@@ -10,7 +10,7 @@
      就再也拖不动了。浏览器只允许在用户手势里请求 —— 开始任务的那次点击、
      取消暂停的那次按键、以及画布上的任何一次点击都算。 */
   function requestAimLock() {
-    if (!$.cv || !$.aimMode || document.pointerLockElement === $.cv || !$.cv.requestPointerLock) return;
+    if ($.failing || !$.cv || !$.aimMode || document.pointerLockElement === $.cv || !$.cv.requestPointerLock) return;
     /* 先要"原始位移"（unadjustedMovement）：绕开系统鼠标加速，Chrome 在
        Windows 上锁定指针时偶发的巨大 movementX/Y 尖峰也少得多。
        浏览器不支持这个选项时 promise 会被拒绝，退回普通锁定。 */

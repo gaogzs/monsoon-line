@@ -48,9 +48,9 @@
     return 1 - M3.clamp(ent.gunResist || 0, 0, 0.999);
   }
 
-  function hitAny(e, dmg, world, source) {
+  function hitAny(e, dmg, world, source, info) {
     if (e.kind === 'target') hitSurface(e, dmg, world, source);
-    else $.damage(e, dmg, world, source);
+    else $.damage(e, dmg, world, source, info);
   }
 
   /* 近炸 / 撞上的判定：在**最近的那一刻**起爆。

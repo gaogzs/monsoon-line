@@ -104,8 +104,19 @@ function bombTheBase(bomber, w) {
       (i % 3) ? '#ffb24a' : '#fff2cc',
       { grow: true, drag: 0.9, grav: 0.15 });
   }
-  Ent.damage(base, 340, w, bomber);
+  Ent.damage(base, 340, w, bomber, { weapon: null, kind: 'script' });
 }
+
+/* 失败原因：在 lose() 返回 true 之前调用，写 w.fail = { key, params }，
+   结算页与失败无线电按 key 去 locales/zh-CN/text/fail.json 里取（fail.<key>.reason / .sub / .who / .radio）。
+   玩家阵亡不用调它 —— 死因由 Ent.kill 记在 player.deathCause 上。
+   用法：if (基地没了) return Mission.fail(w, 'm2.baseLost'); */
+var Mission = {
+  fail: function (w, key, params) {
+    w.fail = { key: key, params: params || {} };
+    return true;
+  }
+};
 
 function spawnWingman(w, idx, slotX, slotY, slotZ) {
   // 僚机是「折翼」级无人僚机（KA-7），不是有人机 ——

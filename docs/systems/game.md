@@ -175,13 +175,13 @@ watchdog(dt)                                            ← 所有飞机步进�
 导弹 / 子弹 step → resolveBullets(dt) → updateTargets(dt) → Ent.stepParticles
 最近一架 NPC 的引擎声 / 导弹告警 / 引擎音 / 地形与失速音
 mission.tick(world, dt);  compact()                     ← 三数组去死 + 粒子上限
-击杀统计 → mission.lose / mission.win → finish()（命中即 return）
+击杀统计 → 玩家受击台词 → 失败 / 胜负：failing 中则计时、到点 endFail()；否则 时限到 / mission.lose → beginFail()，mission.win → finish(true)（只有胜利 return）
 僚机损失台词（flags.allyDown 一次性触发器）
 updateCamera(dt)                                        ← 相机放在实体全部就位之后
 hits / banner 计时衰减
 ```
 
-`mission.lose()` / `mission.win()` 命中时**直接 `return`**，所以那一帧不再 `updateCamera` —— 无所谓，`finish()` 已切到 `debrief`，下一帧 `loop` 走另一条分支。
+`mission.win()` 命中时**直接 `return`**，那一帧不再 `updateCamera` —— 无所谓，`finish()` 已切到 `debrief`。失败不 return：`beginFail()` 之后 `state` 仍是 `playing`，相机与世界照常推进；只有 `endFail()` 把 `state` 切走时才在该处 return。
 
 ### 电子战与支援单位：每帧的三个环节
 
@@ -232,7 +232,7 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 
 - `timeLimit` / `timeLeft` —— 关卡时限（秒）。`startMission` 从 `mission.timeLimit`
   落进来；主循环倒计时，归零时由**统一的一处**判负
-  （`world.timeLimit > 0 && world.timeLeft <= 0 → finish(false)`）。
+  （`world.timeLimit > 0 && world.timeLeft <= 0 → beginFail()`，原因键 `fail.timeUp`）。
   任务脚本只要声明 `timeLimit`，不需要自己写倒计时；`0` 表示无时限，
   HUD 也不画读秒。此前 `mission.timeLimit` 声明了却全项目没人读。
 - `groundKilled` —— 被摧毁的地面/海面目标数，由 `Ent.killGround` 累加。
@@ -249,6 +249,16 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 3. `p.name = p.label = CALLSIGN.player`；入 `world.actors`；写回 `$.player`；`mission.spawn(world)` —— 敌机、平台、僚机全由任务脚本自己造。
 4. 初始镜头 `camFwd = p.fwd`、`camUp = (0,1,0)`、`camPos = p.pos + (0, 30, -110)`；`Radio.clear()` → `Radio.play(mission.id, 'start')`；横幅 `banner = { t: 3.4, ... }`。
 5. `hideAll(); state = 'playing'; paused = false;` 摘掉暂停层，`p.target = null`。
+
+### 失败：`beginFail` / `endFail`（2.1）
+`engine/game/finish.js`。失败（被击毁、坠毁、关卡条件、时限）**先停在游戏画面上**：
+
+- `failReason()` 把原因整理成 `{ key, reason, sub, who, lines }`：关卡条件失败读 `world.fail`（`Mission.fail(w, key, params)` 写的，见 [missions.md](missions.md)），时限到是 `fail.timeUp`，玩家阵亡读 `player.deathCause`（`Ent.kill` 写：`type ∈ gun / missile / blast / script / crash-ground / crash-sea / unknown`，`by` 取呼号 / 舰级 / 名字，`weapon` 取武器名；`Ent.damage` 与 `Ent.hitAny` 的第五个参数 `info = { weapon, kind }` 就是为它服务的，缺省记 `unknown`）。文本全在 `locales/zh-CN/text/fail.json`（`fail.<key>.reason / sub / who / radio`，玩家阵亡用 `fail.death.<type>.*`）。
+- `beginFail()`：写 `Game.failing = { t0, hold, fail }`；弹 `#failing` 覆盖层（`locales/_html/overlays/failing.html`：原因 + 详情 + `[结束]`）；`releasePointer()`；一次性入队失败无线电（关卡条件：该键的 `radio`；玩家阵亡：活着的僚机优先、否则预警机喊一句，再接 `VOICES.<关>.lose`，都不在则不播）；`hold = max(FAIL_HOLD_S, 台词总时长 + 1)`。
+- `failing` 期间：`controlPlayer` 冻结输入并让飞机平飞自动驾驶；H / Esc / 点按钮都是"结束"；暂停、重新锁鼠标、`fireSpecial`、换目标 / 僚机命令 / EMCON、鼠标瞄准位移全部被 `if ($.failing)` 挡掉；HUD 用 `HUD.dim` 压暗；不再判胜负。
+- `endFail()`：摘掉覆盖层、`finish(false)`，结算页的 `#dReason` / `#dReasonSub` 填同一份原因。
+
+失败台词的 `nogarble: true` 是留给 2.3 的标记：剧情台词不受电磁干扰乱码影响。
 
 ### `finish(win)`
 `engine/game/finish.js`。

@@ -53,6 +53,18 @@
     if (!$.player.alive) return;
     var c = $.player.ctrl;
 
+    /* 失败停留期间：输入冻结，飞机交给平飞自动驾驶 ——
+       免得玩家在失败提示下又被打死，或者又"救回来"。 */
+    if ($.failing) {
+      var f = $.player.fwd;
+      var lvl = M3.norm(M3.V(f.x, 0, f.z));
+      AI.steerTo($.player, lvl, c, null, 0);
+      $.player.gLoad = M3.smooth($.player.gLoad || 1, 1, 6, dt);
+      $.player.hiG = false;
+      SFX.gun(false);
+      return;
+    }
+
     /* 干扰弹：按住 V 连续投放，一次一组。
        "组"才是战术单位 —— 真实中也是按一个程序打出去，
        而不是一发一发抠。投放节奏由 breakLock 里的 flareCd 控制（0.45 s），

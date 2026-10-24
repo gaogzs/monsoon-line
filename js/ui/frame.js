@@ -107,6 +107,7 @@
     Renderer.end();
 
     // HUD
+    HUD.dim = $.failing ? Math.min(1, ($.world.time - $.failing.t0) / 0.8) : 0;    // 失败提示：HUD 压暗
     HUD.draw($.world, $.player, 0, $.S);
 
     // 横幅与提示

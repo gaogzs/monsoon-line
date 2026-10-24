@@ -4,6 +4,7 @@
   $.togglePause = togglePause; $.switchPauseTab = switchPauseTab; $.buildHelpPage = buildHelpPage;
 
   function togglePause() {
+    if ($.failing) { $.endFail(); return; }     // 失败提示期间不弹暂停菜单
     $.paused = !$.paused;
     document.getElementById('pause').classList.toggle('on', $.paused);
     if (!$.paused) $.requestAimLock();

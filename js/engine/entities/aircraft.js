@@ -355,7 +355,7 @@
     var aGy = $.groundY(a.pos.x, a.pos.z);
     if (a.pos.y <= aGy + 2) {
       a.pos.y = aGy + 2;
-      $.kill(a, world, true);
+      $.kill(a, world, true);   // 击杀者由 kill 取 lastHitBy（不传 source：不给对方加战果）
       return;
     }
 

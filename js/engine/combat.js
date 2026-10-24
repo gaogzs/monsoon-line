@@ -118,7 +118,9 @@ var Combat = (function () {
         var amt = dmg0 * k * Ent.warheadK(w, e);
         /* 反辐射弹对**正在辐射**的目标伤害翻倍 —— 它找的就是那部雷达 */
         if (w.tags.antiRadar && Ent.isRadiating(e)) amt *= 2;
-        Ent.hitAny(e, amt, world, shot.owner);
+        Ent.hitAny(e, amt, world, shot.owner, {
+          weapon: w.name || w.id || null, kind: shot.kind === 'missile' ? 'missile' : 'blast'
+        });
         if (e.isPlayer && typeof Renderer !== 'undefined' && Renderer.addShake) {
           Renderer.addShake(3 + 12 * k);
         }
