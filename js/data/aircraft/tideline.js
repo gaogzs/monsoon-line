@@ -22,7 +22,8 @@ Registry.aircraft({
   gun: 'cel1',
   maxLoad: 2600,
   hardpointGroups: [
-    { id: 'A', label: T('aircraft.tideline.hardpointGroups.i0.label'), kind: 'light', pts: [{ x: 2.4, y: -0.6 }, { x: -2.4, y: -0.6 }] }
+    { id: 'A', label: T('aircraft.tideline.hardpointGroups.i0.label'), kind: 'light', pts: [{ x: 2.4, y: -0.6 }, { x: -2.4, y: -0.6 }] },
+    { id: 'B', label: T('aircraft.tideline.hardpointGroups.i1.label'), kind: 'light', playerOnly: true, pts: [{ x: 4.2, y: -4.2 }, { x: -4.2, y: -4.2 }] }
   ],
   defaultLoadout: {}
 });

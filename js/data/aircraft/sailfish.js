@@ -23,7 +23,8 @@ Registry.aircraft({
   hardpointGroups: [
     { id: 'A', label: T('aircraft.sailfish.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 2.6, y: -2.3 }, { x: -2.6, y: -2.3 }] },
     { id: 'B', label: T('aircraft.sailfish.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 4.2, y: -4.2 }, { x: -4.2, y: -4.2 }] },
-    { id: 'C', label: T('aircraft.sailfish.hardpointGroups.i2.label'), kind: 'belly', pts: [{ x: 0.95, y: -4.2 }, { x: -0.95, y: -4.2 }] }
+    { id: 'C', label: T('aircraft.sailfish.hardpointGroups.i2.label'), kind: 'belly', pts: [{ x: 0.95, y: -4.2 }, { x: -0.95, y: -4.2 }] },
+    { id: 'D', label: T('aircraft.sailfish.hardpointGroups.i3.label'), kind: 'tip', playerOnly: true, pts: [{ x: 6.0, y: -5.6 }, { x: -6.0, y: -5.6 }] }
   ],
   defaultLoadout: { A: 'mrm', B: 'hos', C: 'ecm2' },
   desc: T('aircraft.sailfish.desc')

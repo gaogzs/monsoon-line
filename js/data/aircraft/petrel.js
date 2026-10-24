@@ -23,7 +23,8 @@ Registry.aircraft({
   hardpointGroups: [
     // 挂在三角翼中段下面 —— 以前落在前缘之前，弹体整个悬在翼外
     { id: 'A', label: T('aircraft.petrel.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 3.0, y: -3.0 }, { x: -3.0, y: -3.0 }] },
-    { id: 'B', label: T('aircraft.petrel.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 5.0, y: -5.3 }, { x: -5.0, y: -5.3 }] }
+    { id: 'B', label: T('aircraft.petrel.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 5.0, y: -5.3 }, { x: -5.0, y: -5.3 }] },
+    { id: 'C', label: T('aircraft.petrel.hardpointGroups.i2.label'), kind: 'heavy', playerOnly: true, pts: [{ x: 4.0, y: -4.0 }, { x: -4.0, y: -4.0 }] }
   ],
   defaultLoadout: { A: 'hva', B: 'mrm' }
 });

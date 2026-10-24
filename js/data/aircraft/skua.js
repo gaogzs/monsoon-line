@@ -22,7 +22,8 @@ Registry.aircraft({
     /* 升力体机身很扁（下表面约 -0.75 m），默认的 belly -1.95 / light -1.15
        会让挂载悬在机身下面一米多 —— 贴着机腹 / 翼面挂。 */
     { id: 'A', label: T('aircraft.skua.hardpointGroups.i0.label'), kind: 'belly', expose: 0, hy: -0.82, pts: [{ x: 1.1, y: -2.2 }, { x: -1.1, y: -2.2 }] },
-    { id: 'B', label: T('aircraft.skua.hardpointGroups.i1.label'), kind: 'light', hy: -0.55, pts: [{ x: 3.6, y: -3.4 }, { x: -3.6, y: -3.4 }] }
+    { id: 'B', label: T('aircraft.skua.hardpointGroups.i1.label'), kind: 'light', hy: -0.55, pts: [{ x: 3.6, y: -3.4 }, { x: -3.6, y: -3.4 }] },
+    { id: 'C', label: T('aircraft.skua.hardpointGroups.i2.label'), kind: 'light', hy: -0.55, playerOnly: true, pts: [{ x: 5.4, y: -3.6 }, { x: -5.4, y: -3.6 }] }
   ],
   defaultLoadout: { A: 'lcm', B: 'oep' }
 });

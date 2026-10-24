@@ -741,6 +741,43 @@ for (const k in WEAPONS) {
 }
 if (!badStore) ok('全部武器都有挂载属性');
 
+/* 所有战斗机各多一对挂点（2.4）。新组标 playerOnly：NPC 的 mountPlan 一律跳过（关卡难度不变），
+   玩家的 Loadout.defaults 按 defaultLoadout 取值（没写就是 null）。
+   战斗机清单写成常量，避免漂移（AIRCRAFT 没有"是战斗机"的机器字段）。 */
+{
+  const FIGHTERS = { frigatebird: 4, sailfish: 4, booby: 4, petrel: 3, skua: 3, albatross: 4,
+    schist: 3, basalt: 3, sandstone: 3, tideline: 2 };
+  const bad = [];
+  for (const id in FIGHTERS) {
+    const ac = sandbox.AIRCRAFT.find(x => x.id === id);
+    if (!ac) { bad.push(id + ' 不在 AIRCRAFT 里'); continue; }
+    if (ac.hardpointGroups.length !== FIGHTERS[id]) bad.push(id + ' 应有 ' + FIGHTERS[id] + ' 组挂点，实际 ' + ac.hardpointGroups.length);
+    const extra = ac.hardpointGroups.filter(g => g.playerOnly);
+    if (extra.length !== 1) bad.push(id + ' 应恰有 1 组 playerOnly，实际 ' + extra.length);
+    for (const g of ac.hardpointGroups) if (g.pts.length % 2) bad.push(id + ' 的组 ' + g.id + ' 点数不是偶数');
+    // NPC：制式弹铺满所有挂得住的组，但 playerOnly 的组必须空着；逐组 loadout 也一样
+    const light = sandbox.WEAPONS.srm ? 'srm' : null;
+    const wpn = ['dl6', 'srm', 'mrm', 'v11'].map(k => sandbox.WEAPONS[k] && k).find(Boolean);
+    const npc = sandbox.Ent.makeAircraft({ type: id, team: 1, x: 0, y: 5000, z: 0, speed: 300, special: wpn });
+    const plan = sandbox.Ent.mountPlan(npc);
+    ac.hardpointGroups.forEach((g, i) => {
+      if (g.playerOnly && plan[i]) bad.push(id + ' 的 NPC 不该在 playerOnly 组 ' + g.id + ' 上挂东西：' + plan[i]);
+    });
+    const lo = {}; ac.hardpointGroups.forEach(g => { lo[g.id] = wpn; });
+    const npc2 = sandbox.Ent.makeAircraft({ type: id, team: 1, x: 0, y: 5000, z: 0, speed: 300, special: wpn, loadout: lo });
+    const plan2 = sandbox.Ent.mountPlan(npc2);
+    ac.hardpointGroups.forEach((g, i) => {
+      if (g.playerOnly && plan2[i]) bad.push(id + ' 的逐组 loadout 不该落到 playerOnly 组 ' + g.id);
+    });
+    // 玩家：新组可以装，默认不带
+    const d = sandbox.Loadout.defaults(ac);
+    for (const g of extra) if (d[g.id] !== null) bad.push(id + ' 的新组默认配置应为 null，实际 ' + d[g.id]);
+  }
+  sandbox.Ent.clearMountIssues && sandbox.Ent.clearMountIssues();
+  if (bad.length) bad.slice(0, 8).forEach(fail);
+  else ok('战斗机各多一对挂点（playerOnly）：组数 / 偶数点 / NPC 跳过 / 玩家默认空，十型全部符合');
+}
+
 /* 挂载弹体的翼面必须与弹体相接（2.2b）：翼片的根部到弹轴的径向距离不得比六边形截面的
    边心距（0.866 r）更远 —— 否则翼片悬在弹体外面，远看像"悬浮"的翼片。
    只求视觉相接，允许翼根穿入弹体内部。 */

@@ -151,6 +151,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 
 - `pts` 是机体系俯视坐标，**同时是俯视识别图的引线锚点**（单一数据源，别再建一份）
 - `pts.length` 必须是**偶数**（成对挂载），`preflight` 会查
+- `playerOnly: true`（可选）：这一组只给玩家（机库）用，`Ent.mountPlan` / `buildNpcMounts` 对 NPC 一律跳过，所以 NPC 的槽数、弹药池、重量不受它影响。2.4 给每架战斗机多加的一对挂点就是这样标的
 - `defaultLoadout` 的值是 `WEAPONS` 的键或 `null`；多数 NPC 机型写 `{}`（`folded_wing` 例外，见文末）
 - `hy`（可选）是**吊挂高度**（机体系 y，单位米）。不写就用
   `Ent.STORE_HY` 按 `kind` 给的默认值（tip −0.35 / light −1.15 /

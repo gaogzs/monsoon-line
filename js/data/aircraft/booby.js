@@ -24,7 +24,8 @@ Registry.aircraft({
   hardpointGroups: [
     { id: 'A', label: T('aircraft.booby.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 3.8, y: -0.4 }, { x: -3.8, y: -0.4 }] },
     { id: 'B', label: T('aircraft.booby.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 6.2, y: -1.0 }, { x: -6.2, y: -1.0 }] },
-    { id: 'C', label: T('aircraft.booby.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 7.8, y: -1.05 }, { x: -7.8, y: -1.05 }] }
+    { id: 'C', label: T('aircraft.booby.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 7.8, y: -1.05 }, { x: -7.8, y: -1.05 }] },
+    { id: 'D', label: T('aircraft.booby.hardpointGroups.i3.label'), kind: 'belly', playerOnly: true, pts: [{ x: 0.9, y: 1.0 }, { x: -0.9, y: 1.0 }] }
   ],
   defaultLoadout: { A: 'asl', B: 'rkt', C: 'hdp' },
   desc: T('aircraft.booby.desc')

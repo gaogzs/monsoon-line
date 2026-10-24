@@ -49,16 +49,25 @@ hardpointGroups: [
   大型机体要自己给 —— 否则挂载物会埋进机身（`smoke.js` 有几何断言盯着，
   见 [data.md](data.md#hardpointgroups--defaultloadout)）
 
-可驾驶的六架机（`npcOnly` 的机型也有组，但只用于资料库展示）：
+所有战斗机（上游可玩 6 型 + 下游 / 中立 NPC 战斗机 4 型；`npcOnly` 的机型也有组，但只用于资料库展示）。
+**2.4 起每架各多一对挂点**（为以后扮演下游的战役做平衡准备），新组带 `playerOnly: true`：
+`Ent.mountPlan` 对 NPC 一律跳过它（槽数、弹药池、重量与加这一对之前一致，关卡难度不变），
+`Loadout`（机库 / 玩家）照常当普通组，`defaultLoadout` 不填新组（默认空着）。
 
-| 机型 | 组数 | 点数 | 组号与类型 |
+| 机型 | 组数 | 点数 | 组号与类型（★ = 2.4 新增，`playerOnly`） |
 |---|---|---|---|
-| DB-11 军舰鸟 | 3 | 6 | A light · B heavy · C belly |
-| D-14 旗鱼 | 3 | 6 | A heavy · B light · C belly |
-| G-6 鲣鸟 | 3 | 6 | A heavy · B light · C light |
-| F-9 海燕 | 2 | 4 | A heavy · B light |
-| D-21 贼鸥 | 2 | 4 | A belly · B light |
-| D-33 信天翁 | 3 | 6 | A heavy · B light · C tip |
+| DB-11 军舰鸟 | 4 | 8 | A light · B heavy · C belly · ★D light（机身后侧） |
+| D-14 旗鱼 | 4 | 8 | A heavy · B light · C belly · ★D tip（翼尖） |
+| G-6 鲣鸟 | 4 | 8 | A heavy · B light · C light · ★D belly（机腹） |
+| F-9 海燕 | 3 | 6 | A heavy · B light · ★C heavy（翼下内侧） |
+| D-21 贼鸥 | 3 | 6 | A belly · B light · ★C light（翼下外挂，外露、匿踪会掉） |
+| D-33 信天翁 | 4 | 8 | A heavy · B light · C tip · ★D light（内侧） |
+| ROK-27 schist | 3 | 6 | A heavy · B light · ★C light（翼下中段） |
+| GAL-31 basalt | 3 | 6 | A heavy · B light · ★C light（翼下中段） |
+| VAC-14 sandstone | 3 | 6 | A heavy · B light · ★C light（翼尖外侧） |
+| XAMSI Mk.2 tideline | 2 | 4 | A light · ★B light（外侧） |
+
+smoke 里有这十型的清单常量（组数、恰一组 `playerOnly`、NPC 跳过、玩家默认空）。
 
 `maxLoad`（最大挂载重量 kg）：军舰鸟 6500、旗鱼 4800、鲣鸟 7200、
 海燕 5200、贼鸥 4200、信天翁 5000、折翼 4200。

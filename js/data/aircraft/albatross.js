@@ -22,7 +22,8 @@ Registry.aircraft({
     // 跟着后移后的前掠翼走：每个挂点落在该处翼弦的中段
     { id: 'A', label: T('aircraft.albatross.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 3.0, y: -1.8 }, { x: -3.0, y: -1.8 }] },
     { id: 'B', label: T('aircraft.albatross.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 5.2, y: -0.3 }, { x: -5.2, y: -0.3 }] },
-    { id: 'C', label: T('aircraft.albatross.hardpointGroups.i2.label'), kind: 'tip', pts: [{ x: 7.4, y: 1.0 }, { x: -7.4, y: 1.0 }] }
+    { id: 'C', label: T('aircraft.albatross.hardpointGroups.i2.label'), kind: 'tip', pts: [{ x: 7.4, y: 1.0 }, { x: -7.4, y: 1.0 }] },
+    { id: 'D', label: T('aircraft.albatross.hardpointGroups.i3.label'), kind: 'light', playerOnly: true, pts: [{ x: 1.7, y: -3.0 }, { x: -1.7, y: -3.0 }] }
   ],
   defaultLoadout: { A: 'wasp', B: 'qsr', C: 'irp' }
 });

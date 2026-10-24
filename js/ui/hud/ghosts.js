@@ -34,7 +34,8 @@
   }
   var rng = mulberry32(20780314);
 
-  var CJK = '电磁战术链路雷达导弹目标编队航空火控频谱干扰平台指挥侦察空域任务信号数据';
+  // 汉字乱码用的字池（文本层里：locales/zh-CN/text/ui/hud/ghosts.json）
+  var cjkPool = null;
 
   /* 同形状乱码：字母 → 字母，数字 → 数字，汉字 → 汉字，其余（连字符、空格、点）原样。
      step 按 GHOST_GLITCH_HZ 取整，phase 让每个框各自错开，避免整屏同步闪。 */
@@ -43,13 +44,14 @@
     var step = Math.floor(time * GHOST_GLITCH_HZ + (phase || 0) * 7);
     var h = step * 2654435761;
     for (var i = 0; i < str.length; i++) h = (h ^ str.charCodeAt(i)) * 16777619;
+    if (cjkPool === null) cjkPool = T('ui.hud.ghosts.glitchPool');
     var r = mulberry32(h >>> 0), out = '';
     for (i = 0; i < str.length; i++) {
       var c = str.charAt(i);
       if (/[A-Z]/.test(c)) out += String.fromCharCode(65 + Math.floor(r() * 26));
       else if (/[a-z]/.test(c)) out += String.fromCharCode(97 + Math.floor(r() * 26));
       else if (/[0-9]/.test(c)) out += String.fromCharCode(48 + Math.floor(r() * 10));
-      else if (/[一-鿿]/.test(c)) out += CJK.charAt(Math.floor(r() * CJK.length));
+      else if (/[一-鿿]/.test(c)) out += cjkPool.charAt(Math.floor(r() * cjkPool.length));
       else out += c;
     }
     return out;

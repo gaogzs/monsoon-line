@@ -27,11 +27,13 @@ Registry.aircraft({
     /* 变后掠翼的活动翼段上不挂东西 —— 挂架得跟着机翼转、还要保持顺气流，
        现实里只有极少数机型这么做，而且代价很大。所以 DB-11 的挂载全在
        机身和固定的翼套（翼根）上：机身前侧一对、翼套下一对、机腹一对。
-       早先机身后侧还有一对轻挂（共四组），对一架要上舰的飞机太多了 ——
-       其他机型最多三组，舰载机的起降重量更紧，于是剪掉了。 */
+       早先机身后侧还有一对轻挂（共四组），当时对一架要上舰的飞机太多了而剪掉；
+       2.4 给所有战斗机各加一对挂点（为下游战役做平衡准备），又把这一对（D）加了回来，
+       标 playerOnly：NPC 不用它，现有关卡的难度不变。 */
     { id: 'A', label: T('aircraft.frigatebird.hardpointGroups.i0.label'), kind: 'light', pts: [{ x: 0.85, y: 2.6 }, { x: -0.85, y: 2.6 }] },
     { id: 'B', label: T('aircraft.frigatebird.hardpointGroups.i1.label'), kind: 'heavy', pts: [{ x: 1.85, y: -0.6 }, { x: -1.85, y: -0.6 }] },
-    { id: 'C', label: T('aircraft.frigatebird.hardpointGroups.i2.label'), kind: 'belly', pts: [{ x: 0.45, y: -1.0 }, { x: -0.45, y: -1.0 }] }
+    { id: 'C', label: T('aircraft.frigatebird.hardpointGroups.i2.label'), kind: 'belly', pts: [{ x: 0.45, y: -1.0 }, { x: -0.45, y: -1.0 }] },
+    { id: 'D', label: T('aircraft.frigatebird.hardpointGroups.i3.label'), kind: 'light', playerOnly: true, pts: [{ x: 0.95, y: -3.2 }, { x: -0.95, y: -3.2 }] }
   ],
   defaultLoadout: { A: 'srm', B: 'v11', C: 'oep' },
   desc: T('aircraft.frigatebird.desc')

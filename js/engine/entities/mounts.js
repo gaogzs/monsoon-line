@@ -137,11 +137,16 @@
     var groups = (a.ac && a.ac.hardpointGroups) || [];
     var plan = [], gi, pi;
     for (gi = 0; gi < groups.length; gi++) plan.push(null);
+    /* playerOnly 的挂点组（2.4 给每架战斗机多加的一对）：NPC 一律跳过 ——
+       槽数、弹药池、重量与 mountPlan 的结果与加这一对之前逐字节一致，关卡难度不变。
+       玩家的 loadout 走机库（Loadout），不经过这里的 NPC 分支。 */
+    var npc = !a.isPlayer;
 
     // ① 任务写死的逐组配置
     var lo = a.loadout || null;
     if (lo) {
       for (gi = 0; gi < groups.length; gi++) {
+        if (npc && groups[gi].playerOnly) continue;
         var lw = WEAPONS[lo[groups[gi].id]];
         if (!lw) continue;
         if (!fitsKind(lw, groups[gi].kind, false)) {
@@ -169,6 +174,7 @@
       var placed = false;
       for (gi = groups.length - 1; gi >= 0; gi--) {
         if (plan[gi]) continue;
+        if (npc && groups[gi].playerOnly) continue;
         if (!fitsKind(pw, groups[gi].kind, false)) continue;
         plan[gi] = pods[pi];
         placed = true;
@@ -187,6 +193,7 @@
     if (lo) return plan;
     for (gi = 0; gi < groups.length; gi++) {
       if (plan[gi] || !a.special) continue;
+      if (npc && groups[gi].playerOnly) continue;
       var sw = WEAPONS[a.special];
       if (!sw || !fitsKind(sw, groups[gi].kind, false)) continue;
       plan[gi] = a.special;

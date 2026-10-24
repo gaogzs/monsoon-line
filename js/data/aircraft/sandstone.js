@@ -24,7 +24,8 @@ Registry.aircraft({
   maxLoad: 3400,
   hardpointGroups: [
     { id: 'A', label: T('aircraft.sandstone.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 2.6, y: -0.6 }, { x: -2.6, y: -0.6 }] },
-    { id: 'B', label: T('aircraft.sandstone.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 4.6, y: -1.2 }, { x: -4.6, y: -1.2 }] }
+    { id: 'B', label: T('aircraft.sandstone.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 4.6, y: -1.2 }, { x: -4.6, y: -1.2 }] },
+    { id: 'C', label: T('aircraft.sandstone.hardpointGroups.i2.label'), kind: 'light', playerOnly: true, pts: [{ x: 6.0, y: -1.0 }, { x: -6.0, y: -1.0 }] }
   ],
   defaultLoadout: {}
 });

@@ -10,6 +10,9 @@
       "hardpointGroups": {
         "i0": {
           "label": "翼下"
+        },
+        "i1": {
+          "label": "外侧"
         }
       }
     }
