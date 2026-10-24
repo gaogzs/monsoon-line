@@ -23,7 +23,11 @@ Registry.aircraft({
   maxLoad: 2600,
   hardpointGroups: [
     { id: 'A', label: T('aircraft.tideline.hardpointGroups.i0.label'), kind: 'light', pts: [{ x: 2.4, y: -0.6 }, { x: -2.4, y: -0.6 }] },
-    { id: 'B', label: T('aircraft.tideline.hardpointGroups.i1.label'), kind: 'light', playerOnly: true, pts: [{ x: 4.2, y: -4.2 }, { x: -4.2, y: -4.2 }] }
+    { id: 'B', label: T('aircraft.tideline.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 4.2, y: -4.2 }, { x: -4.2, y: -4.2 }] }
   ],
-  defaultLoadout: {}
+  defaultLoadout: {},
+  /* 敌机挂载预设：patrol 只挂 A 一对老式短程弹（B 空着）。中立机，不参与战斗。 */
+  npcLoadouts: {
+    patrol: { A: 'otr' }
+  },
 });

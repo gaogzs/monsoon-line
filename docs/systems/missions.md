@@ -122,6 +122,19 @@ spawnEnemy(w, {
 });
 ```
 
+**下游战斗机（schist / basalt / sandstone / tideline）写预设名**：这四型的数据里有 `npcLoadouts`（名字 → 逐组配置），关卡写 `loadout: 'cap'` 这样的字符串即可，`spawnEnemy` 会取预设（查不到、或对象里写了不存在的组 id 都直接抛错）：
+
+| 机型 | 预设 |
+|---|---|
+| basalt | `cap`（DAR-4 + BIN-9）· `lead`（DAR-4 分挂到 A、D 两对重挂点） |
+| schist | `cap`（BIN-6 挂 A、B）· `capMix`（DAR-4 + BIN-6）· `capPod`（只挂 A，吊舱另写 `pods`）· `capLead` · `strikeShip`（BOX-14 + BIN-6）· `strikeLead` |
+| sandstone | `escort`（BIN-9 挂 A、B）· `strike`（TUM-7 + BIN-9） |
+| tideline | `patrol`（只挂 A） |
+
+- **别只写 `special` 不写 `loadout`**：下游四型的新挂点已开放给敌机，没有 `loadout` 时制式弹会被铺满**所有**挂得住的组（槽数翻倍）。`spawnEnemy` 会为此记一条 `mountIssue`，smoke 会拦。`special: null` 且不写 `loadout`（运输机、预警机、轰炸机）不受影响。
+- **同一种弹可以挂在几个组上，不必满载**：下游弹的弹药池只看武器（`perPoint` 为 0），所以同弹多挂几个点只是"同时就绪的发数"变多（突发更强），总弹数不变；没写的组就是空着。
+- **领队机用 `lead` / `capLead` / `strikeLead`**（池不变、槽数多一倍）：m2 伏击头机、冬港（`spawnWinterport`）、m3 skill 0.70 的 ROK-27、m4 skill 0.68 的 ROK-27、m6 老兵队长、m8 的"榔头"与第二波头机、m10 skill 0.72 的 ROK-27。其余敌机每种弹的池与槽数与开放新挂点之前逐项一致 —— `node tools/test/probes/probe-npc-loadouts.js` 对着基线 `tools/test/baseline/npc-loadouts.json` 守着这条（领队清单在探针的 `LEADS` 里）。
+
 几条**设计约束**（不是建议，是代码的边界）：
 
 - **`loadout` 里的组就是全部装机。** 没写到的组空着 —— 不要指望
@@ -189,7 +202,7 @@ spawnEnemy(w, {
 | m12 | 冬港（`spawnWinterport`，同 m3，skill 0.98）· 护航 6 架（左右各 3：GAL-31 ×3 `dl4` + `vbn`、ROK-27 ×3 `dl6` + `vzu`）· 石英 | 指挥舰邓氏鱼 `dl9` |
 | sk1 | 机型池 `['schist','schist','basalt','sandstone']`，按 `SK_FITS` 配弹；6 批共 2/2/3/4/5/6 架 | 鹈鹕（team 0）；tideline（team 2） |
 
-`spawnWinterport(w, {x, y, z, skill})`（`_lib.js`）是 m3 与 m12 共用的冬港生成器：GAL-31、`loadout: {A:'dl4', B:'vbn'}`、
+`spawnWinterport(w, {x, y, z, skill})`（`_lib.js`）是 m3 与 m12 共用的冬港生成器：GAL-31、`loadout: 'lead'`（`{A:'dl4', D:'dl4', B:'vbn'}`）、
 `phys` 覆盖（"人比飞机快"）、`isAce` / `bigTarget`、写入 `w.ace`。
 
 **舰艇的 `weapon` 对 team 0 同样生效**：上游舰带 `ss6`（FAN-6）只打敌机、从不朝玩家开火；

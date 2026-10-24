@@ -33,8 +33,24 @@ Registry.aircraft({
   hardpointGroups: [
     { id: 'A', label: T('aircraft.schist.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 2.9, y: -1.0 }, { x: -2.9, y: -1.0 }] },
     { id: 'B', label: T('aircraft.schist.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 5.2, y: -1.6 }, { x: -5.2, y: -1.6 }] },
-    { id: 'C', label: T('aircraft.schist.hardpointGroups.i2.label'), kind: 'light', playerOnly: true, pts: [{ x: 4.0, y: -1.3 }, { x: -4.0, y: -1.3 }] },
-    { id: 'D', label: T('aircraft.schist.hardpointGroups.i3.label'), kind: 'light', playerOnly: true, pts: [{ x: 6.4, y: -2.6 }, { x: -6.4, y: -2.6 }] }
+    { id: 'C', label: T('aircraft.schist.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 4.0, y: -1.3 }, { x: -4.0, y: -1.3 }] },
+    { id: 'D', label: T('aircraft.schist.hardpointGroups.i3.label'), kind: 'light', pts: [{ x: 6.4, y: -2.6 }, { x: -6.4, y: -2.6 }] }
   ],
-  defaultLoadout: {}
+  defaultLoadout: {},
+  /* 敌机挂载预设（关卡里 `loadout: 'cap'`，见 js/missions/_lib.js 的 spawnEnemy）。
+     逐组写、可以留空组、可以同弹多组；下游弹的池只看武器，同弹多挂只增加同时就绪的发数。
+       cap         BIN-6 挂 A、B 两对（与开放新挂点之前"special: dl6 自动铺满"一致）
+       capMix      DAR-4 + BIN-6
+       capPod      只挂 A 的 BIN-6，另有吊舱时由关卡写 pods（吊舱落在最后一个挂得住的组）
+       strikeShip  BOX-14 + BIN-6 自卫
+       capLead     领队：DAR-4 + BIN-6 分挂到 B、C 两对，池不变
+       strikeLead  领队：BOX-14 + BIN-6 分挂到 B、C 两对，池不变 */
+  npcLoadouts: {
+    cap: { A: 'dl6', B: 'dl6' },
+    capMix: { A: 'dl4', B: 'dl6' },
+    capPod: { A: 'dl6' },
+    capLead: { A: 'dl4', B: 'dl6', C: 'dl6' },
+    strikeShip: { A: 'vsr', B: 'dl6' },
+    strikeLead: { A: 'vsr', B: 'dl6', C: 'dl6' }
+  },
 });

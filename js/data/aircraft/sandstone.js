@@ -25,7 +25,14 @@ Registry.aircraft({
   hardpointGroups: [
     { id: 'A', label: T('aircraft.sandstone.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 2.6, y: -0.6 }, { x: -2.6, y: -0.6 }] },
     { id: 'B', label: T('aircraft.sandstone.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 4.6, y: -1.2 }, { x: -4.6, y: -1.2 }] },
-    { id: 'C', label: T('aircraft.sandstone.hardpointGroups.i2.label'), kind: 'light', playerOnly: true, pts: [{ x: 6.0, y: -1.0 }, { x: -6.0, y: -1.0 }] }
+    { id: 'C', label: T('aircraft.sandstone.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 6.0, y: -1.0 }, { x: -6.0, y: -1.0 }] }
   ],
-  defaultLoadout: {}
+  defaultLoadout: {},
+  /* 敌机挂载预设（见 basalt.js 的说明）：
+       escort  BIN-9 挂 A、B 两对（与开放新挂点之前"special: vbn 自动铺满"一致）
+       strike  TUM-7 + BIN-9 自卫 */
+  npcLoadouts: {
+    escort: { A: 'vbn', B: 'vbn' },
+    strike: { A: 'vgt', B: 'vbn' }
+  },
 });

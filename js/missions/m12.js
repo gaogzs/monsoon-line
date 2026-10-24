@@ -77,7 +77,7 @@ Registry.mission({
         z: 14000 + (i % 3) * 2500,
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'dl6',
-        loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
+        loadout: heavy ? 'cap' : 'capPod',
         pods: heavy ? null : ['vzu'],
         skill: 0.68 + (i > 3 ? 0.08 : 0),
         callsign: squadCallsign(51 + Math.floor(i / 2), (i % 2) + 1)

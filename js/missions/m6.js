@@ -69,7 +69,7 @@ Registry.mission({
         z: 22000 + Math.floor(i / 2) * 4000,
         fwd: M3.V(0, 0, -1),
         special: 'dl4',
-        loadout: { A: 'dl4', B: 'vbn' },
+        loadout: i === 0 ? 'lead' : 'cap',
         skill: i === 0 ? 0.88 : 0.72,
         callsign: squadCallsign(15 + i, 1)
       });
@@ -84,7 +84,7 @@ Registry.mission({
         x: 3000 + i * 3500, y: 14200 + (i % 2) * 500, z: 26000,
         fwd: M3.V(0, 0, -1),
         special: 'dl6',
-        loadout: (i % 2) ? null : { A: 'dl4', B: 'dl6' },
+        loadout: (i % 2) ? 'capPod' : 'capMix',
         pods: (i % 2) ? ['vzu'] : null,
         skill: 0.6, callsign: squadCallsign(15 + i, 2)
       });

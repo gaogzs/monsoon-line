@@ -254,7 +254,7 @@ Registry.mission({
           x: -2200 + k * 900, y: isHigh ? 17500 : (isHeavy ? 7600 : 3200), z: 24000,
           fwd: M3.V(0, 0, -1), speed: isHigh ? 470 : (isHeavy ? 430 : 340),
           special: (isHigh || isHeavy) ? 'dl4' : 'dl6',
-          loadout: (isHigh || isHeavy) ? { A: 'dl4', B: 'vbn' } : null,
+          loadout: k === 0 ? 'lead' : 'cap',          // 头机（skill 0.72）带领队配置：DAR-4 分挂到 A、D 两对重挂点
           skill: k === 0 ? 0.72 : 0.5,
           callsign: ambCs[k]
         });

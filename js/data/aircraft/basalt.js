@@ -26,8 +26,17 @@ Registry.aircraft({
   hardpointGroups: [
     { id: 'A', label: T('aircraft.basalt.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 3.6, y: -1.4 }, { x: -3.6, y: -1.4 }] },
     { id: 'B', label: T('aircraft.basalt.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 6.0, y: -2.2 }, { x: -6.0, y: -2.2 }] },
-    { id: 'C', label: T('aircraft.basalt.hardpointGroups.i2.label'), kind: 'light', playerOnly: true, pts: [{ x: 4.2, y: -3.0 }, { x: -4.2, y: -3.0 }] },
-    { id: 'D', label: T('aircraft.basalt.hardpointGroups.i3.label'), kind: 'heavy', playerOnly: true, pts: [{ x: 2.2, y: -2.0 }, { x: -2.2, y: -2.0 }] }
+    { id: 'C', label: T('aircraft.basalt.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 4.2, y: -3.0 }, { x: -4.2, y: -3.0 }] },
+    { id: 'D', label: T('aircraft.basalt.hardpointGroups.i3.label'), kind: 'heavy', pts: [{ x: 2.2, y: -2.0 }, { x: -2.2, y: -2.0 }] }
   ],
-  defaultLoadout: {}
+  defaultLoadout: {},
+  /* 敌机挂载预设（关卡里 `loadout: 'cap'`，见 js/missions/_lib.js 的 spawnEnemy）。
+     逐组写、可以留空组、可以同一种弹挂在几个组上。下游弹的弹药池只看武器（perPoint 为 0），
+     所以同弹多挂几个点只是"同时就绪的发数"变多，总弹数不变：
+       cap   与开放新挂点之前的配置逐项一致（DAR-4 一对 + BIN-9 一对）
+       lead  领队 / 高空机：DAR-4 分挂到 A 与 D 两对重挂点，池不变，突发更强 */
+  npcLoadouts: {
+    cap: { A: 'dl4', B: 'vbn' },
+    lead: { A: 'dl4', D: 'dl4', B: 'vbn' }
+  },
 });

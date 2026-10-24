@@ -90,7 +90,7 @@ Registry.mission({
       ac: 'schist',
       x: 14000, y: 5000, z: 20000,
       fwd: M3.V(0, 0, -1), speed: 320,
-      special: 'dl6', skill: 0.5,
+      special: 'dl6', loadout: 'cap', skill: 0.5,
       callsign: downstreamCallsign(35)
     });
 

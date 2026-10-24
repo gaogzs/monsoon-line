@@ -479,7 +479,7 @@ grep -rlE '碘化银|播撒|凝结核' . | grep -v '^./.git/'
 
 1. **尺寸**：机长拉到约 58 m、翼展约 54 m（≈ ×1.25，不是整体放大），机身更细长。尺寸已定。
 2. **命中半径**：所有飞机统一用 `HIT_R_AIR = 7.5`。机体放大后会显得"打偏也算中"或"贴着机翼不算中"。新增机型字段 `hitR`（缺省 7.5；写进 `js/data/_schema.js` 与 `docs/systems/data.md`），重轰设 11–12，并相应调 `hp`（起步 420 保持，靠更大靶面自然变脆）。
-3. **挂点**：炸弹舱 4 点（沿机身前后两对，间距 ≥ 3 m）、翼下 4 点（两对）。组 id 由 `A / B` 改成 `A1 A2 / B1 B2`；**所有指定了 boulder `loadout` 的关卡要同步改**（m2、m8 等，`js/missions/<id>.js` 里 `ac: 'boulder'` 的 `loadout`），否则会进 `Ent.mountIssues` 被 smoke 拦下。`hardpointGroups` 的 `label` 键在 `locales/zh-CN/text/aircraft/boulder.json`。
+3. **挂点**：**保持两个组、每组四个点**（不是拆成四个各 2 点的组）：`A` 弹舱 4 点（沿机身前后两对，间距 ≥ 3 m）、`B` 翼下 4 点（发动机内外各一对）。组 id 仍是 `A / B`，所以关卡里的 `loadout: { B: 'vsr' }` 不用改名；点按"右、左、右、左"排，槽号按这个顺序对应挂点。`hardpointGroups` 的 `label` 键在 `locales/zh-CN/text/aircraft/boulder.json`。（实施时一度拆成了 `A1 A2 / B1 B2`，v3.1.15 改回。）
 4. **弹药上限**：NPC 的弹药池是 `min(w.ammo, 点数 × perPoint)`（`Ent.buildNpcMounts`），点数翻倍会让轰炸机带的炸弹翻倍，直接改变 m2 / m8 的难度。批次内先把 `perPoint` 折半抵消（武器数据在 `js/data/weapons/<id>.js` 的 `attr` 里），再用 `probe-balance`（m2 m8）的"基地被炸到失守要多久"校验（`loseAt`；Sim 场景在批次 W 的 2.5.1 里已有）。
 5. **连带单位**：`quartz`（ROK-2 预警机）与 `lodestone`（ROK-44 干扰机）共用 `boulder` 模型，一起变大；它们各有一个腹部组，坐标按新尺寸重算。尾炮 `tail20a`（`js/data/turret-guns/tail20a.js`，`boulder` 的 `mounts` 里 `[0, 0.4, −22.2]`）后移到新机尾。
 6. 模型（`js/models/aircraft/boulder.js`）、俯视图（`js/render/planform/planes.js`）、图鉴（`js/ui/codex/entries/`）、详情页同步。

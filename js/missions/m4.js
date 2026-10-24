@@ -121,7 +121,7 @@ Registry.mission({
       ac: 'schist', team: 1,
       x: 8000, y: 6000, z: 22000,
       fwd: M3.V(0, 0, -1), speed: 380,
-      special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
+      special: 'vsr', loadout: 'strikeLead',
       skill: 0.68,
       callsign: squadCallsign(10, 1)
     });
@@ -129,7 +129,7 @@ Registry.mission({
       ac: 'schist', team: 1,
       x: 11000, y: 5200, z: 24000,
       fwd: M3.V(0, 0, -1), speed: 380,
-      special: 'vsr', loadout: { A: 'vsr', B: 'dl6' },
+      special: 'vsr', loadout: 'strikeShip',
       skill: 0.62,
       callsign: downstreamCallsign(11)
     });
@@ -137,7 +137,7 @@ Registry.mission({
       ac: 'sandstone',
       x: -9000, y: 5500, z: 25000,
       fwd: M3.V(0, 0, -1), speed: 340,
-      special: 'vgt', loadout: { A: 'vgt', B: 'vbn' },
+      special: 'vgt', loadout: 'strike',
       skill: 0.64,
       callsign: squadCallsign(10, 2)
     });

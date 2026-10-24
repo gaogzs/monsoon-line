@@ -68,7 +68,7 @@ Registry.mission({
         x: x, y: 8100, z: 20000,
         fwd: M3.V(0, 0, -1),
         speed: 265,
-        special: 'dl6',
+        special: 'dl6', loadout: 'cap',
         skill: 0.32,
         behavior: 'recon',
         callsign: squadCallsign(30, i + 1)
@@ -85,7 +85,7 @@ Registry.mission({
         x: (i - 0.5) * 5200, y: 8600, z: 20800,
         fwd: M3.V(0, 0, -1),
         speed: 300,
-        special: 'vbn',
+        special: 'vbn', loadout: 'escort',
         skill: 0.40,
         behavior: 'escort',
         escort: true,
@@ -105,7 +105,7 @@ Registry.mission({
         ac: 'schist',
         x: (i - 0.5) * 3000, y: 10200, z: 23500,
         fwd: M3.V(0, 0, -1), speed: 360,
-        special: 'dl6', loadout: { A: 'dl6' },
+        special: 'dl6', loadout: 'capPod',
         pods: ['vzu'],
         skill: 0.62,
         callsign: squadCallsign(31 + i, 2),
@@ -123,7 +123,7 @@ Registry.mission({
       ac: 'tideline', team: 2,
       x: 9000, y: 4200, z: 12000,
       fwd: M3.V(-1, 0, 0), speed: 240,
-      special: 'otr', skill: 0.30,
+      special: 'otr', loadout: 'patrol', skill: 0.30,
       behavior: 'recon'
     });
 

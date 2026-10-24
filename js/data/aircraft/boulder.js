@@ -40,13 +40,15 @@ Registry.aircraft({
      靠更大的靶面自然变脆。quartz / lodestone 共用这个机体，但它们各有自己的数据，
      没写就仍是 7.5。 */
   hitR: 11.5,
-  /* 弹舱 4 点（沿机身前后两对）+ 翼下 4 点（发动机内外各一对）。
-     2.5 之前是 A 弹舱一对 / B 翼下一对；关卡里的 loadout 同步改成 B1（见 m5 / m8）。 */
+  /* 两个组、每组四个点：
+       A 弹舱：沿机身前后两对（y = +5.0 / −2.0，间距 7 m）
+       B 翼下：发动机内外各一对（x = ±5.4 / ±13.5）
+     点的顺序是"一对一对排"（右、左、右、左），发射槽号按这个顺序对应挂点。 */
   hardpointGroups: [
-    { id: 'A1', label: T('aircraft.boulder.hardpointGroups.i0.label'), kind: 'belly', expose: 0, hy: -2.65, pts: [{ x: 1.0, y: 5.0 }, { x: -1.0, y: 5.0 }] },
-    { id: 'A2', label: T('aircraft.boulder.hardpointGroups.i1.label'), kind: 'belly', expose: 0, hy: -2.65, pts: [{ x: 1.0, y: -2.0 }, { x: -1.0, y: -2.0 }] },
-    { id: 'B1', label: T('aircraft.boulder.hardpointGroups.i2.label'), kind: 'heavy', pts: [{ x: 5.4, y: 0.0 }, { x: -5.4, y: 0.0 }] },
-    { id: 'B2', label: T('aircraft.boulder.hardpointGroups.i3.label'), kind: 'heavy', pts: [{ x: 13.5, y: 0.2 }, { x: -13.5, y: 0.2 }] }
+    { id: 'A', label: T('aircraft.boulder.hardpointGroups.i0.label'), kind: 'belly', expose: 0, hy: -2.65,
+      pts: [{ x: 1.0, y: 5.0 }, { x: -1.0, y: 5.0 }, { x: 1.0, y: -2.0 }, { x: -1.0, y: -2.0 }] },
+    { id: 'B', label: T('aircraft.boulder.hardpointGroups.i1.label'), kind: 'heavy',
+      pts: [{ x: 5.4, y: 0.0 }, { x: -5.4, y: 0.0 }, { x: 13.5, y: 0.2 }, { x: -13.5, y: 0.2 }] }
   ],
   defaultLoadout: {},
   /* ROK-40 的尾炮：没有实体，从尾锥射出，管后半球。它本身没有前射机炮（gun: null） */

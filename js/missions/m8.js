@@ -13,7 +13,7 @@ function m8Wave2(w) {
       ac: bomber ? 'boulder' : 'schist',
       x: 26000, y: bomber ? 5000 : 2800, z: -4000 + i * 3000,
       fwd: M3.V(-1, 0, 0), speed: bomber ? 250 : 300,
-      special: 'vsr', loadout: bomber ? { B1: 'vsr' } : { A: 'vsr', B: 'dl6' },
+      special: 'vsr', loadout: bomber ? { B: 'vsr' } : (i === 2 ? 'strikeLead' : 'strikeShip'),
       skill: bomber ? 0.3 : 0.6,
       callsign: bomber ? squadCallsign(40, i + 1) : squadCallsign(41 + i, 1)
     });
@@ -26,7 +26,7 @@ function m8Wave2(w) {
   for (i = 0; i < 2; i++) {
     spawnEnemy(w, {
       ac: 'basalt', x: 28000, y: 8000, z: -2000 + i * 5000,
-      fwd: M3.V(-1, 0, 0), special: 'dl4', loadout: { A: 'dl4', B: 'vbn' },
+      fwd: M3.V(-1, 0, 0), special: 'dl4', loadout: 'cap',
       skill: 0.62, callsign: squadCallsign(43 + i, 2)
     });
   }
@@ -120,7 +120,7 @@ Registry.mission({
         z: 22000 + lane * 3000,
         fwd: M3.V(0, 0, -1),
         special: isSledge ? 'vsr' : 'vgt',
-        loadout: isSledge ? { A: 'vsr', B: 'dl6' } : { A: 'vgt', B: 'vbn' },
+        loadout: isSledge ? 'strikeLead' : 'strike',
         skill: 0.6, callsign: isSledge ? squadCallsign(45, 6) : squadCallsign(45, i + 1)
       });
       st.striker = true;
@@ -138,7 +138,7 @@ Registry.mission({
         ac: 'boulder',
         x: (i - 0.5) * 5000, y: 5000, z: 26000,
         fwd: M3.V(0, 0, -1), speed: 250,
-        special: 'vsr', loadout: { B1: 'vsr' },
+        special: 'vsr', loadout: { B: 'vsr' },
         skill: 0.3,
         callsign: squadCallsign(46, i + 1)
       });
@@ -160,7 +160,7 @@ Registry.mission({
         x: -9000 + i * 6000, y: heavy ? 9000 : 4000, z: 28000,
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'vbn',
-        loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
+        loadout: heavy ? 'cap' : 'escort',
         skill: 0.62, callsign: heavy ? squadCallsign(47 + i, 1) : squadCallsign(45 + i, 2)
       });
     }

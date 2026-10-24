@@ -138,10 +138,10 @@ Registry.mission({
     var escCs = [squadCallsign(7, 1), squadCallsign(8, 1), squadCallsign(7, 2),
       squadCallsign(8, 2), downstreamCallsign(9)];
     var escorts = [
-      { ac: 'basalt', x: -6000, y: 18400, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.62 },
-      { ac: 'basalt', x: 6000, y: 18800, sp: 'dl4', loadout: { A: 'dl4', B: 'vbn' }, pod: null, sk: 0.66 },
-      { ac: 'schist', x: -3000, y: 14600, sp: 'dl6', pod: ['vzu'], sk: 0.66 },
-      { ac: 'schist', x: 0, y: 14200, sp: 'dl6', loadout: { A: 'dl4', B: 'dl6' }, pod: null, sk: 0.70 },
+      { ac: 'basalt', x: -6000, y: 18400, sp: 'dl4', loadout: 'cap', pod: null, sk: 0.62 },
+      { ac: 'basalt', x: 6000, y: 18800, sp: 'dl4', loadout: 'cap', pod: null, sk: 0.66 },
+      { ac: 'schist', x: -3000, y: 14600, sp: 'dl6', loadout: 'capPod', pod: ['vzu'], sk: 0.66 },
+      { ac: 'schist', x: 0, y: 14200, sp: 'dl6', loadout: 'capLead', pod: null, sk: 0.70 },
       { ac: 'spray', team: 2, x: -9000, y: 9200, sp: 'otr', loadout: { A: 'otr' }, pod: null, sk: 0.30 }
     ];
     for (i = 0; i < escorts.length; i++) {

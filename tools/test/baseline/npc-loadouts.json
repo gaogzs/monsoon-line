@@ -1,0 +1,2922 @@
+{
+ "m1": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "pelican",
+   "team": 0,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vbn",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vbn": 2
+   },
+   "slots": {
+    "vbn": 4
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vbn",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vbn",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vbn": 2
+   },
+   "slots": {
+    "vbn": 4
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vbn",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "tideline",
+   "team": 2,
+   "plan": [
+    "otr",
+    null
+   ],
+   "pool": {
+    "otr": 2
+   },
+   "slots": {
+    "otr": 2
+   },
+   "lf": 0.0769,
+   "pods": null,
+   "special": "otr",
+   "hasLoadout": true
+  }
+ ],
+ "m2": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "boulder",
+   "team": 1,
+   "plan": [
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "boulder",
+   "team": 1,
+   "plan": [
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "quartz",
+   "team": 1,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    "dl4"
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 4,
+    "vbn": 2
+   },
+   "lf": 0.0968,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  }
+ ],
+ "m3": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "quartz",
+   "team": 1,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "lodestone",
+   "team": 1,
+   "plan": [
+    "vsc"
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0.04,
+   "pods": null,
+   "special": "vsc",
+   "hasLoadout": false
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    "dl6",
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 4
+   },
+   "lf": 0.15,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "spray",
+   "team": 2,
+   "plan": [
+    "otr",
+    null
+   ],
+   "pool": {
+    "otr": 2
+   },
+   "slots": {
+    "otr": 2
+   },
+   "lf": 0.1429,
+   "pods": null,
+   "special": "otr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    "dl4"
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 4,
+    "vbn": 2
+   },
+   "lf": 0.0968,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  }
+ ],
+ "m4": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "vsr",
+    "dl6",
+    "dl6",
+    null
+   ],
+   "pool": {
+    "vsr": 1,
+    "dl6": 6
+   },
+   "slots": {
+    "vsr": 2,
+    "dl6": 4
+   },
+   "lf": 0.15,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "vsr",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "vsr": 1,
+    "dl6": 6
+   },
+   "slots": {
+    "vsr": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  }
+ ],
+ "m5": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "lodestone",
+   "team": 1,
+   "plan": [
+    "vsc"
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0.04,
+   "pods": null,
+   "special": "vsc",
+   "hasLoadout": false
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "boulder",
+   "team": 1,
+   "plan": [
+    null,
+    "vsr"
+   ],
+   "pool": {
+    "vsr": 1
+   },
+   "slots": {
+    "vsr": 4
+   },
+   "lf": 0.0182,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "datum",
+   "team": 2,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  }
+ ],
+ "m6": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    "dl4"
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 4,
+    "vbn": 2
+   },
+   "lf": 0.0968,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "quartz",
+   "team": 1,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  }
+ ],
+ "m7": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "lodestone",
+   "team": 1,
+   "plan": [
+    "vsc"
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0.04,
+   "pods": null,
+   "special": "vsc",
+   "hasLoadout": false
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 4
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  }
+ ],
+ "m8": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "vsr",
+    "dl6",
+    "dl6",
+    null
+   ],
+   "pool": {
+    "vsr": 1,
+    "dl6": 6
+   },
+   "slots": {
+    "vsr": 2,
+    "dl6": 4
+   },
+   "lf": 0.15,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "boulder",
+   "team": 1,
+   "plan": [
+    null,
+    "vsr"
+   ],
+   "pool": {
+    "vsr": 1
+   },
+   "slots": {
+    "vsr": 4
+   },
+   "lf": 0.0182,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "boulder",
+   "team": 1,
+   "plan": [
+    null,
+    "vsr"
+   ],
+   "pool": {
+    "vsr": 1
+   },
+   "slots": {
+    "vsr": 4
+   },
+   "lf": 0.0182,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vbn",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vbn": 2
+   },
+   "slots": {
+    "vbn": 4
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vbn",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vbn",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vbn": 2
+   },
+   "slots": {
+    "vbn": 4
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vbn",
+   "hasLoadout": true
+  },
+  {
+   "ac": "quartz",
+   "team": 1,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "boulder",
+   "team": 1,
+   "plan": [
+    null,
+    "vsr"
+   ],
+   "pool": {
+    "vsr": 1
+   },
+   "slots": {
+    "vsr": 4
+   },
+   "lf": 0.0182,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "boulder",
+   "team": 1,
+   "plan": [
+    null,
+    "vsr"
+   ],
+   "pool": {
+    "vsr": 1
+   },
+   "slots": {
+    "vsr": 4
+   },
+   "lf": 0.0182,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "vsr",
+    "dl6",
+    "dl6",
+    null
+   ],
+   "pool": {
+    "vsr": 1,
+    "dl6": 6
+   },
+   "slots": {
+    "vsr": 2,
+    "dl6": 4
+   },
+   "lf": 0.15,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "vsr",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "vsr": 1,
+    "dl6": 6
+   },
+   "slots": {
+    "vsr": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  }
+ ],
+ "m10": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "vsr",
+    "dl6",
+    "dl6",
+    null
+   ],
+   "pool": {
+    "vsr": 1,
+    "dl6": 6
+   },
+   "slots": {
+    "vsr": 2,
+    "dl6": 4
+   },
+   "lf": 0.15,
+   "pods": null,
+   "special": "vsr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  }
+ ],
+ "m12": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl6",
+    null,
+    null,
+    "vzu"
+   ],
+   "pool": {
+    "dl6": 6
+   },
+   "slots": {
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": [
+    "vzu"
+   ],
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "quartz",
+   "team": 1,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    "dl4"
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 4,
+    "vbn": 2
+   },
+   "lf": 0.0968,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  }
+ ],
+ "sk1": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "pelican",
+   "team": 0,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  },
+  {
+   "ac": "tideline",
+   "team": 2,
+   "plan": [
+    "otr",
+    null
+   ],
+   "pool": {
+    "otr": 2
+   },
+   "slots": {
+    "otr": 2
+   },
+   "lf": 0.0769,
+   "pods": null,
+   "special": "otr",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vbn",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vbn": 2
+   },
+   "slots": {
+    "vbn": 4
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vbn",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vbn",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vbn": 2
+   },
+   "slots": {
+    "vbn": 4
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vbn",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl6",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "schist",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "dl6",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "dl6": 6
+   },
+   "slots": {
+    "dl4": 2,
+    "dl6": 2
+   },
+   "lf": 0.1,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  }
+ ],
+ "m9": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vbn",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vbn": 2
+   },
+   "slots": {
+    "vbn": 4
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vbn",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vbn",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vbn": 2
+   },
+   "slots": {
+    "vbn": 4
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vbn",
+   "hasLoadout": true
+  },
+  {
+   "ac": "quartz",
+   "team": 1,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  }
+ ],
+ "m11": [
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "folded_wing",
+   "team": 0,
+   "plan": [
+    "drm",
+    "mrm"
+   ],
+   "pool": {
+    "drm": 30,
+    "mrm": 4
+   },
+   "slots": {
+    "drm": 2,
+    "mrm": 2
+   },
+   "lf": 0.6143,
+   "pods": null,
+   "special": "drm",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "basalt",
+   "team": 1,
+   "plan": [
+    "dl4",
+    "vbn",
+    null,
+    null
+   ],
+   "pool": {
+    "dl4": 8,
+    "vbn": 2
+   },
+   "slots": {
+    "dl4": 2,
+    "vbn": 2
+   },
+   "lf": 0.0645,
+   "pods": null,
+   "special": "dl4",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  },
+  {
+   "ac": "sandstone",
+   "team": 1,
+   "plan": [
+    "vgt",
+    "vbn",
+    null
+   ],
+   "pool": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "slots": {
+    "vgt": 2,
+    "vbn": 2
+   },
+   "lf": 0.1176,
+   "pods": null,
+   "special": "vgt",
+   "hasLoadout": true
+  },
+  {
+   "ac": "quartz",
+   "team": 1,
+   "plan": [
+    null
+   ],
+   "pool": {},
+   "slots": {},
+   "lf": 0,
+   "pods": null,
+   "special": null,
+   "hasLoadout": true
+  }
+ ]
+}

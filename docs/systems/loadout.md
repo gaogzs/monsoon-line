@@ -50,11 +50,11 @@ hardpointGroups: [
   见 [data.md](data.md#hardpointgroups--defaultloadout)）
 
 所有战斗机（上游可玩 6 型 + 下游 / 中立 NPC 战斗机 4 型；`npcOnly` 的机型也有组，但只用于资料库展示）。
-**2.4 起每架各多一对挂点**（为以后扮演下游的战役做平衡准备），新组带 `playerOnly: true`：
+**2.4 起每架各多一对挂点**（为以后扮演下游的战役做平衡准备）。上游可驾驶六型的新组带 `playerOnly: true`；**下游四型的新组在 3.1.15 起开放给敌机**（去掉了 `playerOnly`，关卡用 `npcLoadouts` 预设名挂，见 [missions.md](missions.md)）。`playerOnly` 的语义仍是：
 `Ent.mountPlan` 对 NPC 一律跳过它（槽数、弹药池、重量与加这一对之前一致，关卡难度不变），
 `Loadout`（机库 / 玩家）照常当普通组。可驾驶六型的新组**带默认挂载**（按定位挑，见下表）；下游 / 中立四型的 `defaultLoadout` 仍是 `{}`（NPC 不用新组）。
 
-| 机型 | 组数 | 点数 | 组号与类型（★ = 2.4 新增，`playerOnly`） |
+| 机型 | 组数 | 点数 | 组号与类型（★ = 2.4 新增；上游六型的 ★ 组是 `playerOnly`，下游四型的 ★ 组敌机也能挂） |
 |---|---|---|---|
 | DB-11 军舰鸟 | 4 | 8 | A light · B heavy · C belly · ★D light（机身后侧，默认 CLA-4：扩展锁定吊舱要有中距弹配套） |
 | D-14 旗鱼 | 4 | 8 | A heavy · B light · C belly · ★D tip（翼尖，默认 GUS-9 被动探测吊舱：载重已 84%，轻吊舱只涨到 90%） |
@@ -67,13 +67,13 @@ hardpointGroups: [
 | VAC-14 sandstone | 3 | 6 | A heavy · B light · ★C light（翼尖外侧） |
 | XAMSI Mk.2 tideline | 2 | 4 | A light · ★B light（外侧） |
 
-下游 basalt（重型截击机，`maxLoad` 6200）与 schist（多用途战斗机）在 3.1.14 又各补了一对（共两组 `playerOnly`），为的是和上游同等规模；sandstone 是轻型攻击机，`maxLoad` 只有 3400，留在 3 对。
+下游 basalt（重型截击机，`maxLoad` 6200）与 schist（多用途战斗机）在 3.1.14 又各补了一对，为的是和上游同等规模；sandstone 是轻型攻击机，`maxLoad` 只有 3400，留在 3 对。
 
-smoke 里有这十型的清单常量（组数、`playerOnly` 组数（schist / basalt 两组，其余一组）、NPC 跳过、可驾驶六型的新组默认非空、NPC 四型留空）。
+smoke 里有这十型的清单常量（组数、`playerOnly` 组数（上游六型一组，下游四型零）、NPC 跳过、可驾驶六型的新组默认非空、下游四型的 `npcLoadouts` 预设都挂得上）。
 
 默认挂载的选法：同一架机的 `maxLoad` 是硬约束（挂载重量 / `maxLoad` 决定 `loadoutPenalty`，满格最多 −26% 加速），所以尽量选轻的；按"这架飞机的定位缺什么"补。多数机型加完会到 90% 上下或满格，惩罚封顶 1.0，不会更糟。
 
-**ROK-40 巨砾**（重型轰炸机，2.5 重做，`npcOnly`）：4 组 8 点 —— `A1` / `A2` 弹舱前后两对（`belly`，`expose: 0`）、`B1` 翼下内侧 / `B2` 翼下外侧（`heavy`，发动机的内外各一对）。2.5 之前是 `A` 弹舱 / `B` 翼下各一对；m5 / m8 的 `loadout: { B1: 'vsr' }` 同步改了（BOX-14 `perPoint` 为 0、`ammo` 1，弹药池与重量与之前一致）。
+**ROK-40 巨砾**（重型轰炸机，2.5 重做，`npcOnly`）：**2 组、每组 4 点** —— `A` 弹舱（`belly`，`expose: 0`，前后两对）、`B` 翼下（`heavy`，发动机内外各一对）。组 id 与 2.5 之前一样是 `A` / `B`，只是每组由一对变成两对（点按"右、左、右、左"排，发射槽号按这个顺序对应挂点），关卡里的 `loadout: { B: 'vsr' }` 不用改名。BOX-14 `perPoint` 为 0、`ammo` 1，弹药池不变，但槽数随点数从 2 变 4（仍只有一发就绪），挂载重量按点数多 200 kg（`loadFactor` 0.9% → 1.8%）。
 
 `maxLoad`（最大挂载重量 kg）：军舰鸟 6500、旗鱼 4800、鲣鸟 7200、
 海燕 5200、贼鸥 4200、信天翁 5000、折翼 4200。

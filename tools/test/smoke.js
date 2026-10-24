@@ -753,10 +753,11 @@ if (!badStore) ok('全部武器都有挂载属性');
     if (!ac) { bad.push(id + ' 不在 AIRCRAFT 里'); continue; }
     if (ac.hardpointGroups.length !== FIGHTERS[id]) bad.push(id + ' 应有 ' + FIGHTERS[id] + ' 组挂点，实际 ' + ac.hardpointGroups.length);
     const extra = ac.hardpointGroups.filter(g => g.playerOnly);
-    const wantExtra = (id === 'schist' || id === 'basalt') ? 2 : 1;      // 下游两型多补了一对（3.1.14）
+    /* 上游可驾驶六型的新组是玩家专用（playerOnly）；下游四型的新组已开放给敌机（3.1.15），不再标 */
+    const wantExtra = ac.npcOnly ? 0 : 1;
     if (extra.length !== wantExtra) bad.push(id + ' 应有 ' + wantExtra + ' 组 playerOnly，实际 ' + extra.length);
     for (const g of ac.hardpointGroups) if (g.pts.length % 2) bad.push(id + ' 的组 ' + g.id + ' 点数不是偶数');
-    // NPC：制式弹铺满所有挂得住的组，但 playerOnly 的组必须空着；逐组 loadout 也一样
+    // NPC：制式弹铺满所有挂得住的组，但 playerOnly 的组必须空着；逐组 loadout 也一样（下游四型没有 playerOnly 组，这里是空转）
     const light = sandbox.WEAPONS.srm ? 'srm' : null;
     const wpn = ['dl6', 'srm', 'mrm', 'v11'].map(k => sandbox.WEAPONS[k] && k).find(Boolean);
     const npc = sandbox.Ent.makeAircraft({ type: id, team: 1, x: 0, y: 5000, z: 0, speed: 300, special: wpn });
@@ -770,6 +771,19 @@ if (!badStore) ok('全部武器都有挂载属性');
     ac.hardpointGroups.forEach((g, i) => {
       if (g.playerOnly && plan2[i]) bad.push(id + ' 的逐组 loadout 不该落到 playerOnly 组 ' + g.id);
     });
+    // 下游四型的敌机挂载预设（npcLoadouts）：组 id 存在、武器存在、挂点类型与机体能力都挂得上
+    if (ac.npcOnly) {
+      for (const pn in (ac.npcLoadouts || {})) {
+        for (const gid in ac.npcLoadouts[pn]) {
+          const g = ac.hardpointGroups.find(x => x.id === gid), w = sandbox.WEAPONS[ac.npcLoadouts[pn][gid]];
+          if (!g) { bad.push(id + ' 预设 ' + pn + ' 引用了不存在的组 ' + gid); continue; }
+          if (!w) { bad.push(id + ' 预设 ' + pn + ' 引用了不存在的武器 ' + ac.npcLoadouts[pn][gid]); continue; }
+          if (!sandbox.Ent.fitsKind(w, g.kind, false)) bad.push(id + ' 预设 ' + pn + ' 的 ' + w.name + ' 挂不上组 ' + gid + '（' + g.kind + '）');
+          if (!sandbox.canCarry(ac, w)) bad.push(id + ' 预设 ' + pn + ' 的 ' + w.name + ' 机体能力不够');
+        }
+      }
+      if (!ac.npcLoadouts || !Object.keys(ac.npcLoadouts).length) bad.push(id + ' 缺 npcLoadouts');
+    }
     // 玩家：新组可以装；可驾驶的六型默认挂着东西（按定位挑的，见 defaultLoadout 的注释），NPC 四型留空
     const d = sandbox.Loadout.defaults(ac);
     for (const g of extra) {
@@ -777,34 +791,50 @@ if (!badStore) ok('全部武器都有挂载属性');
       else if (!d[g.id]) bad.push(id + ' 的新组 ' + g.id + ' 没有默认挂载');
     }
   }
+  // spawnEnemy：预设名查不到 / 组 id 写错要抛错；下游机型写 special 却没有 loadout 要记 mountIssue
+  {
+    const w0 = { actors: [], targets: [], particles: [], missiles: [], bullets: [], events: [] };
+    const sp = o => sandbox.spawnEnemy(w0, Object.assign({ x: 0, y: 5000, z: 0 }, o));
+    let threw = 0;
+    try { sp({ ac: 'schist', special: 'dl6', loadout: 'nope' }); } catch (e) { threw++; }
+    try { sp({ ac: 'schist', special: 'dl6', loadout: { Z: 'dl6' } }); } catch (e) { threw++; }
+    if (threw !== 2) bad.push('spawnEnemy 对不存在的预设名 / 组 id 应当抛错（抛了 ' + threw + '/2 次）');
+    sandbox.Ent.clearMountIssues();
+    sp({ ac: 'schist', special: 'dl6' });
+    if (!sandbox.Ent.mountIssues.some(m => /without a per-group loadout/.test(m))) bad.push('下游机型 special 非空却无 loadout 时应记一条 mountIssue');
+    sandbox.Ent.clearMountIssues();
+    sp({ ac: 'schist', special: 'dl6', loadout: 'cap' });
+    if (sandbox.Ent.mountIssues.length) bad.push('用预设 cap 不该有挂载问题：' + sandbox.Ent.mountIssues.join('；'));
+  }
   sandbox.Ent.clearMountIssues && sandbox.Ent.clearMountIssues();
   if (bad.length) bad.slice(0, 8).forEach(fail);
-  else ok('战斗机各多一对挂点（playerOnly）：组数 / 偶数点 / NPC 跳过 / 玩家默认空，十型全部符合');
+  else ok('战斗机各多一对挂点（上游 playerOnly，下游已开放）+ 敌机挂载预设：组数 / 偶数点 / NPC 跳过 / 玩家默认空，十型全部符合');
 }
 
 /* 重型轰炸机 ROK-40 重做（2.5）：机体 58 × 54 m、命中半径 11.5（其余飞机缺省 7.5）、
-   4 组 8 点（A1 A2 弹舱前后、B1 B2 翼下内外）、间距 ≥ 3 m；关卡里的逐组 loadout 用 B1 且没有 NPC 挂载问题。 */
+   2 组每组 4 点（A 弹舱：前后两对；B 翼下：发动机内外各一对）、弹舱前后间距 ≥ 3 m；
+   关卡里的逐组 loadout 写 { B: 'vsr' } 且没有 NPC 挂载问题。 */
 {
   const bad = [];
   const ac = sandbox.AIRCRAFT.find(x => x.id === 'boulder'), m = sandbox.MODELS.boulder;
   if (!m || Math.abs(m.len - 58) > 0.01 || Math.abs(m.span - 54) > 0.01) bad.push('boulder 模型尺寸应为 58 × 54：' + (m && m.len) + ' × ' + (m && m.span));
   if (ac.hitR !== 11.5) bad.push('boulder 的 hitR 应为 11.5：' + ac.hitR);
   const ids = ac.hardpointGroups.map(g => g.id).join(',');
-  if (ids !== 'A1,A2,B1,B2') bad.push('boulder 的挂点组应为 A1,A2,B1,B2：' + ids);
-  for (const g of ac.hardpointGroups) if (g.pts.length !== 2) bad.push('boulder 的组 ' + g.id + ' 应是一对');
-  const A1 = ac.hardpointGroups[0].pts[0], A2 = ac.hardpointGroups[1].pts[0];
-  if (Math.abs(A1.y - A2.y) < 3) bad.push('弹舱前后两对间距应 ≥ 3 m：' + Math.abs(A1.y - A2.y));
+  if (ids !== 'A,B') bad.push('boulder 的挂点组应为 A,B（两个组）：' + ids);
+  for (const g of ac.hardpointGroups) if (g.pts.length !== 4) bad.push('boulder 的组 ' + g.id + ' 应有 4 个点，实际 ' + g.pts.length);
+  const bay = ac.hardpointGroups[0].pts;
+  if (Math.abs(bay[0].y - bay[2].y) < 3) bad.push('弹舱前后两对间距应 ≥ 3 m：' + Math.abs(bay[0].y - bay[2].y));
   const Ec = sandbox.Ent, Cc = sandbox.Combat;
-  const bm = Ec.makeAircraft({ type: 'boulder', team: 1, x: 0, y: 5000, z: 0, speed: 250, special: 'vsr', loadout: { B1: 'vsr' } });
+  const bm = Ec.makeAircraft({ type: 'boulder', team: 1, x: 0, y: 5000, z: 0, speed: 250, special: 'vsr', loadout: { B: 'vsr' } });
   const fg = Ec.makeAircraft({ type: 'frigatebird', team: 1, x: 0, y: 5000, z: 0, speed: 250 });
   if (Cc.radiusOf(bm) !== 11.5 || Cc.radiusOf(fg) !== Cc.HIT_R_AIR) bad.push('Combat.radiusOf 应读 hitR（boulder 11.5，战斗机 ' + Cc.HIT_R_AIR + '）：' + Cc.radiusOf(bm) + ' / ' + Cc.radiusOf(fg));
   const plan = Ec.mountPlan(bm);
-  if (plan[2] !== 'vsr' || plan.filter(Boolean).length !== 1) bad.push('boulder { B1: vsr } 的挂载计划不对：' + JSON.stringify(plan));
+  if (plan[1] !== 'vsr' || plan.filter(Boolean).length !== 1) bad.push('boulder { B: vsr } 的挂载计划不对：' + JSON.stringify(plan));
   if (Ec.mountIssues.length) bad.push('boulder 挂载有问题：' + Ec.mountIssues.join('；'));
   Ec.clearMountIssues();
   // 实弹覆盖（弹丸判定读 a.hitR）由 smoke 的"机炮抗性"段负责，这里只验证半径读取
   if (bad.length) bad.forEach(fail);
-  else ok('ROK-40 重做：58 × 54 m、hitR 11.5、挂点 A1 A2 B1 B2、loadout B1 挂得上');
+  else ok('ROK-40 重做：58 × 54 m、hitR 11.5、两个挂点组各 4 点（A 弹舱 / B 翼下）、loadout B 挂得上');
 }
 
 /* 存档（2.6）：cleared 与 loadouts 的存取往返；坏数据 / 未知版本 / 没有 localStorage 时不抛；
@@ -2403,13 +2433,16 @@ if (Ent && M3 && me && world) {
     const W3 = sandbox.WEAPONS;
     const bad = [];
 
-    function npc(type, special, pods) {
+    /* loadout 必须显式给：下游机型的新挂点对 NPC 开放之后，只写 special 会
+       铺满所有挂得住的组（见 docs/systems/missions.md「别只写 special」）。 */
+    function npc(type, special, pods, loadout) {
       return Ent3.makeAircraft({
         type: type, team: 1, x: 0, y: 6000, z: 0,
         fwd: M3n.V(0, 0, -1), speed: 300,
-        special: special, pods: pods || null
+        special: special, pods: pods || null, loadout: loadout || null
       });
     }
+    const ALL_DL6 = { A: 'dl6', B: 'dl6', C: 'dl6', D: 'dl6' };
     function countStoresOf(a) {
       let c = 0;
       const o = Rn.pushModel;
@@ -2420,7 +2453,7 @@ if (Ent && M3 && me && world) {
     }
 
     // 1. 典型敌机：片岩（重挂点 2 + 通用挂点 2）挂下游格斗弹 → 4 枚
-    const schist = npc('schist', 'dl6');
+    const schist = npc('schist', 'dl6', null, ALL_DL6);
     const n1 = countStoresOf(schist);
     if (n1 !== 4) bad.push('ROK-27 挂 BIN-6 应当画出 4 枚，实际 ' + n1);
     // 打光之后机翼必须变干净（弹药池 = 0）
@@ -2428,7 +2461,7 @@ if (Ent && M3 && me && world) {
     const n2 = countStoresOf(schist);
     if (n2 !== 0) bad.push('ROK-27 的弹打光后翼下仍然挂着 ' + n2 + ' 枚');
     // 装填中的挂架空着 —— 这条以前对 NPC 完全不存在
-    const m27b = npc('schist', 'dl6');
+    const m27b = npc('schist', 'dl6', null, ALL_DL6);
     if (!m27b.slotCd.dl6 || m27b.slotCd.dl6.length !== 4) {
       bad.push('ROK-27 没有按挂点数建起 4 个发射槽');
     } else {
@@ -2449,7 +2482,7 @@ if (Ent && M3 && me && world) {
 
     // 4. 任务写定的吊舱也要看得见：玄武岩挂 DAR-4 + SAV-6
     //    （吊舱先占通用挂点，制式弹占重挂点）
-    const gal = npc('basalt', 'dl4', ['vzu']);
+    const gal = npc('basalt', 'dl4', ['vzu'], { A: 'dl4', D: 'dl4' });
     const n6 = countStoresOf(gal);
     if (n6 !== 4) bad.push('GAL-31 挂 DAR-4 + SAV-6 应当画出 4 件，实际 ' + n6);
     if (!gal.ammoPool || gal.ammoPool.dl4 !== W3.dl4.ammo) {
@@ -2466,7 +2499,7 @@ if (Ent && M3 && me && world) {
     // 4b. 吊舱与制式弹**共存**：片岩（重 + 通用）挂 BIN-6 + SAV-6 ——
     //     吊舱占外侧通用挂点、导弹保住重挂点。可视挂架少了两个，
     //     但弹药池不能跟着改：AI 该打几发还是几发。
-    const mixed = npc('schist', 'dl6', ['vzu']);
+    const mixed = npc('schist', 'dl6', ['vzu'], { A: 'dl6', B: 'dl6' });
     const n9 = countStoresOf(mixed);
     if (n9 !== 4) bad.push('ROK-27 挂 BIN-6 + SAV-6 应当画出 4 件，实际 ' + n9);
     if (mixed.ammoPool.dl6 !== W3.dl6.ammo) {

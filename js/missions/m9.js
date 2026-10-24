@@ -99,7 +99,7 @@ Registry.mission({
         ac: heavy ? 'basalt' : 'sandstone',
         x: -9000 + i * 6000, y: heavy ? 9000 : 5000, z: 24000,
         fwd: M3.V(0, 0, -1), special: heavy ? 'dl4' : 'vbn',
-        loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
+        loadout: heavy ? 'cap' : 'escort',
         skill: 0.6, callsign: heavy ? squadCallsign(54 + i, 1) : squadCallsign(52 + i, 2)
       });
     }

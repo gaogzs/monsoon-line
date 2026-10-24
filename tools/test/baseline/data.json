@@ -46,11 +46,11 @@
    "skua": "928bb9f45813",
    "albatross": "565a18acfb2e",
    "folded_wing": "801c255146ed",
-   "schist": "c50cd244b5d4",
-   "basalt": "a4ef36331774",
-   "sandstone": "6ab78491b0a9",
-   "boulder": "1caa37483657",
-   "tideline": "0849bf0a1b54",
+   "schist": "91016091e960",
+   "basalt": "6be83a848095",
+   "sandstone": "65f575aea7fa",
+   "boulder": "98224b702919",
+   "tideline": "9e3a74ff8c37",
    "spray": "b4a3ad40350e",
    "datum": "53f03d687d52",
    "pelican": "49644666702b",
@@ -292,9 +292,9 @@
    "$order": "31c68c97dea9"
   },
   "SK_FITS": {
-   "basalt": "19d20c7e7bdc",
-   "sandstone": "9cd52e6c102b",
-   "schist": "2bfd5b30ba5c",
+   "basalt": "258698102096",
+   "sandstone": "433b9d6c8805",
+   "schist": "f8910ee38b1b",
    "$order": "d114c20a2a2e"
   }
  },
@@ -371,18 +371,18 @@
   "beacon_wreck": "a4059e0a5139"
  },
  "missions": {
-  "m1@0": "27103d0c3604",
-  "m2@1": "6fad6f0fa638",
-  "m3@2": "9707758e6484",
-  "m4@3": "584acad9c6f2",
-  "m5@4": "2042df285d5b",
-  "m6@5": "f68d29905819",
-  "m7@6": "04f065a06dbc",
-  "m8@7": "fcde729cee93",
-  "m10@8": "5e2a8966901c",
-  "m12@9": "c528282878ef",
-  "sk1@10": "e3788713a421",
-  "m9@11": "c0f25af9bbf3",
-  "m11@12": "4aff7ad9d630"
+  "m1@0": "01f2ae738379",
+  "m2@1": "179d21cc9c56",
+  "m3@2": "a23787d2fa93",
+  "m4@3": "8d2aeb46671f",
+  "m5@4": "d63a91798a57",
+  "m6@5": "7f869089439a",
+  "m7@6": "d538fef4d1b5",
+  "m8@7": "32c2bae4909b",
+  "m10@8": "b95e20da537f",
+  "m12@9": "ffbbc855358a",
+  "sk1@10": "b39f8b8de3ff",
+  "m9@11": "1b5fe27896b2",
+  "m11@12": "73ec6bcf63db"
  }
 }

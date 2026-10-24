@@ -55,7 +55,7 @@ Registry.mission({
       ac: 'tideline', team: 2,
       x: -9000, y: 3800, z: 9000,
       fwd: M3.V(1, 0, 0), speed: 240,
-      special: 'otr', skill: 0.30,
+      special: 'otr', loadout: 'patrol', skill: 0.30,
       behavior: 'recon'
     });
 

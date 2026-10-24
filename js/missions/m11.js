@@ -104,7 +104,7 @@ Registry.mission({
         ac: striker ? 'sandstone' : 'basalt',
         x: -6000 + i * 4000, y: striker ? 3000 : 9000, z: 22000,
         fwd: M3.V(0, 0, -1), special: striker ? 'vgt' : 'dl4',
-        loadout: striker ? { A: 'vgt', B: 'vbn' } : { A: 'dl4', B: 'vbn' },
+        loadout: striker ? 'strike' : 'cap',
         skill: 0.6, callsign: striker ? squadCallsign(54 + i, 2) : squadCallsign(56 + i, 1)
       });
       if (striker) e.striker = true;

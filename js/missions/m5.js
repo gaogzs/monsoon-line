@@ -110,7 +110,7 @@ Registry.mission({
         x: -4000 + i * 4000, y: heavy ? 13000 : 7000, z: 26000,
         fwd: M3.V(0, 0, -1),
         special: heavy ? 'dl4' : 'dl6',
-        loadout: heavy ? { A: 'dl4', B: 'vbn' } : null,
+        loadout: 'cap',
         skill: 0.58, callsign: i === 2 ? downstreamCallsign(13) : squadCallsign(12, i + 1)
       });
     }
@@ -126,7 +126,7 @@ Registry.mission({
       ac: 'boulder',
       x: 12000, y: 12000, z: 34000,
       fwd: M3.V(-1, 0, 0), speed: 250,
-      special: 'vsr', loadout: { B1: 'vsr' },
+      special: 'vsr', loadout: { B: 'vsr' },
       skill: 0.4, callsign: downstreamCallsign(14)
     });
     cruise.bigTarget = true;

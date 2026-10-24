@@ -14,6 +14,28 @@ function spawnEnemy(w, o) {
   }
   if (!ac) ac = AIRCRAFT[0];
 
+  /* 逐组挂载：对象 { 组id: 武器id }，或该机型 npcLoadouts 里的预设名（字符串）。
+     预设名查不到、对象里写了不存在的组 id，都直接抛错 —— 以前写错只会让那一组静默空着。
+     下游战斗机（有 npcLoadouts 的机型）如果 special 非空却没有逐组 loadout，
+     mountPlan 会把这件弹铺满所有挂得住的组（新挂点开放后槽数翻倍），所以记一条 mountIssue。 */
+  var lo = o.loadout || null;
+  if (typeof lo === 'string') {
+    var preset = ac.npcLoadouts && ac.npcLoadouts[lo];
+    if (!preset) throw new Error('spawnEnemy: aircraft ' + ac.id + ' has no loadout preset "' + lo + '"');
+    lo = Object.assign({}, preset);
+  }
+  if (lo) {
+    for (var lk in lo) {
+      var known = false;
+      for (var gk = 0; gk < (ac.hardpointGroups || []).length; gk++) if (ac.hardpointGroups[gk].id === lk) known = true;
+      if (!known) throw new Error('spawnEnemy: aircraft ' + ac.id + ' has no hardpoint group "' + lk + '"');
+    }
+  }
+  var specialWid = o.special === undefined ? 'dl6' : o.special;
+  if (!lo && specialWid && ac.npcLoadouts) {
+    Ent.mountIssues.push('spawnEnemy: ' + ac.id + ' spawned with special=' + specialWid + ' without a per-group loadout (it would fill every hardpoint); use a preset name');
+  }
+
   var a = Ent.makeAircraft({
     type: ac.id,
     /* 默认敌方（team 1）。预警机那类**我方支援单位**要显式传 team: 0 ——
@@ -39,7 +61,7 @@ function spawnEnemy(w, o) {
        里记一条，smoke.js 会断言它是空的。
        `special` 是"当前触发的那件"，AI 开火前会按目标与射程重挑
        （见 ai.js 的开火段），所以它只是默认值 / 兜底。 */
-    loadout: o.loadout || null
+    loadout: lo
   });
   a.model = ac.model;
   a.phys = {
@@ -206,7 +228,7 @@ function spawnWinterport(w, o) {
     ac: 'basalt',
     x: o.x, y: o.y, z: o.z,
     fwd: M3.V(0, 0, -1), speed: 470,
-    special: 'dl4', loadout: { A: 'dl4', B: 'vbn' },
+    special: 'dl4', loadout: 'lead',                 // 王牌：DAR-4 分挂到 A、D 两对重挂点，池不变
     skill: o.skill, callsign: T('missions._lib.spawnWinterport.ace.callsign')
   });
   ace.isAce = true;
@@ -400,9 +422,9 @@ function batchCallsigns(list, base) {
 }
 
 var SK_FITS = {
-  schist:   { sp: 'dl6', lo: { A: 'dl4', B: 'dl6' } },
-  basalt: { sp: 'dl4', lo: { A: 'dl4', B: 'vbn' } },
-  sandstone: { sp: 'vbn', lo: { A: 'vbn', B: 'vbn' } }
+  schist:   { sp: 'dl6', lo: 'capMix' },
+  basalt: { sp: 'dl4', lo: 'cap' },
+  sandstone: { sp: 'vbn', lo: 'escort' }
 };
 
 /* ============================================================
