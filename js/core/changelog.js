@@ -2,9 +2,28 @@
    由 tools/build/release.js 从 CHANGELOG.md 写出，每次发版后重新生成。
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
-  "current": "v3.1.16",
-  "generated": "2026-10-24T18:20:00+09:00",
+  "current": "v3.1.17",
+  "generated": "2026-10-24T18:31:36+09:00",
   "releases": [
+    {
+      "version": "v3.1.17",
+      "date": "2026-10-24",
+      "title": "敌我弹药同一套规则",
+      "tag": "小版本",
+      "commit": "85e5ebd",
+      "lead": "敌机的弹药池与挂载重量不再另按“单机预算”算，和玩家一样：池 = 挂点数 × 武器的 perPoint，重量 = 挂点数 × perPoint × 单件重量，由同一个函数算出。下游弹补上了 perPoint 与 mass；多挂几对点就多几对的弹，飞机也更重。KA-7 僚机的载重上限同步提高，飞行性能不变。",
+      "sections": [
+        {
+          "h": "调整",
+          "items": [
+            "NPC 弹药 / 重量走 Loadout.arm，与玩家同一套代码，去掉 buildNpcMounts 里另算的一支",
+            "下游弹 DAR-4 / BIN-6 / BIN-9 / TOR-1 / BOX-14 / TUM-7 / 吊舱补 perPoint 与 mass，删掉不再有读者的 ammo",
+            "KA-7 maxLoad 4200 → 6700（内埋 CLA-4 由 4 发变 12 发，载重系数仍约 0.62）",
+            "多挂点的预设敌机弹更多、重量更大（例：schist 的 cap 的 BIN-6 6 → 12 发）"
+          ]
+        }
+      ]
+    },
     {
       "version": "v3.1.16",
       "date": "2026-10-24",
