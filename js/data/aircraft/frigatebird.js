@@ -31,9 +31,9 @@ Registry.aircraft({
        2.4 给所有战斗机各加一对挂点（为下游战役做平衡准备），又把这一对（D）加了回来，
        标 playerOnly：NPC 不用它，现有关卡的难度不变。 */
     { id: 'A', label: T('aircraft.frigatebird.hardpointGroups.i0.label'), kind: 'light', pts: [{ x: 0.85, y: 2.6 }, { x: -0.85, y: 2.6 }] },
-    { id: 'B', label: T('aircraft.frigatebird.hardpointGroups.i1.label'), kind: 'heavy', pts: [{ x: 1.85, y: -0.6 }, { x: -1.85, y: -0.6 }] },
+    { id: 'B', label: T('aircraft.frigatebird.hardpointGroups.i1.label'), kind: 'heavy', pts: [{ x: 1.85, y: -2.8 }, { x: -1.85, y: -2.8 }] },
     { id: 'C', label: T('aircraft.frigatebird.hardpointGroups.i2.label'), kind: 'belly', pts: [{ x: 0.45, y: -1.0 }, { x: -0.45, y: -1.0 }] },
-    { id: 'D', label: T('aircraft.frigatebird.hardpointGroups.i3.label'), kind: 'light', playerOnly: true, pts: [{ x: 0.95, y: -3.2 }, { x: -0.95, y: -3.2 }] }
+    { id: 'D', label: T('aircraft.frigatebird.hardpointGroups.i3.label'), kind: 'light', playerOnly: true, pts: [{ x: 0.95, y: -5.2 }, { x: -0.95, y: -5.2 }] }
   ],
   defaultLoadout: { A: 'srm', B: 'v11', C: 'oep' },
   desc: T('aircraft.frigatebird.desc')
