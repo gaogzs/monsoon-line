@@ -231,10 +231,10 @@
   /* 制式编号的含义（前缀取自逻辑语词根，但玩家只需要看懂中文含义） */
   var ROOTS = {
     cel1: T('ui.screens.hardpoints.ROOTS.cel1'),
-    cel2: T('ui.screens.hardpoints.ROOTS.cel2'),
+    cel3v: T('ui.screens.hardpoints.ROOTS.cel3v'),
     cel3: T('ui.screens.hardpoints.ROOTS.cel3'),
     cel7: T('ui.screens.hardpoints.ROOTS.cel7'),
-    cel11: T('ui.screens.hardpoints.ROOTS.cel11'),
+    tca11: T('ui.screens.hardpoints.ROOTS.tca11'),
     v9: T('ui.screens.hardpoints.ROOTS.v9'),
     v11: T('ui.screens.hardpoints.ROOTS.v11'),
     v17: T('ui.screens.hardpoints.ROOTS.v17'),

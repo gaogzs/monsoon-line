@@ -15,6 +15,7 @@
      ZUN-  zunti  干扰             DAR-  darno  远
      BIN-  jbini  之间 / 近        BAD-  bandu  防卫
      CAV-  carvi  雨（调节场体系）  DIL-  dilnu  云（调节单元）
+     TCA-  tcati  火 / 炮（下游机炮）
 
    机型命名传统
    ------------

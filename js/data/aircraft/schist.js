@@ -27,7 +27,7 @@ Registry.aircraft({
   desc: T('aircraft.schist.desc'),
   stats: { spd: 0.64, mob: 0.58, stl: 0.18, fire: 0.68, dur: 0.55, rng: 0.52, ecm: 0.26 },
   phys: { vMax: 520, vMil: 398, vStall: 118, accel: 25, decel: 38, pitch: 0.58, roll: 2.11, yaw: 0.30, hp: 120 },
-  gun: 'cel11',
+  gun: 'tca11',
   maxLoad: 4000,
   // 挂点只用于资料库展示；下游弹的 fits 为空，所以 defaultLoadout 留空
   hardpointGroups: [

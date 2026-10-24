@@ -116,7 +116,7 @@
       if (!MODELS[needModels[i]]) problems.push(T('boot.main.preflight.s30') + needModels[i]);
     }
 
-    var needWeapons = ['cel1', 'cel2', 'cel3', 'cel7', 'cel11', 'v11', 'v9', 'v17', 'v22', 'v25', 'v30',
+    var needWeapons = ['cel1', 'cel3v', 'cel3', 'cel7', 'tca11', 'v11', 'v9', 'v17', 'v22', 'v25', 'v30',
       'e4', 'l2', 'dl4', 'dl6', 'dl9', 'hwm', 'kkv', 'pgb'];
     for (i = 0; i < needWeapons.length; i++) {
       if (!WEAPONS[needWeapons[i]]) problems.push(T('boot.main.preflight.s31') + needWeapons[i]);

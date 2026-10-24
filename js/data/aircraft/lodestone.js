@@ -18,7 +18,7 @@ Registry.aircraft({
   stats: { spd: 0.34, mob: 0.12, stl: 0.06, fire: 0.05, dur: 0.88, rng: 0.72, ecm: 0.56 },
   phys: { vMax: 390, vMil: 330, vStall: 122, accel: 14, decel: 30, pitch: 0.40, roll: 1.17, yaw: 0.22, hp: 260 },
   /* 没有机炮：设定写明"它不参加空战"，机体又是 ROK-40 轰炸机改的
-     （ROK-40 同样 gun: null）。早先挂着 cel11，于是会凑上去跟人对射。 */
+     （ROK-40 同样 gun: null）。早先挂着 tca11，于是会凑上去跟人对射。 */
   gun: null,
   maxLoad: 0,
   hardpointGroups: [

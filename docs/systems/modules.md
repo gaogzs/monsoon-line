@@ -81,4 +81,4 @@
 | `game.js` | `Game` 按职责分在 `engine/game/` `ui/` `ui/screens/` `boot/`；`Radio` → `ui/radio.js`，`SysNote` → `ui/sysnote.js` |
 | `codex.js` | `ui/codex/entries/<id>.js`（一条一个文件）+ `ui/codex/_lib.js` + `ui/codex/zz-seal.js` |
 
-武器 id：五门机炮 `k1 k2 k3 k7 k11` 改名为 `cel1 cel2 cel3 cel7 cel11`，与玩家看到的 CEL-n 对应。
+武器 id：五门机炮 `k1 k2 k3 k7 k11` 改名为 `cel1 cel3v cel3 cel7 tca11`，与玩家看到的 CEL-n 对应。

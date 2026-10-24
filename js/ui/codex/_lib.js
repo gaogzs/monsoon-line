@@ -24,10 +24,10 @@ function _cxRel(y) { return Ent.airDensity(y) / Ent.airDensity(0); }
 /** 机炮附带的"装备方"是叙事，不是数据；参数列全部现读 WEAPONS */
 var _CX_GUN_OWNER = {
   cel1: T('ui.codex._lib._CX_GUN_OWNER.cel1'),
-  cel2: T('ui.codex._lib._CX_GUN_OWNER.cel2'),
+  cel3v: T('ui.codex._lib._CX_GUN_OWNER.cel3v'),
   cel3: T('ui.codex._lib._CX_GUN_OWNER.cel3'),
   cel7: T('ui.codex._lib._CX_GUN_OWNER.cel7'),
-  cel11: T('ui.codex._lib._CX_GUN_OWNER.cel11')
+  tca11: T('ui.codex._lib._CX_GUN_OWNER.tca11')
 };
 
 function _cxGunTable() {

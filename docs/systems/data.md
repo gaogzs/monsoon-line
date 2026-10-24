@@ -246,13 +246,13 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 
 ## WEAPONS 表
 
-对象，51 键，由 `data/weapons/<id>.js` 一件一个文件注册（`Registry.weapon({ id, order, … })`），封存时汇成 `WEAPONS`。**`id`（= 文件名）是内部代号**（`v11` `cel3` `dl4`…），玩家看到的永远是 `name`。改 id 要动多个文件，别改（五门机炮是唯一一次改名：`k1 k2 k3 k7 k11` → `cel1 cel2 cel3 cel7 cel11`，与玩家看到的 CEL-n 对应）。
+对象，51 键，由 `data/weapons/<id>.js` 一件一个文件注册（`Registry.weapon({ id, order, … })`），封存时汇成 `WEAPONS`。**`id`（= 文件名）是内部代号**（`v11` `cel3` `dl4`…），玩家看到的永远是 `name`。改 id 要动多个文件，别改（五门机炮是唯一一次改名：`k1 k2 k3 k7 k11` → `cel1 cel3v cel3 cel7 tca11`，与玩家看到的 CEL-n 对应）。
 
 `kind` 取值（当前分布）：
 
 | kind | 数量 | 含义 | 例 |
 |---|---|---|---|
-| `gun` | 5 | 机炮（四方各有一条自己的供应线） | `cel3` `cel7` `cel11` `cel1` `cel2` |
+| `gun` | 5 | 机炮（四方各有一条自己的供应线） | `cel3` `cel7` `tca11` `cel1` `cel3v` |
 | `aam` | 22 | 空空（含下游专用弹、僚机专用的 `drm`、舰载的 `ss6`） | `srm` `mrm` `v11`… |
 | `asm` | 4 | 反大型 / 反舰 | `sat` `v22` `vsr` `ssm` |
 | `agm` | 5 | 对地 | `asl` `v25` `lcm`… |
@@ -369,7 +369,7 @@ attr: { fits: ['tip', 'light', 'heavy'], perPoint: 10, mass: 95 }
 
 ### `role`
 
-一句话定位。机炮（`cel1` `cel2` `cel3` `cel7` `cel11`）没有 `role`；图鉴/卡片用 `(w.role || '—')` 兜底。
+一句话定位。机炮（`cel1` `cel3v` `cel3` `cel7` `tca11`）没有 `role`；图鉴/卡片用 `(w.role || '—')` 兜底。
 
 ### `needs`
 

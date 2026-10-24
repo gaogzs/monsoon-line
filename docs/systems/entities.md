@@ -359,7 +359,7 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 | 每槽装填时间 | `js/data/weapons/<id>.js` 的 `cd`（**每槽**；原 `STORE_COOLDOWN` 侧表已并入武器文件） |
 | 一次按键打几枚 | `js/data/weapons/` 的 `salvo` + `Game` `launch()`（`engine/game/launch.js`） |
 | 空挂架标记值 | `Ent` `SLOT_EMPTY`（`entities/aircraft.js`，`1e9`） |
-| 机炮射速 / 单发伤害 / 初速 | `js/data/` `WEAPONS[cel3/cel7]`（五门机炮 id 为 `cel1 cel2 cel3 cel7 cel11`，原 `k1 k2 k3 k7 k11`） 的 `rpm` / `dmg` / `speed` |
+| 机炮射速 / 单发伤害 / 初速 | `js/data/` `WEAPONS[cel3/cel7]`（五门机炮 id 为 `cel1 cel3v cel3 cel7 tca11`，原 `k1 k2 k3 k7 k11`） 的 `rpm` / `dmg` / `speed` |
 | 机炮有效射程（含高空翻倍） | `js/data/` 的 `range` / `highRange`，由 `fireGun()` 换算成子弹寿命 |
 | 机炮散布 | `js/data/` `spread`，`fireGun()` 里做成随机方向偏移 |
 | 飞机命中半径（7.5 m） | `Combat.HIT_R_AIR`（`engine/combat.js`），`scanShot()` 引用它 |

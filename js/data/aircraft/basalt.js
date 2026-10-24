@@ -21,7 +21,7 @@ Registry.aircraft({
   desc: T('aircraft.basalt.desc'),
   stats: { spd: 0.83, mob: 0.32, stl: 0.16, fire: 0.78, dur: 0.68, rng: 0.58, ecm: 0.24 },
   phys: { vMax: 610, vMil: 490, vStall: 142, accel: 30, decel: 30, pitch: 0.44, roll: 1.56, yaw: 0.22, hp: 150 },
-  gun: 'cel11',
+  gun: 'tca11',
   maxLoad: 6200,
   hardpointGroups: [
     { id: 'A', label: T('aircraft.basalt.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 3.6, y: -1.4 }, { x: -3.6, y: -1.4 }] },

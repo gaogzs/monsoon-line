@@ -1,7 +1,7 @@
 # 2.0 实施计划
 
 > **路径说明**：本文写于 tools 分组之前，文中的 `tools/xxx.js` 现在在子文件夹里（`tools/test/`、`tools/test/probes/`、`tools/build/`、`tools/render/`），对照表见 [systems/tools.md](systems/tools.md)。
-
+> 当前该计划已全部应用完毕，为过时文档，仅仅为参考而保留。
 
 对应 [2-0PLAN.md](2-0PLAN.md)。本文是落地方案：分阶段、每阶段独立发布、每步都能玩能验。数值都是**起步值**，以各阶段的探针脚本实测为准再调。
 
@@ -37,7 +37,7 @@
 | smoke 断言：机炮散布要在 1.25 s 内打掉 250 hp 的 G-6 | `tools/smoke.js`，`weapons.md:281` | G-6 抗性保持 0 |
 | `game.js` 已有 3768 行 | — | 新逻辑一律放新文件（`js/combat.js`、`js/turret.js`），并加到 `index.html` 和 `smoke.js` 的加载列表 |
 
-**机炮 DPS 基准**（假设全部命中）：CEL-3 20mm 为 7×65 = **455/s**；CEL-7 / CEL-11 30mm 为 17×65 = **1105/s**。按现状，一艘 2600 hp 的 Humpback 航母挨 30mm 不到 2.4 s 就沉了。这就是抗性要解决的问题。
+**机炮 DPS 基准**（假设全部命中）：CEL-3 20mm 为 7×65 = **455/s**；CEL-7 / TCA-11 30mm 为 17×65 = **1105/s**。按现状，一艘 2600 hp 的 Humpback 航母挨 30mm 不到 2.4 s 就沉了。这就是抗性要解决的问题。
 
 ---
 

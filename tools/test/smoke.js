@@ -5452,7 +5452,7 @@ try {
   if (!near(Ent.gunResistK(tg, { kind: 'bullet', cal: 75 }), 1)) bad.push('75mm 炮弹不该吃机炮抗性');
   if (!near(Ent.gunResistK(tg, { kind: 'missile', cal: 0 }), 1)) bad.push('导弹不该吃机炮抗性');
   if (!near(Ent.gunResistK(Ent.makeTarget({ gunResist: 5 }), { kind: 'bullet', cal: 20 }), 0.001)) bad.push('抗性应封顶 0.999');
-  for (const id of ['cel1', 'cel2', 'cel3', 'cel7', 'cel11']) {
+  for (const id of ['cel1', 'cel3v', 'cel3', 'cel7', 'tca11']) {
     if (!(WEAPONS[id].cal > 0 && WEAPONS[id].cal <= Ent.SMALL_CAL)) bad.push(id + ' 缺 cal 或不是小口径');
   }
 

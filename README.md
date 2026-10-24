@@ -149,7 +149,8 @@ cd monsoon-line
 
 | 编号 | 词根 | 源词 | 含义 |
 |---|---|---|---|
-| `CEL-` | cel | *cecla* | 发射器 / 炮 |
+| `CEL-` | cel | *cecla* | 发射器 / 炮 —— 上游机炮 |
+| `TCA-` | tca | *tcati* | 火 / 炮 —— 下游机炮 |
 | `SUT-` | sut | *sutra* | 快 |
 | `PEJ-` | pej | *preja* | 扩散 / 播撒 |
 | `GUS-` | gus | *gusni* | 光 |
