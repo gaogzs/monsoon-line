@@ -2442,7 +2442,8 @@ if (Ent && M3 && me && world) {
         special: special, pods: pods || null, loadout: loadout || null
       });
     }
-    const ALL_DL6 = { A: 'dl6', B: 'dl6', C: 'dl6', D: 'dl6' };
+    // 片岩的 A（重）+ B（通用）各一对：与"下游新挂点开放之前"这条断言的含义一致（4 个挂点、池 6）
+    const ALL_DL6 = { A: 'dl6', B: 'dl6' };
     function countStoresOf(a) {
       let c = 0;
       const o = Rn.pushModel;
@@ -2482,7 +2483,7 @@ if (Ent && M3 && me && world) {
 
     // 4. 任务写定的吊舱也要看得见：玄武岩挂 DAR-4 + SAV-6
     //    （吊舱先占通用挂点，制式弹占重挂点）
-    const gal = npc('basalt', 'dl4', ['vzu'], { A: 'dl4', D: 'dl4' });
+    const gal = npc('basalt', 'dl4', ['vzu'], { A: 'dl4' });
     const n6 = countStoresOf(gal);
     if (n6 !== 4) bad.push('GAL-31 挂 DAR-4 + SAV-6 应当画出 4 件，实际 ' + n6);
     if (!gal.ammoPool || gal.ammoPool.dl4 !== W3.dl4.ammo) {
@@ -2499,7 +2500,7 @@ if (Ent && M3 && me && world) {
     // 4b. 吊舱与制式弹**共存**：片岩（重 + 通用）挂 BIN-6 + SAV-6 ——
     //     吊舱占外侧通用挂点、导弹保住重挂点。可视挂架少了两个，
     //     但弹药池不能跟着改：AI 该打几发还是几发。
-    const mixed = npc('schist', 'dl6', ['vzu'], { A: 'dl6', B: 'dl6' });
+    const mixed = npc('schist', 'dl6', ['vzu'], { A: 'dl6' });
     const n9 = countStoresOf(mixed);
     if (n9 !== 4) bad.push('ROK-27 挂 BIN-6 + SAV-6 应当画出 4 件，实际 ' + n9);
     if (mixed.ammoPool.dl6 !== W3.dl6.ammo) {

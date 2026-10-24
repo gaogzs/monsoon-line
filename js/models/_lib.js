@@ -154,6 +154,53 @@ var ModelLib = (function () {
     return this.wing(f(p1), f(p2), f(p3), f(p4), col);
   };
 
+  /* 有厚度的翼面（机翼、尾翼）。wing 是一张纸，侧视是一条线；foil 用同样的四个点
+     （p1→p2 前缘翼根→翼尖，p3 翼尖后缘，p4 翼根后缘），平面位置不变，沿法线两侧各加半个厚度，
+     截面是菱形：前缘、最厚处（40% 弦长）、后缘。
+     厚度 = 弦长 × 相对厚度，翼根、翼尖各一个（opts.t，缺省 FOIL_T），不薄于 FOIL_MIN。 */
+  var FOIL_T = [0.075, 0.05];
+  var FOIL_MIN = 0.10;
+
+  /** 有厚度翼面的 8 个顶点：翼根的 前缘 / 上 / 后缘 / 下，然后是翼尖的同样四个。
+      模型构造器（foil）和可变后掠的 morph 都用它，保证两套位置的拓扑一致。 */
+  function foilPts(p1, p2, p3, p4, opts) {
+    var t = (opts && opts.t) || FOIL_T;
+    var n = M3.norm(M3.cross(M3.sub(p2, p1), M3.sub(p4, p1)));
+    var secs = [[p1, p4, t[0]], [p2, p3, t[1]]];
+    var out = [];
+    for (var s = 0; s < 2; s++) {
+      var LE = secs[s][0], TE = secs[s][1];
+      var c = M3.sub(TE, LE);
+      var cl = Math.sqrt(c.x * c.x + c.y * c.y + c.z * c.z);
+      var th = Math.max(FOIL_MIN, cl * secs[s][2]) / 2;
+      var mid = M3.add(LE, M3.mul(c, 0.4));
+      out.push(LE, M3.add(mid, M3.mul(n, th)), TE, M3.add(mid, M3.mul(n, -th)));
+    }
+    return out;
+  }
+
+  /** 有厚度的翼面：6 个面（4 个侧面 + 翼根、翼尖两个端盖）。返回 8 个顶点下标。
+      面的区间与翼根顶点记在 this.foils 上（done 会挂到模型上），rootFins 据此把翼根插进机身。 */
+  MB.prototype.foil = function (p1, p2, p3, p4, col, opts) {
+    var P = foilPts(p1, p2, p3, p4, opts), id = [], i, j;
+    for (i = 0; i < P.length; i++) id.push(this.vt(P[i]));
+    var f0 = this.f.length;
+    for (i = 0; i < 4; i++) {
+      j = (i + 1) % 4;
+      this.quad(id[i], id[j], id[4 + j], id[4 + i], col);
+    }
+    this.quad(id[0], id[1], id[2], id[3], col);
+    this.quad(id[4], id[5], id[6], id[7], col);
+    (this.foils = this.foils || []).push({ f0: f0, f1: this.f.length, root: id.slice(0, 4), tip: id.slice(4) });
+    return id;
+  };
+
+  /** 镜像的有厚度翼面（x 取反） */
+  MB.prototype.foilM = function (p1, p2, p3, p4, col, opts) {
+    var f = function (p) { return V(-p.x, p.y, p.z); };
+    return this.foil(f(p1), f(p2), f(p3), f(p4), col, opts);
+  };
+
   /* ============================================================
      水面舰船的两件专用工具
 
@@ -253,6 +300,8 @@ var ModelLib = (function () {
 
   function done(mb, extra) {
     var m = { v: mb.v, f: mb.f };
+    // foils 只给收尾遍（rootFins）用，不进 MODELS 的公开形状
+    if (mb.foils) Object.defineProperty(m, 'foils', { value: mb.foils, enumerable: false });
     if (extra) for (var k in extra) m[k] = extra[k];
     if (!m.ground && !m.sea) orientClosed(m);
     return m;
@@ -319,6 +368,7 @@ var ModelLib = (function () {
   }
 
   return {
-    V: V, C: C, MB: MB, mast: mast, house: house, done: done, orientClosed: orientClosed
+    V: V, C: C, MB: MB, mast: mast, house: house, done: done, orientClosed: orientClosed,
+    foilPts: foilPts
   };
 })();

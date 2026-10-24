@@ -132,9 +132,44 @@
       for (k = 0; k < 4; k++) if (use[f.i[k]] > 1 || morph[f.i[k]]) ok = false;
       if (ok) { fins.push(fi); skip[fi] = true; }
     }
-    if (!fins.length) return;
+    // 有厚度的翼（_lib 的 foil）：整段面都不算机身；翼根的点另外推（见下）
+    var foils = m.foils || [];
+    for (var q = 0; q < foils.length; q++) {
+      for (fi = foils[q].f0; fi < foils[q].f1; fi++) skip[fi] = true;
+    }
+    if (!fins.length && !foils.length) return;
     var body = bodyFaces(m, skip);
     var rad = function (v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1]); };
+    var dir = function (P, T) {
+      var dx = P[0] - T[0], dy = P[1] - T[1], dz = P[2] - T[2];
+      var l = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      return [dx / l, dy / l, dz / l];
+    };
+    var pushAlong = function (P, dd) {
+      // 偏在一侧的翼面不越过中线；本来就在中线上的（单垂尾、腹鳍）不受限
+      var side = Math.abs(P[0]) > 0.05 ? (P[0] > 0 ? 1 : -1) : 0;
+      var found = -1;
+      for (var e = 0.02; e <= 4 + 1e-9; e += 0.02) {
+        var x = P[0] + dd[0] * e;
+        if (side && x * side < 0.02) break;
+        if (insideBody(m, body, x, P[1] + dd[1] * e, P[2] + dd[2] * e)) { found = e; break; }
+      }
+      if (found < 0) return null;
+      var e2 = found + 0.15;
+      if (side && dd[0] * side < 0) e2 = Math.min(e2, (Math.abs(P[0]) - 0.02) / Math.abs(dd[0]));
+      e2 = Math.max(0, e2);
+      return { e: found, q: [P[0] + dd[0] * e2, P[1] + dd[1] * e2, P[2] + dd[2] * e2] };
+    };
+    // 两个翼根点各自往里推，直到落进机体再多插 15 cm —— 只看中点会漏：
+    // 中点插进去了，翼根前后两端还悬在收窄的机身外面。
+    // 方向两个都试：沿翼面（翼尖 → 翼根）和直接朝机身轴线，取挪动更少的那个；
+    // 翼根在收窄段外侧时，顺着翼展往下戳会擦边而过或戳得很深。
+    var push = function (P, T) {
+      if (insideBody(m, body, P[0], P[1], P[2])) return;
+      var a = pushAlong(P, dir(P, T)), c = pushAlong(P, dir([0, 0, P[2]], P));
+      var p = a && (!c || a.e <= c.e) ? a : c;
+      if (p) { P[0] = p.q[0]; P[1] = p.q[1]; P[2] = p.q[2]; }
+    };
     for (var n = 0; n < fins.length; n++) {
       var ids = m.f[fins[n]].i;
       // 翼根 = 离机身轴线（x=0, y=0）最近的那条边
@@ -145,39 +180,23 @@
       }
       var r0 = ids[best], r1 = ids[(best + 1) % 4];
       var t0 = ids[(best + 3) % 4], t1 = ids[(best + 2) % 4];   // 各自对应的翼尖点
-      var P0 = m.v[r0], P1 = m.v[r1], T0 = m.v[t0], T1 = m.v[t1];
-      var dir = function (P, T) {
-        var dx = P[0] - T[0], dy = P[1] - T[1], dz = P[2] - T[2];
-        var l = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-        return [dx / l, dy / l, dz / l];
-      };
-      // 两个翼根点各自往里推，直到落进机体再多插 15 cm —— 只看中点会漏：
-      // 中点插进去了，翼根前后两端还悬在收窄的机身外面。
-      // 方向两个都试：沿翼面（翼尖 → 翼根）和直接朝机身轴线，取挪动更少的那个；
-      // 翼根在收窄段外侧时，顺着翼展往下戳会擦边而过或戳得很深。
-      var push = function (P, T) {
-        if (insideBody(m, body, P[0], P[1], P[2])) return;
-        var a = pushAlong(P, dir(P, T)), c = pushAlong(P, dir([0, 0, P[2]], P));
-        var p = a && (!c || a.e <= c.e) ? a : c;
-        if (p) { P[0] = p.q[0]; P[1] = p.q[1]; P[2] = p.q[2]; }
-      };
-      var pushAlong = function (P, dd) {
-        // 偏在一侧的翼面不越过中线；本来就在中线上的（单垂尾、腹鳍）不受限
-        var side = Math.abs(P[0]) > 0.05 ? (P[0] > 0 ? 1 : -1) : 0;
-        var found = -1;
-        for (var e = 0.02; e <= 4 + 1e-9; e += 0.02) {
-          var x = P[0] + dd[0] * e;
-          if (side && x * side < 0.02) break;
-          if (insideBody(m, body, x, P[1] + dd[1] * e, P[2] + dd[2] * e)) { found = e; break; }
+      push(m.v[r0], m.v[t0]);
+      push(m.v[r1], m.v[t1]);
+    }
+    // foil 的翼根：前缘、后缘两点各推一次；上下最厚点跟着它们平移（按 0.6 : 0.4 取）。
+    // 可变后掠翼的根由 morph 驱动，跳过。
+    for (q = 0; q < foils.length; q++) {
+      var R = foils[q].root, TP = foils[q].tip;
+      if (morph[R[0]] || morph[R[2]]) continue;
+      var oL = m.v[R[0]].slice(), oT = m.v[R[2]].slice();
+      push(m.v[R[0]], m.v[TP[0]]);
+      push(m.v[R[2]], m.v[TP[2]]);
+      for (var kk = 1; kk < 4; kk += 2) {
+        var mv = m.v[R[kk]];
+        for (k = 0; k < 3; k++) {
+          mv[k] += 0.6 * (m.v[R[0]][k] - oL[k]) + 0.4 * (m.v[R[2]][k] - oT[k]);
         }
-        if (found < 0) return null;
-        var e2 = found + 0.15;
-        if (side && dd[0] * side < 0) e2 = Math.min(e2, (Math.abs(P[0]) - 0.02) / Math.abs(dd[0]));
-        e2 = Math.max(0, e2);
-        return { e: found, q: [P[0] + dd[0] * e2, P[1] + dd[1] * e2, P[2] + dd[2] * e2] };
-      };
-      push(P0, T0);
-      push(P1, T1);
+      }
     }
   }
 

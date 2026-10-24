@@ -53,37 +53,36 @@ Registry.model({
     var SP = sweepPt(20, 2.8, 2.0);          // 展开位
     var SW = sweepPt(62, 2.2, 1.4);          // 后掠位
 
-    var addWingPts = function (pts) {
-      var a = b.vt(pts[0]), c = b.vt(pts[1]), d = b.vt(pts[2]), e = b.vt(pts[3]);
-      b.quad(a, c, d, e, C.wing);
-      return [a, c, d, e];
-    };
     var mirrorP = function (p) { return V(-p.x, p.y, p.z); };
+    var sideOf = function (pts, side) { return side ? pts.map(mirrorP) : pts; };
 
-    var wRight = addWingPts(SW);
-    var wLeft = addWingPts([mirrorP(SW[0]), mirrorP(SW[1]), mirrorP(SW[2]), mirrorP(SW[3])]);
+    /* 机翼是有厚度的翼面（foil，8 个顶点）。展开位、后掠位各算一套顶点，
+       拓扑相同，所以下标一一对应，morph 表按下标登记。 */
+    var wRight = b.foil(SW[0], SW[1], SW[2], SW[3], C.wing);
+    var wLeft = b.foil(mirrorP(SW[0]), mirrorP(SW[1]), mirrorP(SW[2]), mirrorP(SW[3]), C.wing);
 
     var morphMap = [];
     for (var mi = 0; mi < b.v.length; mi++) morphMap.push(-1);
     var morphSpread = [], morphSwept = [];
     for (var side = 0; side < 2; side++) {
       var idx = side ? wLeft : wRight;
-      for (var k2 = 0; k2 < 4; k2++) {
+      var sp = sideOf(SP, side), sw = sideOf(SW, side);
+      var spread = L.foilPts(sp[0], sp[1], sp[2], sp[3]);
+      var swept = L.foilPts(sw[0], sw[1], sw[2], sw[3]);
+      for (var k2 = 0; k2 < idx.length; k2++) {
         morphMap[idx[k2]] = morphSpread.length;
-        var s1 = side ? mirrorP(SP[k2]) : SP[k2];
-        morphSpread.push([s1.x, s1.y, s1.z]);
-        var s2 = side ? mirrorP(SW[k2]) : SW[k2];
-        morphSwept.push([s2.x, s2.y, s2.z]);
+        morphSpread.push([spread[k2].x, spread[k2].y, spread[k2].z]);
+        morphSwept.push([swept[k2].x, swept[k2].y, swept[k2].z]);
       }
     }
 
     // 平尾
-    b.wing(V(0.95, 0.05, -6.7), V(3.3, 0.16, -8.5), V(3.3, 0.16, -9.7), V(0.95, 0.05, -9.1), C.wing2);
-    b.wingM(V(0.95, 0.05, -6.7), V(3.3, 0.16, -8.5), V(3.3, 0.16, -9.7), V(0.95, 0.05, -9.1), C.wing2);
+    b.foil(V(0.95, 0.05, -6.7), V(3.3, 0.16, -8.5), V(3.3, 0.16, -9.7), V(0.95, 0.05, -9.1), C.wing2);
+    b.foilM(V(0.95, 0.05, -6.7), V(3.3, 0.16, -8.5), V(3.3, 0.16, -9.7), V(0.95, 0.05, -9.1), C.wing2);
 
     // 双垂尾（外倾 18°）
-    b.wing(V(0.72, 0.85, -5.6), V(1.62, 3.45, -7.80), V(1.62, 3.45, -9.45), V(0.72, 0.85, -9.10), C.wing2);
-    b.wingM(V(0.72, 0.85, -5.6), V(1.62, 3.45, -7.80), V(1.62, 3.45, -9.45), V(0.72, 0.85, -9.10), C.wing2);
+    b.foil(V(0.72, 0.85, -5.6), V(1.62, 3.45, -7.80), V(1.62, 3.45, -9.45), V(0.72, 0.85, -9.10), C.wing2);
+    b.foilM(V(0.72, 0.85, -5.6), V(1.62, 3.45, -7.80), V(1.62, 3.45, -9.45), V(0.72, 0.85, -9.10), C.wing2);
 
     // 进气道
     b.box(1.28, -0.15, 0.3, 0.42, 1.25, 3.6, C.dark);
