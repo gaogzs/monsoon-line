@@ -1224,21 +1224,41 @@ droneCarrier: {
 
 这是前面所有批次的总装。**先出修订稿、再改代码**：每关一份设计说明，评审后再落地。
 
+**底层规则**：所有关卡内的敌我增援都由关卡脚本给定，在固定位置刷出，不随战况动态投入；不存在"战斗中从某处起飞"的设计。若以后要加动态增援，作为关卡脚本的功能另行实现。友方被击落的飞行员默认视为成功跳伞，可在其它关卡再次出现（除非关卡特殊设计）。
+
 ### 8.1 上游空军呼号体系
 
-- 已有的：`CALLSIGN.player = VESPER-1`、`awacs = SEXTANT`（本身已是天文意象；`CALLSIGN`、`CS_RESERVED`、`squadCallsign` 都在 `js/data/callsigns/air.js`）；下游用"消失的村庄名" + 小队词 + 编号（`squadCallsign`）。
-- 新增上游**非玩家编队**的呼号库 `js/data/callsigns/upstream-air.js`（与 `air.js`、`naval.js` 同目录；呼号词条的文字按 `docs/systems/text.md` 放进 `locales/<语言>/text/data/callsigns/`）：**天文词汇**（星座、恒星、行星、星团、天文仪器）约 80 个词，格式同下游（小队词 + 编号，如 `ALTAIR-2`）；预留词表避开 `VESPER` 与 `SEXTANT`；碰撞检测沿用 `air.js` 里 `CS_RESERVED` 的机制（`naval.js` 的 `NAVAL_CS_RESERVED` 是舰名的同类机制，不动）。
-- 舰载分队与陆基分队用不同词簇（便于玩家在无线电里听出是谁）。
+- 已有的：`CALLSIGN.player = VESPER-1`、`awacs = SEXTANT`（`CALLSIGN`、`CS_RESERVED`、`squadCallsign` 都在 `js/data/callsigns/air.js`）；下游用"消失的村庄名" + 小队词 + 编号（`squadCallsign`）。
+- 新增上游**非玩家编队**的呼号库 `js/data/callsigns/upstream-air.js`（与 `air.js`、`naval.js` 同目录；呼号词条的文字按 `docs/systems/text.md` 放进 `locales/<语言>/text/data/callsigns/`）：
+  - **战斗机编队**用天文术语（恒星、星座等），格式同下游（小队词 + 编号，如 `ALTAIR-2`）。
+  - **预警机与其它特种机型**用天文仪器名，沿用 `SEXTANT` 的逻辑（看星的仪器）。天文仪器不进战斗机词簇。
+  - 预留词表避开 `VESPER` 与 `SEXTANT`；碰撞检测沿用 `air.js` 里 `CS_RESERVED` 的机制（`naval.js` 的 `NAVAL_CS_RESERVED` 是舰名的同类机制，不动）。
+- **无人僚机的呼号跟随所属有人长机的编队**，不单独取词；无人僚机不会单独出现。
+- 舰载分队与陆基分队用不同词簇（便于玩家在无线电里听出是谁）。小队内共用一个词、编号从 1 起（见设定集 8.7）。
 
 ### 8.2 友军编成模板
 
+**航母侧**（除主角外）：3 个"1 长机 + 2 无人僚机"小队，共 3 名有人长机、6 架僚机（`spawnDrones`，批次 5 新建）。
+
+**基地侧**：4 名轮换休整的飞行员。开战时不在场，由关卡脚本在指定时间于基地固定位置刷出；他们的无人僚机配置与小队划分暂未确定。
+
+**主角 VESPER-1**：部署较自由，不写死属于航母侧还是基地侧；剧情开场在航母上。两侧人数随主角归属变化（主角在航母侧时 4 对 4，在基地侧时 3 对 5），由关卡脚本按实际部署给定。
+
+**无人僚机**是有人长机的固定配属，按长机需求分配。非战斗状态的备用僚机不占编制，各处都有存放，不写进中队编制。
+
+**中队规模**暂不明写具体数字，便于后续调整。设定只写比例关系："半个中队跟着浮岛，半个驻在基地"。
+
+**设定依据**：浮岛机库容量远大于关卡出场数，因为开战前未进入战备、未满载，且另存备用机与备用僚机。关卡内数量是脚本给定值，不反映机库容量。
+
 | 模板 | 构成 |
 |---|---|
-| 航母分队 ×2 | 各 1 名有人机飞行员 + 2 架无人僚机（`spawnDrones`，批次 5 新建），从各自的母舰附近出生 |
-| 前进基地陆基分队 | 全人类，4 架（两对），沿基地方向出生 |
+| 航母侧小队 ×3 | 各 1 名有人机长机 + 2 架无人僚机，在脚本给定的固定位置刷出 |
+| 基地侧轮换分队 | 4 名有人机飞行员，开战时不在场，由脚本在指定时间于基地固定位置刷出 |
 | 友军有人机 | 带 `ally` 角色（批次 5）、技能 0.6–0.8；部分带自己的无人僚机 |
 
-`spawnAlliedSquad({ template, from, callsignSet })`（新）放进 `js/missions/_lib.js`，与现有的 `spawnEnemy / spawnWingman / spawnShip / spawnTarget / spawnPlatform / spawnCellField / batchCallsigns` 同处；`spawnWingman`（玩家的两架无人僚机，写死 `team: 0`、`CALLSIGN['wing' + idx]`）不改动，也不复用给友军编队。
+"友军"的广义写法不改，这是机制更新，为日后扮演其他势力做准备。
+
+`spawnAlliedSquad({ template, from, callsignSet })`（新）放进 `js/missions/_lib.js`，与现有的 `spawnEnemy / spawnWingman / spawnShip / spawnTarget / spawnPlatform / spawnCellField / batchCallsigns` 同处。其中 `from` 指固定刷出位置，不暗示起飞。`spawnWingman`（玩家的两架无人僚机，写死 `team: 0`、`CALLSIGN['wing' + idx]`）不改动，也不复用给友军编队。
 
 ### 8.3 逐关修订表
 
