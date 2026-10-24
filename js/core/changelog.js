@@ -2,9 +2,26 @@
    由 tools/build/release.js 从 CHANGELOG.md 写出，每次发版后重新生成。
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
-  "current": "v3.1.18",
-  "generated": "2026-10-24T18:40:51+09:00",
+  "current": "v3.1.19",
+  "generated": "2026-10-24T19:58:49+09:00",
   "releases": [
+    {
+      "version": "v3.1.19",
+      "date": "2026-10-24",
+      "title": "下游机炮换名，外贸型加后缀",
+      "tag": "小版本",
+      "commit": "dfda3a3",
+      "lead": "下游的 CEL-11 改名为 TCA-11：它不再和上游共用 cel 词根，改取逻辑语 tcati（火）。CEL-2 是 CEL-3 的外贸型，编号改为 CEL-3V，后缀 V 取自 vecnu（卖）。参数与之前完全一致，只改名字与设定。",
+      "sections": [
+        {
+          "h": "调整",
+          "items": [
+            "下游机炮 CEL-11 改为 TCA-11，设定集 8.1 / 8.4 同步",
+            "CEL-2 改为 CEL-3V（上游外贸型，调节场管理局采购），不再写作\"退役库存\""
+          ]
+        }
+      ]
+    },
     {
       "version": "v3.1.18",
       "date": "2026-10-24",
