@@ -59,6 +59,13 @@
   // 偏航耗时加权 —— 侧滑本身就不舒服
   var STEER_PUSH_K = 0.5;
 
+  /* 玩家向下转向的"推杆 ↔ 翻过去拉"是两个相反的操作，不做混合，做成带滞回的二选一：
+     离轴角超过 ENTER 才翻（跳变点放在两种做法耗时相当的 ~80°），
+     一旦开始就承诺到底，缩到 EXIT 以下才放弃。rad。 */
+  // 玩家：离轴角小于这个值时，α 逐渐压回 0，让飞机改平而不是追着噪声方位滚（rad，约 4°）
+  var STEER_AIMED_THETA = 0.07;
+  var STEER_ROLL_ENTER = 1.40, STEER_ROLL_EXIT = 0.87;
+
   // 与 entities.js 的 PITCH_DOWN_K 一致
 
   /* 执行层增益（1/s）。飞机在这里没有转动惯量 —— 杆量直接就是角速率 ——
@@ -139,6 +146,24 @@
     // 正后方 / 正前方时方位退化 —— 当作在座舱正上方（拉杆）
     var phi = lateral > 1e-5 ? Math.atan2(rx, ux) : 0;
 
+    /* 玩家向下转向的承诺状态（见 STEER_ROLL_ENTER）。belowW = 目标在机腹一侧的程度。
+       承诺的瞬间锁定往哪边滚：目标几乎正下方时左右由一点点误差决定，鼠标一抖就会换边。 */
+    var belowW = 0;
+    if (st && dt > 0) {
+      belowW = M3.clamp((-Math.cos(phi) - 0.3) / 0.5, 0, 1);
+      belowW = belowW * belowW * (3 - 2 * belowW);
+      if (belowW <= 0) {
+        st.belowCommit = false;
+        st.belowSide = 0;
+      } else if (!st.belowCommit && belowW > 0.5 && theta > STEER_ROLL_ENTER) {
+        st.belowCommit = true;
+        st.belowSide = (st.lastRollCmd || 0) !== 0 ? (st.lastRollCmd > 0 ? 1 : -1) : (phi >= 0 ? 1 : -1);
+      } else if (st.belowCommit && theta < STEER_ROLL_EXIT) {
+        st.belowCommit = false;
+        st.belowSide = 0;
+      }
+    }
+
     // 执行几何（短前馈）
     var ex = M3.dot(desExec, a.fwd);
     var erx = M3.dot(desExec, a.right);
@@ -175,7 +200,7 @@
        逐帧翻号。规则只有一条：**不要反着正在进行的滚转**。如果上一帧
        已经在往某边滚，就沿那边改平（必要时 dL ± 2π），而不是滚过倒飞点
        那一刻突然掉头、再从另一边转一大圈。 */
-    var lastR = (st && st.lastRollCmd) || 0;
+    var lastR = (st && st.belowCommit && st.belowSide) ? st.belowSide : (st && st.lastRollCmd) || 0;
     if (Math.abs(bank) > 2.6 && Math.abs(lastR) > 0.05) {
       var side = lastR > 0 ? 1 : -1;
       if ((dL >= 0 ? 1 : -1) !== side) dL += side * Math.PI * 2;
@@ -242,18 +267,32 @@
     else if (thC <= 0) alpha = 1;
     else if (thC >= 1e8) alpha = 0;
     else if (st && dt > 0) {
-      /* 玩家（鼠标引导）在**左右转**时用更宽的过渡带：0.4θc → 3θc。
+      /* 玩家（鼠标引导）在**左右转**时用更宽的过渡带：0.4θc → 4θc（再宽一档：要鼠标偏得更远才整机滚满拉起）。
          典型战机 θc 只有 10° 左右，原来的 0.5θc → 1.5θc 意味着
          鼠标横移十几度就整机滚满再拉杆。拉宽之后小幅度左右转
          只压一部分坡度，剩下的交给偏航 + 斜拉杆，大幅度才滚满。
          按目标的侧向分量 |sin φ| 混合：正上 / 正下方的目标仍走原来的
          窄过渡带 —— 推杆俯冲时半滚不滚会在竖直附近原地连滚。 */
       var sw = Math.abs(Math.sin(phi));
-      var uP = M3.clamp((theta / thC - (0.5 - 0.1 * sw)) / (1 + 1.6 * sw), 0, 1);
+      var uP = M3.clamp((theta / thC - (0.5 - 0.1 * sw)) / (1 + 2.6 * sw), 0, 1);
       alpha = uP * uP * (3 - 2 * uP);
+      /* 目标在机腹一侧、离轴角还没到 ENTER 时，玩家要的是"推杆 + 少许偏航"直接压下去。
+         放任 α 往 1 走，机体会朝偏的一侧先滚出六七十度（有时滚满 180°），
+         机头绕远路，目标一接近又滚回来改平，中幅度向下转向白白多出一两秒。
+         承诺翻转之后才放开 α。只对玩家生效 —— AI 不传 dt。 */
+      if (!st.belowCommit) alpha *= 1 - belowW;
     } else {
       var u = M3.clamp(theta / thC - 0.5, 0, 1);
       alpha = u * u * (3 - 2 * u);
+    }
+
+    /* 玩家：机头已经几乎对准（θ 只有几度）时，"把目标滚到头顶"没有意义。
+       目标方位 φ 在这个尺度上就是噪声，还会让 thC 判成"已经大坡度 → α = 1"，
+       于是光标回到水平后飞机带着十几度坡度停住不改平。
+       θ 越小越把 α 压回 0（= 滚回镜头水平）；所有分支都要过这一道。 */
+    if (st && dt > 0) {
+      var aimed = M3.clamp(theta / STEER_AIMED_THETA, 0, 1);
+      alpha *= aimed * aimed * (3 - 2 * aimed);
     }
 
     /* 时间上再平滑一次（约 0.15 s）。偏航比滚转慢一个量级，
