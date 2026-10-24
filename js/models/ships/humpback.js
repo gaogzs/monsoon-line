@@ -58,25 +58,6 @@ Registry.model({
     mast(b, 12.5, -44, 39.4, 58.0, 1.5, 0.5, C.hull2);   // 挪到舰桥顶上（原来底座悬在舰桥后面）
     b.tube(V(12.5, 24.0, -68), V(12.5, 33.0, -68), 2.2, 1.9, 6, C.hull2, C.boot);
 
-    // 甲板上的舰载机（简化剪影，停在两舷与艉部）
-    var parked = [[-9, 96], [-9, 66], [-9, 30], [-9, -6], [-9, -40], [7, 92], [7, 58]];
-    for (var pi = 0; pi < parked.length; pi++) {
-      var px = parked[pi][0], pz = parked[pi][1];
-      /* 机身中心在 (px, pz)。两侧机翼都按 px 写 —— 以前右翼用 wingM 镜像，
-         而 wingM 是绕船的中线（x = 0）镜像，右翼于是跑到了甲板另一侧 */
-      b.box(px, 20.0, pz, 2.0, 1.2, 10.4, C.grey, C.white);          // 机身
-      b.wing(V(px - 1.0, 20.2, pz + 1.6), V(px - 6.0, 20.2, pz - 2.0),
-        V(px - 6.0, 20.2, pz - 3.4), V(px - 1.0, 20.2, pz - 2.4), C.metal);   // 左翼
-      b.wing(V(px + 1.0, 20.2, pz + 1.6), V(px + 6.0, 20.2, pz - 2.0),
-        V(px + 6.0, 20.2, pz - 3.4), V(px + 1.0, 20.2, pz - 2.4), C.metal);   // 右翼
-      b.wing(V(px - 1.0, 20.3, pz - 4.0), V(px - 3.0, 20.3, pz - 4.9),
-        V(px - 3.0, 20.3, pz - 5.4), V(px - 1.0, 20.3, pz - 5.2), C.metal);   // 平尾
-      b.wing(V(px + 1.0, 20.3, pz - 4.0), V(px + 3.0, 20.3, pz - 4.9),
-        V(px + 3.0, 20.3, pz - 5.4), V(px + 1.0, 20.3, pz - 5.2), C.metal);
-      b.wing(V(px, 20.6, pz - 2.8), V(px, 23.0, pz - 4.4),
-        V(px, 23.0, pz - 5.2), V(px, 20.6, pz - 5.2), C.metal);      // 垂尾
-    }
-
     return done(b, { span: 40, len: 280, ground: true, sea: true, radius: 84 });
   }
 });
