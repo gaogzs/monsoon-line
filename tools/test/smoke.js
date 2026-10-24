@@ -4113,6 +4113,48 @@ if (Ent && M3 && me && world) {
     else ok('失败原因：死因记录、关卡失败键与文本、停留画面、点结束结算都对');
   }
 
+  /* ---- 电磁干扰下的无线电乱码（2.3） ----
+     garble 的性质：k < 0.05 恒等；标签 / 实体不被破坏；去掉星号后与原文一致（只插不换）；
+     星号互不相邻；个数随 k 单调不减。被压制时下令：指令不写入、台词照常播出。 */
+  {
+    const R = sandbox.Radio, bad = [];
+    const mk = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const src = '<b>VESPER-2</b> 收到。&nbsp;长机，<span class="x">两点钟方向</span>有敌机，距离 12 公里。';
+    if (R.garble(src, 0, mk(1)) !== src || R.garble(src, 0.04, mk(1)) !== src) bad.push('k < 0.05 时 garble 应当恒等');
+    let prevN = -1;
+    for (const k of [0.1, 0.3, 0.6, 1.0]) {
+      const g = R.garble(src, k, mk(7));
+      const strip = g.replace(/\*/g, '');
+      if (strip !== src) bad.push('k=' + k + ' 去掉星号后与原文不一致：' + g);
+      const tags = s => (s.match(/<[^>]*>|&#?\w+;/g) || []).join('|');
+      if (tags(g) !== tags(src)) bad.push('k=' + k + ' 标签 / 实体被破坏：' + g);
+      if (/\*\*/.test(g)) bad.push('k=' + k + ' 出现了连续星号：' + g);
+      const n = (g.match(/\*/g) || []).length;
+      if (n < prevN) bad.push('星号个数应随 k 单调不减：k=' + k + ' 为 ' + n + '，前一档 ' + prevN);
+      prevN = n;
+    }
+    if (prevN <= 0) bad.push('k=1 时一个星号都没插');
+
+    // 压制下给僚机下令：指令不生效，且台词照常入队（走乱码）
+    const G16 = sandbox.Game;
+    G16.startMission(0);
+    const p16 = G16.__player(), w16 = G16.__world();
+    const wing = Object.values(w16.wings).find(x => x && x.ai);
+    if (wing) {
+      wing.ai.cmd = 'spread';
+      p16.suppressed = 0.8;
+      sandbox.document.dispatchEvent && 0;
+      const before = wing.ai.cmd;
+      G16.__setWingCmd('focus');
+      if (wing.ai.cmd !== before) bad.push('被压制时下令不该生效：' + before + ' → ' + wing.ai.cmd);
+      p16.suppressed = 0;
+      G16.__setWingCmd('focus');
+      if (wing.ai.cmd !== 'focus') bad.push('解除压制后下令应当生效');
+    }
+    if (bad.length) bad.forEach(fail);
+    else ok('无线电乱码：garble 性质成立，被压制时指令不生效、解除后恢复');
+  }
+
   /* ---- 地面/海面目标计分 ----
 
      `world.killed` 只统计 team===1 的飞机，设施与舰船从不进那个数。

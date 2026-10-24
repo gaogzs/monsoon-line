@@ -389,7 +389,8 @@ var SFX = (function () {
     confirm: function () { beep(0.09, 1180, 0.07, 'square'); setTimeout(function () { beep(0.09, 1580, 0.09, 'square'); }, 70); },
 
     /** 无线电语音条的底噪 */
-    radio: function () { burst(0.045, 2400, 1900, 0.20, 'bandpass'); },
+    /* k：电磁干扰度（0–1），被压制时噪声脉冲加长、加重 */
+    radio: function (k) { k = k || 0; burst(0.045 + 0.05 * k, 2400, 1900, 0.20 + 0.25 * k, 'bandpass'); },
 
     /** 任务达成 / 失败 */
     fanfare: function () {

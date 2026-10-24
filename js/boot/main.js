@@ -238,6 +238,8 @@
     Renderer.init($.cv);
     $.applyRenderMode();
     $.bindInput();
+    // 电磁干扰度交给 Radio（它不直接读 player）：被压制时无线电台词会被插入星号
+    Radio.setDistortion(function () { return $.player ? ($.player.suppressed || 0) : 0; });
 
     // 导航按钮。注意这里不再用兜底 else ——
     // 早先的写法会让任何一个拼错的 data-go 值都悄悄跳回标题页，

@@ -117,11 +117,13 @@
       SysNote.show(T('ui.input.setWingCmd.s1'));
       return;
     }
+    var names = { spread: T('ui.input.setWingCmd.names.spread'), focus: T('ui.input.setWingCmd.names.focus'), cover: T('ui.input.setWingCmd.names.cover') };
     if ($.player && ($.player.suppressed || 0) > 0.35) {
+      /* 被压制：指令照常喊出来（台词走电磁干扰乱码），但数据链断了，指令不生效、没有确认。 */
+      Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: T('ui.input.setWingCmd.tx.s1') + names[cmd] + '</b>', gap: 0.5 });
       SysNote.show(T('ui.input.setWingCmd.s2'), { warn: true });
       return;
     }
-    var names = { spread: T('ui.input.setWingCmd.names.spread'), focus: T('ui.input.setWingCmd.names.focus'), cover: T('ui.input.setWingCmd.names.cover') };
     for (var k in $.world.wings) {
       if ($.world.wings[k] && $.world.wings[k].ai) $.world.wings[k].ai.cmd = cmd;
     }

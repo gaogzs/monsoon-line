@@ -64,9 +64,13 @@
 | 成员 | 签名 | 语义 |
 |---|---|---|
 | `play` | `play(missionId, evt)` | 把 `VOICES[missionId][evt]` 整组台词压入队列；表或键不存在时静默返回 |
-| `raw` | `raw(line)` | 压入单条台词对象 `{ who, cls, tx, gap }` |
+| `raw` | `raw(line)` | 压入单条台词对象 `{ who, cls, tx, gap, nogarble? }`（`nogarble: true` = 剧情台词，不受干扰乱码影响，失败台词用它） |
 | `update` | `update(dt)` | 推进出队计时与淡出。**只有 `update(dt)` 会调它** |
 | `clear` | `clear()` | 清空队列、活动字幕数组与 `#radio` 的 `innerHTML` |
+| `setDistortion` | `setDistortion(fn)` | 注册电磁干扰度（0–1）的取值函数；`Game` 初始化时挂上玩家的 `suppressed`（`Radio` 不直接读 player） |
+| `garble` | `garble(html, k, rng?)` | 往 html 的文本段里**插入**星号（不替换、不碰标签 / 实体）：个数 ≈ `round(k × 字数 / 6)`，位置随机、互不相邻；`k < 0.05` 原样返回 |
+
+**电磁干扰乱码（2.3）**：台词在队列里保留原文，上屏那一刻（`push`）才按当时的 `suppressed` 处理；`cls ∈ ally / enemy / cmd` 才乱码，`fx`（系统音）、`SysNote`、`nogarble` 台词不处理；`SFX.radio(k)` 的噪声脉冲随干扰度加长 / 加重。被压制（`suppressed > 0.35`）时 `setWingCmd` 仍把指令喊出来（走乱码），但不写 `ai.cmd`、不确认，只弹 SysNote（数据链被压制）。预警机被压制时本来就静默（`updateAewc`）。
 
 ---
 ## 屏幕状态机
