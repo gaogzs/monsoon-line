@@ -35,6 +35,7 @@ Registry.aircraft({
     { id: 'C', label: T('aircraft.frigatebird.hardpointGroups.i2.label'), kind: 'belly', pts: [{ x: 0.45, y: -1.0 }, { x: -0.45, y: -1.0 }] },
     { id: 'D', label: T('aircraft.frigatebird.hardpointGroups.i3.label'), kind: 'light', playerOnly: true, pts: [{ x: 0.95, y: -5.2 }, { x: -0.95, y: -5.2 }] }
   ],
-  defaultLoadout: { A: 'srm', B: 'v11', C: 'oep' },
+  /* D（2.4 新增）挂 CLA-4：GUS-6 扩展锁定吊舱要有中距弹配套才有意义，多用途机也该带一对 BVR */
+  defaultLoadout: { A: 'srm', B: 'v11', C: 'oep', D: 'mrm' },
   desc: T('aircraft.frigatebird.desc')
 });

@@ -25,5 +25,6 @@ Registry.aircraft({
     { id: 'C', label: T('aircraft.albatross.hardpointGroups.i2.label'), kind: 'tip', pts: [{ x: 7.4, y: 1.0 }, { x: -7.4, y: 1.0 }] },
     { id: 'D', label: T('aircraft.albatross.hardpointGroups.i3.label'), kind: 'light', playerOnly: true, pts: [{ x: 1.7, y: -3.0 }, { x: -1.7, y: -3.0 }] }
   ],
-  defaultLoadout: { A: 'wasp', B: 'qsr', C: 'irp' }
+  /* D（2.4 新增）内侧挂 TOR-6 大离轴格斗弹：近战格斗机多一种追尾以外的选择 */
+  defaultLoadout: { A: 'wasp', B: 'qsr', C: 'irp', D: 'hos' }
 });

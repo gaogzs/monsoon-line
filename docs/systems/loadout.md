@@ -52,22 +52,24 @@ hardpointGroups: [
 所有战斗机（上游可玩 6 型 + 下游 / 中立 NPC 战斗机 4 型；`npcOnly` 的机型也有组，但只用于资料库展示）。
 **2.4 起每架各多一对挂点**（为以后扮演下游的战役做平衡准备），新组带 `playerOnly: true`：
 `Ent.mountPlan` 对 NPC 一律跳过它（槽数、弹药池、重量与加这一对之前一致，关卡难度不变），
-`Loadout`（机库 / 玩家）照常当普通组，`defaultLoadout` 不填新组（默认空着）。
+`Loadout`（机库 / 玩家）照常当普通组。可驾驶六型的新组**带默认挂载**（按定位挑，见下表）；下游 / 中立四型的 `defaultLoadout` 仍是 `{}`（NPC 不用新组）。
 
 | 机型 | 组数 | 点数 | 组号与类型（★ = 2.4 新增，`playerOnly`） |
 |---|---|---|---|
-| DB-11 军舰鸟 | 4 | 8 | A light · B heavy · C belly · ★D light（机身后侧） |
-| D-14 旗鱼 | 4 | 8 | A heavy · B light · C belly · ★D tip（翼尖） |
-| G-6 鲣鸟 | 4 | 8 | A heavy · B light · C light · ★D belly（机腹） |
-| F-9 海燕 | 3 | 6 | A heavy · B light · ★C heavy（翼下内侧） |
-| D-21 贼鸥 | 3 | 6 | A belly · B light · ★C light（翼下外挂，外露、匿踪会掉） |
-| D-33 信天翁 | 4 | 8 | A heavy · B light · C tip · ★D light（内侧） |
+| DB-11 军舰鸟 | 4 | 8 | A light · B heavy · C belly · ★D light（机身后侧，默认 CLA-4：扩展锁定吊舱要有中距弹配套） |
+| D-14 旗鱼 | 4 | 8 | A heavy · B light · C belly · ★D tip（翼尖，默认 GUS-9 被动探测吊舱：载重已 84%，轻吊舱只涨到 90%） |
+| G-6 鲣鸟 | 4 | 8 | A heavy · B light · C light · ★D belly（机腹，默认 PEJ-14 精确制导炸弹；本机默认载重本来就满格，再加无额外惩罚） |
+| F-9 海燕 | 3 | 6 | A heavy · B light · ★C heavy（翼下内侧，默认 CLA-17 远距冲压拦截弹） |
+| D-21 贼鸥 | 3 | 6 | A belly · B light · ★C light（翼下外挂，外露、匿踪会掉；默认 ZUN-8 被动抗锁定吊舱——最轻、也最贴电子战定位） |
+| D-33 信天翁 | 4 | 8 | A heavy · B light · C tip · ★D light（内侧，默认 TOR-6 大离轴格斗弹） |
 | ROK-27 schist | 3 | 6 | A heavy · B light · ★C light（翼下中段） |
 | GAL-31 basalt | 3 | 6 | A heavy · B light · ★C light（翼下中段） |
 | VAC-14 sandstone | 3 | 6 | A heavy · B light · ★C light（翼尖外侧） |
 | XAMSI Mk.2 tideline | 2 | 4 | A light · ★B light（外侧） |
 
-smoke 里有这十型的清单常量（组数、恰一组 `playerOnly`、NPC 跳过、玩家默认空）。
+smoke 里有这十型的清单常量（组数、恰一组 `playerOnly`、NPC 跳过、可驾驶六型的新组默认非空、NPC 四型留空）。
+
+默认挂载的选法：同一架机的 `maxLoad` 是硬约束（挂载重量 / `maxLoad` 决定 `loadoutPenalty`，满格最多 −26% 加速），所以尽量选轻的；按"这架飞机的定位缺什么"补。多数机型加完会到 90% 上下或满格，惩罚封顶 1.0，不会更糟。
 
 **ROK-40 巨砾**（重型轰炸机，2.5 重做，`npcOnly`）：4 组 8 点 —— `A1` / `A2` 弹舱前后两对（`belly`，`expose: 0`）、`B1` 翼下内侧 / `B2` 翼下外侧（`heavy`，发动机的内外各一对）。2.5 之前是 `A` 弹舱 / `B` 翼下各一对；m5 / m8 的 `loadout: { B1: 'vsr' }` 同步改了（BOX-14 `perPoint` 为 0、`ammo` 1，弹药池与重量与之前一致）。
 

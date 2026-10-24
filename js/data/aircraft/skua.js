@@ -25,5 +25,6 @@ Registry.aircraft({
     { id: 'B', label: T('aircraft.skua.hardpointGroups.i1.label'), kind: 'light', hy: -0.55, pts: [{ x: 3.6, y: -3.4 }, { x: -3.6, y: -3.4 }] },
     { id: 'C', label: T('aircraft.skua.hardpointGroups.i2.label'), kind: 'light', hy: -0.55, playerOnly: true, pts: [{ x: 5.4, y: -3.6 }, { x: -5.4, y: -3.6 }] }
   ],
-  defaultLoadout: { A: 'lcm', B: 'oep' }
+  /* C（2.4 新增）外挂一个 ZUN-8 被动抗锁定吊舱：电子战定位的自然延伸（外露挂点会折损匿踪，吊舱最轻） */
+  defaultLoadout: { A: 'lcm', B: 'oep', C: 'ecm2' }
 });

@@ -27,6 +27,7 @@ Registry.aircraft({
     { id: 'C', label: T('aircraft.booby.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 7.8, y: -1.05 }, { x: -7.8, y: -1.05 }] },
     { id: 'D', label: T('aircraft.booby.hardpointGroups.i3.label'), kind: 'belly', playerOnly: true, pts: [{ x: 0.9, y: 1.0 }, { x: -0.9, y: 1.0 }] }
   ],
-  defaultLoadout: { A: 'asl', B: 'rkt', C: 'hdp' },
+  /* D（2.4 新增）机腹中线挂 PEJ-14 精确制导炸弹：近距支援机的标准配置，与火箭 / 防区外弹互补 */
+  defaultLoadout: { A: 'asl', B: 'rkt', C: 'hdp', D: 'pgb' },
   desc: T('aircraft.booby.desc')
 });

@@ -26,6 +26,7 @@ Registry.aircraft({
     { id: 'C', label: T('aircraft.sailfish.hardpointGroups.i2.label'), kind: 'belly', pts: [{ x: 0.95, y: -4.2 }, { x: -0.95, y: -4.2 }] },
     { id: 'D', label: T('aircraft.sailfish.hardpointGroups.i3.label'), kind: 'tip', playerOnly: true, pts: [{ x: 6.0, y: -5.6 }, { x: -6.0, y: -5.6 }] }
   ],
-  defaultLoadout: { A: 'mrm', B: 'hos', C: 'ecm2' },
+  /* D（2.4 新增）翼尖挂 GUS-9 被动探测吊舱：载重已到 84%，轻吊舱只涨到 90%，匿踪机不靠主动辐射找目标 */
+  defaultLoadout: { A: 'mrm', B: 'hos', C: 'ecm2', D: 'irp' },
   desc: T('aircraft.sailfish.desc')
 });

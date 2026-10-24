@@ -26,5 +26,6 @@ Registry.aircraft({
     { id: 'B', label: T('aircraft.petrel.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 5.0, y: -5.3 }, { x: -5.0, y: -5.3 }] },
     { id: 'C', label: T('aircraft.petrel.hardpointGroups.i2.label'), kind: 'heavy', playerOnly: true, pts: [{ x: 4.0, y: -4.0 }, { x: -4.0, y: -4.0 }] }
   ],
-  defaultLoadout: { A: 'hva', B: 'mrm' }
+  /* C（2.4 新增）翼下内侧再挂一对 CLA-17 远距冲压弹：一击脱离靠射程，截击机不缺远弹 */
+  defaultLoadout: { A: 'hva', B: 'mrm', C: 'v17' }
 });

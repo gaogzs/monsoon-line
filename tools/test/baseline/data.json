@@ -39,12 +39,12 @@
    "$order": "d1d8e86cbcd2"
   },
   "AIRCRAFT": {
-   "frigatebird": "2a484deaa1e9",
-   "sailfish": "e6423f842800",
-   "booby": "99c80265f69e",
-   "petrel": "d7ea5c09bb02",
-   "skua": "5672183527cf",
-   "albatross": "b88ec87d8c7b",
+   "frigatebird": "fc9a344b560d",
+   "sailfish": "076d0281d9ce",
+   "booby": "8a6b9316693d",
+   "petrel": "bca3c14e9e9e",
+   "skua": "928bb9f45813",
+   "albatross": "565a18acfb2e",
    "folded_wing": "801c255146ed",
    "schist": "056924ba92db",
    "basalt": "ba52d40ddfbe",

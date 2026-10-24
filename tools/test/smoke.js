@@ -769,9 +769,12 @@ if (!badStore) ok('全部武器都有挂载属性');
     ac.hardpointGroups.forEach((g, i) => {
       if (g.playerOnly && plan2[i]) bad.push(id + ' 的逐组 loadout 不该落到 playerOnly 组 ' + g.id);
     });
-    // 玩家：新组可以装，默认不带
+    // 玩家：新组可以装；可驾驶的六型默认挂着东西（按定位挑的，见 defaultLoadout 的注释），NPC 四型留空
     const d = sandbox.Loadout.defaults(ac);
-    for (const g of extra) if (d[g.id] !== null) bad.push(id + ' 的新组默认配置应为 null，实际 ' + d[g.id]);
+    for (const g of extra) {
+      if (ac.npcOnly) { if (d[g.id] !== null) bad.push(id + '（NPC）的新组默认配置应为 null，实际 ' + d[g.id]); }
+      else if (!d[g.id]) bad.push(id + ' 的新组 ' + g.id + ' 没有默认挂载');
+    }
   }
   sandbox.Ent.clearMountIssues && sandbox.Ent.clearMountIssues();
   if (bad.length) bad.slice(0, 8).forEach(fail);
@@ -809,6 +812,9 @@ if (!badStore) ok('全部武器都有挂载属性');
   const bad = [];
   const Gs = sandbox.Game, st = Gs.__saveState(), LS = sandbox.localStorage;
   const fm = sandbox.AIRCRAFT.find(a => a.id === 'frigatebird');
+  /* 机库的挂载卡片按创建时那一刻的 loadout 对象改值：测完要把**原来的对象引用**放回去，
+     否则后面"六维条随挂载变化"那条断言点的是脱节的旧对象，会误报"纹丝不动" */
+  const origCleared = Object.assign({}, st.cleared), origLoadouts = Object.assign({}, st.loadouts);
   const reset = () => { for (const k in st.cleared) delete st.cleared[k]; for (const k in st.loadouts) delete st.loadouts[k]; };
   reset();
   // ① 往返
@@ -830,7 +836,7 @@ if (!badStore) ok('全部武器都有挂载属性');
   if (got && got.B !== def.B) bad.push('机炮不能挂在挂点上，应回退默认：B=' + got.B);
   if (got && 'Z' in got) bad.push('不存在的组不该出现');
   if (got && got.C !== null) bad.push('明确选的空置应保留：C=' + got.C);
-  if (got && got.D !== null) bad.push('旧存档里缺的新组（2.4 的 D）应取默认 null：D=' + got.D);
+  if (got && got.D !== def.D) bad.push('旧存档里缺的新组（2.4 的 D）应取默认值 ' + def.D + '：D=' + got.D);
   if (st.loadouts.ghost) bad.push('不存在的机型不该进 loadouts');
   // ③ 坏数据 / 未知版本 / 存储不可用
   reset();
@@ -845,6 +851,7 @@ if (!badStore) ok('全部武器都有挂载属性');
   try { Gs.__save.load(); Gs.__save.save(); } catch (e) { bad.push('localStorage 不可用时不该抛：' + e.message); }
   LS.getItem = g0; LS.setItem = s0;
   reset();
+  Object.assign(st.cleared, origCleared); Object.assign(st.loadouts, origLoadouts);
   if (bad.length) bad.forEach(fail);
   else ok('存档：cleared / loadouts 往返；坏 JSON、未知版本、存储不可用都不抛；不合法的挂载回退默认');
 }
