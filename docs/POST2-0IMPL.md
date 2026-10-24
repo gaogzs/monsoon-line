@@ -31,7 +31,7 @@
 | 3 | **v3.2** | 光标越极点 + 相机重构；关卡时间与天色；过失速机动（PSM） | 1 | |
 | 4 | **v3.3** | 地图边界；整备点（含暂停整备界面） | 1、2（失败原因） | |
 | 5 | **v3.4** | AI 强化：技能值、外围游走 / 回头、友军独立 AI、撤离；Radio 队列与条件触发无线电；半主动雷达弹（**仅锁定时受引导**） | 3、4 | |
-| 6 | **v3.5** | 新单位：VTOL、航空巡洋舰、战略制空支援机、浮空平台武器、敌方无人机、友方有人机的无人僚机 | 5 | |
+| 6 | **v3.5** | 新单位：轻型舰载 VTOL（可玩）、国土防卫重型战机（可玩）、战斗轰炸机（可玩）、航空巡洋舰、战略制空支援机、浮空平台武器、敌方无人机、友方有人机的无人僚机 | 5 | |
 | 7 | **v3.6** | 资料库追加背景、世界地图 | W | |
 | 8 | **v3.7** | 关卡重构：友军编成、上游空军呼号、无线电填充、剧情文案 | 4、5、6、W | |
 | 9 | **v3.8** | 地形、城市与场景类型（海洋 / 海岸 / 岛屿 / 内陆）；遮挡锁定与导弹追踪 | 1、2（死因）、3、4、5（FovWatch） | |
@@ -1113,9 +1113,13 @@ droneCarrier: {
 - smoke（`tools/test/smoke.js`）：`droneCarrier` 与 `resupply` 标签组合断言（且两者都在 `tags.js` 声明——smoke 本就查"声明过的标签都有人用"）；无人机机型带 `unmanned` 且 `Ent.mountIssues` 为空；`arms` 文本与 `mounts` 一致；新舰的模型文件带 `settle: true`，且在 `needModels` 里；
 - 性能：`tools/test/probe-perf.js` 加"航母 + 24 架无人机"场景，逻辑帧耗时在预算内。
 
-### 6.2 VTOL 可玩机型
+### 6.2 轻型舰载 VTOL 可玩机型
 
-**行为**（草稿要点）：速度上限不高、下限可到 0 且**不失速而是悬浮**；推力只能向下，机体倾斜时靠更大推力补偿高度，因此产生横向漂移；挂点比别的机型更多的国土防卫重型战机。
+**定位**：轻型单发垂直起降战斗机，从上游航母的甲板或整备点起降，不需要跑道。它是前线的近距护卫与补位，**不是重型机**：挂点少（2–3 组）、载荷小、造价低。
+
+> 草稿曾把它与"国土防卫重型战机"写在同一条里，那是误合并。两者是独立单位：重型战机见 6.2b，本节不写它的挂点。
+
+**行为**（草稿要点）：速度上限不高、下限可到 0 且**不失速而是悬浮**；推力只能向下，机体倾斜时靠更大推力补偿高度，因此产生横向漂移。
 
 **实现**：
 
@@ -1125,8 +1129,32 @@ droneCarrier: {
   - 速度高于 `transSpeed`（起步 120 m/s）后逐渐混入现有翼升力模型（过渡区线性混合），高速时与普通战机行为接近；`vMax` 较低；无失速判定与速度下限。
   - 油门轴语义在低速区改成"升力"；HUD 低速时显示悬停指示、垂直速度与漂移矢量。
 - 影响面（调查已列出）：`steerTo`（`js/engine/ai/steer.js`）假设前飞（`ctrlAuth`、高度回收分支）、HUD 失速 / 速度显示（`js/ui/hud/instruments.js`）、`Ent.agl`（`js/engine/entities/physics.js`，`pos.y − groundY`）、`Game` 对 `stepAircraft` 的两处调用点（`js/engine/game/update.js`：玩家一处、其它 actor 一处，要按 `a.vtol` 分流到 `Ent.stepVtol`）。**本批 VTOL 只给玩家用**，AI 用 VTOL 暂不做（`npcOnly` 不给）。
-- 数据：`js/data/aircraft/<id>.js`（`Registry.aircraft`，带 `vtol` 字段与标签 `vtol`，`noPSM` 若用到也在 `tags.js` 声明）、模型 `js/models/aircraft/<id>.js`、俯视图（`js/render/planform/planes.js`）、`needModels`、资料库条目（`js/ui/codex/entries/<id>.js`）/ 详情页（`js/ui/unitview.js` 自动生成，含"机制标签"一行读 `tags.js` 的 `doc`）、挂载组（≥ 5 对，"国土防卫重型"的体现，同时重量惩罚 / `maxLoad` 加大）、文本 JSON、`gen-pages`。
+- 数据：`js/data/aircraft/<id>.js`（`Registry.aircraft`，带 `vtol` 字段与标签 `vtol`，`noPSM` 若用到也在 `tags.js` 声明）、模型 `js/models/aircraft/<id>.js`、俯视图（`js/render/planform/planes.js`）、`needModels`、资料库条目（`js/ui/codex/entries/<id>.js`）/ 详情页（`js/ui/unitview.js` 自动生成，含"机制标签"一行读 `tags.js` 的 `doc`）、挂载组（2–3 组，轻型，`maxLoad` 偏小；起步值以 `probe-balance` 为准）、文本 JSON、`gen-pages`。
 - 验证：Sim 场景（`tools/test/probes/probe-vtol.js`）——悬停推力平衡、倾斜漂移方向与量级、过渡区速度连续、无失速；`probe-envelope`（`tools/test/probes/`）在悬停 / 低速下的发射包线不出怪值。
+
+#### 6.2b 国土防卫重型战机（可玩，独立单位）
+
+**定位**：上游守本土的重型战机，守浮岛与基地上空。不以机动取胜，靠挂载多、续航中等、扛打。它与 6.2 的 VTOL 没有依赖关系。
+
+**现状**（已核实，`js/data/aircraft/*.js` 与 `locales/zh-CN/text/aircraft/*.json`）：可玩机型里挂载最大的是 `booby`（`maxLoad` 7200 kg）和 `frigatebird`（6500 kg），但前者是近距支援攻击机、后者是舰载多用途机，**没有一架上游可玩机型是为守土设计的重型战机**。其余可玩战斗机的 `maxLoad` 是 4200–5200 kg（`petrel` 5200、`albatross` 5000、`sailfish` 4800、`skua` 4200），挂点组数都在 3–4 组。
+
+**要做的**：
+- 数据：`js/data/aircraft/<id>.js`（`Registry.aircraft`，不带 `npcOnly`）。挂载组数要**多于 2.4 落地后的上游战斗机**（至少多 2 组，起步 5 组，与草稿一致）。`maxLoad` 高于 5200 kg，代价是 `phys` 里 `accel / vMax` 降低、`roll` 变慢。
+- 挂点组的种类要同时覆盖空空弹（中距，翼下）与对地弹（机腹），这样它守土时两种任务都能接。
+- 模型 `js/models/aircraft/<id>.js`、俯视图（`js/render/planform/planes.js`）、资料库条目（`js/ui/codex/entries/<id>.js`）、文本 JSON、`needModels`、`gen-pages`。详情页由 `js/ui/unitview.js` 自动生成。
+- 验证：`tools/render/render-units.js` 出图；smoke 的挂点检查（`Ent.mountIssues` 为空）；`probe-balance` 比较它与 `petrel` / `sailfish` 的守土表现（基地防空、被击落时间）。
+
+#### 6.2c 战斗轰炸机（可玩，新机型）
+
+**定位**：速度足以自卫的对地攻击机。能挂对地重弹，也保留中距空空弹，遇到敌机能应战。它填补的是"快速、能打空战、又能挂对地重弹"的空缺。
+
+**现状**（已核实）：玩家能挂的对地弹（`kind: 'bomb'`，`fits` 非空）有 `clb / hbh / hbl / v30 / pgb / rkt` 六种。可玩机型里，对地攻击的主力是 `booby`（近距支援，`vMax` 340 m/s，装甲重）。快速战斗机 `petrel`（`vMax` 高空截击）、`sailfish`、`albatross`、`skua` 的最大载荷只有 4200–5200 kg，且挂点设计以空战为主。所以**没有一架可玩的快速战斗机能携带重型对地弹**。
+
+**要做的**：
+- 数据：`js/data/aircraft/<id>.js`（上游、可玩）。挂点组：机腹 2 组（接受中型对地弹，`kind: 'belly'`）、翼下 2 组（中距空空弹，`kind: 'light'`）。`maxLoad` 起步约 6000 kg。`vMax` 落在 `skua`（540 m/s）与 `booby`（340 m/s）之间，起步值待定。
+- 机炮复用现有 `cel*`，不新增机炮。
+- 模型 `js/models/aircraft/<id>.js`（新几何，`albatross` 的前掠翼布局可作参考但不照搬）、俯视图、资料库条目、文本 JSON、`needModels`、`gen-pages`。
+- 验证：smoke 的挂点检查（`Ent.mountIssues` 为空，`bomb` 装进机腹组时 `fitsKind` 通过）；`probe-balance` 比较它对地的命中效率与 `booby`，并比较空战表现与 `skua`。
 
 ### 6.3 上游航空巡洋舰
 
@@ -1498,6 +1526,7 @@ terrain: {
 | — | 发射后切换武器 | 算作丢锁：半主动弹只有在当前武器本身是它、且完成锁定时才保持引导 |
 | — | NPC 位格 | 枚举 `rank ∈ rookie / pawn / elite / ace`，每个 NPC 飞机都标注其一；是枚举字段不是标签；缺省 `pawn`，机型可给默认值 |
 | — | AI 机动库目录 | 暂时平铺：`js/engine/ai/man-<名字>.js`，不建子目录 |
+| Q9 | 批次 6 可玩机型的划分 | 草稿把"VTOL"与"国土防卫重型战机"写在同一条里，属于误合并。拆成三个独立单位：6.2 轻型舰载 VTOL、6.2b 国土防卫重型战机、6.2c 战斗轰炸机，三者互不依赖，各自发一个 `aircraft` 条目 |
 
 ### 待定
 
@@ -1563,6 +1592,7 @@ W.4 原文只有标题；以上验证步骤是按新工具补的，是否沿用"
 - `Registry.ship` 的 schema 是否已接受 `tags` 与 `hangar` 类的新字段、`makeTarget` 是否应对舰船带 `tags`（现在 `tags` 只按 `TARGETS[o.model]` 取，舰船取不到）：我只确认了 `makeTarget` 的行为，没读 `js/data/ships/_schema.js`，实施时先读它。
 - 6.1 里"`js/engine/ai/tactics.js` 是否适合放 `support` 角色"：没逐个读 `tactics.js`，只知道它是 AI 四个模块之一。
 - 6.2 `index` 脚本清单的维护方式（新增 `vtol.js` 需要登记在哪里：`locales/_html/` 片段还是 `tools/build/gen-pages.js` 的清单）未核对。
+- **6.2 / 6.2b / 6.2c 的待定项**：（a）6.2b 与 6.2c 默认按草稿的"可玩机型"处理，若想让重型战机只做 NPC，改 `npcOnly` 即可；（b）三者的上游命名前缀（`D-` 战斗 / `F-` 截击）按设定集 8.1 定，6.2b 倾向 `F-`，待评审；（c）6.2 的 VTOL 能否在整备点（`resupply`）补给、还是只能在航母甲板起降，未定；（d）6.2c 的 `vMax` 与 `maxLoad` 数值只是起步值，未用探针实测；（e）`fitsKind` 是否把 `bomb` 接受到 `belly` 挂点组，未读 `js/engine/entities/mounts.js` 核对。
 - 6.6 smoke 的 `arms` 检查现在只有舰船、平台两处；`relay` 没有 `arms` 字段，核对方式见正文，未读 `Registry.target` schema 是否允许加 `arms`。
 - 6.1b 的 31 处 `team===1` 判断是重构前数字，未重数；`unitview.js` 预览对设施是否已调 `composeTurrets`、`zz-api` 暴露的 `Game` 公开接口名也未逐条核对。
 - 7.1 `<unit>.dev` 的缺键判断（`T` 是否有"键存在"的探测接口）以及 `data/geo` 走 `Registry` 还是常量，均未核对（`docs/systems/text.md` / `modules.md` 里应有答案）。
