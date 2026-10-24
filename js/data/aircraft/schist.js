@@ -33,7 +33,8 @@ Registry.aircraft({
   hardpointGroups: [
     { id: 'A', label: T('aircraft.schist.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 2.9, y: -1.0 }, { x: -2.9, y: -1.0 }] },
     { id: 'B', label: T('aircraft.schist.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 5.2, y: -1.6 }, { x: -5.2, y: -1.6 }] },
-    { id: 'C', label: T('aircraft.schist.hardpointGroups.i2.label'), kind: 'light', playerOnly: true, pts: [{ x: 4.0, y: -1.3 }, { x: -4.0, y: -1.3 }] }
+    { id: 'C', label: T('aircraft.schist.hardpointGroups.i2.label'), kind: 'light', playerOnly: true, pts: [{ x: 4.0, y: -1.3 }, { x: -4.0, y: -1.3 }] },
+    { id: 'D', label: T('aircraft.schist.hardpointGroups.i3.label'), kind: 'light', playerOnly: true, pts: [{ x: 6.4, y: -2.6 }, { x: -6.4, y: -2.6 }] }
   ],
   defaultLoadout: {}
 });

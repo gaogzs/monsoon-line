@@ -62,12 +62,14 @@ hardpointGroups: [
 | F-9 海燕 | 3 | 6 | A heavy · B light · ★C heavy（翼下内侧，默认 CLA-17 远距冲压拦截弹） |
 | D-21 贼鸥 | 3 | 6 | A belly · B light · ★C light（翼下外挂，外露、匿踪会掉；默认 ZUN-8 被动抗锁定吊舱——最轻、也最贴电子战定位） |
 | D-33 信天翁 | 4 | 8 | A heavy · B light · C tip · ★D light（内侧，默认 TOR-6 大离轴格斗弹） |
-| ROK-27 schist | 3 | 6 | A heavy · B light · ★C light（翼下中段） |
-| GAL-31 basalt | 3 | 6 | A heavy · B light · ★C light（翼下中段） |
+| ROK-27 schist | 4 | 8 | A heavy · B light · ★C light（翼下中段）· ★D light（翼尖外侧） |
+| GAL-31 basalt | 4 | 8 | A heavy · B light · ★C light（翼下中段）· ★D heavy（机身内侧） |
 | VAC-14 sandstone | 3 | 6 | A heavy · B light · ★C light（翼尖外侧） |
 | XAMSI Mk.2 tideline | 2 | 4 | A light · ★B light（外侧） |
 
-smoke 里有这十型的清单常量（组数、恰一组 `playerOnly`、NPC 跳过、可驾驶六型的新组默认非空、NPC 四型留空）。
+下游 basalt（重型截击机，`maxLoad` 6200）与 schist（多用途战斗机）在 3.1.14 又各补了一对（共两组 `playerOnly`），为的是和上游同等规模；sandstone 是轻型攻击机，`maxLoad` 只有 3400，留在 3 对。
+
+smoke 里有这十型的清单常量（组数、`playerOnly` 组数（schist / basalt 两组，其余一组）、NPC 跳过、可驾驶六型的新组默认非空、NPC 四型留空）。
 
 默认挂载的选法：同一架机的 `maxLoad` 是硬约束（挂载重量 / `maxLoad` 决定 `loadoutPenalty`，满格最多 −26% 加速），所以尽量选轻的；按"这架飞机的定位缺什么"补。多数机型加完会到 90% 上下或满格，惩罚封顶 1.0，不会更糟。
 

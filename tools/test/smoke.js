@@ -746,14 +746,15 @@ if (!badStore) ok('全部武器都有挂载属性');
    战斗机清单写成常量，避免漂移（AIRCRAFT 没有"是战斗机"的机器字段）。 */
 {
   const FIGHTERS = { frigatebird: 4, sailfish: 4, booby: 4, petrel: 3, skua: 3, albatross: 4,
-    schist: 3, basalt: 3, sandstone: 3, tideline: 2 };
+    schist: 4, basalt: 4, sandstone: 3, tideline: 2 };
   const bad = [];
   for (const id in FIGHTERS) {
     const ac = sandbox.AIRCRAFT.find(x => x.id === id);
     if (!ac) { bad.push(id + ' 不在 AIRCRAFT 里'); continue; }
     if (ac.hardpointGroups.length !== FIGHTERS[id]) bad.push(id + ' 应有 ' + FIGHTERS[id] + ' 组挂点，实际 ' + ac.hardpointGroups.length);
     const extra = ac.hardpointGroups.filter(g => g.playerOnly);
-    if (extra.length !== 1) bad.push(id + ' 应恰有 1 组 playerOnly，实际 ' + extra.length);
+    const wantExtra = (id === 'schist' || id === 'basalt') ? 2 : 1;      // 下游两型多补了一对（3.1.14）
+    if (extra.length !== wantExtra) bad.push(id + ' 应有 ' + wantExtra + ' 组 playerOnly，实际 ' + extra.length);
     for (const g of ac.hardpointGroups) if (g.pts.length % 2) bad.push(id + ' 的组 ' + g.id + ' 点数不是偶数');
     // NPC：制式弹铺满所有挂得住的组，但 playerOnly 的组必须空着；逐组 loadout 也一样
     const light = sandbox.WEAPONS.srm ? 'srm' : null;
