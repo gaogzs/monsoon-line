@@ -221,17 +221,18 @@
 
     /* 实时过载 G：由 stepAircraft 按实际加速度算（a.gNow），不是由杆量推出来的 ——
        所以低动压下拉满杆、表上也只有一两个 G，这正是"舵面失效"的手感。
-       不设上限，只在超过 9G（人能扛的量级）时变色。 */
+       读数不设上限；条的范围 −5 … +12 G。
+       超过 +9 G / 低于 −2 G 变琥珀（人开始吃力），条撑满（≥ +12 G / ≤ −5 G）变红。 */
     var gy = qy;
     var gN = (p.gNow === undefined) ? 1 : p.gNow;
-    var gCol = (gN > 9 || gN < -2) ? $.AMBER : $.GREEN;
+    var G_LO = -5, G_HI = 12;
+    var gCol = (gN >= G_HI || gN <= G_LO) ? $.RED : (gN > 9 || gN < -2) ? $.AMBER : $.GREEN;
     ctx.strokeStyle = $.DIM; ctx.lineWidth = 1;
     ctx.strokeRect(gx - 58, gy - 26, 116, 48);
     $.text(ctx, T('ui.hud.instruments.drawTapes.s3'), gx - 50, gy - 9, $.DIM, $.FS, 'left');
     $.text(ctx, gN.toFixed(1) + ' G', gx + 50, gy + 11, gCol, $.FB, 'right');
 
-    // G 条：-3 … +12，从 0G 往两边长；1G 处一道基准线
-    var G_LO = -3, G_HI = 12;
+    // G 条：-5 … +12，从 0G 往两边长；1G 处一道基准线
     var g0 = 100 * (0 - G_LO) / (G_HI - G_LO);
     var gk = 100 * (M3.clamp(gN, G_LO, G_HI) - G_LO) / (G_HI - G_LO);
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
