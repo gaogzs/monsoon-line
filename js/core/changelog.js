@@ -2,9 +2,25 @@
    由 tools/build/release.js 从 CHANGELOG.md 写出，每次发版后重新生成。
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
-  "current": "v3.1.4",
-  "generated": "2026-10-24T17:15:28+09:00",
+  "current": "v3.1.5",
+  "generated": "2026-10-24T17:16:17+09:00",
   "releases": [
+    {
+      "version": "v3.1.5",
+      "date": "2026-10-24",
+      "title": "无人机没有座舱",
+      "tag": "小版本",
+      "commit": "62d1f73",
+      "lead": "KA-7 折翼无人僚机机头那一点凸起原来涂成座舱盖的颜色，而它根本没有座舱；现在改成天线罩的深灰色，和资料库里“通讯天线罩”的说法一致。",
+      "sections": [
+        {
+          "h": "修复",
+          "items": [
+            "折翼无人机去掉座舱盖，机头凸起改为天线罩的深色"
+          ]
+        }
+      ]
+    },
     {
       "version": "v3.1.4",
       "date": "2026-10-24",
