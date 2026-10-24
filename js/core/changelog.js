@@ -2,9 +2,25 @@
    由 tools/build/release.js 从 CHANGELOG.md 写出，每次发版后重新生成。
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
-  "current": "v3.1.17",
-  "generated": "2026-10-24T18:31:36+09:00",
+  "current": "v3.1.18",
+  "generated": "2026-10-24T18:40:51+09:00",
   "releases": [
+    {
+      "version": "v3.1.18",
+      "date": "2026-10-24",
+      "title": "清掉多余的弹数字段",
+      "tag": "小版本",
+      "commit": "5ca8ff6",
+      "lead": "导弹、炸弹和吊舱的数据里不再有 ammo 字段：弹数只由挂点数 × perPoint 决定（玩家与敌机同一套），机炮的总发数仍写在 ammo 里。没有行为变化。",
+      "sections": [
+        {
+          "h": "调整",
+          "items": [
+            "38 件非机炮武器删掉不再被读取的 ammo 字段，文档同步说明"
+          ]
+        }
+      ]
+    },
     {
       "version": "v3.1.17",
       "date": "2026-10-24",
