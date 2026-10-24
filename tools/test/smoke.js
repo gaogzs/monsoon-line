@@ -2486,8 +2486,9 @@ if (Ent && M3 && me && world) {
     const gal = npc('basalt', 'dl4', ['vzu'], { A: 'dl4' });
     const n6 = countStoresOf(gal);
     if (n6 !== 4) bad.push('GAL-31 挂 DAR-4 + SAV-6 应当画出 4 件，实际 ' + n6);
-    if (!gal.ammoPool || gal.ammoPool.dl4 !== W3.dl4.ammo) {
-      bad.push('GAL-31 没有建起弹药池');
+    // 弹药池 = 挂点数 × perPoint（与玩家同一套规则）：A 重挂点一对 = 2 点
+    if (!gal.ammoPool || gal.ammoPool.dl4 !== 2 * W3.dl4.perPoint) {
+      bad.push('GAL-31 的弹药池应为 挂点数 × perPoint = ' + 2 * W3.dl4.perPoint + '，实际 ' + (gal.ammoPool && gal.ammoPool.dl4));
     }
     if (!gal.slotCd || !gal.slotCd.dl4 || gal.slotCd.dl4.length !== 2) {
       bad.push('GAL-31 的发射槽数与它占的挂点数不符');
@@ -2503,8 +2504,8 @@ if (Ent && M3 && me && world) {
     const mixed = npc('schist', 'dl6', ['vzu'], { A: 'dl6' });
     const n9 = countStoresOf(mixed);
     if (n9 !== 4) bad.push('ROK-27 挂 BIN-6 + SAV-6 应当画出 4 件，实际 ' + n9);
-    if (mixed.ammoPool.dl6 !== W3.dl6.ammo) {
-      bad.push('挂了吊舱之后导弹的弹药池被改了（' + mixed.ammoPool.dl6 + '）');
+    if (mixed.ammoPool.dl6 !== 2 * W3.dl6.perPoint) {
+      bad.push('挂了吊舱之后导弹的弹药池应仍是 挂点数 × perPoint = ' + 2 * W3.dl6.perPoint + '，实际 ' + mixed.ammoPool.dl6);
     }
     if (!mixed.slotCd.dl6 || mixed.slotCd.dl6.length !== 2) {
       bad.push('ROK-27 上 BIN-6 的发射槽应当只剩它占的那 2 个，实际 ' +
@@ -2662,8 +2663,8 @@ if (Ent && M3 && me && world) {
     // 1. 一架上挂三种射程的空空弹：按距离挑"够得着里面最短的那件"
     //    frigatebird 的组：A 机身前侧（轻）/ B 翼套（重）/ C 机腹 —— srm 4.2 km / mrm 8.6 / v17 12.5
     const mix = npcOf('frigatebird', { A: 'srm', B: 'v17', C: 'mrm' });
-    /* 弹药池 = min(w.ammo, 挂点数 × perPoint)：预算不能超过机翼上实际挂得下的 */
-    const capOf = wid => Math.min(W4[wid].ammo, (mix.slotCd[wid] || []).length * W4[wid].perPoint);
+    /* 弹药池 = 挂点数 × perPoint（玩家与 NPC 同一套规则，Loadout.arm） */
+    const capOf = wid => (mix.slotCd[wid] || []).length * W4[wid].perPoint;
     if (!mix.ammoPool || mix.ammoPool.srm !== capOf('srm') ||
         mix.ammoPool.v17 !== capOf('v17') || mix.ammoPool.mrm !== capOf('mrm')) {
       bad.push('逐组挂载没有建成弹药池：' + JSON.stringify(mix.ammoPool));
@@ -6486,14 +6487,15 @@ section('KA-7 默认挂载与携带量重量', () => {
   const bad = [];
   const E6 = sandbox.Ent, M6 = sandbox.M3;
   const w6 = E6.makeAircraft({ type: 'folded_wing', team: 0, x: 0, y: 3000, z: 0, fwd: M6.V(0, 0, 1), speed: 300, isDrone: true });
-  if (!w6.ammoPool || w6.ammoPool.drm !== 30 || w6.ammoPool.mrm !== 4) bad.push('KA-7 默认挂载的弹药池应为 drm 30 / mrm 4，实际 ' + JSON.stringify(w6.ammoPool));
+  /* 弹药池 = 挂点数 × perPoint（与玩家同一套规则）：翼下 2 点 × 15 = 30 发 TOR-3，内埋 2 点 × 6 = 12 发 CLA-4 */
+  if (!w6.ammoPool || w6.ammoPool.drm !== 30 || w6.ammoPool.mrm !== 12) bad.push('KA-7 默认挂载的弹药池应为 drm 30 / mrm 12，实际 ' + JSON.stringify(w6.ammoPool));
   if (E6.mountIssues && E6.mountIssues.length) bad.push('KA-7 默认挂载出现挂载问题：' + JSON.stringify(E6.mountIssues));
   const lf6 = E6.curLoadFactor(w6);
-  if (Math.abs(lf6 - 0.614) > 0.01) bad.push('KA-7 满挂 loadFactor 应约 0.614（按携带量算），实际 ' + lf6.toFixed(3));
+  if (Math.abs(lf6 - 0.618) > 0.01) bad.push('KA-7 满挂 loadFactor 应约 0.618（4140 kg / maxLoad 6700），实际 ' + lf6.toFixed(3));
   w6.ammoPool.mrm = 0;
   if (!(E6.curLoadFactor(w6) < lf6 - 0.1)) bad.push('打光 CLA-4 后 KA-7 的挂载重量没有减轻');
   if (bad.length) bad.forEach(fail);
-  else ok('KA-7 默认挂载：翼下 TOR-3 ×2 + 内埋 CLA-4 ×2 按组落位，弹药池 drm 30 / mrm 4，满挂 loadFactor ' + lf6.toFixed(3) + '，打光 CLA-4 后减轻');
+  else ok('KA-7 默认挂载：翼下 TOR-3 ×2 + 内埋 CLA-4 ×2 按组落位，弹药池 drm 30 / mrm 12，满挂 loadFactor ' + lf6.toFixed(3) + '，打光 CLA-4 后减轻');
 });
 
 section('僚机掩护撒干扰弹', () => {

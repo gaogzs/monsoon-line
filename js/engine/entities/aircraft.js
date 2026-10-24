@@ -66,7 +66,7 @@
       firingGun: false,
 
       special: spWid,
-      spAmmo: spWid ? WEAPONS[spWid].ammo : 0,
+      spAmmo: 0,          // 真实发数由挂载决定：玩家 Loadout.apply、NPC Ent.buildNpcMounts（都是 点数 × perPoint）
       spCd: 0,
       /* 并行发射槽：{ 武器 id: [槽1剩余, 槽2剩余, ...] }
          槽数 = 该武器占用的挂载点数。

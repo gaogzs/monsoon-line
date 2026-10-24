@@ -107,11 +107,12 @@ var Loadout = (function () {
   }
 
   /**
-   * 把挂载配置落到一架飞机实体上：武器列表 + 弹药池 + 每个挂载点一个发射槽
-   * + 挂载重量模型 + 被动吊舱效果。wl 缺省时现场 resolve。返回武器列表。
+   * 弹药与重量：武器列表 → 弹药池 + 发射槽 + 挂载重量模型。**玩家与 NPC 同一份**
+   * （NPC 的 Ent.buildNpcMounts 也走这里）：池 = 挂点数 × 武器的 perPoint，
+   * 槽数 = 挂点数，重量 = 挂点数 × perPoint × 单件重量。不再有"NPC 另按 w.ammo 算"这一支。
+   * 不碰触发武器（special / spAmmo）与被动吊舱 —— 那是各自调用方的事。
    */
-  function apply(p, ac, lo, wl) {
-    wl = wl || resolve(ac, lo);
+  function arm(p, ac, lo, wl) {
     var loadK = Math.min(1, mass(ac, lo) / (ac.maxLoad || 5000));
 
     p.loadoutList = wl;
@@ -134,9 +135,6 @@ var Loadout = (function () {
       p.slotCd[wl[wi].wid] = sArr;
     }
 
-    p.wpIdx = 0;
-    p.spAmmo = wl.length ? wl[0].ammo : 0;
-    p.spSalvo = wl.length ? wl[0].salvo : 1;
     // 挂载重量：拖累机动性，空挂架能换回一点
     p.loadFactor = loadK;
     /* 打出去的弹不再拖累飞机：每枚弹摊到的拖累 = 该类弹的总拖累 / 该类弹的弹药上限，
@@ -149,6 +147,19 @@ var Loadout = (function () {
     }
     var totalMass = mass(ac, lo);
     p.loadModel = { k0: loadK, total: totalMass, fixed: Math.max(0, totalMass - roundsMass), rounds: rounds };
+    return wl;
+  }
+
+  /**
+   * 把挂载配置落到玩家飞机实体上：arm（武器列表 + 弹药池 + 发射槽 + 重量模型）
+   * + 触发武器 + 被动吊舱效果。wl 缺省时现场 resolve。返回武器列表。
+   */
+  function apply(p, ac, lo, wl) {
+    wl = arm(p, ac, lo, wl || resolve(ac, lo));
+
+    p.wpIdx = 0;
+    p.spAmmo = wl.length ? wl[0].ammo : 0;
+    p.spSalvo = wl.length ? wl[0].salvo : 1;
 
     // 被动吊舱的效果（不占扳机，装上就生效）
     var pe = passive(ac, lo);
@@ -167,5 +178,5 @@ var Loadout = (function () {
     return wl;
   }
 
-  return { defaults: defaults, resolve: resolve, mass: mass, passive: passive, apply: apply };
+  return { defaults: defaults, resolve: resolve, mass: mass, passive: passive, arm: arm, apply: apply };
 })();

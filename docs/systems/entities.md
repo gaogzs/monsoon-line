@@ -114,8 +114,8 @@
   special, spAmmo, spCd,
   slotCd:{},                           // { 武器id: [槽1剩余, 槽2剩余, ...] }
   /* 挂载：玩家那套由 startMission 按机库配置另建；NPC 由 makeAircraft
-     末尾的 buildNpcMounts() 建（弹药取 min(w.ammo, 挂点数 × perPoint)，
-     perPoint 为 0 的下游弹只按 w.ammo；槽数 = 挂点数）。
+     末尾的 buildNpcMounts() 建 —— 与玩家**同一套**（Loadout.resolve / Loadout.arm）：
+     弹药池 = 挂点数 × 武器的 perPoint，槽数 = 挂点数，重量 = 挂点数 × perPoint × 单件重量。
      pods 是任务写定的被动吊舱，机制与外观（mountPlan）都用它。 */
   ammoPool, pods,
   spActive,                            // ECM 生效

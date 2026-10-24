@@ -5,11 +5,11 @@ Registry.weapon({
   model: 'missile',
   speed: 560, boost: 150, life: 11.0, vsLife: 24.0,
   turn: 0.55, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 9000,
-  dmg: 260, ammo: 1, cd: 15.6, salvo: 1, flare: 0.72, blast: 20, blastCore: 6,
+  dmg: 260, cd: 15.6, salvo: 1, flare: 0.72, blast: 20, blastCore: 6,
   target: 'ship',
   /* 高抛剖面 + 末段俯冲（entities.js 的 loft 分支） */
   loft: { alt: 2500, dive: 3500 },
-  fits: [], perPoint: 0, mass: 0,
+  fits: [], perPoint: 1, mass: 500,
   /* 反大型弹只有重挂点撑得住（与上游的 SPO-22 同一档） */
   npcFits: ['heavy'],
   desc: T('weapons.vsr.desc'),

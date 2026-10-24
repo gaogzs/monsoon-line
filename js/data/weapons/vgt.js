@@ -5,9 +5,9 @@ Registry.weapon({
   model: 'missile',
   speed: 430, boost: 120, life: 9.0, vsLife: 20.0,
   turn: 0.62, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 7000,
-  dmg: 190, ammo: 2, cd: 11, salvo: 1, flare: 0.62, blast: 30, blastCore: 8,
+  dmg: 190, cd: 11, salvo: 1, flare: 0.62, blast: 30, blastCore: 8,
   target: 'ground',
-  fits: [], perPoint: 0, mass: 0,
+  fits: [], perPoint: 1, mass: 300,
   /* 对地弹挂重型挂点或机腹 —— 下游的随队攻击机都是重型/机腹布局 */
   npcFits: ['heavy', 'belly'],
   /* 原文写"精度比不上上游的 GUT-9"，但 GUT-9 是一枚**无动力滑翔弹**

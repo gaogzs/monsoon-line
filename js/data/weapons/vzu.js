@@ -21,7 +21,7 @@ Registry.weapon({
   model: 'pod',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-  dmg: 0, ammo: 0, cd: 6.8, salvo: 1, flare: 1.0,
+  dmg: 0, cd: 6.8, salvo: 1, flare: 1.0,
   target: 'air',
   /* 顶层字段，不是嵌套的 passiveEffect。
 
@@ -30,7 +30,7 @@ Registry.weapon({
      结果是这枚吊舱的锁抗加成**完全没有生效**：
      它是六个被动吊舱里唯一用嵌套写法的，其余五个都写顶层。 */
   lockResist: 0.22,
-  fits: [], perPoint: 0, mass: 0,
+  fits: [], perPoint: 1, mass: 200,
   npcFits: ['light', 'belly'],
   desc: T('weapons.vzu.desc'),
   stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.78 },

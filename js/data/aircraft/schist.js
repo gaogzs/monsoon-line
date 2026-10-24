@@ -38,13 +38,14 @@ Registry.aircraft({
   ],
   defaultLoadout: {},
   /* 敌机挂载预设（关卡里 `loadout: 'cap'`，见 js/missions/_lib.js 的 spawnEnemy）。
-     逐组写、可以留空组、可以同弹多组；下游弹的池只看武器，同弹多挂只增加同时就绪的发数。
-       cap         BIN-6 挂 A、B 两对（与开放新挂点之前"special: dl6 自动铺满"一致）
+     逐组写、可以留空组、可以同弹多组；弹药与重量跟玩家同一套规则：池 = 挂点数 × 武器的 perPoint，
+     多挂一对就多一对的弹、多一对的重量。
+       cap         BIN-6 挂 A、B 两对（共 4 点）
        capMix      DAR-4 + BIN-6
        capPod      只挂 A 的 BIN-6，另有吊舱时由关卡写 pods（吊舱落在最后一个挂得住的组）
        strikeShip  BOX-14 + BIN-6 自卫
-       capLead     领队：DAR-4 + BIN-6 分挂到 B、C 两对，池不变
-       strikeLead  领队：BOX-14 + BIN-6 分挂到 B、C 两对，池不变 */
+       capLead     领队：DAR-4 + BIN-6 分挂到 B、C 两对
+       strikeLead  领队：BOX-14 + BIN-6 分挂到 B、C 两对 */
   npcLoadouts: {
     cap: { A: 'dl6', B: 'dl6' },
     capMix: { A: 'dl4', B: 'dl6' },

@@ -31,10 +31,10 @@ Registry.aircraft({
   ],
   defaultLoadout: {},
   /* 敌机挂载预设（关卡里 `loadout: 'cap'`，见 js/missions/_lib.js 的 spawnEnemy）。
-     逐组写、可以留空组、可以同一种弹挂在几个组上。下游弹的弹药池只看武器（perPoint 为 0），
-     所以同弹多挂几个点只是"同时就绪的发数"变多，总弹数不变：
-       cap   与开放新挂点之前的配置逐项一致（DAR-4 一对 + BIN-9 一对）
-       lead  领队 / 高空机：DAR-4 分挂到 A 与 D 两对重挂点，池不变，突发更强 */
+     逐组写、可以留空组、可以同一种弹挂在几个组上。弹药与重量跟玩家同一套规则：
+     池 = 挂点数 × 武器的 perPoint（DAR-4 每点 4 发），所以多挂一对就多一对的弹、多一对的重量：
+       cap   DAR-4 一对 + BIN-9 一对
+       lead  领队 / 高空机：DAR-4 分挂到 A 与 D 两对重挂点（DAR-4 共 16 发） */
   npcLoadouts: {
     cap: { A: 'dl4', B: 'vbn' },
     lead: { A: 'dl4', D: 'dl4', B: 'vbn' }

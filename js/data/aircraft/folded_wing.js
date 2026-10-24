@@ -29,7 +29,9 @@ Registry.aircraft({
   /* 没有机炮：它是"发射架"，自己看不见东西，目标参数全靠长机喂 ——
      机炮要的是自己对准、自己判断开火时机，这两样它都没有。 */
   gun: null,
-  maxLoad: 4200,
+  /* 默认挂载（TOR-3 ×2 点 × 15 发 + CLA-4 ×2 点 × 6 发 = 4140 kg）按挂点数 × perPoint 算，
+     与玩家同一套规则；6700 让它的载重系数仍是 ≈ 0.62（以前 NPC 另按 w.ammo 封顶，只算 4 发 CLA-4 = 0.61）。 */
+  maxLoad: 6700,
   hardpointGroups: [
     { id: 'A', label: T('aircraft.folded_wing.hardpointGroups.i0.label'), kind: 'light', pts: [{ x: 2.0, y: -0.5 }, { x: -2.0, y: -0.5 }] },
     /* 机身中线两侧的内埋弹舱：expose 0，不拉低匿踪。名义上在机身内，实际紧贴机腹挂着，hy 压到机腹下沿 */

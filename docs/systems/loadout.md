@@ -420,16 +420,19 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 （`smoke.js` 有断言盯着）。
 
 所以"一种导弹 + 一些吊舱"、以及"两种导弹各占一组"都是支持的。
-吊舱吃掉挂点后，导弹的**可视挂架会变少，弹药池也跟着变少**：
-上游弹的储备按 `min(w.ammo, 挂点数 × perPoint)` 封顶 —— 机翼上挂不下的弹打不出来。
+吊舱吃掉挂点后，导弹的**可视挂架会变少，弹药池也跟着变少**：池 = 挂点数 × `perPoint`，
+没挂上的点就没有弹。
 
-`Ent` 内部的 `buildNpcMounts(a)`（`js/engine/entities/mounts.js`，不导出；`makeAircraft()` 末尾对非玩家调用）据此建两样东西：
+`Ent` 内部的 `buildNpcMounts(a)`（`js/engine/entities/mounts.js`，不导出；`makeAircraft()` 末尾对非玩家调用）
+先用 `mountPlan` 定下"哪组挂什么"，再转成和机库一样的逐组配置 `{ 组id: 武器id }`，
+交给 `Loadout.resolve` / `Loadout.arm`（`js/engine/loadout.js`）—— **玩家与 NPC 弹药、重量同一套代码**：
 
-- `a.ammoPool[wid] = min(w.ammo, 挂点数 × perPoint)` —— `w.ammo` 是"打一仗的预算"，
-  但不能超过机翼上实际挂得下的量（以前直接取 `w.ammo`，KA-7 两个轻挂点能打出 44 发 GIR-9）。
-  下游弹的 `perPoint` 是 0（没有挂载表），**仍只按 `w.ammo`** —— 按玩家口径会建出 0 发弹
+- `a.ammoPool[wid] = 该武器占的挂点数 × perPoint` —— 武器的弹数只写在 `perPoint` 一处。
+  下游弹也是这样（DAR-4 每点 4 发、BIN-6 每点 3 发、BIN-9 / BOX-14 / TUM-7 / TOR-1 每点 1 发）。
+  以前 NPC 另按 `w.ammo` 这份"打一仗的预算"算，下游弹的 `perPoint` 是 0，两边是两套数据；现在 `w.ammo` 不再有读者（机炮除外）
 - `a.slotCd[wid] = [...]` —— 长度 = 该武器占用的挂点数，超出储备的槽标
   `SLOT_EMPTY`（与玩家同一条规矩）
+- `a.loadFactor` / `a.loadModel` —— 重量 = 挂点数 × perPoint × 单件重量，随弹药池打空而减轻
 
 没有这两样，实体挂载就只是装饰：`pushStores()` 判断"这枚还在不在"
 靠的正是它们（打光即不画 / 装填中则挂架空），而它们以前只有玩家有 ——
@@ -715,7 +718,7 @@ cd[wid] = slots.map(剩余 => 1 - clamp(剩余 / w.cd, 0, 1));
 
 **别忘第 2 步的 `cd`。** 漏了不会崩，但 `smoke.js` 会拦；绕过它的话那个武器的槽冷却是 `undefined`。完整的字段清单见 [weapons.md](weapons.md#数据字段) 与 [data.md](data.md#一件武器的字段是怎么来的)。
 
-只给 NPC 用的弹（下游那批）走另一条路：`fits` 写空数组（顶层，不用 `attr`）、`perPoint` / `mass` 填 0，再写一条 `npcFits`（§ NPC 的挂载）；
+只给 NPC 用的弹（下游那批）：`fits` 写空数组（顶层，不用 `attr`，玩家挂不上），再写一条 `npcFits`（§ NPC 的挂载）；**`perPoint` / `mass` 照常填真实值**（NPC 的弹药与重量与玩家同一套规则，池 = 挂点数 × `perPoint`，填 0 就是没有弹）；
 玩家那边根本不列它，所以不需要 `attr`。（它们的 `cd` 仍然要写，是给 NPC 的开火节奏用的。）
 
 ## 加一架新飞机
@@ -758,5 +761,5 @@ cd[wid] = slots.map(剩余 => 1 - clamp(剩余 / w.cd, 0, 1));
 - 翼下 A 组（`light`，2 点）：TOR-3「雏矢」×2（`drm`，僚机专用，只有 `npcFits`）。
 - 机腹 B 组（`belly`，2 点，`expose: 0`）：CLA-4「中继」×2（`mrm`，中距雷达弹）。名义内埋，实际紧贴机腹（`hy: -0.12`）。
 - 远近切换不需要下令：近处由 TOR-3 负责，远处的空中目标由 CLA-4 负责（`chooseWeapon` 取够得着的里面射程最短的）。
-- `maxLoad` 4200；满挂 `loadFactor` ≈ 0.614；打光 CLA-4 后降到约 0.43。
-- 挂载重量按携带量算：`mrm` 的 `ammo` 是 4，只算 4 × 195 kg，不是 2 × 6 × 195 kg。
+- `maxLoad` 6700；满挂 `loadFactor` ≈ 0.618（TOR-3 2 点 × 15 发 + CLA-4 2 点 × 6 发 = 4140 kg）；打光 CLA-4 后降到约 0.33。
+- 弹药与重量与玩家同一套：池 = 挂点数 × `perPoint`，所以内埋 CLA-4 是 2 × 6 = 12 发（以前 NPC 另按 `w.ammo` 封顶成 4 发，`maxLoad` 当时是 4200；换成统一规则后把 `maxLoad` 提到 6700，载重系数仍是 ≈ 0.62）。

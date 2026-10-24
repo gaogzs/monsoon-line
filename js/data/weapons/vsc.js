@@ -15,14 +15,14 @@ Registry.weapon({
   model: 'pod',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
-  dmg: 0, ammo: 99, cd: 40, salvo: 0, flare: 1.0,
+  dmg: 0, cd: 40, salvo: 0, flare: 1.0,
   target: 'none', duration: 8,
   /* 范围压制：半径内的人被压住，越靠中心越狠（见 game.js updateJamming） */
   jamRadius: 12000, jamK: 0.85,
   /* 辐射特征：开机期间 ewPower > 0，entities.js 的 isRadiating 据此
      把它当反辐射目标（SPO-8 伤害翻倍）。原来这里另有一个 emitter 字段，
      没有任何代码读它，删掉。 */
-  fits: [], perPoint: 0, mass: 0,
+  fits: [], perPoint: 1, mass: 210,
   npcFits: ['light', 'belly'],
   desc: T('weapons.vsc.desc'),
   stat: { dmg: 0, spd: 0, trn: 0, rng: 0, ecm: 0.86 }

@@ -207,85 +207,30 @@
      靠的是 ammoPool（打光即不画）与 slotCd（装填中则挂架空），
      而它们以前只有玩家有 —— 于是敌机的弹永远挂在翼下，打光也不消失。
 
-     弹药数取 w.ammo：那是 AI 一直在用的预算（spAmmo），
-     不能换成玩家的 `挂点数 × perPoint` —— 下游弹的 perPoint 是 0，
-     那样会建出 0 发。 */
+     **弹药与重量跟玩家同一套**：mountPlan 先把"哪组挂什么"定下来，转成和机库一样的
+     逐组配置 { 组id: 武器id }，再交给 Loadout.resolve / Loadout.arm（js/engine/loadout.js）——
+     池 = 挂点数 × 武器的 perPoint，槽数 = 挂点数，重量 = 挂点数 × perPoint × 单件重量。
+     武器的弹数只写在 perPoint 一处，玩家和敌机读的是同一个数；NPC 不再有另外一份"w.ammo 预算"。 */
   function buildNpcMounts(a) {
-    var groups = (a.ac && a.ac.hardpointGroups) || [];
-    var plan = mountPlan(a);
-    var pts = {}, gi, k, mass = 0;
-    /* 重量分两块：吊舱（不随打空而变轻）进 fixed；弹按武器分进 massBy，随弹药池折算（见 curLoadFactor） */
-    var fixedM = 0, massBy = {};
+    var ac = a.ac, groups = (ac && ac.hardpointGroups) || [];
+    var plan = mountPlan(a), lo = {}, gi;
+    for (gi = 0; gi < groups.length; gi++) if (plan[gi]) lo[groups[gi].id] = plan[gi];
 
-    for (gi = 0; gi < groups.length; gi++) {
-      var wid = plan[gi];
-      if (!wid) continue;
-      var w = WEAPONS[wid];
-      /* 吊舱与定向能不是打出去的东西，不占发射槽（渲染那边也一直挂着）。
-         它们的重量按挂点算、不随打空而变。打出去的弹按携带量算（见下）。 */
-      if (!w || w.kind === 'gun' || w.kind === 'ecm' || w.kind === 'dew') {
-        if (w) fixedM += groups[gi].pts.length * (w.perPoint || 1) * (w.mass || 100);
-        continue;
-      }
-      pts[wid] = (pts[wid] || 0) + groups[gi].pts.length;
-    }
-    /* 弹的重量按**实际携带量**算：min(ammo, 点数 × perPoint) 发 × 单件重量。
-       以前按 点数 × perPoint 算，CLA-4 这种 ammo 远小于挂点容量的弹会被算成 2340 kg，实际只带 4 发（780 kg）。
-       下游弹 perPoint 为 0，仍按挂点数 × 占位 100 kg。 */
-    for (k in pts) {
-      if (!Object.prototype.hasOwnProperty.call(pts, k)) continue;
-      var kw = WEAPONS[k], carried = kw.perPoint > 0
-        ? Math.min(kw.ammo || 0, pts[k] * kw.perPoint) : pts[k];
-      massBy[k] = carried * (kw.mass || 100);
-    }
-    for (k in massBy) mass += massBy[k];
-    mass += fixedM;
-
-    /* NPC 也吃挂载重量惩罚。以前只有玩家设 loadFactor，
-       满挂的敌机飞起来和空挂一样。 */
-    a.loadFactor = Math.min(1, mass / ((a.ac && a.ac.maxLoad) || 5000));
-
-    for (k in pts) {
-      if (!Object.prototype.hasOwnProperty.call(pts, k)) continue;
-      var ammo = WEAPONS[k].ammo || 0;
-      /* 但预算不能超过机翼上实际挂得下的量：w.ammo 是"这架飞机打一仗的预算"，
-         以前直接拿来当弹药池，于是 KA-7 一组轻挂点（2 点 × 2 发 = 4）
-         能打出 44 发 v9。上游弹按 `挂点数 × perPoint` 封顶；
-         下游弹 perPoint 是 0（没有挂载表），仍然只按 w.ammo。 */
-      var per = WEAPONS[k].perPoint || 0;
-      if (per > 0) ammo = Math.min(ammo, pts[k] * per);
-      var arr = [];
-      /* 与玩家同一条规矩：储备少于挂架数时，多出来的挂点一开始就是空的
-         （SLOT_EMPTY 永远不会被减到 0，见 stepAircraft 的冷却段） */
-      for (gi = 0; gi < pts[k]; gi++) arr.push(gi < ammo ? 0 : $.SLOT_EMPTY);
-      a.slotCd[k] = arr;
-      if (!a.ammoPool) a.ammoPool = {};
-      a.ammoPool[k] = ammo;
-    }
+    // NPC 也吃挂载重量惩罚（loadFactor），弹打出去、池变小，总重跟着减轻（curLoadFactor）
+    Loadout.arm(a, ac, lo, Loadout.resolve(ac, lo));
 
     /* special 兜底：任务写的逐组配置里如果那件被校验挡掉了（挂不上 /
        能力不足），a.special 可能指着一件根本没装上的东西。换成第一件
        真挂上的，否则 AI 会拿着一件不在机翼上的弹去挑、去开火。 */
-    if (a.ammoPool && (!a.special || !a.ammoPool[a.special])) {
+    if (!a.special || !a.ammoPool[a.special]) {
       var first = null;
-      for (k in a.ammoPool) {
+      for (var k in a.ammoPool) {
         if (!Object.prototype.hasOwnProperty.call(a.ammoPool, k)) continue;
         first = k;
         break;
       }
       setWeapon(a, first);
     }
-    /* NPC 的挂载拖累随弹药池折算，与玩家同一套：k0 = 初始挂载系数，total = 满挂总重，
-       弹打出去、弹药池变小，总重跟着减轻（curLoadFactor）。
-       储备为 0 的武器没有弹可打，它的重量算固定（不然打光前后对不上）。 */
-    var rounds = [];
-    for (k in pts) {
-      if (!Object.prototype.hasOwnProperty.call(pts, k)) continue;
-      var cap = a.ammoPool ? (a.ammoPool[k] || 0) : 0;
-      if (cap > 0) rounds.push({ wid: k, cap: cap, mass: massBy[k] || 0 });
-      else fixedM += massBy[k] || 0;
-    }
-    a.loadModel = { k0: a.loadFactor, total: mass, fixed: fixedM, rounds: rounds };
     a.mountWids = plan;
     $.setStealth(a, null);
   }
