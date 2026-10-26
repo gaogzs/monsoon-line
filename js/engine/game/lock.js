@@ -281,17 +281,9 @@
       /* 方位限制：只量水平方位（Ent.lockOff），世界垂直方向不算 ——
          与 AI、航线 strike 同一条规则。以前这里只看俯角，正后方的目标也锁得上。 */
       var dep = -dir.y;                       // 目标低于机头的程度（sin）
-      /* 带弹翼的精确制导炸弹（PEJ-14）：HUD 画的是机头周围的圆形视场圈，
-         目标落在圈里（三维离轴角 < 锥角）就开始锁，不再只量水平方位、也不看俯角 */
-      if (w.fin && w.tags.ballistic) {
-        $.player.lockInCone = off < cone;
-        $.player.lockInRange = dist < lockDist * 1.35;
-        ok = $.player.lockInRange && $.player.lockInCone;
-      } else {
-        $.player.lockInCone = Ent.lockOff($.player, t, w) < cone;
-        $.player.lockInRange = dist < lockDist * 1.35;
-        ok = dist < lockDist * 1.35 && dep > -0.10 && $.player.lockInCone;
-      }
+      $.player.lockInCone = Ent.lockOff($.player, t, w) < cone;
+      $.player.lockInRange = dist < lockDist * 1.35;
+      ok = dist < lockDist * 1.35 && dep > -0.10 && $.player.lockInCone;
     }
 
     /* 锁定速率按导引方式分档。
