@@ -256,11 +256,12 @@
       if (!m.alive || m.team === actor.team) continue;
       if (m.target !== actor) continue;
       var d = M3.dist(m.pos, actor.pos);
-      if (d > w.interceptRange) continue;
+      /* 空气越稀，光束越不散，射程越远：海平面 ×1，18 km 及以上 ×highAltRange。 */
+      var rngK = 1 + ((w.highAltRange || 1) - 1) * M3.clamp(actor.pos.y / 18000, 0, 1);
+      if (d > w.interceptRange * rngK) continue;
       var toM = M3.norm(M3.sub(m.pos, actor.pos));
       if (M3.angleBetween(actor.fwd, toM) > w.interceptCone) continue;
-      // 平流层的风切变会把光斑抹开，拦截概率下降（见 codex t4 铁律二）
-      var chance = (actor.pos.y > 18000 && w.highAltChance) ? w.highAltChance : w.interceptChance;
+      var chance = w.interceptChance;
       /* 每枚来袭弹**只判一次**：第一次进入包线时按 chance 掷骰。
 
          以前是把总概率按"约 1.2 秒飞行时间"折成每帧概率连续掷，

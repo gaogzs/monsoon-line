@@ -133,13 +133,13 @@ e4 → 干扰    l2 → 光      dl4 → 远   dl6 → 之间 / 近   dl9 → �
 | `passive`（标签） | `Loadout`、`Game`、`Ent` | 被动吊舱：不占扳机、不进入武器纵列 |
 | `silentLock`（标签） | `Ent` `passiveEffects` | 被动测距：用它锁人时对方 RWR 收不到告警（GUS-6 / GUS-9） |
 | `duration` / `lockReduce` | `Ent` `openEcm`（→ `spActive` / `ewLockReduce`，再由 `AI` 的锁定距离读） | ECM 生效时间与锁定压缩 |
-| `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | `Game` `updateDEW`、`Ent` `stepAircraft` | 定向能吊舱（没有充能储备，只有 `cd`，见下「定向能拦截」） |
+| `interceptRange` / `interceptCone` / `interceptChance` / `highAltRange` | `Game` `updateDEW`、`Ent` `stepAircraft` | 定向能吊舱（没有充能储备，只有 `cd`，见下「定向能拦截」） |
 
 desc 里可以写 `{{字段}}`（以及 `coneDeg`、`lockKm`、`hardPct` 等派生量），
 `js/data/zz-seal.js` 在 `attr` 平铺之后替换成当前数值（文本本身在 `locales/zh-CN/text/weapons/<id>.json`）。desc 不再自动追加任何交战规则句子
 （武器锁定机制已整个删掉，见[调节单元附近开火](#调节单元附近开火)）。
 派生量全表（`DERIVED`）：`coneDeg` `lockKm` `flarePct` `flareRDPct` `lockResistPct` `lockReducePct`
-`interceptConeDeg` `interceptPct` `highAltPct` `volleys` `hardPct` `loftAlt` `loftDiveKm`；
+`interceptConeDeg` `interceptPct` `volleys` `hardPct` `loftAlt` `loftDiveKm`；
 其余 `{{x}}` 取 `w[x]` 的数值，取不到就原样保留。`hardPct` 的 0.2 / 0.6 是在
 `js/data/zz-seal.js` 里**另写一份**的（`HARD_K_TEXT`），改 `Ent` 的 `HARD_K`（`warhead.js`）时要同步。
 `highAltScale` / `bigTarget`（武器上）/ `selfBlind` / `emitter` / `reDone`
@@ -594,11 +594,11 @@ m.decoy = { p, v, t0, p2: chance * 0.5 };   // 骗走它的那团诱饵云
 
 - 武器 `kind === 'dew'` 且有就绪的 `slotCd` 槽（值为 0）
 - 导弹以本机为目标、敌我不同队
-- 距离 < `interceptRange`（1200 m）
+- 距离 < `interceptRange × rngK`（1200 m 起；`rngK` 从海平面的 1 线性升到 18 km 及以上的 `highAltRange` = 1.6）
 - 与本机机头夹角 < `interceptCone`（35°）
 
 ```js
-chance = (actor.pos.y > 18000 && w.highAltChance) ? w.highAltChance : w.interceptChance;
+chance = w.interceptChance;   // 高度改变的是距离（rngK），不是概率
 if (m.dewRolled === actor.id) continue;   // 每枚来袭弹只掷一次骰
 m.dewRolled = actor.id;
 if (!(Math.random() < chance)) continue;
@@ -607,7 +607,7 @@ if (!(Math.random() < chance)) continue;
 **每枚来袭弹只判一次**：第一次进入包线时按 `chance` 掷骰，结果记在 `m.dewRolled`
 （`makeMissile` 初始化为 `null`）。以前是把总概率按"约 1.2 s 飞行时间"折成每帧概率连续掷，
 实际累积取决于接近速度 —— 迎头快弹的 55% 实际只有 37% 左右。现在 desc 写的 55%
-就是每枚弹被烧掉的概率（18 km 以上用 `highAltChance`）。
+就是每枚弹被烧掉的概率（高度影响的是拦截距离，不是概率）。
 
 成功后烧毁导弹、播 `laser()` 音效与一句电台；玩家还会在"挂载切换"同一处（`SysNote`）弹一条拦截提示。
 

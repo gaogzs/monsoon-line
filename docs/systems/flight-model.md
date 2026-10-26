@@ -624,7 +624,7 @@ b.life -= dt;                      // life = gunRange / w.speed
 在 `Game` 的 `updateDEW(dt, actor)`（`engine/game/combat.js`）。**每枚来袭弹只判一次**：
 
 ```js
-chance = (actor.pos.y > 18000 && w.highAltChance) ? w.highAltChance : w.interceptChance;
+chance = w.interceptChance;   // 高度改的是拦截距离（rngK，上限 highAltRange），不是概率
 if (m.dewRolled === actor.id) continue;
 m.dewRolled = actor.id;
 if (!(Math.random() < chance)) continue;

@@ -89,7 +89,6 @@ var _CX_VALS = {
   'w.l2.interceptRange': function () { return _cxW('l2').interceptRange; },
   'w.l2.coneDeg': function () { return Math.round(_cxW('l2').interceptCone * 180 / Math.PI); },
   'w.l2.chancePct': function () { return _cxPct(_cxW('l2').interceptChance); },
-  'w.l2.highPct': function () { return _cxPct(_cxW('l2').highAltChance); },
   'w.l2.cd': function () { return _cxW('l2').cd; },
 
   'w.v17.name': function () { return _cxW('v17').name; },

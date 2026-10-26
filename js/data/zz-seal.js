@@ -23,7 +23,6 @@ Registry.sealData();
     lockReducePct: function (w) { return pct(w.lockReduce || 0); },
     interceptConeDeg: function (w) { return deg(w.interceptCone || 0); },
     interceptPct: function (w) { return pct(w.interceptChance || 0); },
-    highAltPct: function (w) { return pct(w.highAltChance || 0); },
     volleys: function (w) { return Math.floor((w.perPoint || 0) / Math.max(1, w.salvo || 1)); },
     hardPct: function (w) { return pct(w.cluster ? HARD_K_TEXT.cluster : HARD_K_TEXT.other); },
     loftAlt: function (w) { return w.loft ? w.loft.alt : 0; },

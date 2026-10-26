@@ -9,7 +9,8 @@ Registry.weapon({
   dmg: 0,salvo: 0, flare: 1.0,
   target: 'none',
   interceptRange: 1200, interceptCone: 35 * Math.PI / 180,
-  interceptChance: 0.55, highAltChance: 0.35,
+  interceptChance: 0.55,
+  highAltRange: 1.6,   // 18 km 及以上的拦截距离倍率，从海平面的 1 线性过渡（空气越稀，光束越不散）
   desc: T('weapons.l2.desc'),
   stat: { dmg: 0.0, spd: 0.0, trn: 0.0, rng: 0.0, ecm: 1.0 },
   attr: { fits: ['light', 'belly'],        perPoint: 1,  mass: 190 },

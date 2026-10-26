@@ -307,7 +307,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `cluster` | 子母弹覆盖半径（米） | `Ent` `warheadK`、`Combat` |
 | `loft` | `{alt, dive}` 攻顶弹道 | `Ent` `stepMissile` |
 | `duration` / `lockReduce` | ECM 生效时长与压缩比 | `Ent` `openEcm` |
-| `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltChance` | 定向能拦截 | `Ent`、`Game` `updateDEW` |
+| `charges` / `recharge` / `interceptRange` / `interceptCone` / `interceptChance` / `highAltRange` | 定向能拦截 | `Ent`、`Game` `updateDEW` |
 
 `highAltScale` / `selfBlind` / `emitter` / 武器上的 `bigTarget` 曾是"写了没人读"的说明性标记，**已全部删除**
 （`bigTarget` 现在只是 `js/missions/` 写在**实体**上的标签）。
