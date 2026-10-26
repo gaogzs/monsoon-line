@@ -74,6 +74,17 @@
       }
     }
 
+    /* 绘制顺序：远的先画、近的后画 —— 右侧信息文字叠在一起时，更近的单位盖在上面；
+       已选定的目标（锁定框的信息）最后画，永远在最顶层。 */
+    var order = {};
+    for (i = 0; i < list.length; i++) order[i] = p.target === list[i] ? -1 : M3.dist(p.pos, list[i].pos);
+    var idx = list.map(function (_, k) { return k; });
+    idx.sort(function (a, b) {
+      if (order[a] < 0 || order[b] < 0) return order[a] < 0 ? 1 : -1;
+      return order[b] - order[a];
+    });
+    list = idx.map(function (k) { return list[k]; });
+
     // 屏外标记的落点每帧只算一次 —— 与目标数量无关
     var offRect = $.offscreenRect(W, H, p);
 
@@ -426,7 +437,10 @@
     ctx.strokeStyle = hot ? $.RED : (t ? 'rgba(255,176,58,0.42)' : 'rgba(150,170,180,0.22)');
     ctx.lineWidth = hot ? 1.6 : 1.4;
     if (!hot && ctx.setLineDash) ctx.setLineDash([6, 6]);
-    if (Ent.targetClass(w, t) === 'air') {      // 对空对地通用（any）随当前目标走；无目标默认圆
+    /* 带弹翼的精确制导炸弹：对面弹也画圆（锁定按三维离轴角算，见 lock.js），
+       和泪滴形瞄准圈（aids.js 的 drawFootprint）同时显示 */
+    var fin = !!(w.fin && w.tags.ballistic);
+    if (fin || Ent.targetClass(w, t) === 'air') {      // 对空对地通用（any）随当前目标走；无目标默认圆
       var bs = M3.project(cam, M3.add(p.pos, M3.mul(p.fwd, 2000)));
       var r = cam.focal * Math.tan(Math.min(1.45, cone));
       if (bs && r < Math.max(W, H)) {

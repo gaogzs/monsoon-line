@@ -9,7 +9,7 @@
   function newWorld() {
     var w = {
       time: 0,
-      actors: [], missiles: [], bullets: [], particles: [], targets: [],
+      actors: [], missiles: [], shotQueue: [], bullets: [], particles: [], targets: [],
       wings: {},
       player: null,
       flags: {},

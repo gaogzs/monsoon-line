@@ -100,7 +100,8 @@
 
     watchdog(dt);
 
-    // 导弹
+    // 导弹（先放出到点的连射延迟弹）
+    $.stepShotQueue(dt);
     for (i = 0; i < $.world.missiles.length; i++) Ent.stepMissile($.world.missiles[i], dt, $.world);
     // 子弹
     for (i = 0; i < $.world.bullets.length; i++) Ent.stepBullet($.world.bullets[i], dt, $.world);

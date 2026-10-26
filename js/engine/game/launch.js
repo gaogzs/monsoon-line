@@ -1,7 +1,7 @@
 (function (Game) {
   'use strict';
   var $ = Game.$;
-  $.fireEcm = fireEcm; $.launch = launch;
+  $.fireEcm = fireEcm; $.launch = launch; $.stepShotQueue = stepShotQueue;
 
   /* ============================================================
      齐射的出膛扇面
@@ -113,6 +113,24 @@
     return true;
   }
 
+  /* 放出到点的延迟发射。载机沿机头方向前进 elapsed × 速度，出膛点跟着走。 */
+  function stepShotQueue(dt) {
+    var q = $.world.shotQueue;
+    if (!q || !q.length) return;
+    var keep = [];
+    for (var i = 0; i < q.length; i++) {
+      var e = q[i];
+      e.t -= dt;
+      if (e.t > 0) { keep.push(e); continue; }
+      var o = e.spec.owner;
+      if (o && o.alive) e.spec.pos = M3.add(e.spec.pos, M3.mul(o.fwd, (o.speed || 0) * -e.t));
+      var m = Ent.makeMissile(e.spec);
+      m.salvo = e.salvo;
+      $.world.missiles.push(m);
+    }
+    $.world.shotQueue = keep;
+  }
+
   function launch(actor, target, w) {
     var wp = WEAPONS[actor.special];
     if (!wp) return false;
@@ -175,8 +193,12 @@
        一次齐射才能分打一个编队。雷达弹要靠载机交接，不走这条。 */
     var irSalvo = (nShot > 1 && wp.seeker === 'ir') ? { claimed: [] } : null;
     if (irSalvo && target) irSalvo.claimed.push(target);
+    /* 连射延迟 wp.salvoGap：第 q 发在按键后 q × salvoGap 秒出膛（火箭巢是
+       依次点火的，不是同一帧齐出）。0 / 不写 = 同时。延迟的几发进 world.shotQueue，
+       由 stepShotQueue 到点放出 —— 位置顺着载机当时的航向推进，指向沿用按键那一刻的。 */
+    var gap = wp.salvoGap || 0;
     for (var q = 0; q < nShot; q++) {
-      var m = Ent.makeMissile({
+      var spec = {
         weapon: actor.special,
         team: actor.team,
         pos: M3.add(hp, shots[q].off),
@@ -184,7 +206,12 @@
         speed: actor.speed + 70,
         target: (irSalvo && q > 0) ? null : (target || null),
         owner: actor
-      });
+      };
+      if (gap > 0 && q > 0) {
+        w.shotQueue.push({ t: q * gap, spec: spec, salvo: irSalvo });
+        continue;
+      }
+      var m = Ent.makeMissile(spec);
       m.salvo = irSalvo;
       w.missiles.push(m);
     }

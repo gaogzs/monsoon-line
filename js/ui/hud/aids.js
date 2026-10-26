@@ -100,12 +100,12 @@
     var w = WEAPONS[p.special];
     if (!w || !w.fin || !w.tags.ballistic) return;
 
-    /* 可达区域每 1 s 重算一次（一次要跑上百份弹道）：像机载火控解算那样一秒一刷，
+    /* 可达区域每 0.3 s 重算一次（一次要跑上百份弹道）：像机载火控解算那样定时刷新，
        两次之间圈钉在世界坐标上不动，换武器 / 换目标高度才立刻重算。 */
     var now = performance.now();
     var ft = p.target && p.target.alive && p.target.kind === 'target' ? p.target.pos.y : 0;
     var c = p.__fp;
-    if (!c || c.w !== w.id || c.ty !== ft || now - c.at > 1000) {
+    if (!c || c.w !== w.id || c.ty !== ft || now - c.at > 300) {
       c = p.__fp = { w: w.id, ty: ft, at: now, spd: p.speed || 0, y: p.pos.y,
         fp: Ent.finFootprint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }, undefined, ft) };
     }
