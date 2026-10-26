@@ -2,7 +2,7 @@ Registry.weapon({
   order: 380,
   id: 'e4', name: 'ZUN-4', cn: T('weapons.e4.cn'), kind: 'ecm',
   ecmBonus: 0.12,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
-  model: 'pod',
+  model: 'pod_jam',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
   dmg: 0,salvo: 0, flare: 1.0,

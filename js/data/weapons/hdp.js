@@ -2,7 +2,7 @@ Registry.weapon({
   order: 250,
   tags: ['passive'],
   id: 'hdp', name: 'JDA-3', cn: T('weapons.hdp.cn'), kind: 'ecm',
-  model: 'pod',
+  model: 'pod_armor',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
   dmg: 0, cd: 0, salvo: 0, flare: 1.0,

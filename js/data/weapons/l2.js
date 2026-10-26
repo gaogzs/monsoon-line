@@ -1,7 +1,7 @@
 Registry.weapon({
   order: 390,
   id: 'l2', name: 'GUS-2', cn: T('weapons.l2.cn'), kind: 'dew',
-  model: 'pod',
+  model: 'pod_dew',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
   /* 没有充能储备：每拦截一次，这个吊舱的发射槽进入 cd 秒冷却，

@@ -2,7 +2,7 @@ Registry.weapon({
   order: 230,
   tags: ['passive', 'silentLock'],
   id: 'oep', name: 'GUS-6', cn: T('weapons.oep.cn'), kind: 'ecm',
-  model: 'pod',
+  model: 'pod_eo',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
   dmg: 0, cd: 0, salvo: 0, flare: 1.0,

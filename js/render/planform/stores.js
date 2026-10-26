@@ -36,7 +36,7 @@
      没有 look 的（吊舱）走老的按 kind 画法。 */
   function drawStore(g, x, y, w, k, style) {
     var lk = w.look;
-    if (!lk) return drawStoreKind(g, x, y, w.kind, k, style);
+    if (!lk) return drawStoreKind(g, x, y, w.kind, k, style, w.model);
     g.lineWidth = style.line;
     var L = lk.len * k, D = Math.max(2, lk.dia * 1.7 * k), i;
 
@@ -168,7 +168,95 @@
     if (lk.boost) seg(x - D * 0.8, y + L * 0.28, x + D * 0.8, y + L * 0.28);
   }
 
-  function drawStoreKind(g, x, y, kind, k, style) {
+  /* 吊舱按职能分六种剪影，与 3D 的 pod / pod_jam / pod_eo / pod_dec / pod_armor / pod_dew 对应。
+     g.lineWidth 已由调用方设好；L 是长、W 是宽（像素），机头朝上。 */
+  function drawPod(g, x, y, model, kind, L, W) {
+    function seg(x0, y0, x1, y1) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+    function ring(cx, cy, r) { g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); }
+
+    if (model === 'pod_jam') {
+      // 主动干扰机：细长尖头 + 两侧平板天线
+      var jw = W * 0.38;
+      g.beginPath();
+      g.moveTo(x, y - L / 2);
+      g.lineTo(x + jw, y - L * 0.28);
+      g.lineTo(x + jw, y + L / 2);
+      g.lineTo(x - jw, y + L / 2);
+      g.lineTo(x - jw, y - L * 0.28);
+      g.closePath();
+      g.stroke();
+      g.strokeRect(x + jw, y - L * 0.16, W * 0.2, L * 0.34);
+      g.strokeRect(x - jw - W * 0.2, y - L * 0.16, W * 0.2, L * 0.34);
+      seg(x - jw, y + L * 0.02, x + jw, y + L * 0.02);   // 环带
+      return;
+    }
+    if (model === 'pod_eo') {
+      // 光电测距：圆筒 + 前端一颗球形转塔
+      var ew = W * 0.42, er = Math.max(2.4, W * 0.40);
+      g.beginPath();
+      g.moveTo(x - ew, y - L * 0.22);
+      g.lineTo(x + ew, y - L * 0.22);
+      g.lineTo(x + ew, y + L / 2);
+      g.lineTo(x - ew, y + L / 2);
+      g.closePath();
+      g.stroke();
+      ring(x, y - L * 0.28, er);
+      ring(x, y - L * 0.28, Math.max(0.8, er * 0.4));
+      return;
+    }
+    if (model === 'pod_dec') {
+      // 诱饵投放舱：窄体切角头 + 后半段 2×3 的投放口方格
+      var dw = W * 0.42;
+      g.beginPath();
+      g.moveTo(x - dw * 0.55, y - L / 2);
+      g.lineTo(x + dw * 0.55, y - L / 2);
+      g.lineTo(x + dw, y - L * 0.34);
+      g.lineTo(x + dw, y + L / 2);
+      g.lineTo(x - dw, y + L / 2);
+      g.lineTo(x - dw, y - L * 0.34);
+      g.closePath();
+      g.stroke();
+      var cs = Math.max(1.6, dw * 0.62);
+      for (var r = 0; r < 3; r++) {
+        var cy = y - L * 0.10 + r * (L * 0.22);
+        g.strokeRect(x - dw * 0.85, cy - cs / 2, cs, cs);
+        g.strokeRect(x + dw * 0.85 - cs, cy - cs / 2, cs, cs);
+      }
+      return;
+    }
+    if (model === 'pod_armor') {
+      // 装甲舱：方块 + 对角加强
+      var aw = W * 0.5;
+      g.strokeRect(x - aw, y - L / 2, aw * 2, L);
+      seg(x - aw, y - L * 0.18, x + aw, y + L * 0.18);
+      seg(x + aw, y - L * 0.18, x - aw, y + L * 0.18);
+      return;
+    }
+
+    // 通用（被动干扰）与定向能：方头方脑，头部略收
+    g.beginPath();
+    g.moveTo(x - W * 0.34, y - L / 2);
+    g.lineTo(x + W * 0.34, y - L / 2);
+    g.lineTo(x + W / 2, y - L * 0.30);
+    g.lineTo(x + W / 2, y + L / 2);
+    g.lineTo(x - W / 2, y + L / 2);
+    g.lineTo(x - W / 2, y - L * 0.30);
+    g.closePath();
+    g.stroke();
+    seg(x - W / 2, y - L * 0.06, x + W / 2, y - L * 0.06);   // 舱段分隔
+    if (kind === 'dew' || model === 'pod_dew') {
+      // 定向能：前方双层孔径 + 尾部散热片
+      ring(x, y - L * 0.34, Math.max(1.6, W * 0.30));
+      ring(x, y - L * 0.34, Math.max(0.8, W * 0.14));
+      for (var i = 0; i < 3; i++) seg(x - W * 0.7, y + L * (0.20 + i * 0.1), x + W * 0.7, y + L * (0.20 + i * 0.1));
+      return;
+    }
+    // 被动干扰：尾端散热格栅（短竖线）
+    seg(x - W / 2, y + L * 0.26, x + W / 2, y + L * 0.26);
+    for (var j = -1; j <= 1; j++) seg(x + j * W * 0.22, y + L * 0.26, x + j * W * 0.22, y + L / 2);
+  }
+
+  function drawStoreKind(g, x, y, kind, k, style, model) {
     var L = ($.STORE_LEN[kind] || 3.0) * k;
     var W;
 
@@ -184,34 +272,7 @@
 
     g.lineWidth = style.line;
 
-    if (isPod(kind)) {
-      // 电子战 / 定向能吊舱：方头方脑，头部略收
-      g.beginPath();
-      g.moveTo(x - W * 0.34, y - L / 2);
-      g.lineTo(x + W * 0.34, y - L / 2);
-      g.lineTo(x + W / 2, y - L * 0.30);
-      g.lineTo(x + W / 2, y + L / 2);
-      g.lineTo(x - W / 2, y + L / 2);
-      g.lineTo(x - W / 2, y - L * 0.30);
-      g.closePath();
-      g.stroke();
-
-      // 舱段分隔
-      g.beginPath();
-      g.moveTo(x - W / 2, y - L * 0.06);
-      g.lineTo(x + W / 2, y - L * 0.06);
-      g.moveTo(x - W / 2, y + L * 0.26);
-      g.lineTo(x + W / 2, y + L * 0.26);
-      g.stroke();
-
-      // 定向能吊舱前方加一个发射孔径
-      if (kind === 'dew') {
-        g.beginPath();
-        g.arc(x, y - L * 0.34, Math.max(1.6, W * 0.30), 0, Math.PI * 2);
-        g.stroke();
-      }
-      return;
-    }
+    if (isPod(kind)) { drawPod(g, x, y, model, kind, L, W); return; }
 
     // 注意：屏幕坐标 y 向下增大，而弹体要朝上（和机头同向），
     // 所以"头部"取 y - L/2、"尾部"取 y + L/2。写反过一次。

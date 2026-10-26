@@ -3,7 +3,7 @@ Registry.weapon({
   tags: ['passive', 'silentLock'],
   id: 'irp', name: 'GUS-9', cn: T('weapons.irp.cn'), kind: 'ecm',
   ecmBonus: 0.03,   // 每具吊舱叠加到机体 ECM 上（见 Ent.passiveEffects）
-  model: 'pod',
+  model: 'pod_eo',
   speed: 0, boost: 0, life: 0, vsLife: 0,
   turn: 0, seeker: 'none', lockCone: 0, lockDist: 0,
   dmg: 0, cd: 0, salvo: 0, flare: 1.0,
