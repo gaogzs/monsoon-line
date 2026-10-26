@@ -85,6 +85,13 @@ ${tags}
   function look(from, at) {
     Renderer.setCamera(from, M3.norm(M3.sub(at, from)), M3.V(0, 1, 0), 50);
   }
+  /* 极点附近的相机：基由 (偏航 Y, 俯仰 P) 直接写出（同 camera.js 的 camBasis），up 显式传入。
+     look() 写死 up=+Y，P = 90° 时与视线共线，所以这里不能复用它。 */
+  function poleLook(from, Ydeg, Pdeg) {
+    var Y = Ydeg * Math.PI / 180, P = Pdeg * Math.PI / 180;
+    var sy = Math.sin(Y), cy = Math.cos(Y), sp = Math.sin(P), cp = Math.cos(P);
+    Renderer.setCamera(from, M3.V(sy * cp, sp, cy * cp), M3.V(-sy * sp, cp, -cy * sp), 50);
+  }
   var O = M3.V(0, 3000, 0);
   var SC = [
     { id: 'wing-top', occl: true, fn: function () { look(M3.V(-6, 3009, -16), O); pushPlane(plane('sailfish', O, M3.V(0, 0, 1))); } },
@@ -103,6 +110,14 @@ ${tags}
   ];
   ['sailfish', 'basalt', 'boulder'].forEach(function (t) {
     SC.push({ id: 'aircraft-' + t, fn: function () { look(M3.V(18, 3008, -22), O); pushPlane(plane(t, O, M3.V(0, 0, 1))); } });
+  });
+  /* 抬头 / 过顶：从机腹下方往上看，机头指向 +Z（Y = 0 / 180° 表示相机转到另一侧） */
+  [[80, 0], [89, 0], [90, 0], [90, 135], [-90, 40]].forEach(function (c) {
+    SC.push({ id: 'pole-' + c[0] + '-y' + c[1], env: true, fn: function () {
+      var sgn = c[0] < 0 ? -1 : 1;
+      poleLook(M3.V(0, 3000 - 40 * sgn, -30), c[1], c[0]);
+      pushPlane(plane('sailfish', M3.V(0, 3000, 0), M3.V(0, 0, 1)));
+    } });
   });
   /* 环境场景：粒子固定一份（同一组随机数），两边画同一批 */
   var blast = [];

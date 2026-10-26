@@ -33,11 +33,6 @@
     };
   // 油门轴的两个分界点：HUD 的 THR 读数按它们标度，断言两边一致
   Game.__thr = { IDLE: $.THR_IDLE, MAX: $.THR_MAX };
-  // 鼠标引导时镜头俯仰与瞄准俯仰的映射（天顶卡在画面上沿）
-  Game.__camPitch = {
-      camPitchFor: $.camPitchFor,
-      AIM_LIM: $.AIM_PITCH_LIM
-    };
 })(Game);
 
 window.addEventListener('load', function () { Game.init(); });

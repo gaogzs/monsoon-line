@@ -1,7 +1,7 @@
 (function (Game) {
   'use strict';
   var $ = Game.$;
-  $.camPitchFor = camPitchFor; $.frameDeficit = frameDeficit; $.softClampFrame = softClampFrame; $.stepFrameExtra = stepFrameExtra; $.updateCamera = updateCamera;
+  $.camBasis = camBasis; $.frameDeficit = frameDeficit; $.softClampFrame = softClampFrame; $.stepFrameExtra = stepFrameExtra; $.updateCamera = updateCamera;
 
   /* ============================================================
      相机
@@ -41,43 +41,35 @@
 
   // C：收回速率（约 1–2 s 凑回）
   var EXTRA_HOLD = 0.6;
+  var POLE_FRAME_START = 70 * Math.PI / 180;
 
   // C：需求消失后保持多久才开始收回
 
-  /* 鼠标引导时镜头俯仰与瞄准俯仰的映射：**天顶刚好卡在画面上沿**。
-
-     瞄准方向（CMD）俯仰钳在 AIM_PITCH_LIM = 89°，永远过不了天顶；镜头若也
-     跟到 89°，画面就是一片空天，而且离正交基退化只差 1°。反过来，镜头俯仰
-     停在 90° − 半视场时，天顶正好投影在画面上沿 —— CMD 拉满时就贴着它，
-     看起来能一直朝正上方飞，只是光标永远推不过那条边。天底同理卡在下沿。
-
-     上限随 FOV 变（设置里实时拖 FOV 也对）：FOV 56° → 62°，38° → 71°，100° → 40°。
-
-     映射：|瞄准| ≤ k 时镜头 = 瞄准（准星在画面正中）；之外
-         镜头 = k + (A − k)·r·(1 − (1 − t)^(1/r))，t = (|瞄准| − k)/(A − k)，r = (上限 − k)/(A − k)
-     在 k 处斜率为 1（衔接无折角），到 A 时正好等于上限且斜率为 0（平稳停住），全程单调。
-     k = max(0, 2·上限 − A)：FOV 56° 时 k = 35°，35° 以下准星都在正中。 */
-  function camPitchFor(aim, fovDeg) {
-    var A = $.AIM_PITCH_LIM;
-    var pMax = Math.PI / 2 - fovDeg * Math.PI / 360;
-    var x = Math.min(Math.abs(aim), A);
-    var k = Math.max(0, 2 * pMax - A);
-    if (x <= k) return aim;
-    var r = (pMax - k) / (A - k);
-    var t = (x - k) / (A - k);
-    return (aim < 0 ? -1 : 1) * (k + (A - k) * r * (1 - Math.pow(1 - t, 1 / r)));
+  /* 相机基，由 (偏航 Y, 俯仰 P) 直接写出，不靠 up=(0,1,0) 做叉乘：
+       fwd   = ( sinY·cosP,  sinP,  cosY·cosP )
+       right = ( cosY,       0,    −sinY      )   恒水平 → 镜头永不滚转
+       up    = (−sinY·sinP,  cosP, −cosY·sinP )
+     P = ±90° 时 up = ∓(sinY, 0, cosY)，模长仍为 1，没有退化。
+     返回 { f, r, u }（r / u 的名字沿用旧版，取景函数照旧读）。 */
+  function camBasis(Y, P) {
+    var sy = Math.sin(Y), cy = Math.cos(Y), sp = Math.sin(P), cp = Math.cos(P);
+    return {
+      f: M3.V(sy * cp, sp, cy * cp),
+      r: M3.V(cy, 0, -sy),
+      u: M3.V(-sy * sp, cp, -cy * sp)
+    };
   }
 
-  function camBasis(camDir) {
-    var r = M3.norm(M3.cross(M3.V(0, 1, 0), camDir));
-    if (M3.len(r) < 0.5) r = M3.V(1, 0, 0);
-    return { r: r, u: M3.cross(camDir, r) };
+  // 取景函数收的是视线向量：偏航默认从它反算，极点处 updateCamera 会把真实偏航传进来
+  function basisOf(camDir, yaw) {
+    if (yaw === undefined) yaw = Math.atan2(camDir.x, camDir.z);
+    return camBasis(yaw, Math.asin(M3.clamp(camDir.y, -1, 1)));
   }
 
   /* 偏移 off 下要把飞机放进画面 FRAME_FILL 以内（且深度不小于
      FRAME_MIN_DEPTH），镜头还得沿视线再退多少米。fr = { tanV, tanH }。 */
-  function frameDeficit(off, camDir, fr) {
-    var b = camBasis(camDir);
+  function frameDeficit(off, camDir, fr, yaw) {
+    var b = basisOf(camDir, yaw);
     var rel = M3.mul(off, -1);
     var need = Math.max(FRAME_MIN_DEPTH,
       Math.abs(M3.dot(rel, b.u)) / (fr.tanV * FRAME_FILL),
@@ -96,8 +88,8 @@
   /* B 侧滑软钳：保持深度，把飞机在画面上的坐标软压进 FRAME_SOFT_LIM。
      静态底座已经保证稳态位置在 FRAME_FILL 以内，所以玩家设的高度/距离不受影响。
      深度不足（视线甩得太快，镜头几乎到了飞机侧面甚至前方）时只能退到最小深度。 */
-  function softClampFrame(off, camDir, fr) {
-    var b = camBasis(camDir);
+  function softClampFrame(off, camDir, fr, yaw) {
+    var b = basisOf(camDir, yaw);
     var rel = M3.mul(off, -1);
     var f = Math.max(FRAME_MIN_DEPTH, M3.dot(rel, camDir));
     var y = softKnee(M3.dot(rel, b.u) / (f * fr.tanV), FRAME_FILL, $.FRAME_SOFT_LIM);
@@ -127,6 +119,11 @@
     return { extra: st.extra + (need - st.extra) * (1 - Math.exp(-EXTRA_DOWN * dt)), hold: 0 };
   }
 
+  function smoothstep(a, b, x) {
+    var t = M3.clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+
   function updateCamera(dt) {
     var p = $.player;
     if (!p) return;
@@ -140,49 +137,20 @@
     if (!$.keys.ArrowUp && !$.keys.ArrowDown) $.camPitch = M3.smooth($.camPitch, 0, 2.2, dt);
 
     if ($.S.camMode === 0) {
-      /* 追尾：不跟随滚转，地平线永远水平。
+      /* ---------- 追尾镜头：构造上恒水平，可以穿过上下极点 ----------
 
-         **镜头俯仰限制在 ±89°，飞机可以翻过去，镜头不跟。**
-         空翻照样能做 —— 只是到了限位之后镜头停住，
-         玩家会看到机身从视野上方（或下方）翻出去。
+         相机基由 (偏航 Y, 俯仰 P) 直接写出（见 camBasis）：right 恒水平，
+         所以镜头永不滚转、地平线永远水平；P = ±90° 时 up 仍是单位向量，
+         不再有"正交基退化"，也就不再需要 89° 限位。
 
-         为什么必须限：镜头的"上"参考只有在它与视线不共线时才有定义。
-         机头压到正上/正下时视线本身是垂直的，世界 up 与它共线，
-         正交基退化，退化保护只能临时换一根参考轴 —— 而 |f.y| 在
-         极点附近逐帧抖动，参考轴就跟着反复横跳，画面来回侧翻。
-         之前那套"混合参考"只能把跳变抹成旋转，抹不掉极点本身；
-         把俯仰限住，镜头就永远不会到达那个位置。 */
-      /* ---------- 追尾镜头：稳定的水平镜头 + 俯仰限位 ----------
+         穿越极点时偏航目标 atan2(d.x, d.z) 会突变（最多差 π），三件事压住它：
+         ① 视线水平分量小于 POLE_HOLD 时冻结偏航目标（一个极小的延迟）
+         ② 出冻结区后的转速由光标过极点多远决定（刚过一点不转，拉远慢慢转，
+            拉得很远迅速转，全程平滑）：P 在转的过程中保持 ≈ 90°，看起来就是绕竖直轴自转
+         ③ 俯仰单独平滑，P = asin(d.y) 本身连续，没有跳变
 
-         相机 up 恒为世界 up，所以地平线永远水平、画面不会跟着滚转乱转。
-         俯仰限制在 ±89°：飞机可以翻过正上方/正下方，镜头不跟，
-         到限位就停住。视线因此永远不会与世界 up 共线，正交基不会退化 ——
-         这也正是"极点卡动"那个老问题的根治办法。
-
-         限位附近最容易出的毛病是**来回抽动**。三件事必须一起做才能压住：
-
-         ① 偏航按最短角差平滑
-            翻越顶点时水平投影会瞬间反向 180°，直接跟就是瞬移。
-         ② 俯仰也要平滑
-            相机 up 是世界 up，而正交化之后 up 的长度是 cos(pitch)：
-            俯仰越接近限位这个长度越小，同样的视线变化引起的 up 变化越大。
-            所以俯仰直接阶跃时地平线会明显发抖。
-         ③ 视线最后再钳一次
-            camPos 是插值量、天生滞后，若用滞后的位置反推方向，
-            视线会比基准朝向更陡，把限位绕过去。
-
-         时间常数的取舍：偏航 1.2（约一秒转完 180°，够快也不甩），
-         俯仰 9（俯仰是玩家直接控制的，太慢会显得操纵迟滞）。
-
-         为什么是 89° 而不是 90°：正交化前 |up| = cos(限位)，
-         而 orthonormalize 的退化阈值是 |up| < 1e-4。
-         持续垂直压到限位时，89° 还剩 1.75e-2（175 倍余量），
-         实测收敛后镜头帧间差为 0、没有任何抽动；
-         89.9° 只剩 17 倍，89.999° 只剩 1 倍，到 90° 直接归零 ——
-         参考轴反复横跳、"极点卡动"就回来了。
-         89° 是"能看见最高"与"正交基始终远离退化"之间留够余量的位置。 */
-      var CAM_PITCH_LIM = 89 * Math.PI / 180;
-      var SIN_LIM = Math.sin(CAM_PITCH_LIM);
+         抬头取景：P 接近 ±90° 时视线沿机体上下，若相机还沿视线后退就会钻到机腹下面，
+         所以 |P| > 70° 起把后退方向混向水平（POLE_FRAME_*）。 */
 
       /* 鼠标引导时镜头跟**瞄准方向**，不跟机头 —— 这是战雷式操纵的另一半：
          准星永远在画面中心，机头标记去追它；镜头若跟机头，准星就会跟着
@@ -194,40 +162,45 @@
       var hx = lookDir.x, hz = lookDir.z;
       var hlen = Math.sqrt(hx * hx + hz * hz);
 
-      /* ① 偏航：最短角差平滑。
-         键盘直控时从机头的水平投影反算，接近垂直时投影塌缩、沿用上一帧。
-         鼠标引导时直接用 aimYaw —— 它在任何仰角都有定义。以前这里也走反算：
-         CMD 顶在 89° 时水平投影只有 cos 89° ≈ 0.017，一直卡在冻结区，左右拖时
-         罗盘和飞机在转、画面不转，一往下拖离开冻结区画面就猛地追过去。 */
-      if (lookAim || hlen > 0.12) {
-        var tYaw = lookAim ? $.aimYaw : Math.atan2(hx, hz);
-        var dYaw = tYaw - $.camYawBase;
-        while (dYaw > Math.PI) dYaw -= Math.PI * 2;
-        while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-        $.camYawBase += dYaw * (1 - Math.exp(-yawRate * dt));
-        if ($.camYawBase > Math.PI) $.camYawBase -= Math.PI * 2;
-        if ($.camYawBase < -Math.PI) $.camYawBase += Math.PI * 2;
-      }
+      // ① 偏航目标：水平分量够大才更新，极点附近冻结
+      if ($.camYawTarget === null) $.camYawTarget = $.camYawBase;
+      if (hlen >= $.POLE_HOLD) $.camYawTarget = Math.atan2(hx, hz);
 
-      // ② 俯仰：先钳位，再平滑
-      var camPitchAng = Math.atan2(lookDir.y, Math.max(hlen, 1e-4));
-      // 跟瞄准方向时：天顶 / 天底刚好卡在画面上下沿，见 camPitchFor
-      if (lookAim) camPitchAng = camPitchFor(camPitchAng, $.S.fov);
-      camPitchAng = M3.clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
+      /* ② 偏航：最短角差指数平滑，单步夹在转速上限内。
+         过极点后目标偏航差近 π，镜头偏航跟随的速度由**光标离极点多远**决定
+         （hlen = cos P = 光标离极点的角距的正弦）：
+           刚过一点（hlen < POLE_TURN_START）  不转，镜头先停着
+           再拉远一些                          从零开始慢慢转，平滑加速（smoothstep 再平方）
+           拉得很远（hlen ≥ POLE_TURN_FULL）   放开到 POLE_SWING_RATE，迅速转过去
+         上限对**所有**偏航跟随生效（不只是过顶那一转）：光标贴着极点左右移动时
+         目标偏航会绕着极点飞转，若镜头也跟，就只会锁在极点原地空转；
+         现在光标在极点附近画小圈，镜头纹丝不动、光标在屏幕上正常左右走，
+         幅度大到离极点够远（hlen 够大）才开始转向。离极点 POLE_TURN_FULL 以外上限
+         已高到不影响普通跟随。 */
+      var dYaw = $.camYawTarget - $.camYawBase;
+      while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+      while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+      var ts = smoothstep($.POLE_TURN_START, $.POLE_TURN_FULL, hlen);
+      var swingCap = $.POLE_SWING_RATE * ts * ts;
+      var wBig = smoothstep(1.2, 2.4, Math.abs(dYaw));   // 偏航差近半圈 = 过顶那一转，俯仰保持用
+      $.camYawBase += M3.clamp(dYaw * (1 - Math.exp(-yawRate * dt)), -swingCap * dt, swingCap * dt);
+      if ($.camYawBase > Math.PI) $.camYawBase -= Math.PI * 2;
+      if ($.camYawBase < -Math.PI) $.camYawBase += Math.PI * 2;
+
+      /* ③ 俯仰：asin(d.y) ∈ [−90°, 90°]，不钳位，只平滑。
+         但光标过顶、镜头偏航还没转过来时，asin(d.y) 会随光标往另一侧走下去 ——
+         而这时屏幕还朝着原来的方向，往上拉反而把镜头往下拉。所以偏航没转完之前
+         俯仰停在过顶那一刻（camPitchHold），随偏航转过来再平滑放开，
+         不需要变成反向镜头。只在极点附近生效（nearW），平飞时的大角度转向不受影响。 */
+      var camPitchAng = Math.asin(M3.clamp(lookDir.y, -1, 1));
+      var holdW = wBig * (1 - smoothstep(0.5, 0.9, hlen));
+      if (holdW < 1e-3 || $.camPitchHold === null) $.camPitchHold = camPitchAng;
+      camPitchAng = $.camPitchHold + (camPitchAng - $.camPitchHold) * (1 - holdW);
       if ($.camPitchSmooth === null) $.camPitchSmooth = camPitchAng;
       $.camPitchSmooth += (camPitchAng - $.camPitchSmooth) * (1 - Math.exp(-pitchRate * dt));
 
-      var cpc = Math.cos($.camPitchSmooth), cps = Math.sin($.camPitchSmooth);
-      var camDir = M3.V(Math.sin($.camYawBase) * cpc, cps, Math.cos($.camYawBase) * cpc);
-
-      // ③ 视线钳位，保证 |y| 不超过限位
-      var fy2 = M3.clamp(camDir.y, -SIN_LIM, SIN_LIM);
-      var fh2 = camDir.x * camDir.x + camDir.z * camDir.z;
-      if (fh2 > 1e-8) {
-        var fhz = Math.sqrt(fh2);
-        var fsc = Math.sqrt(Math.max(0, 1 - fy2 * fy2)) / fhz;
-        camDir = M3.V(camDir.x * fsc, fy2, camDir.z * fsc);
-      }
+      var cb = camBasis($.camYawBase, $.camPitchSmooth);
+      var camDir = cb.f;
 
       /* 位置在**世界坐标**的后方（不是机体坐标系）——
          这样滚转时镜头不会绕着飞机转圈，是"稳定"的另一半。 */
@@ -246,7 +219,15 @@
       $.camSpeedBack = $.camSpeedBack === null ? wantSpeedBack
         : $.camSpeedBack + (wantSpeedBack - $.camSpeedBack) * (1 - Math.exp(-$.CAM_SPEED_RATE * dt));
       var back = $.S.camDist + $.camSpeedBack;
-      var off0 = M3.rotAxis(M3.mul(camDir, -back), M3.V(0, 1, 0), $.camYaw);
+      /* 抬头 / 俯冲取景：|P| 从 70° 到 90° 把后退方向从视线混向水平的"机后"，
+         相机不会钻到机腹正下方。数值是原型起点，要在浏览器里调。 */
+      var poleW = M3.clamp((Math.abs($.camPitchSmooth) - POLE_FRAME_START) / (Math.PI / 2 - POLE_FRAME_START), 0, 1);
+      var backDir = camDir;
+      if (poleW > 0) {
+        var hzDir = M3.V(Math.sin($.camYawBase), 0, Math.cos($.camYawBase));
+        backDir = M3.norm(M3.add(M3.mul(camDir, 1 - poleW), M3.mul(hzDir, poleW)));
+      }
+      var off0 = M3.rotAxis(M3.mul(backDir, -back), M3.V(0, 1, 0), $.camYaw);
       var wantOff = M3.add(off0, M3.V(0, $.S.camHeight + $.camPitch * 70, 0));
 
       /* 静态底座：设定本身放不下飞机时（例如距离 2、高度 10、FOV 38°，
@@ -255,7 +236,7 @@
       var halfTan = Math.tan($.S.fov * Math.PI / 360);
       var aspect = ($.cv && $.cv.height) ? $.cv.width / $.cv.height : 16 / 9;
       var fr = { tanV: halfTan, tanH: halfTan * aspect };
-      wantOff = M3.sub(wantOff, M3.mul(camDir, frameDeficit(wantOff, camDir, fr)));
+      wantOff = M3.sub(wantOff, M3.mul(camDir, frameDeficit(wantOff, camDir, fr, $.camYawBase)));
       $.camOff = $.camOff ? smoothOffset($.camOff, wantOff, 1 - Math.exp(-7.5 * dt)) : wantOff;
 
       /* 动态：camOff 跟不上视线时飞机会偏向画面边缘，三种处理见上面"出画处理"的说明。
@@ -263,10 +244,10 @@
          中途切换模式也不会留下残余。 */
       var viewOff = $.camOff;
       if ($.S.camFrame === 1) {
-        viewOff = softClampFrame($.camOff, camDir, fr);
+        viewOff = softClampFrame($.camOff, camDir, fr, $.camYawBase);
       } else if ($.S.camFrame === 2) {
         var ex = stepFrameExtra({ extra: $.camExtra, hold: $.camExtraHold },
-          frameDeficit($.camOff, camDir, fr), dt);
+          frameDeficit($.camOff, camDir, fr, $.camYawBase), dt);
         $.camExtra = ex.extra;
         $.camExtraHold = ex.hold;
         viewOff = M3.sub($.camOff, M3.mul(camDir, $.camExtra));
@@ -275,7 +256,7 @@
       $.camPos = M3.add(p.pos, viewOff);
 
       $.camFwd = camDir;
-      $.camUp = M3.V(0, 1, 0);
+      $.camUp = cb.u;
       Renderer.setCamera($.camPos, $.camFwd, $.camUp, $.S.fov);
     }
 

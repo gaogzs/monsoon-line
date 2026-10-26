@@ -1495,198 +1495,65 @@ if (Ent && M3 && me && world) {
     }
   }
 
-  /* ---- 追尾镜头：稳定水平 + 俯仰限位 ----
-     相机 up 恒为世界 up，所以**无论飞机怎么滚转，地平线都不动**。
-     俯仰被钳在 ±89°，视线因此永远不会与世界 up 共线、正交基不会退化。
-
-     限位附近最容易出的毛病是来回抽动，所以要检查两件事：
-     一是地平线在整个过程中是否真的纹丝不动，
-     二是俯仰扫到限位时 up 的帧间差够不够小。 */
+  /* ---- 追尾镜头：构造上恒水平，可以穿过上下极点 ----
+     相机基由 (偏航, 俯仰) 直接写出：right 恒水平，P = ±90° 也不退化。
+     先测纯函数 camBasis（任意角度三向量正交单位、right.y == 0、无 NaN），
+     再让瞄准方向沿过天顶的大圆扫过去，盯真实 updateCamera 的输出：
+     视线与 up 逐帧连续、up 始终是单位向量。 */
   {
-    const M3 = sandbox.M3;
+    const Game = sandbox.Game, G$ = Game.$, M3 = sandbox.M3;
+    const D = Math.PI / 180;
+    const bad = [];
+
+    // 纯函数
+    let worst = 0, nan = false, rightY = 0;
+    for (let y = -400; y <= 400; y += 17) {
+      for (let pp = -90; pp <= 90; pp += 7.5) {
+        const b = G$.camBasis(y * D, pp * D);
+        const all = [b.f, b.r, b.u];
+        for (const v of all) if (![v.x, v.y, v.z].every(Number.isFinite)) nan = true;
+        for (const v of all) worst = Math.max(worst, Math.abs(Math.hypot(v.x, v.y, v.z) - 1));
+        worst = Math.max(worst, Math.abs(M3.dot(b.f, b.r)), Math.abs(M3.dot(b.f, b.u)), Math.abs(M3.dot(b.r, b.u)));
+        rightY = Math.max(rightY, Math.abs(b.r.y));
+      }
+    }
+    if (nan) bad.push('camBasis 出现 NaN');
+    if (worst > 1e-9) bad.push('camBasis 不是正交单位基（误差 ' + worst.toExponential(2) + '）');
+    if (rightY !== 0) bad.push('camBasis 的 right 不水平（|y| ' + rightY + '）');
+
+    // 真实 updateCamera：鼠标瞄准一路扫过天顶再回来（俯仰 −60° → 过顶 → 回到 +120° 即对面的 60°）
+    Game.startMission(0);
+    G$.S.camMode = 0;
+    G$.aimMode = true; G$.aimInit = true;
+    G$.aimYaw = 0.3; G$.aimPitch = -60 * D;
     const dt = 1 / 60;
-    const CAM_PITCH_LIM = 89 * Math.PI / 180;
-    const SIN_LIM = Math.sin(CAM_PITCH_LIM);
-    const bad = [];
-
-    // 复现 updateCamera 里 camMode===0 的那段
-    function track(steps, pose) {
-      let yawBase = 0, pitchSm = null, camFwd = M3.V(0, 0, 1);
-      let maxJump = 0, prev = null, maxY = 0, maxTiltOfUp = 0;
-      for (let i = 0; i < steps; i++) {
-        const fwd = pose(i);
-        const hx = fwd.x, hz = fwd.z;
-        const hlen = Math.sqrt(hx * hx + hz * hz);
-
-        if (hlen > 0.12) {
-          const tYaw = Math.atan2(hx, hz);
-          let dYaw = tYaw - yawBase;
-          while (dYaw > Math.PI) dYaw -= Math.PI * 2;
-          while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-          yawBase += dYaw * (1 - Math.exp(-1.2 * dt));
-          if (yawBase > Math.PI) yawBase -= Math.PI * 2;
-          if (yawBase < -Math.PI) yawBase += Math.PI * 2;
-        }
-
-        let pa = Math.atan2(fwd.y, Math.max(hlen, 1e-4));
-        pa = Math.min(CAM_PITCH_LIM, Math.max(-CAM_PITCH_LIM, pa));
-        if (pitchSm === null) pitchSm = pa;
-        pitchSm += (pa - pitchSm) * (1 - Math.exp(-9 * dt));
-
-        const cp = Math.cos(pitchSm), sp = Math.sin(pitchSm);
-        camFwd = M3.V(Math.sin(yawBase) * cp, sp, Math.cos(yawBase) * cp);
-
-        const fy = Math.min(SIN_LIM, Math.max(-SIN_LIM, camFwd.y));
-        const fh2 = camFwd.x * camFwd.x + camFwd.z * camFwd.z;
-        if (fh2 > 1e-8) {
-          const fhz = Math.sqrt(fh2);
-          const fsc = Math.sqrt(Math.max(0, 1 - fy * fy)) / fhz;
-          camFwd = M3.V(camFwd.x * fsc, fy, camFwd.z * fsc);
-        }
-        maxY = Math.max(maxY, Math.abs(camFwd.y));
-
-        const cam = M3.makeCamera(M3.V(0, 0, -52), camFwd, M3.V(0, 1, 0), 100, 100, 56);
-        maxTiltOfUp = Math.max(maxTiltOfUp, Math.hypot(cam.up.x, cam.up.z));
-        const s = [cam.up.x, cam.up.y, cam.up.z];
-        if (prev) {
-          let d = 0;
-          for (let k = 0; k < 3; k++) d += Math.abs(s[k] - prev[k]);
-          if (d > maxJump) maxJump = d;
-        }
-        prev = s;
+    for (let i = 0; i < 120; i++) G$.updateCamera(dt);   // 先让镜头追上起始瞄准，不把启动瞬态算进扫掠
+    let prevF = null, prevU = null, maxF = 0, maxU = 0, maxHoriz = 0, maxRightY = 0;
+    const Y0 = 0.3;
+    for (let i = 0; i < 480; i++) {
+      // 沿过天顶的大圆走：P 从 −60° 扫到 +180°−60°（过顶后水平分量反向）
+      const P = (-60 + 0.5 * i) * D;
+      const d = M3.V(Math.sin(Y0) * Math.cos(P), Math.sin(P), Math.cos(Y0) * Math.cos(P));
+      G$.aimYaw = Math.atan2(d.x, d.z);
+      G$.aimPitch = Math.asin(M3.clamp(d.y, -1, 1));
+      G$.updateCamera(dt);
+      const f = G$.camFwd, u = G$.camUp;
+      if (![f.x, f.y, f.z, u.x, u.y, u.z].every(Number.isFinite)) { bad.push('相机基出现 NaN'); break; }
+      maxHoriz = Math.max(maxHoriz, Math.abs(Math.hypot(u.x, u.y, u.z) - 1));
+      maxRightY = Math.max(maxRightY, Math.abs(M3.dot(M3.cross(f, u), M3.V(0, 1, 0))));
+      if (prevF) {
+        maxF = Math.max(maxF, M3.dist(f, prevF));
+        maxU = Math.max(maxU, M3.dist(u, prevU));
       }
-      return { maxJump, maxY, maxTiltOfUp };
+      prevF = f; prevU = u;
     }
-
-    /* 姿态输入用**真实角速度**。
-       dPitch = p.pitch · ctrl · dt ≈ 0.76/60 ≈ 0.0127 rad/帧。
-       一阶低通滤的是突变而不是斜坡，用超现实的扫掠速度去测，
-       测出来的只会是测试参数的问题（这个坑踩过一次）。 */
-    const PITCH_RATE = 0.0127;
-    const ROLL_RATE = 0.045;
-
-    // 1. 飞机滚转一整圈 —— 地平线必须纹丝不动
-    {
-      const r = track(600, (i) => {
-        const ang = i * ROLL_RATE;
-        const f = M3.V(0, 0, 1);
-        // 用正交化保证 up 真的与 fwd 垂直（模拟机体基）
-        const up = M3.norm(M3.rotAxis(M3.V(0, 1, 0), f, ang));
-        return M3.V(f.x, f.y, f.z);
-      });
-      if (r.maxTiltOfUp > 0.02) {
-        bad.push('滚转时地平线歪了（up 的水平分量峰值 ' + r.maxTiltOfUp.toFixed(3) + '）');
-      }
-      if (r.maxJump > 0.02) bad.push('滚转时镜头在动（帧间差 ' + r.maxJump.toFixed(3) + '）');
-    }
-
-    // 2. 俯仰扫到限位再回来 —— 不能抽动，也不能越过限位
-    {
-      const r = track(900, (i) => {
-        const a = CAM_PITCH_LIM * Math.sin(i * PITCH_RATE * 1.6);
-        return M3.V(0, Math.sin(a), Math.cos(a));
-      });
-      if (r.maxJump > 0.12) bad.push('俯仰扫到限位时镜头帧间差 ' + r.maxJump.toFixed(3));
-      if (r.maxY > SIN_LIM + 1e-6) {
-        bad.push('视线越过了限位：|y| 峰值 ' + r.maxY.toFixed(4) + ' > ' + SIN_LIM.toFixed(4));
-      }
-    }
-
-    // 3. 直接垂直（正上/正下）—— 这是当初"极点卡动"的场景
-    {
-      const r = track(600, (i) => {
-        const a = (i / 600) * Math.PI;        // 0 → 180°，穿过正上方
-        return M3.V(0, Math.sin(a), Math.cos(a));
-      });
-      if (r.maxJump > 0.12) bad.push('穿越极点时镜头帧间差 ' + r.maxJump.toFixed(3));
-      if (r.maxY > SIN_LIM + 1e-6) bad.push('穿越极点时视线越界：|y| ' + r.maxY.toFixed(4));
-    }
-
-    // 4. 持续垂直（稳态）—— "边界上的连续反弹"只可能出在这里
-    //    pa 恒被钳在限位，pitchSm 指数收敛后应当彻底静止。
-    //    限位越高，正交化前的 |up| = cos(限位) 越小、越接近 1e-4 的退化阈值，
-    //    所以这里同时盯住"静止"和"余量"。
-    {
-      const N = 3600;                       // 60 秒，足够收敛
-      let yawBase = 0, pitchSm = null, prev = null, maxJump = 0, minOrtho = 1e9;
-      for (let i = 0; i < N; i++) {
-        const pa = Math.min(CAM_PITCH_LIM, Math.atan2(1, 1e-4));
-        if (pitchSm === null) pitchSm = pa;
-        pitchSm += (pa - pitchSm) * (1 - Math.exp(-9 * dt));
-
-        const cp = Math.cos(pitchSm), sp = Math.sin(pitchSm);
-        let camFwd = M3.V(Math.sin(yawBase) * cp, sp, Math.cos(yawBase) * cp);
-        const fy = Math.min(SIN_LIM, Math.max(-SIN_LIM, camFwd.y));
-        const fh2 = camFwd.x * camFwd.x + camFwd.z * camFwd.z;
-        if (fh2 > 1e-8) {
-          const fsc = Math.sqrt(Math.max(0, 1 - fy * fy)) / Math.sqrt(fh2);
-          camFwd = M3.V(camFwd.x * fsc, fy, camFwd.z * fsc);
-        }
-        if (i < N - 600) continue;          // 只看收敛之后的 10 秒
-
-        minOrtho = Math.min(minOrtho, Math.sqrt(Math.max(0, 1 - camFwd.y * camFwd.y)));
-        const cam = M3.makeCamera(M3.V(0, 0, -52), camFwd, M3.V(0, 1, 0), 100, 100, 56);
-        const s = [cam.up.x, cam.up.y, cam.up.z];
-        if (prev) {
-          let d = 0;
-          for (let k = 0; k < 3; k++) d += Math.abs(s[k] - prev[k]);
-          if (d > maxJump) maxJump = d;
-        }
-        prev = s;
-      }
-      if (maxJump > 1e-4) {
-        bad.push('持续垂直时镜头在限位上抽动（帧间差 ' + maxJump.toExponential(2) + '）');
-      }
-      if (minOrtho < 1e-3) {
-        bad.push('持续垂直时正交基余量不足：|up| ' + minOrtho.toExponential(2) +
-          '（orthonormalize 的退化阈值是 1e-4）');
-      }
-    }
+    if (maxRightY > 1e-9) bad.push('过顶时镜头滚转了（right.y ' + maxRightY.toExponential(2) + '）');
+    if (maxHoriz > 1e-6) bad.push('过顶时 up 不是单位向量（' + maxHoriz.toExponential(2) + '）');
+    if (maxF > 0.2) bad.push('过顶时视线帧间跳变 ' + maxF.toFixed(3));
+    if (maxU > 0.4) bad.push('过顶时 up 帧间跳变 ' + maxU.toFixed(3));
 
     if (bad.length) bad.forEach(fail);
-    else ok('追尾镜头：地平线稳定、俯仰钳在 89°、全程不抽动');
-  }
-
-  /* ---- 鼠标引导时镜头俯仰：天顶刚好卡在画面上沿 ----
-     CMD 俯仰钳在 89°，永远过不了天顶。镜头俯仰停在 90° − 半视场，
-     拉满时天顶正好投影在画面上沿、CMD 贴在它下面 —— 看起来能一直朝正上方飞。
-     上限随 FOV 变；k 以下镜头 = 瞄准（准星在正中）；全程单调、衔接无折角。 */
-  {
-    const CP = sandbox.Game.__camPitch, M3 = sandbox.M3;
-    const D = Math.PI / 180, W = 1280, H = 720;
-    const bad = [];
-    const rows = [];
-    for (const fov of [38, 56, 80, 100]) {
-      const top = CP.camPitchFor(CP.AIM_LIM, fov);
-      const want = 90 * D - fov * D / 2;
-      if (Math.abs(top - want) > 1e-9) bad.push('FOV ' + fov + '：拉满时镜头 ' + (top / D).toFixed(2) + '°（应为 ' + (want / D).toFixed(2) + '°）');
-      // 真投影：天顶在画面上沿（y ≈ 0），CMD（89°）在画面里、贴着上沿
-      const fwd = M3.V(0, Math.sin(top), Math.cos(top));
-      const cam = M3.makeCamera(M3.V(0, 0, 0), fwd, M3.V(0, 1, 0), W, H, fov);
-      const zen = M3.projectUnclamped(cam, M3.V(0, 1e4, 0));
-      const cmd = M3.projectUnclamped(cam, M3.V(0, Math.sin(CP.AIM_LIM) * 1e4, Math.cos(CP.AIM_LIM) * 1e4));
-      if (Math.abs(zen.y) > 0.5) bad.push('FOV ' + fov + '：天顶在画面 y = ' + zen.y.toFixed(2) + '（应在上沿 0）');
-      if (!(cmd.y > 0 && cmd.y < H * 0.1)) bad.push('FOV ' + fov + '：CMD 拉满时在 y = ' + cmd.y.toFixed(1) + '（应在画面里、贴着上沿）');
-      // 天底对称
-      if (Math.abs(CP.camPitchFor(-CP.AIM_LIM, fov) + want) > 1e-9) bad.push('FOV ' + fov + '：天底不对称');
-      // 单调、无折角（相邻 0.1° 的斜率不跳）
-      let prev = -Infinity, prevSlope = null, maxKink = 0, k1 = null;
-      for (let a = -89; a <= 89; a += 0.1) {
-        const v = CP.camPitchFor(a * D, fov);
-        if (v < prev - 1e-12) { bad.push('FOV ' + fov + '：不单调（' + a.toFixed(1) + '°）'); break; }
-        if (prev > -Infinity) {
-          const s = (v - prev) / (0.1 * D);
-          if (prevSlope !== null) maxKink = Math.max(maxKink, Math.abs(s - prevSlope));
-          prevSlope = s;
-        }
-        if (k1 === null && a >= 0 && Math.abs(v - a * D) > 1e-9) k1 = a;
-        prev = v;
-      }
-      if (maxKink > 0.05) bad.push('FOV ' + fov + '：映射有折角（相邻斜率差 ' + maxKink.toFixed(3) + '）');
-      rows.push(fov + '°→' + (top / D).toFixed(0) + '°（' + (k1 === null ? 89 : k1.toFixed(0)) + '° 以下准星居中）');
-    }
-    if (bad.length) bad.forEach(fail);
-    else ok('镜头俯仰：拉满时天顶卡在画面上沿 —— ' + rows.join('，'));
+    else ok('追尾镜头：构造上恒水平，过顶连续（视线帧间 ≤ ' + maxF.toFixed(3) + '，up ≤ ' + maxU.toFixed(3) + '）');
   }
 
   /* ---- 追尾镜头：出画处理（静态拉远 / 侧滑软钳 / 拉远带滞回） ----
@@ -3125,12 +2992,12 @@ if (Ent && M3 && me && world) {
       ' m，每帧 ≤ ' + maxStep.toFixed(2) + ' m，反向 ' + revs + ' 次）');
   }
 
-  /* ---- 真实链路：CMD 顶在最上面左右拖，画面要跟着转 ----
-     曾经镜头偏航从瞄准方向的水平投影反算，投影太短（≈83° 以上）就冻结：
-     CMD 顶在 89° 时左右拖，罗盘和飞机在转、画面不转；一往下拖离开冻结区，
-     画面猛地转过去、CMD 从上沿跳下来。 */
+  /* ---- 真实链路：鼠标拖过天顶，光标与画面连续 ----
+     瞄准俯仰不再钳在 89°，可以越过 ±90°（过顶）。mousemove 事件 → aimYaw/aimPitch →
+     镜头，盯四件事：光标方向每帧位移不超过鼠标本身带来的量、镜头视线连续、
+     光标俯仰始终是 asin(y)（不需要越过 ±90° 的第二套表示）、过顶后左右拖画面仍在转（不冻结）。 */
   {
-    const G = sandbox.Game, R = sandbox.Renderer, M3 = sandbox.M3;
+    const G = sandbox.Game, R = sandbox.Renderer, M3 = sandbox.M3, G$ = G.$;
     const cvEl = sandbox.document.getElementById('cv');
     const bad = [];
     const D = 180 / Math.PI;
@@ -3142,34 +3009,39 @@ if (Ent && M3 && me && world) {
       cvEl.fire('mousemove', { clientX: R.W / 2, clientY: R.H / 2, movementX: mx, movementY: my });
       pump(1);
     };
-    // 推到顶：每帧 −40 px（≈5°），20 帧 ≈ 100°，早就钳在 89° 了
-    for (let f = 0; f < 20; f++) move(0, -40);
-    for (let f = 0; f < 30; f++) move(0, 0);
 
-    // 顶着左右拖 2 s（每帧 20 px ≈ 2.5°）：镜头偏航要跟着瞄准偏航
+    // 往上拖过天顶：每帧 −40 px（≈5°），30 帧 ≈ 150°
+    let prevAim = G$.aimDirNow(), prevCam = R.getCam().fwd;
+    let maxAim = 0, maxCam = 0, minCos = 1, crossed = false;
+    for (let f = 0; f < 30; f++) {
+      move(0, -40);
+      const a = G$.aimDirNow(), c = R.getCam().fwd;
+      maxAim = Math.max(maxAim, Math.acos(M3.clamp(M3.dot(prevAim, a), -1, 1)) * D);
+      maxCam = Math.max(maxCam, Math.acos(M3.clamp(M3.dot(prevCam, c), -1, 1)) * D);
+      minCos = Math.min(minCos, Math.cos(G$.aimPitch));
+      if (a.y > 0.9) crossed = true;
+      prevAim = a; prevCam = c;
+    }
+    for (let f = 0; f < 60; f++) move(0, 0);
+    if (!crossed) bad.push('光标没有越过天顶');
+    if (maxAim > 8) bad.push('光标一帧跳了 ' + maxAim.toFixed(1) + '°');
+    if (maxCam > 16) bad.push('过顶时镜头视线一帧跳了 ' + maxCam.toFixed(1) + '°');
+    if (Math.abs(G$.aimPitch) > Math.PI / 2 + 1e-9) bad.push('光标俯仰越过了 ±90°（' + (G$.aimPitch * D).toFixed(1) + '°），应始终是 asin(y)');
+
+    // 过顶后左右拖 2 s（每帧 20 px ≈ 2.5°）：镜头偏航要跟着瞄准偏航
     let maxLag = 0;
     for (let f = 0; f < 120; f++) {
-      move(20, -5);
-      if (f > 15) {
+      move(20, 0);
+      if (f > 40) {
         const lag = Math.abs(M3.wrapPi(yawOf(R.getCam().fwd) - yawOf(G.__player().aimDir))) * D;
         maxLag = Math.max(maxLag, lag);
       }
     }
-    if (maxLag > 15) bad.push('CMD 顶在最上左右拖时画面不跟（镜头与瞄准偏航差 ' + maxLag.toFixed(1) + '°）');
-
-    // 往下拖：画面每帧转动不超过鼠标本身带来的量，不能猛地追过去
-    let prev = R.getCam().fwd, maxJump = 0;
-    for (let f = 0; f < 30; f++) {
-      move(0, 10);
-      const c = R.getCam().fwd;
-      maxJump = Math.max(maxJump, Math.acos(M3.clamp(M3.dot(prev, c), -1, 1)) * D);
-      prev = c;
-    }
-    if (maxJump > 3) bad.push('顶着左右拖之后往下拖，画面一帧猛转 ' + maxJump.toFixed(1) + '°');
+    if (maxLag > 25) bad.push('过顶后左右拖画面不跟（镜头与瞄准偏航差 ' + maxLag.toFixed(1) + '°）');
 
     if (bad.length) bad.forEach(fail);
-    else ok('真实链路：CMD 顶在最上左右拖画面跟着转（偏航差 ≤ ' + maxLag.toFixed(1) +
-      '°），之后往下拖不跳（每帧 ≤ ' + maxJump.toFixed(2) + '°）');
+    else ok('真实链路：鼠标拖过天顶光标与画面连续（光标每帧 ≤ ' + maxAim.toFixed(1) +
+      '°，镜头 ≤ ' + maxCam.toFixed(1) + '°），过顶后左右拖偏航差 ≤ ' + maxLag.toFixed(1) + '°');
   }
 
   /* ---- 真实链路：鼠标位移 → 瞄准方向 → 飞控 → 机头 ----
@@ -4847,7 +4719,8 @@ if (Ent && M3 && me && world) {
      推导出来的话，新武器用错词根就测不出来了。 */
   {
     const RAFSI = ['CEL', 'TOR', 'SUT', 'GIR', 'CLA', 'SPO', 'GUT', 'PEJ',
-      'GUS', 'ZUN', 'JDA', 'FAN', 'DAR', 'BIN', 'BAD', 'SAV', 'TUM', 'BOX', 'CAV', 'DIL'];
+      'GUS', 'ZUN', 'JDA', 'FAN', 'DAR', 'BIN', 'BAD', 'SAV', 'TUM', 'BOX', 'CAV', 'DIL',
+      'TCA'];   // TCA：tcati（火），下游机炮
     // 上游：按用途分类，同用途共用首字母；舰载型在尾部追加一个字母
     const UP_PREFIX = ['D', 'DB', 'F', 'G', 'KA', 'J'];
     // 下游：按设计局分类
@@ -4882,8 +4755,9 @@ if (Ent && M3 && me && world) {
 
     for (const k in WEAPONS) {
       const w = WEAPONS[k];
-      const m = w.name.match(/^([A-Z]{3})-(\d+)$/);
-      if (!m) { bad.push('武器 ' + w.name + ' 不是「三字母 rafsi - 序号」格式'); continue; }
+      // 序号后可带一个字母后缀（外贸型 V = vecnu，卖：CEL-3V）
+      const m = w.name.match(/^([A-Z]{3})-(\d+)[A-Z]?$/);
+      if (!m) { bad.push('武器 ' + w.name + ' 不是「三字母 rafsi - 序号[后缀]」格式'); continue; }
       if (RAFSI.indexOf(m[1]) < 0) {
         bad.push('武器 ' + w.name + ' 的前缀 ' + m[1] + ' 不是逻辑语词根');
       }

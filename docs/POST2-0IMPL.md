@@ -512,6 +512,9 @@ DESIGN.md §8 已知问题第 4 条：`cleared` 只在内存里，刷新就丢�
 
 ### 3.1 光标穿过上下极点
 
+> **实施偏差（v3.2 已落地，以实际代码与 game.md 相机一节为准）**：① 光标层没有走"aimPitch 越过 ±90° + 折回"，而是让鼠标位移沿**屏幕平面**（相机 right / up 轴）转动瞄准方向，`aimPitch = asin(y)` 始终在 ±90° 内，所以没有折回与 `sign(cosP)`；② 偏航跟随上限由光标离极点的角距决定（`POLE_TURN_START` / `POLE_TURN_FULL` / `POLE_SWING_RATE`），不是单一定速；③ 过顶后偏航没转完前，镜头俯仰停在过顶那一刻（`camPitchHold`）；④ `camPitchFor` / `AIM_PITCH_LIM` / `Game.__camPitch` 已删，相机基经 `Game.$.camBasis` 暴露。
+
+
 **现状（已按重构后的代码核对）**：
 
 - 瞄准状态在 `Game.$`：`aimYaw` / `aimPitch` / `aimInit`，常量 `AIM_PITCH_LIM`（89°）、`AIM_SENS`、`AIM_SPIKE_PX` 都在 `js/engine/game/vars.js`。`aimDirNow`、`resetAim`、`updateMouseAim`（经 `AI.steerTo` 驱动玩家）在 `js/engine/game/control.js`。鼠标输入（`mousemove`，含尖峰丢弃与 FOV 灵敏度折算）在 `js/ui/input.js`，把 `aimPitch` 夹进 ±`AIM_PITCH_LIM`。`Game` 的公开钩子 `AIM_LIM`（`js/boot/zz-api-game.js`）也引用它。

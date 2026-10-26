@@ -48,7 +48,9 @@
   $.AIM_SPIKE_PX = 200;
 
   // 单个 mousemove 位移超过它就当尖峰丢掉（≈ 25°）
-  $.AIM_PITCH_LIM = 89 * Math.PI / 180;
+
+  /* 瞄准俯仰不设限，就是 asin(y)，始终在 ±90° 内。鼠标位移沿屏幕平面转动
+     瞄准方向（见 input.js），过顶只是向量自然越过极点，不需要第二套表示。 */
 
   $.last = 0;
 
@@ -58,6 +60,18 @@
      camPitchSmooth 是平滑后的基准俯仰，首帧惰性初始化。 */
   $.camYawBase = 0;
   $.camPitchSmooth = null;
+
+  /* 穿越极点：视线水平分量 |d_h| < POLE_HOLD（sin 3°）时偏航目标冻结不更新
+     （"穿越后的一个极小延迟"）。出冻结区后目标可能差 π，转过去的速度由光标
+     过极点多远（|d_h| = cos P）决定：< POLE_TURN_START（sin 8°）不转，之后
+     平滑加速，≥ POLE_TURN_FULL（sin 35°）放开到 POLE_SWING_RATE rad/s。
+     camYawTarget 是冻结的偏航目标，首帧惰性初始化。 */
+  $.POLE_HOLD = Math.sin(3 * Math.PI / 180);
+  $.POLE_TURN_START = Math.sin(8 * Math.PI / 180);
+  $.POLE_TURN_FULL = Math.sin(35 * Math.PI / 180);
+  $.POLE_SWING_RATE = 40;
+  $.camYawTarget = null;
+  $.camPitchHold = null;   // 过顶后偏航没转完时镜头俯仰停住的值
 
   /* 单一油门轴：THR_IDLE..1 是常规推力区，1..1.25 是加力区，THR_IDLE 以下张减速板。
      不再需要单独的加力/减速板按键。HUD 的 THR 读数按这两个点重新标度

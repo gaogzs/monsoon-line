@@ -74,9 +74,30 @@
            镜头被重置。正常甩鼠标单个事件远到不了 AIM_SPIKE_PX。 */
         if (Math.abs(mx) > $.AIM_SPIKE_PX || Math.abs(my) > $.AIM_SPIKE_PX) return;
         var fovK = ($.S.fov || 56) / 56;      // 放大视野时灵敏度跟着降，屏幕上的手感一致
-        $.aimYaw += mx * $.AIM_SENS * fovK;
-        $.aimPitch = M3.clamp($.aimPitch - my * $.AIM_SENS * fovK,
-          -$.AIM_PITCH_LIM, $.AIM_PITCH_LIM);
+        /* 鼠标位移沿**屏幕平面**转动瞄准方向（相机的 right / up 轴上的大圆弧），
+           而不是直接加到偏航 / 俯仰角上。偏航 / 俯仰在极点附近病态：
+           贴着天顶左右拖，偏航角飞转、光标在屏幕上却几乎不动，镜头只会原地空转。
+           屏幕平面里每像素的转角恒定，在极点处照样有定义：过顶就是向量自然越过去，
+           aimPitch = asin(y) 始终在 ±90° 内，不需要"越过 ±90°"的第二套表示。
+           镜头基取自 camera.js 当前的（平滑后的）偏航 / 俯仰，所以"右"永远是屏幕右。 */
+        var k = $.AIM_SENS * fovK;
+        var d0 = $.aimDirNow();
+        var cy = $.camPitchSmooth === null ? $.aimYaw : $.camYawBase;
+        var cpch = $.camPitchSmooth === null ? $.aimPitch : $.camPitchSmooth;
+        var cb = $.camBasis(cy, cpch);
+        var w = M3.add(M3.mul(cb.r, mx), M3.mul(cb.u, -my));
+        w = M3.sub(w, M3.mul(d0, M3.dot(d0, w)));             // 去掉沿瞄准方向的分量
+        var wl = M3.len(w);
+        if (wl > 1e-9) {
+          var ang = Math.hypot(mx, my) * k;
+          var d1 = M3.add(M3.mul(d0, Math.cos(ang)), M3.mul(w, Math.sin(ang) / wl));
+          var h1 = Math.hypot(d1.x, d1.z);
+          if (h1 > 1e-6) {                                      // 正好压在极点上时保留原偏航
+            var ny = Math.atan2(d1.x, d1.z);
+            $.aimYaw += M3.wrapPi(ny - $.aimYaw);
+          }
+          $.aimPitch = Math.asin(M3.clamp(d1.y, -1, 1));
+        }
       }
     });
 

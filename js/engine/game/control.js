@@ -16,7 +16,7 @@
   function resetAim() {
     var f = $.player.fwd;
     $.aimYaw = Math.atan2(f.x, f.z);
-    $.aimPitch = M3.clamp(Math.asin(M3.clamp(f.y, -1, 1)), -$.AIM_PITCH_LIM, $.AIM_PITCH_LIM);
+    $.aimPitch = Math.asin(M3.clamp(f.y, -1, 1));
     $.aimInit = true;
   }
 

@@ -23,7 +23,7 @@
 | 结算 | `engine/game/finish.js` | `finish(win)`、`beginFail` / `endFail` / `failReason`（失败停留画面）、`combatEvents`、`killCredit`、`friendlyLosses` |
 | 存档 | `engine/game/save.js` | `loadSave`、`saveGame`、`sanitizeLoadout`（键 `monsoonline.save.v1`） |
 | 输入 / 选目标 / 发射键 | `ui/input.js` | `bindInput`、`cycleTarget`、`rankTargets`、`fireSpecial`、`cycleSpecial`、`setWingCmd`、`toggleEmcon`、`updateTargetKey` |
-| 相机 | `ui/camera.js` | `updateCamera`、出画处理（`frameDeficit` / `softClampFrame` / `stepFrameExtra`）、`camPitchFor` |
+| 相机 | `ui/camera.js` | `updateCamera`、出画处理（`frameDeficit` / `softClampFrame` / `stepFrameExtra`）、相机基 `camBasis(Y, P)` |
 | 画一帧 | `ui/frame.js` | `render()`、`pushStores` / `pushOneStore`、`tracerGeom` / `tracerParticles` / `drawTracers` |
 | 屏幕切换 | `ui/screens/nav.js` | `show` / `hideAll` / 指针锁定 |
 | 设置与手册 | `ui/screens/settings.js` | `SET_GROUPS` / `DEFAULTS` / `KEYMAP` / `TIPS` / `GUIDE`、`loadSettings` / `saveSettings`、`buildSettingsInto` / `buildHelpHTML` |
@@ -56,7 +56,7 @@
 | `__pushStores` | `__pushStores(a)` | 直接暴露内部的 `pushStores`：断言要能单独喂一架飞机进来，数它画了几个挂载 |
 | `__update` / `__render` | `(dt)` / `()` | 只推进逻辑 / 只画一帧，给 `tools/lib/sim.js` 与 `tools/test/golden-render.js` 用 |
 | `__updateTargets` / `__updateLock` / `__cycleTarget` / `__scanShot` | 同名内部函数 | 单独喂一帧做断言 |
-| `__camFrame` / `__camPitch` / `__thr` | 对象 | 相机出画处理、镜头俯仰映射、油门分界点，供断言脱离整局单独验算 |
+| `__camFrame` / `__thr` | 对象 | 相机出画处理、油门分界点，供断言脱离整局单独验算（相机基走 `Game.$.camBasis`） |
 
 除 `init` / `startMission` 外都是**给 `tools/test/` 做断言用的调试口**，不是玩法接口。局内状态全部放在 `Game.$` 里（`vars.js` 声明）：`state / paused / world / player / mission / missionIdx / activeCampaign / selectedAC / loadouts / keys / mouse / aimMode / camYawBase / camPitchSmooth / banner / hits / stats / cleared`，设置对象 `S` 在 `ui/screens/settings.js`；机库正在编辑的挂载组不再是全局 `activeHpGroup`，而在 `$.hangarView.group`。**`$` 只许 `Game` 自己的文件读写**。
 
@@ -313,10 +313,10 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 ### 鼠标引导机头 `updateMouseAim(dt)`（战雷式）
 （`engine/game/control.js`；`mousemove` / 指针锁定的事件绑定在 `ui/input.js`，`releasePointer` / `requestAimLock` 在 `ui/screens/nav.js`。）
 
-1. 瞄准方向存在世界坐标里：`aimYaw / aimPitch`（俯仰限 ±89°）。`mousemove` 用 `movementX/Y × AIM_SENS × FOV/56` 转动它；单个事件位移超过 `AIM_SPIKE_PX = 200` 的当尖峰丢掉（Chrome 锁定指针时偶发的巨大位移、未锁定时光标移出画布再移回的第一下 —— 不丢的话准星被甩到"随机"方向，镜头跟过去像被重置）；指针锁定先请求 `{ unadjustedMovement: true }`（原始位移，尖峰更少），不支持时退回普通锁定；点击画布时 `requestPointerLock()`，菜单 / 暂停时 `releasePointer()` 交还指针。
+1. 瞄准方向存在世界坐标里：`aimYaw / aimPitch`（俯仰就是 `asin(y)`，始终在 ±90° 内）。`mousemove` 把 `movementX/Y × AIM_SENS × FOV/56` 换成**沿屏幕平面的大圆弧**（相机的 right / up 轴）转动瞄准方向，不直接加到偏航 / 俯仰角上；单个事件位移超过 `AIM_SPIKE_PX = 200` 的当尖峰丢掉（Chrome 锁定指针时偶发的巨大位移、未锁定时光标移出画布再移回的第一下 —— 不丢的话准星被甩到"随机"方向，镜头跟过去像被重置）；指针锁定先请求 `{ unadjustedMovement: true }`（原始位移，尖峰更少），不支持时退回普通锁定；点击画布时 `requestPointerLock()`，菜单 / 暂停时 `releasePointer()` 交还指针。
 2. `aimInit = false`（重生、`M` 切模式）时下一帧 `resetAim()` 从机头重新取。
 3. `AI.steerTo(player, aimDirNow(), player.ctrl, player, dt)` —— 传 `dt` 启用瞄准角速度前馈（见 [ai.md](ai.md)）；`player.aimDir` 供 HUD 画准星与机头连线。
-4. 追尾镜头（`S.camMode === 0`）在鼠标引导时跟 `aimDir` 而不跟机头，平滑系数 14；键盘直控时仍跟机头。这样准星固定在画面中心、机头标记去追它，机头才能真正收敛到准星上。跟 `aimDir` 时俯仰走 `camPitchFor(瞄准俯仰, S.fov)`：镜头上限是 `90° − FOV/2`，瞄准拉满 89° 时**天顶正好卡在画面上沿**（天底卡在下沿），CMD 贴着它 —— 看起来能一直朝正上方飞，只是光标推不过那条边。上限随 FOV 实时变（56° → 62°，38° → 71°，100° → 40°）。`k = max(0, 2·上限 − 89°)` 以下镜头 = 瞄准（FOV 56° 时 35° 以下准星在正中），之外 `k + (A − k)·r·(1 − (1 − t)^(1/r))` 平滑收到上限：衔接处斜率为 1、到 89° 时斜率为 0，全程单调。（以前是软膝 78° → 87°，拉满时画面几乎全是空天。）
+4. 追尾镜头（`S.camMode === 0`）在鼠标引导时跟 `aimDir` 而不跟机头，平滑系数 14；键盘直控时仍跟机头。这样准星固定在画面中心、机头标记去追它，机头才能真正收敛到准星上。镜头俯仰直接取 `asin(aimDir.y)`，不再钳位也没有天顶重映射，可以穿过上下极点（见下面「机位 0」）。
 
 ### 键盘直控与油门轴
 `controlPlayer(dt)`（`control.js`）：
@@ -350,31 +350,41 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 **方向键只在 `camMode === 0` 被读取**：`camYaw` 只用于追尾镜头的绕机偏移、`camPitch` 只加到追尾镜头的镜头上。座舱与目标机位下按方向键没有任何效果。
 
 ### 机位 0：追尾（`S.camMode === 0`）
-`camUp` 恒为世界 `(0,1,0)`，所以地平线永远水平、画面不跟滚转乱转。计算分四步：
+相机基由 (偏航 Y, 俯仰 P) **直接写出**（纯函数 `camBasis(Y, P)`，`Game.$.camBasis`），不再靠 `up=(0,1,0)` 做叉乘：
+
+```
+fwd   = ( sinY·cosP,  sinP,  cosY·cosP )
+right = ( cosY,       0,    −sinY      )     // 恒水平 → 镜头永不滚转，地平线永远水平
+up    = (−sinY·sinP,  cosP, −cosY·sinP )
+```
+
+P = ±90° 时 `up = ∓(sinY, 0, cosY)`，模长仍为 1，**没有退化**，所以不需要 89° 限位；`right.y ≡ 0` 让“地平线永远水平”变成构造上的恒等式。`Renderer.setCamera(pos, fwd, up, fov)` 收的就是这个显式 `up`。计算分三步：
 
 ```js
-var CAM_PITCH_LIM = 89 * Math.PI / 180;
-var SIN_LIM = Math.sin(CAM_PITCH_LIM);
-var hlen = hypot(p.fwd.x, p.fwd.z);
+lookDir = lookAim ? aimDirNow() : p.fwd;          // 观察向量 d：鼠标引导跟瞄准，键盘直控跟机头
+hlen = hypot(d.x, d.z);
 
-// ① 偏航：最短角差平滑。键盘直控时 tYaw 从机头水平投影反算，投影塌缩时（hlen <= 0.12）沿用上一帧；
-//    鼠标引导时 tYaw = aimYaw，任何仰角都跟（CMD 顶在 89° 时投影只有 0.017，反算会一直冻结）
-if (lookAim || hlen > 0.12) {
-  dYaw = wrap(tYaw - camYawBase);                       // 归一到 ±π
-  camYawBase += dYaw * (1 - Math.exp(-1.2 * dt));
-  // 再把 camYawBase 归一到 ±π
-}
-// ② 俯仰：先钳到 ±CAM_PITCH_LIM，再一阶低通
-camPitchAng = atan2(p.fwd.y, max(hlen, 1e-4));
-camPitchAng = clamp(camPitchAng, -CAM_PITCH_LIM, CAM_PITCH_LIM);
-if (camPitchSmooth === null) camPitchSmooth = camPitchAng;   // 首帧惰性初始化
-camPitchSmooth += (camPitchAng - camPitchSmooth) * (1 - Math.exp(-9 * dt));
-camDir = V(sin(camYawBase)*cos(camPitchSmooth), sin(camPitchSmooth), cos(...));
+// ① 偏航目标：水平分量 < POLE_HOLD（sin 3°）时冻结（穿越极点后的一个极小延迟）
+if (hlen >= POLE_HOLD) camYawTarget = atan2(d.x, d.z);
 
-// ③ 视线最后再钳一次 |y|
-fy2 = clamp(camDir.y, -SIN_LIM, SIN_LIM);
-// 用 sqrt(1 - fy2²) 重新分配水平分量，保持 camDir 是单位向量
+// ② 偏航：最短角差指数平滑，单步夹在转速上限内。过极点后目标偏航差近 π，转速由
+//    光标过极点多远（hlen = cos P）决定，全程平滑：
+//      hlen < POLE_TURN_START（sin 8°）  不转，镜头先停着（略微过极点不动）
+//      之后                               从零平滑加速：cap = POLE_SWING_RATE · smoothstep²
+//      hlen ≥ POLE_TURN_FULL（sin 35°）   放开到 POLE_SWING_RATE（40 rad/s），拉远了迅速转
+//    上限对所有偏航跟随生效：光标贴着极点左右移动时目标偏航会绕极点飞转，镜头不跟，
+//    光标在屏幕上正常左右走，幅度够大（离极点够远）才开始转向。
+//    P 在转的过程中保持 ≈ 90°，看起来就是绕竖直轴自转
+// ③ 俯仰：P = asin(d.y) ∈ [−90°, 90°]，不钳位，只做一阶低通。
+//    光标过顶、偏航还没转过来时，俯仰停在过顶那一刻（camPitchHold），随偏航转过来再平滑放开：
+//    否则屏幕还朝着原方向，往上拉反而把镜头往下拉。只在极点附近生效，平飞时的大角度转向不受影响
+camPitchSmooth += (P - camPitchSmooth) * (1 - exp(-pitchRate * dt));
+camDir = camBasis(camYawBase, camPitchSmooth).f;
 ```
+
+**鼠标沿屏幕平面转动瞄准方向**：偏航 / 俯仰角在极点附近病态——贴着天顶左右拖，偏航角飞转、光标在屏幕上却几乎不动，镜头只会原地空转。所以 `input.js` 把位移换成相机 right / up 轴上的大圆弧（每像素屏幕转角恒定，极点处照样有定义），再换回 `aimYaw / aimPitch`（`aimPitch = asin(y)`，不需要“越过 ±90°”的第二套表示，也就没有折回）。相机基取 `camYawBase` / `camPitchSmooth`（平滑后的），所以“右”永远是屏幕右。已知特性：过顶后镜头转了半圈，屏幕的“上”变成指向天顶，一直往上拉会回到天顶再过一次顶。
+
+**抬头取景**：`|P|` 从 70° 到 90° 把后退方向从视线混向水平的“机后”（`POLE_FRAME_START`），否则相机会钻到机腹正下方。取景辅助（`frameDeficit` / `softClampFrame`）把真实偏航 `camYawBase` 传进 `camBasis`，极点处不用反算。
 
 位置在**世界坐标**里算（不在机体坐标系）：
 
@@ -388,7 +398,7 @@ wantOff = off0 + (0, S.camHeight + camPitch * 70, 0);
 wantOff -= camDir * frameDeficit(wantOff, camDir, fr);       // 静态底座
 camOff = smoothOffset(camOff, wantOff, 1 - Math.exp(-7.5 * dt));  // 方向 slerp + 长度单独插值（lerpV 走弦会把镜头拉近）
 viewOff = 按 S.camFrame 处理 camOff;                          // 只影响本帧，不写回
-Renderer.setCamera(p.pos + viewOff, camDir, (0,1,0), S.fov);
+Renderer.setCamera(p.pos + viewOff, camDir, camBasis.u, S.fov);
 ```
 
 世界坐标这一点是“稳定”的另一半：**滚转时镜头不会绕着飞机转圈**。
@@ -405,26 +415,6 @@ Renderer.setCamera(p.pos + viewOff, camDir, (0,1,0), S.fov);
 - **2 拉远带滞回** `stepFrameExtra`：用滞后的 `camOff` 算需要的额外距离 `camExtra`；上升 rate 8，需求消失后保持 0.6 s，再以 rate 0.8 收回。连续机动期间一直保持远距离。
 
 **为什么旧做法会跳**：以前每帧用滞后的 `camOff` 判断，出画就瞬间沿视线后推并写回 `camOff`。大机动时误差在横向，纠正却在深度，平滑又把深度拉回 —— 推远、拉回、再推远，镜头前后“呼吸”。现在静态部分只看 `wantOff`，动态修正不写回平滑状态，两条反馈回路断开了。
-
-#### 为什么必须限位（正交基退化）
-镜头的“上”只有与视线不共线时才有定义。机头压到正上/正下时视线本身垂直，世界 `up` 与它共线，`M3.orthonormalize` 的退化保护只能临时换一根参考轴 —— 而 `|fwd.y|` 在极点附近逐帧抖动，参考轴就跟着反复横跳，画面来回侧翻。旧的“混合参考”只能把跳变抹成旋转，抹不掉极点本身；**把俯仰限住，镜头就永远到不了那个位置**，问题从根上消失。
-
-#### 89° 的余量依据
-正交化前 `|up| = cos(限位)`，而 `orthonormalize` 的退化阈值是 `|up| < 1e-4`：
-
-| 限位 | `cos(限位)` | 相对 `1e-4` 的余量 |
-|---|---|---|
-| 89° | `1.75e-2` | **175 倍** |
-| 89.9° | `1.75e-3` | 17 倍 |
-| 89.999° | ~`1.7e-5` | 约 1 倍 |
-| 90° | 0 | 归零 |
-
-89° 是“能看见最高”与“正交基始终远离退化”之间留够余量的位置；实测收敛后镜头帧间差为 0、没有任何抽动。（此前的限位是 78°，提到 89° 是为了让垂直机动时保留更多视野，而余量依然充足。）
-
-#### 限位附近不抖动，三件事缺一不可
-1. **偏航按最短角差平滑**（时间常数 1.2，约一秒转完 180°）：翻越顶点时水平投影会瞬间反向 180°，直接跟就是瞬移。
-2. **俯仰也平滑**（时间常数 9）：`up` 是世界 `up`，正交化后它的长度就是 `cos(pitch)`，越接近限位越小，同样的视线变化引起的 `up` 变化越大，俯仰直接阶跃时地平线会明显发抖。
-3. **视线最后再钳一次**：`camPos` 是插值量、天生滞后，若用滞后的位置反推方向，视线会比基准朝向更陡，把限位绕过去。
 
 ### 机位 1：座舱
 ```js
@@ -577,7 +567,7 @@ var queue = [], timer = 0, box = null, live = [];
 | 油门推进 / 回落 / 加力阈值 | `controlPlayer()` 里的 `0.62` / `dt * 1.6` / `1.0` |
 | 高 G 倍率 | `HIG_MAX = 1.90`（掉速见 `Ent` 的 `TURN_BLEED`） |
 | 高 G 触发门槛 | `controlPlayer()` 里的 `demand > 0.55`、`vStall * 1.30` |
-| 相机俯仰限位 | `updateCamera()` 里的 `CAM_PITCH_LIM = 89°` |
+| 极点冻结 / 定速偏航 | `vars.js` 的 `POLE_HOLD`（sin 3°）/ `POLE_TURN_START`（sin 8°）/ `POLE_TURN_FULL`（sin 35°）/ `POLE_SWING_RATE`（40 rad/s）；`camera.js` 的 `POLE_FRAME_START`（70°） |
 | 追尾镜头的偏航/俯仰平滑与位置跟随 | `1.2` / `9` / `7.5`（`exp` 时间常数） |
 | 相机自由视角速度与回中 | 方向键的 `1.3` / `0.9`、`M3.smooth(..., 2.2, dt)` |
 | 座舱偏移与视场 | `p.fwd * 3.4` / `p.up * 1.1` / `S.fov + 6` |
