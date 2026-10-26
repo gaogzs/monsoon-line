@@ -12,7 +12,7 @@
  *   {{lang}} {{base}}     语言代码与 <base>  {{html.x.y}}  文本；非回退语言缺键时回退 zh-CN 并警告
  * 开发者写在片段里的 HTML 注释不进生成的页面。
  *
- *   node tools/build/gen-pages.js              生成并写回
+ *   node tools/build/gen-pages.js              生成并写回（顺带刷新 locales/<语言>/text.gen.js）
  *   node tools/build/gen-pages.js --check      只检查是否过期（smoke 用）
  *   node tools/build/gen-pages.js --pseudo     另生成 locales/pseudo/html/index.html（静态文本也包成 ⟦…⟧，gitignore，仅开发）
  */
@@ -109,6 +109,7 @@ function build(opt) {
   }
   if (opt.pseudo) files[path.join(LOC, 'pseudo', 'html', 'index.html')] = expand(shell, 'pseudo', fb, null, true, warnings);
   files[path.join(ROOT, 'index.html')] = launcher(langs.filter(l => l !== 'pseudo'));
+  for (const lang of langs) files[GL.outOf(lang)] = outputs[lang].src;   // 页面副本加载 text.gen.js，一起刷新
   return { files, errors, warnings, langs };
 }
 

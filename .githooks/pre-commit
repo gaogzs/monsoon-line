@@ -1,0 +1,6 @@
+#!/bin/sh
+# 提交前刷新生成物（页面副本、启动器、语言包 text.gen.js），并把它们加入本次提交。
+# 启用：git config core.hooksPath .githooks
+set -e
+node tools/build/gen-pages.js
+git add -- index.html $(git ls-files -- 'locales/*/text.gen.js' 'locales/*/html/index.html')
