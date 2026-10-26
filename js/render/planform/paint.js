@@ -31,6 +31,8 @@
    * 分成两份写的话，两边一定会慢慢长得不一样。
    *
    * opts.active   当前高亮的挂载点组
+   * opts.activeWid 当前高亮的武器 id（挂了这种武器的所有组都高亮；战斗 HUD 用）
+   * opts.activeColor 高亮色，默认琥珀色
    * opts.cd       { 武器 id: 0..1 }，1 = 刚打完，0 = 已就绪
    * opts.compact  紧凑模式：省掉标注与尺寸线（HUD 用）
    */
@@ -52,6 +54,7 @@
     var AMBER = '#ffb03a';
     var CY = '#45d6ff';
     var STORE = '#4fe08a';
+    var ACT = opts.activeColor || AMBER;
 
     if (!pf) {
       g.fillStyle = 'rgba(143,168,184,0.5)';
@@ -106,7 +109,8 @@
     for (var gi = 0; gi < groups.length; gi++) {
       var grp = groups[gi];
       var st = groupStore(ac, grp, loadout);
-      var isActive = (opts.active && grp.id === opts.active);
+      var isActive = (opts.active && grp.id === opts.active) ||
+        !!(opts.activeWid && st.wid === opts.activeWid);
       // 这种武器每个挂载点一个槽，所以进度是一个数组
       var cdArr = (cd && st.wid) ? cd[st.wid] : null;
 
@@ -116,7 +120,7 @@
 
         if (!st.w) {
           // 空置：只留一个方框标记
-          g.strokeStyle = isActive ? AMBER : 'rgba(79,224,138,0.40)';
+          g.strokeStyle = isActive ? ACT : 'rgba(79,224,138,0.40)';
           g.lineWidth = 1.2;
           g.strokeRect(px - 3.5, py - 3.5, 7, 7);
           continue;
@@ -142,13 +146,13 @@
             g.beginPath();
             g.rect(px - Hc, py + Lc / 2 - Lc * ready, Hc * 2, Lc * ready);
             g.clip();
-            g.strokeStyle = STORE;
+            g.strokeStyle = isActive ? ACT : STORE;
             g.lineWidth = 1.4;
             $.drawStore(g, px, py, st.w, k, { line: 1.4 });
             g.restore();
           }
         } else {
-          g.strokeStyle = isActive ? AMBER : STORE;
+          g.strokeStyle = isActive ? ACT : STORE;
           g.lineWidth = isActive ? 2 : 1.3;
           $.drawStore(g, px, py, st.w, k, { line: isActive ? 2 : 1.3 });
         }

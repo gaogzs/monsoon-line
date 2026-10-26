@@ -188,8 +188,11 @@
       cd[e.wid] = out;
     }
 
+    /* 当前选中的武器（R 键切换的那一种）整组画成白色 */
+    var cur = lst[p.wpIdx];
     PLANFORM.paint(ctx, bx, by, size, size, p.ac, p.loadout,
-      { compact: true, cd: cd });
+      { compact: true, cd: cd, activeWid: cur ? cur.wid : null,
+        activeColor: '#ffffff' });
 
     $.text(ctx, 'STORES', bx + size / 2, by - 5, $.DIM, $.FS, 'center');
   }
