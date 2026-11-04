@@ -8,11 +8,12 @@ Registry.mission({
   name: T('missions.m2.name'),
   en: 'UNDER THE ANVIL',
   loc: T('missions.m2.loc'),
-  date: '2078.03.19 / 0520L',
+  date: '2078.03.19 / 0555L',
   altStart: 1400,
   speedStart: 340,
   timeLimit: 0,
   axis: 200,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  time: { hour: 5.92 },                 // 黎明前的灰光（太阳在地平线下 1°）：躲在 900 m 云下
 
   prose: T('missions.m2.prose'),
 

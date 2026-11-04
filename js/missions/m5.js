@@ -11,11 +11,12 @@ Registry.mission({
   name: T('missions.m5.name'),
   en: 'SILENT BEACONS',
   loc: T('missions.m5.loc'),
-  date: '2078.03.31 / 0410L',
+  date: '2078.03.31 / 1800L',
   altStart: 9000,
   speedStart: 400,
   timeLimit: 0,
   axis: 175,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  time: { hour: 18 },                 // 日落（太阳贴着右舷地平线）：航标熄灭，贴合"静默"
 
   prose: T('missions.m5.prose'),
 

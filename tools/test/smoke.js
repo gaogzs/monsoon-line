@@ -1556,6 +1556,39 @@ if (Ent && M3 && me && world) {
     else ok('追尾镜头：构造上恒水平，过顶连续（视线帧间 ≤ ' + maxF.toFixed(3) + '，up ≤ ' + maxU.toFixed(3) + '）');
   }
 
+  /* ---- 关卡天色：Shading.setEnv ----
+     LIGHT 必须是同一个对象（brightness 的闭包与 render.js 顶部都持有它，重新赋值就断了）；
+     envVersion 每次递增；DEFAULT_LIGHT 不随 setEnv 变；缺省预设与加载时的常量逐值相等，
+     没写时间的关卡画面不变；太阳越低环境光下限越高、直射越弱；真方位按 axis 换成世界方向。 */
+  {
+    const Sh = sandbox.Shading;
+    const bad = [];
+    const snap = () => JSON.stringify([Sh.LIGHT, Sh.FOG_RGB, Sh.SKY, Sh.SEA, Sh.CLOUD, Sh.AMBIENT, Sh.DIFFUSE]);
+    const def0 = snap(), light0 = Sh.LIGHT, dl0 = JSON.stringify(Sh.DEFAULT_LIGHT), v0 = Sh.envVersion;
+
+    Sh.setEnv({ hour: 17.5 }, 190);
+    if (Sh.LIGHT !== light0) bad.push('setEnv 之后 Shading.LIGHT 不是同一个对象');
+    if (Sh.envVersion !== v0 + 1) bad.push('setEnv 之后 envVersion 没有递增（' + v0 + ' → ' + Sh.envVersion + '）');
+    if (JSON.stringify(Sh.DEFAULT_LIGHT) !== dl0) bad.push('DEFAULT_LIGHT 随 setEnv 变了');
+    if (snap() === def0) bad.push('17.5 点的天色与缺省一样，setEnv 没生效');
+    const dusk = { amb: Sh.AMBIENT, dif: Sh.DIFFUSE };
+
+    Sh.setEnv({ hour: 11.5 }, 190);
+    if (!(dusk.amb > Sh.AMBIENT && dusk.dif < Sh.DIFFUSE)) bad.push('太阳低时环境光下限应更高、直射应更弱');
+
+    // 真方位 → 世界方向：az 250°、axis 190° → 世界偏航 60°
+    Sh.setEnv({ sun: { az: 250, el: 20 } }, 190);
+    const want = { x: Math.sin(60 * Math.PI / 180) * Math.cos(20 * Math.PI / 180), y: Math.sin(20 * Math.PI / 180) };
+    if (Math.abs(Sh.LIGHT.x - want.x) > 1e-9 || Math.abs(Sh.LIGHT.y - want.y) > 1e-9) bad.push('sun {az, el} 没有按 axis 换成世界方向');
+
+    Sh.setEnv(null);
+    if (snap() !== def0) bad.push('setEnv(null) 之后没有回到与加载时逐值相等的缺省');
+    if (Sh.LIGHT !== light0) bad.push('还原缺省时 LIGHT 换了对象');
+
+    if (bad.length) bad.forEach(fail);
+    else ok('关卡天色：LIGHT 同一对象、envVersion 递增、DEFAULT_LIGHT 不变、缺省逐值相等、低太阳抬高环境光');
+  }
+
   /* ---- 追尾镜头：出画处理（静态拉远 / 侧滑软钳 / 拉远带滞回） ----
      以前出画就用滞后的 camOff 瞬间后推，平滑又把深度拉回，
      大机动时镜头前后反复跳。这里复现 updateCamera 里 camOff 那段，

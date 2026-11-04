@@ -197,6 +197,15 @@ color = mix(baseColor, (150,176,196), fog)
 三个常量分别是 `FOG_NEAR = 900`、`FOG_FAR = 9000`、`FOG_MAX = 0.82`，
 雾色 `FOG_RGB = [150, 176, 196]`（都在 `Shading` 里，`render.js` 顶部取成局部变量）。
 
+### 关卡时间与天色（`Shading.setEnv`）
+
+上面的 `LIGHT`、亮度系数、雾色、天空 / 海面 / 云色是**缺省预设**。每关可以在 `mission.time = { hour }`（当地太阳时，北纬 12°、春分近似）或 `mission.sun = { az, el }`（真方位° / 高度°，优先）里设时刻，`startMission` 按它调一次 `Shading.setEnv({ hour, sun }, axis)`；没写就调缺省预设，上一关的天色不残留。不做夜战。
+
+- **预设**：4 个按太阳高度插值的关键帧（`Shading` 里的 `KEYS`）——正午 / 高位（= 缺省，与上面的常量逐值相等）、上午午后（38°）、金色时段（15°）、黄昏（1°，天空偏暖、海面暗、雾偏紫）。每帧含：天空渐变四个色标、太阳色与光晕半径、海面四个色标与 `haze`、`glint`、雾色（`FOG_RGB`，与 `SEA.haze` 是两份）、云色，以及模型的 `AMBIENT` / `DIFFUSE`（低太阳角时环境光下限抬高、直射减弱，背光面不会全黑）。太阳比缺省还高沿用缺省、只换光向；比黄昏还低沿用黄昏。
+- **原地修改**：`setEnv` 原地改 `S.LIGHT.x/y/z`、`SKY`、`SEA`、`FOG_RGB`、`CLOUD`、`AMBIENT`、`DIFFUSE`——`LIGHT` 不能重新赋值（`brightness` 闭包与 `render.js` 顶部都持有同一对象）——并递增 `S.envVersion`。`S.sunAt(hour)` 给出太阳的真方位与高度；真方位按 `axis` 换成世界偏航。
+- **谁读 `envVersion`**：GL 的 `env/create.js` 把 `SKY` / `SEA` 色标打平成 `Float32Array` 缓存，版本变了重建；2D 回退的 `render.js` 每帧开头 `syncEnv()` 比版本，变了就重取 `FOG_*` 并清空 `colorCache`。`drawSky` 的天空渐变、太阳光晕（太阳色乘固定比例）、`drawGround` 的海面渐变、云色都改读 `Shading`，缺省值下与原来的写死颜色逐值相等（golden-render 逐帧不变）。模型的 GL 管线本来每帧读 `S.LIGHT / FOG_RGB / AMBIENT / DIFFUSE`，不用改。
+- **`UnitView`（资料库预览）故意不跟随**：它读 `Shading.DEFAULT_LIGHT / DEFAULT_AMBIENT / DEFAULT_DIFFUSE`（缺省副本，不随 `setEnv` 变），预览打光保持稳定。
+
 颜色不是每帧拼字符串，而是**量化缓存**（见 `shade()`）：
 亮度 `b` 与雾浓度 `fog` 各量化成 16 档（`bi = (b*16)|0`，夹在 0…15），
 拼成一个 `hex + bi*32 + fi` 形状的字符串 key 查 `colorCache`；

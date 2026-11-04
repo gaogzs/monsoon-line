@@ -11,11 +11,12 @@ Registry.mission({
   name: T('missions.m7.name'),
   en: 'IN THE FOG',
   loc: T('missions.m7.loc'),
-  date: '2078.04.09 / 2340L',
+  date: '2078.04.09 / 1850L',
   altStart: 2200,
   speedStart: 330,
   timeLimit: 0,
   axis: 215,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  time: { hour: 18.83 },                 // 日落后的暮色（取最暗的黄昏预设）：云下 900 m，雾
 
   prose: T('missions.m7.prose'),
 
@@ -59,6 +60,30 @@ Registry.mission({
       weapon: 'dl9', fireCd: 4
     });
 
+    /* 防空圈的护卫 —— 三条菊石（菊石级护卫舰，各 6 个舰空弹箱 + 近防炮）。
+       以前只有柘渎号一艘担防空，一艘就是一个点，云下切入绕开它就行；
+       现在两条在它两翼与它同向同速（宽度约 3.5 km），一条贴着登陆舰护航，
+       从哪个方向进都要过至少一条舰的射界。呼号走 NAVAL_CS_POOL 自动取。
+       护卫舰不是通关条件（胜利只看登陆舰与敌机），可以绕、也可以打。 */
+    spawnShip(w, {
+      model: 'ammonite',
+      x: -5500, z: 11000,
+      route: { wp: [{ x: -5500, z: 11000 }, { x: 2500, z: 13000 }], speed: 13, loop: true },
+      weapon: 'dl9', fireCd: 5
+    });
+    spawnShip(w, {
+      model: 'ammonite',
+      x: 1500, z: 9500,
+      route: { wp: [{ x: 1500, z: 9500 }, { x: 9500, z: 11500 }], speed: 13, loop: true },
+      weapon: 'dl9', fireCd: 6
+    });
+    spawnShip(w, {
+      model: 'ammonite',
+      x: 9500, z: 15000,
+      route: { wp: [{ x: 9500, z: 15000 }, { x: 500, z: 15200 }], speed: 9, loop: true },
+      weapon: 'dl9', fireCd: 6
+    });
+
     /* 两条登陆舰 —— 这一关的目标。它们武装薄弱，跑得也慢。 */
     spawnShip(w, {
       model: 'seascorpion',
@@ -85,7 +110,7 @@ Registry.mission({
       msg: T('missions.m7.spawn.route.msg')
     });
 
-    // 一架夜间巡逻的片岩
+    // 一架暮色里巡逻的片岩
     spawnEnemy(w, {
       ac: 'schist',
       x: 14000, y: 5000, z: 20000,

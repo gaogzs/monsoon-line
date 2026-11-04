@@ -123,7 +123,9 @@
       for (var i = 0; i < 4; i++) { C.push(stops[i][1][0], stops[i][1][1], stops[i][1][2]); T.push(stops[i][0]); }
       return { C: new Float32Array(C), T: new Float32Array(T) };
     }
-    var S = Shading, sky = flatStops(S.SKY.stops), sea = flatStops(S.SEA.stops);
+    /* 渐变表按 envVersion 重建：Shading.setEnv 原地改了 SKY / SEA 的色标，
+       这里缓存的是打平后的 Float32Array，不跟着变就还是上一关的天色。 */
+    var S = Shading, sky = flatStops(S.SKY.stops), sea = flatStops(S.SEA.stops), envV = S.envVersion;
     function camXZ(cam) {
       var mx = cam.pos.x % $.PERIOD, mz = cam.pos.z % $.PERIOD;
       return [mx < 0 ? mx + $.PERIOD : mx, mz < 0 ? mz + $.PERIOD : mz];
@@ -133,6 +135,7 @@
     /* 天空 + 海面：深度测试开着（LEQUAL，清屏深度 1，全部通过），写深度 */
     function drawEnv(C) {
       var cam = C.cam, U = setCam(P.env, C);
+      if (S.envVersion !== envV) { sky = flatStops(S.SKY.stops); sea = flatStops(S.SEA.stops); envV = S.envVersion; }
       var R = S.EARTH_R, h = Math.max(0.5, cam.pos.y);
       var xz = camXZ(cam);
       gl.uniform3f(U.uLight, S.LIGHT.x, S.LIGHT.y, S.LIGHT.z);

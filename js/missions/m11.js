@@ -10,6 +10,7 @@ Registry.mission({
   speedStart: 380,
   timeLimit: 0,
   axis: 175,
+  time: { hour: 16.17 },                 // 午后偏晚的金色光线（太阳高 27°，在右舷）
 
   prose: T('missions.m11.prose'),
   objectives: [

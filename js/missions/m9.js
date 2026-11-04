@@ -30,6 +30,7 @@ Registry.mission({
   speedStart: 360,
   timeLimit: 0,
   axis: 160,
+  time: { hour: 14.5 },                 // 午后，太阳高 51°，在右舷
 
   prose: T('missions.m9.prose'),
   objectives: [

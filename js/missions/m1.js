@@ -13,6 +13,7 @@ Registry.mission({
   speedStart: 320,
   timeLimit: 0,
   axis: 190,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  time: { hour: 6.2 },                 // 黎明（日出刚过，太阳在左舷低处）：突袭发生在雨前的清晨
 
   prose: T('missions.m1.prose'),
 

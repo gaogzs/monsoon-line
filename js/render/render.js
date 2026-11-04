@@ -16,9 +16,26 @@ var Renderer = (function () {
   var cam = null;
 
   /* ---------- 光照 / 雾：数值全部来自 shading.js（与 WebGL 共用一份） ---------- */
-  var LIGHT = Shading.LIGHT;
-  var FOG_R = Shading.FOG_RGB[0], FOG_G = Shading.FOG_RGB[1], FOG_B = Shading.FOG_RGB[2];
-  var FOG_NEAR = Shading.FOG_NEAR, FOG_FAR = Shading.FOG_FAR, FOG_MAX = Shading.FOG_MAX;
+  var LIGHT = Shading.LIGHT;                  // 同一对象，Shading.setEnv 原地改，不用重取
+  var FOG_R, FOG_G, FOG_B, FOG_NEAR, FOG_FAR, FOG_MAX;
+  var envSeen = -1;
+  /* 环境（雾色、天色）按 Shading.envVersion 重新取：每帧开头比一次版本号，
+     变了就重抄数值并清掉按雾色算好的颜色缓存。 */
+  function syncEnv() {
+    if (envSeen === Shading.envVersion) return;
+    envSeen = Shading.envVersion;
+    FOG_R = Shading.FOG_RGB[0]; FOG_G = Shading.FOG_RGB[1]; FOG_B = Shading.FOG_RGB[2];
+    FOG_NEAR = Shading.FOG_NEAR; FOG_FAR = Shading.FOG_FAR; FOG_MAX = Shading.FOG_MAX;
+    colorCache = {};
+  }
+  function hex2(c) {
+    var h = '#';
+    for (var i = 0; i < 3; i++) { var v = Math.round(c[i]); h += (v < 16 ? '0' : '') + v.toString(16); }
+    return h;
+  }
+  function rgba2(c, k, a) {
+    return 'rgba(' + Math.round(c[0] * k[0]) + ',' + Math.round(c[1] * k[1]) + ',' + Math.round(c[2] * k[2]) + ',' + a + ')';
+  }
 
   /* ---------- 模型用哪条管线 ----------
      'auto'  有 WebGL2 就用（render-gl.js，深度缓冲，遮挡正确），没有就退回下面的画家算法
@@ -46,6 +63,7 @@ var Renderer = (function () {
 
   /* ---------- 颜色缓存（量化亮度/雾浓度，避免每帧拼字符串） ---------- */
   var colorCache = {};
+  syncEnv();
   function shade(hex, b, fog) {
     var bi = b < 0 ? 0 : (b > 0.999 ? 15 : (b * 16) | 0);
     var fi = fog < 0 ? 0 : (fog > 0.999 ? 15 : (fog * 16) | 0);
@@ -196,10 +214,11 @@ var Renderer = (function () {
     var hy = horizonY();
     var top = cam.fwd.y * 0.55;                  // 抬头看时天空更"高"
     var g = ctx.createLinearGradient(0, Math.min(0, hy - H), 0, Math.max(H, hy));
-    g.addColorStop(0, '#122c47');
-    g.addColorStop(0.42, '#2f6c95');
-    g.addColorStop(0.78, '#7fb2cc');
-    g.addColorStop(1, '#c9d8dd');
+    var sk = Shading.SKY.stops;                  // 2D 的渐变从天顶画到地平线：与 GL 的色标顺序相反
+    g.addColorStop(0, hex2(sk[3][1]));
+    g.addColorStop(0.42, hex2(sk[2][1]));
+    g.addColorStop(0.78, hex2(sk[1][1]));
+    g.addColorStop(1, hex2(sk[0][1]));
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
 
@@ -210,10 +229,11 @@ var Renderer = (function () {
     if (ss && ss.z > 0) {
       var r = Math.max(24, cam.focal * 0.055);
       var sg = ctx.createRadialGradient(ss.x, ss.y, 0, ss.x, ss.y, r * 5);
-      sg.addColorStop(0, 'rgba(255,246,220,0.95)');
-      sg.addColorStop(0.08, 'rgba(255,238,190,0.55)');
-      sg.addColorStop(0.30, 'rgba(220,225,205,0.14)');
-      sg.addColorStop(1, 'rgba(200,210,210,0)');
+      var sc = Shading.SKY.sun;                  // 光晕四层色是太阳色乘固定比例（缺省太阳色下与原来的写死值逐值相等）
+      sg.addColorStop(0, rgba2(sc, [1, 1, 1], 0.95));
+      sg.addColorStop(0.08, rgba2(sc, [1, 238 / 246, 190 / 220], 0.55));
+      sg.addColorStop(0.30, rgba2(sc, [220 / 255, 225 / 246, 205 / 220], 0.14));
+      sg.addColorStop(1, rgba2(sc, [200 / 255, 210 / 246, 210 / 220], 0));
       ctx.fillStyle = sg;
       ctx.beginPath();
       ctx.arc(ss.x, ss.y, r * 5, 0, Math.PI * 2);
@@ -255,7 +275,7 @@ var Renderer = (function () {
 
           ctx.globalAlpha = M3.clamp(al, 0, 0.8);
 
-          ctx.fillStyle = '#e8f0f5';
+          ctx.fillStyle = hex2(Shading.CLOUD.body);
           ctx.beginPath();
           ctx.ellipse(p.x, p.y, rr, rr * sq, 0, 0, Math.PI * 2);
           ctx.fill();
@@ -263,14 +283,14 @@ var Renderer = (function () {
           // 给稍大的云一点体积：顶部受光、底部压暗
           if (rr > 26) {
             ctx.globalAlpha = M3.clamp(al * 0.55, 0, 0.42);
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = hex2(Shading.CLOUD.top);
             ctx.beginPath();
             ctx.ellipse(p.x - rr * 0.10, p.y - rr * sq * 0.42,
               rr * 0.66, rr * sq * 0.52, 0, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.globalAlpha = M3.clamp(al * 0.30, 0, 0.24);
-            ctx.fillStyle = '#8ea3b4';
+            ctx.fillStyle = hex2(Shading.CLOUD.base);
             ctx.beginPath();
             ctx.ellipse(p.x + rr * 0.06, p.y + rr * sq * 0.52,
               rr * 0.72, rr * sq * 0.40, 0, 0, Math.PI * 2);
@@ -286,10 +306,11 @@ var Renderer = (function () {
   function drawGround(hy) {
     var y0 = Math.max(-2, Math.min(H + 2, hy));
     var g = ctx.createLinearGradient(0, y0, 0, H);
-    g.addColorStop(0, '#4d6472');
-    g.addColorStop(0.06, '#2b3a46');
-    g.addColorStop(0.5, '#16222b');
-    g.addColorStop(1, '#0b1319');
+    var sea = Shading.SEA.stops;
+    g.addColorStop(0, hex2(sea[0][1]));
+    g.addColorStop(0.06, hex2(sea[1][1]));
+    g.addColorStop(0.5, hex2(sea[2][1]));
+    g.addColorStop(1, hex2(sea[3][1]));
     ctx.fillStyle = g;
     ctx.fillRect(0, y0, W, H - y0);
 
@@ -575,6 +596,7 @@ var Renderer = (function () {
      每帧开始
      ============================================================ */
   function begin() {
+    syncEnv();
     poolN = 0;
     faceN = 0;
     // 全屏滤镜层（hudfx.js）每帧先清空：离开战斗（菜单、结算）时自动消失

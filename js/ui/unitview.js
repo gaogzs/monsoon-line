@@ -20,9 +20,9 @@
 
    而这里需要的东西其实很少：一个模型、一个绕着它转的相机、平面着色。
    所以写一个约 120 行的独立渲染器（`renderModel`）。
-   **光向与亮度公式与 render.js 完全一致**（`0.44 + 0.56*|dot|`，同一个 LIGHT），
-   所以预览里的配色与明暗就是实机里的那一套。
-   代价是两份着色代码 —— 改 render.js 的 `LIGHT` 时，这里要跟着改。
+   **光向与亮度公式与 render.js 一致**（`AMBIENT + DIFFUSE*|dot|`，取 Shading 的缺省副本），
+   所以预览里的配色与明暗就是没写时间的关卡里的那一套；关卡天色不影响它。
+   代价是两份着色代码 —— 改 render.js 的亮度公式时，这里要跟着改。
 
    顺带一个好处：这里的相机是**正交意义上的"绕模型转"**，
    不用管天空、海面、雾、近平面裁剪与对象池，比复用主渲染管线简单得多。
@@ -31,8 +31,11 @@
 
 var UnitView = (function () {
 
-  /* 与 render.js 同一个光向 —— 见文件头注释 */
-  var LIGHT = M3.norm(M3.V(-0.42, 0.80, 0.43));
+  /* 资料库预览需要**稳定的打光**，所以故意不跟随关卡天色（Shading.setEnv 会改
+     Shading.LIGHT / AMBIENT / DIFFUSE），而是读 Shading 里的缺省副本 ——
+     缺省值与 render.js 在没写时间的关卡里用的那一套逐值相等，不再另抄一份。 */
+  var LIGHT = Shading.DEFAULT_LIGHT;
+  var AMBIENT = Shading.DEFAULT_AMBIENT, DIFFUSE = Shading.DEFAULT_DIFFUSE, DEGENERATE = 0.62;
   var BG = '#070d12';                 // 与 planform 的底板色一致
 
   var YAW_RATE = 0.42;                // 自动旋转角速度 rad/s（一圈约 15 秒）
@@ -180,10 +183,10 @@ var UnitView = (function () {
       var ny = e1z * e2x - e1x * e2z;
       var nz = e1x * e2y - e1y * e2x;
       var nl = Math.sqrt(nx * nx + ny * ny + nz * nz);
-      var bright = 0.62;
+      var bright = DEGENERATE;
       if (nl > 1e-9) {
         var dl = Math.abs((nx * lx + ny * ly + nz * lz) / nl);
-        bright = 0.44 + 0.56 * dl;
+        bright = AMBIENT + DIFFUSE * dl;
       }
 
       for (i = 0; i < np; i++) sumZ += cZ[idx[i]];

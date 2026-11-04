@@ -17,6 +17,7 @@ Registry.mission({
   speedStart: 340,
   timeLimit: 300,
   axis: 15,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  time: { hour: 10.08 },                 // 上午高光（太阳高 59°，在右舷）
 
   prose: T('missions.m10.prose'),
 

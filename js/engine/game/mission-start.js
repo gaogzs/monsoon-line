@@ -10,6 +10,8 @@
     $.requestAimLock();
     $.missionIdx = idx;
     $.mission = MISSIONS[idx];
+    /* 本关天色：按 mission.time / sun 设一次；没写就设缺省预设，上一关的天色不残留 */
+    Shading.setEnv({ hour: ($.mission.time || {}).hour, sun: $.mission.sun }, $.mission.axis || 0);
     $.world = $.newWorld();
     $.stats = { startTime: 0, endTime: 0 };
 

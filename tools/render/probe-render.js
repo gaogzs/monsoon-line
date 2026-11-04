@@ -152,6 +152,16 @@ ${tags}
     } }
   );
 
+  /* 天色预设：按当地时刻设环境，镜头朝太阳（axis 190 的世界偏航 = 真方位 − 190°），高度低一点能看到光晕。
+     缺省（不写时间）的画面由 env-low / env-high 等场景覆盖。每个场景自己设环境；放在所有场景最后，页面画完就结束，不必还原。 */
+  [[null, 'default'], [9.5, 'h9.5'], [16.5, 'h16.5'], [18, 'h18']].forEach(function (c) {
+    SC.push({ id: 'sky-' + c[1], env: true, fn: function () {
+      Shading.setEnv(c[0] === null ? null : { hour: c[0] }, 190);
+      var sun = c[0] === null ? { az: 190 + Math.atan2(Shading.LIGHT.x, Shading.LIGHT.z) * 180 / Math.PI, el: 53 } : Shading.sunAt(c[0]);
+      poleLook(M3.V(0, 3000, -40), sun.az - 190, Math.min(40, Math.max(4, sun.el - 12)));
+      pushPlane(plane('sailfish', M3.V(0, 3000, 0), M3.V(0, 0, 1)));
+    } });
+  });
   function shot(sc, mode) {
     Renderer.setMode(mode);
     Renderer.setGfx({ env: !!sc.env });
@@ -195,7 +205,7 @@ function main() {
   fs.writeFileSync(html, page());
   const url = 'file:///' + html.replace(/\\/g, '/');
   const common = ['--headless=new', '--hide-scrollbars', '--no-sandbox', '--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader', '--allow-file-access-from-files', '--window-size=990,4100', '--virtual-time-budget=6000'];
+    '--enable-unsafe-swiftshader', '--allow-file-access-from-files', '--window-size=990,7300', '--virtual-time-budget=6000'];
   spawnSync(chrome, common.concat(['--screenshot=' + png.replace(/\\/g, '/'), url]), { stdio: 'ignore' });
   const dom = spawnSync(chrome, common.concat(['--dump-dom', url]), { encoding: 'utf8' });
   const m = /RESULT (\{.*?\})<\/title>/.exec(dom.stdout || '');
