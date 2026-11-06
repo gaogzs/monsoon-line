@@ -155,9 +155,16 @@
     var tau = m.age - dc.t0;
     if (tau < 0 || tau > $.DECOY_LIFE) return null;
     if (!dc.ent) dc.ent = { kind: 'decoy', alive: true, pos: dc.p, vel: dc.v };
-    dc.ent.pos = M3.add(dc.p, M3.mul(dc.v, tau));
+    dc.ent.pos = $.decoyPos(dc, tau);
     return dc.ent;
   }
+
+  /* 诱饵云的外推位置：速度按 exp(-drag·t) 衰减，位移取闭式解 p + v·(1−e^{−kτ})/k。 */
+  $.decoyPos = function (dc, tau) {
+    var k = dc.drag || 0;
+    var s = k > 1e-6 ? (1 - Math.exp(-k * tau)) / k : tau;
+    return M3.add(dc.p, M3.mul(dc.v, s));
+  };
 
   /* 兼容入口：t 是直接命中的单位（可为空）。所有起爆都走 Combat.detonate。 */
   function detonate(m, t, world) {
@@ -201,15 +208,25 @@
        初速必须有一个明确的**向机体下方**的分量。原来只有
        "载机速度 ×0.35 + 随机方向"，而相机就在飞机正后方，
        于是整团火被机速带着往前、直接糊在镜头上。
-       现在继承的机速比例降到 0.22，再沿机体下方抛出去 ——
-       视觉上就是真正"投"下去的一组火球。 */
+       现在继承大部分机速（0.85），全部沿机体下方抛出，之后靠阻力（drag）
+       慢慢衰减 —— 先随机体前行一段，再落到身后。
+
+       出膛位置也不再是机身中心一个点：真实的投放器在机腹后部、左右各一排。
+       按机体尺度 R（命中半径）把火球分到左右两侧，并略向外侧扇出。 */
+    var R = Combat.radiusOf(a);
+    var right = M3.cross(a.up, a.fwd);
+    var flareOrigin = function (side) {
+      return M3.add(a.pos, M3.add(M3.mul(a.fwd, -0.7 * R),
+        M3.add(M3.mul(a.up, -0.2 * R), M3.mul(right, side * 0.3 * R))));
+    };
     /* 颜色与数量按"鲜艳的橙色"调：热焰是主体，箔丝只是退到背景的淡白丝。 */
     for (i = 0; i < 10; i++) {
-      var dir = $.randUnit();
-      var v = M3.add(M3.mul(a.vel, 0.22), M3.mul(dir, M3.rnd(26, 62)));
-      v = M3.add(v, M3.mul(a.up, -M3.rnd(42, 78)));
-      $.spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -6)), v,
-        M3.rnd(1.3, 2.1), 1.1, '#ff8a1f', { grow: true, drag: 0.5, grav: 0.6 });
+      var side = i % 2 ? 1 : -1;
+      var v = M3.add(M3.mul(a.vel, 0.85), M3.mul($.randUnit(), M3.rnd(6, 16)));
+      v = M3.add(v, M3.mul(a.up, -M3.rnd(30, 60)));
+      v = M3.add(v, M3.mul(right, side * M3.rnd(6, 18)));
+      $.spawnParticle(world.particles, flareOrigin(side), v,
+        M3.rnd(1.3, 2.1), 1.1, '#ff8a1f', { grow: true, drag: 0.35, grav: 0.6 });
     }
     /* 箔丝（chaff）：淡白色的金属丝云，散得更开、下落更慢、停留更久。
        现代干扰弹是热焰弹与箔丝一起投放的 —— 前者骗红外，后者骗雷达，
@@ -218,11 +235,12 @@
        尺寸比热焰弹小得多：它是丝，不是火球。上一轮把热焰弹从 2.2 缩到
        0.85 时漏掉了这里（1.25），结果丝团看着比火球还大。 */
     for (i = 0; i < 6; i++) {
-      var cd2 = $.randUnit();
-      var v2 = M3.add(M3.mul(a.vel, 0.28), M3.mul(cd2, M3.rnd(14, 44)));
-      v2 = M3.add(v2, M3.mul(a.up, -M3.rnd(24, 48)));
-      $.spawnParticle(world.particles, M3.add(a.pos, M3.mul(a.fwd, -5.5)), v2,
-        M3.rnd(2.2, 3.4), 0.34, '#ffe2c4', { drag: 1.15, grav: 0.10, alpha: 0.6 });
+      var side2 = i % 2 ? 1 : -1;
+      var v2 = M3.add(M3.mul(a.vel, 0.9), M3.mul($.randUnit(), M3.rnd(4, 14)));
+      v2 = M3.add(v2, M3.mul(a.up, -M3.rnd(18, 36)));
+      v2 = M3.add(v2, M3.mul(right, side2 * M3.rnd(4, 12)));
+      $.spawnParticle(world.particles, flareOrigin(side2), v2,
+        M3.rnd(2.2, 3.4), 0.34, '#ffe2c4', { drag: 0.6, grav: 0.10, alpha: 0.6 });
     }
 
     var broke = 0, ineffective = 0;
@@ -302,13 +320,14 @@
          结果一次诱饵就永久关掉了这枚弹的重捕获。见 makeMissile 的注释。 */
       m.reLockT = 1.4;
       m.spoofed = a;        // 记住是谁骗的：重捕获时优先避开它
-      /* 骗走它的那一团诱饵云。它跟着载机的 0.22 倍速度往后、往下飘，
+      /* 骗走它的那一团诱饵云。它继承载机 0.85 倍速度、朝下抛出，并按 drag 衰减（见 decoyPos），
          亮 DECOY_LIFE 秒。盲飞期结束时它要是还亮着、还在视场里，
          没有记忆的导引头有一半原概率**再咬回这团云**（见 decoyRecheck）；
          带 decoyMemory 的（CLA-4）认得它，直接略过。 */
       m.decoy = {
-        p: M3.clone(a.pos),
-        v: M3.add(M3.mul(a.vel, 0.22), M3.mul(a.up, -40)),
+        p: flareOrigin(0),
+        v: M3.add(M3.mul(a.vel, 0.85), M3.mul(a.up, -45)),
+        drag: 0.35,
         t0: m.age,
         p2: chance * 0.5,
         done: false

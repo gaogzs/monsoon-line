@@ -163,7 +163,7 @@
     var tau = m.age - dc.t0;
     var remain = $.DECOY_LIFE - tau;
     if (remain <= 0.05) return;
-    var cp = M3.add(dc.p, M3.mul(dc.v, tau));
+    var cp = $.decoyPos(dc, tau);
     var to = M3.sub(cp, m.pos);
     var d = M3.len(to);
     if (d < 1) return;
