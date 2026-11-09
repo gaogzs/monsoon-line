@@ -9,6 +9,14 @@
   Ent.turnFactor = $.turnFactor;
   Ent.makeAircraft = $.makeAircraft;
   Ent.stepAircraft = $.stepAircraft;
+  /* 过失速机动（psm.js）：Game 的 controlPlayer / 按键走这几个公开函数 */
+  Ent.stepPSM = $.stepPSM;
+  Ent.psmGate = $.psmGate;
+  Ent.psmStart = $.psmStart;
+  Ent.psmAbort = $.psmAbort;
+  Ent.psmEnergy = $.psmEnergy;
+  Ent.PSM_SAFE_AGL = $.PSM_SAFE_AGL;
+  Ent.PSM_LEVEL_AGL = $.PSM_LEVEL_AGL;
   /* 挂点适配与 NPC 的挂载分配 —— game.js 的 pushStores 渲染实体挂载时
        要用同一份规则，不能再抄一遍。 */
   Ent.hostile = $.hostile;

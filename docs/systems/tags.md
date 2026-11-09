@@ -40,6 +40,7 @@
 | `relay` | game | 高空中继平台：被击毁时触发中继链断裂的结算与无线电 | 设施 `relay` | `engine/game/combat.js` |
 | `sam` | game | 地对空发射车：被击毁时触发防空网被打开缺口的结算与无线电 | 设施 `sam` | `engine/game/combat.js` |
 | `cullFar` | render | 数量极多的目标：超出绘制 / 雷达显示距离就不画 | 设施 `cell` | `ui/frame.js`、`ui/hud/radar.js` |
+| `noPSM` | entities | 该机型不能做过失速机动（PSM）。缺省所有机型可用；VTOL 带上它。**`reserved`：目前没有机型使用** | （无，批次 6 的 VTOL） | `entities/psm.js`（`psmGate`） |
 
 ## 加一个标签
 

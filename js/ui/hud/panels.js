@@ -86,7 +86,7 @@
      ============================================================ */
   /* 优先级（上 → 下）：雷达 / 导弹 > 低高度 > 失速 > 动压 > 其它状态。
      低高度排在失速前面：它意味着下一秒就是海面。 */
-  $.ALERT_ORDER = ['missile', 'lit', 'damage', 'terrain', 'stall', 'lowq', 'jammed', 'winchester', 'emcon'];
+  $.ALERT_ORDER = ['missile', 'lit', 'damage', 'terrain', 'stall', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
 
   $.alertsBottom = 0;
 
@@ -113,6 +113,8 @@
     if (Ent.agl(p) < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: T('ui.hud.panels.drawAlerts.txt_2'), col: $.RED, font: F1, on: bl, h: $.U(30) });
     if (p.stall) list.push({ id: 'stall', txt: T('ui.hud.panels.drawAlerts.txt_3'), col: $.RED, font: F1, on: bl, h: $.U(30) });
     if (p.pos.y > 18000 && p.q < 12) list.push({ id: 'lowq', txt: T('ui.hud.panels.drawAlerts.txt_4'), col: $.AMBER, font: F2, on: bl, h: $.U(30) });
+    /* 过失速机动：进行中琥珀闪烁，冷却中青色常亮（不闪，不抢眼）。 */
+    if (p.psm) list.push({ id: 'psm', txt: T('ui.hud.panels.drawAlerts.psm_active'), col: $.AMBER, font: F2, on: bl, h: $.U(30) });
     /* 电子战的两个状态：受扰与静默。
        它们都是"你看不见别人 / 别人看不见你"的状态，必须一眼可辨 ——
        否则玩家只会觉得"雷达今天有点难用"。 */

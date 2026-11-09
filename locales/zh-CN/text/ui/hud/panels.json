@@ -17,7 +17,8 @@
           "txt_5": "JAMMED  电磁干扰",
           "txt_6": "DAMAGE  受损警告",
           "txt_7": "WINCHESTER  弹药耗尽",
-          "txt_8": "EMCON-Δ  电磁静默"
+          "txt_8": "EMCON-Δ  电磁静默",
+          "psm_active": "过失速机动"
         }
       }
     }

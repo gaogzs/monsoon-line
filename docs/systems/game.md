@@ -330,11 +330,12 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
   if (thrIn)                       player.throttle += thrIn * dt * 0.62;
   else if (player.throttle > 1.0)  player.throttle = max(1.0,  throttle - dt*1.6);
   else if (player.throttle < THR_IDLE) player.throttle = min(THR_IDLE, throttle + dt*1.6);   // THR_IDLE = 0.04
-  if (keys.KeyX) player.throttle = THR_MAX;
-  if (keys.KeyZ) player.throttle = 0;
   ```
 
+  （油门键是 Shift / Ctrl：`thrIn` 由它们组成。）
+
   加力（`> 1.0`）与减速板（`< THR_IDLE`，0.04）都是**按住才有效的瞬时态**：松手后自动回落到军推区间的边界，回落速率 `dt * 1.6` 比推进的 `0.62` 快、又不是瞬间弹回。这正是 [hud.md](hud.md#引擎出力带thrtape) 警告“别拿它们当稳定读数去测”的原因。`player.ab = throttle > 1.0`、`player.brake = throttle < THR_IDLE`。HUD 读数按慢车 0% / 军推 100% 标度，见 [hud.md](hud.md#引擎出力带thrtape)。
+- **过失速机动（同时按住 `G` 与减速板状态）**：`controlPlayer` 末尾（`player.brake` 算出之后）每帧判 `KeyG && player.brake`：满足且过 `Ent.psmGate` 就 `psmStart`（条件不满足静默忽略，无提示），任一松开走 `psmAbort`；结束时键还按着则 `psmLock` 到松开为止。`controlPlayer` 在 `updateMouseAim` 之后：`player.psm` 活动中时**屏蔽键盘覆盖与高 G**（`psmOn`），飞控照常把机头指向光标，`stepPSM` 消费 `a.ctrl`；键盘直控（没有光标）或 `toggleAimMode` 切走时中止；低空中止后 `player.psmLevel` 期间目标换成水平略带爬升的方向（高于 `PSM_LEVEL_AGL` 且不再下降才解除）。细节见 [flight-model.md](flight-model.md#过失速机动psm玩家侧)。
 - 高 G 机动（`G`）：只有 `demand = |pitch| + |roll| > 0.55` 且 `speed > vStall * 1.30` 才生效 —— 否则它就成了一个无脑常开的加速器。生效时 `gLoad` 用 `M3.smooth(..., HIG_MAX, 9, dt)` 拉起；速度代价由 `stepAircraft` 的转弯掉速自然产生（角速度放大约 1.9 倍，掉速随之放大）；松手用 `M3.smooth(..., 1, 6, dt)` 落回。
 - 机炮：`wantGun = mouse.left || keys.Space` → `Ent.fireGun`，`SFX.gun(wantGun && player.gunAmmo > 0)`（有按键没弹时不出声）。
 

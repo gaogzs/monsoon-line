@@ -30,3 +30,5 @@ Tags.declare('regulator', { owner: 'game',    doc: T('core.tags.doc_14') });
 Tags.declare('relay',    { owner: 'game',     doc: T('core.tags.doc_15') });
 Tags.declare('sam',      { owner: 'game',     doc: T('core.tags.doc_16') });
 Tags.declare('cullFar',  { owner: 'render',   doc: T('core.tags.doc_17') });
+// reserved：本批没有机型使用，VTOL（批次 6）带上它；读的地方是 psm.js 的 psmGate
+Tags.declare('noPSM',    { owner: 'entities', reserved: true, doc: T('core.tags.doc_18') });

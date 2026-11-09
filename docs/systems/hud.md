@@ -507,9 +507,10 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 | 4 | `terrain` | `p.pos.y < 200 && p.fwd.y < 0` | `TERRAIN 低高度告警`（红） |
 | 5 | `stall` | `p.stall` | `STALL 失速`（红） |
 | 6 | `lowq` | `p.pos.y > 18000 && p.q < 12` | `LOW Q 动压不足`（琥珀） |
-| 7 | `jammed` | `suppressed > 0.05 \|\| ewPower > 0` | `JAMMED 电磁干扰`（琥珀） |
-| 8 | `winchester` | `gunAmmo <= 0 && spAmmo <= 0` | `WINCHESTER 弹药耗尽`（琥珀） |
-| 9 | `emcon` | `p.emcon` | `EMCON-Δ 电磁静默`（青，**不闪** —— 它是状态不是告警） |
+| 7 | `psm` | `p.psm`（进行中） | `过失速机动`（琥珀，闪） |
+| 8 | `jammed` | `suppressed > 0.05 \|\| ewPower > 0` | `JAMMED 电磁干扰`（琥珀） |
+| 9 | `winchester` | `gunAmmo <= 0 && spAmmo <= 0` | `WINCHESTER 弹药耗尽`（琥珀） |
+| 10 | `emcon` | `p.emcon` | `EMCON-Δ 电磁静默`（青，**不闪** —— 它是状态不是告警） |
 
 雷达 / 导弹 > 失速 > 动压是定下来的顺序；低高度排在失速前面，因为它意味着下一秒就是海面。
 `threatState()` 只算导弹与照射的数据；RWR 环上仍然保留方位点，两者互补：

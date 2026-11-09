@@ -1,7 +1,7 @@
 (function (Ent) {
   'use strict';
   var $ = Ent.$;
-  $.makeAircraft = makeAircraft; $.curLoadFactor = curLoadFactor; $.stepAircraft = stepAircraft; $.nozzlesOf = nozzlesOf;
+  $.makeAircraft = makeAircraft; $.curLoadFactor = curLoadFactor; $.stepAircraft = stepAircraft; $.effectivePhys = effectivePhys; $.stepAircraftTail = stepAircraftTail; $.nozzlesOf = nozzlesOf;
 
   /* ============================================================
      飞机
@@ -171,11 +171,10 @@
     return m.k0 * mass / m.total;
   }
 
-  function stepAircraft(a, dt, world) {
-    if (a.gunFlashT > 0) a.gunFlashT -= dt;     // 炮口火光的余辉，见 flashRings
-    if (!a.alive) return;
+  /* 本机此刻的有效性能参数：phys 按挂载重量打折（stepAircraft 与 stepPSM 共用）。
+     没有挂载拖累时就是 a.phys 本身。 */
+  function effectivePhys(a) {
     var p = a.phys;
-
     // 挂载越重越笨拙：加速、转向、滚转都吃一点亏。
     // loadFactor：玩家按机库配置设定（game.js），NPC 由 buildNpcMounts 按实体挂载算。
     /* 必须放在函数开头：下面的失速判定、姿态旋转、目标速度全都读 p。
@@ -201,6 +200,14 @@
         yaw: p.yaw
       };
     }
+    return p;
+  }
+
+  function stepAircraft(a, dt, world) {
+    if (a.gunFlashT > 0) a.gunFlashT -= dt;     // 炮口火光的余辉，见 flashRings
+    if (!a.alive) return;
+    if (a.psm) return $.stepPSM(a, dt, world);          // 过失速机动：独立分支，见 psm.js
+    var p = effectivePhys(a);
 
     // ---- 动压 ----
     var q = $.qOf(a.pos.y, a.speed);
@@ -209,6 +216,12 @@
     var ctrl = $.ctrlFactor(a.pos.y, a.speed, a.ac);
     a.stall = a.speed < p.vStall;
     if (a.stall) ctrl *= 0.34;
+    /* 过失速机动刚结束：舵效从 0.34 倍（与失速同量级）在 PSM_RECOVER_S 内爬回满，
+       免得出口突然满舵。没做过 PSM 的飞机这个字段不存在，零开销。 */
+    if (a.psmRecover > 0) {
+      ctrl *= 1 - 0.66 * Math.min(1, a.psmRecover / $.PSM_RECOVER_S);
+      a.psmRecover -= dt;
+    }
     /* 存下来给两处读：AI.steerTo 按它估计每根轴此刻能转多快，
        HUD 的 P/R/Y 舵量表用它画"可用权限"底色。下一帧才被读到，差一帧无所谓。 */
     a.ctrlAuth = ctrl;
@@ -360,6 +373,13 @@
       return;
     }
 
+    stepAircraftTail(a, dt, world);
+  }
+
+  /* 每帧更新的尾部：冷却 / 装填、认知电子战结算、枪热、受伤拖烟、加力尾焰。
+     与"怎么飞"无关，所以从 stepAircraft 里分出来 —— 过失速机动（psm.js）
+     不走主路径的姿态 / 速度段，但这些照样要继续算。 */
+  function stepAircraftTail(a, dt, world) {
     // ---- 冷却 ----
     if (a.spCd > 0) a.spCd -= dt;
     // 每件武器分开计时。否则按 R 切一下挂载就等于跳过装填了 ——

@@ -245,7 +245,8 @@
     ['1 / 2 / 3', T('ui.screens.settings.KEYMAP.i14.i1.s1')],
     ['N', T('ui.screens.settings.KEYMAP.i15.i1.s1')],
     ['G', T('ui.screens.settings.KEYMAP.i16.i1.s1')],
-    ['H / Esc', T('ui.screens.settings.KEYMAP.i17.i1.s1')]
+    ['H / Esc', T('ui.screens.settings.KEYMAP.i17.i1.s1')],
+    ['G + Ctrl', T('ui.screens.settings.KEYMAP.i18.i1.s1')]
   ];
 
   var TIPS = [
@@ -254,7 +255,8 @@
     T('ui.screens.settings.TIPS.i2.s1'),
     T('ui.screens.settings.TIPS.i3.s1'),
     T('ui.screens.settings.TIPS.i4.s1'),
-    T('ui.screens.settings.TIPS.i5.s1')
+    T('ui.screens.settings.TIPS.i5.s1'),
+    T('ui.screens.settings.TIPS.i6.s1')
   ];
 
   /* 实战指南：图标是按 HUD 上的真实样子画的（颜色、虚实、位置与游戏内一致）。

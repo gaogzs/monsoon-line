@@ -1564,7 +1564,11 @@ if (Ent && M3 && me && world) {
     const Sh = sandbox.Shading;
     const bad = [];
     const snap = () => JSON.stringify([Sh.LIGHT, Sh.FOG_RGB, Sh.SKY, Sh.SEA, Sh.CLOUD, Sh.AMBIENT, Sh.DIFFUSE]);
+    /* 先回到缺省再快照：到这里时前面的用例已经开过各关，各关写了 time / sun，
+       当前环境是最后一关的天色，不是加载时的缺省。 */
+    Sh.setEnv(null);
     const def0 = snap(), light0 = Sh.LIGHT, dl0 = JSON.stringify(Sh.DEFAULT_LIGHT), v0 = Sh.envVersion;
+    if (JSON.stringify(Sh.LIGHT) !== dl0) bad.push('setEnv(null) 的光向与 DEFAULT_LIGHT 不一致');
 
     Sh.setEnv({ hour: 17.5 }, 190);
     if (Sh.LIGHT !== light0) bad.push('setEnv 之后 Shading.LIGHT 不是同一个对象');
@@ -4477,7 +4481,8 @@ if (Ent && M3 && me && world) {
     const bad = [];
     const p = {
       pos: M3d.V(0, 19000, 0), fwd: M3d.V(0, -0.2, 1), team: 0,
-      stall: true, q: 5, suppressed: 1, gunAmmo: 0, spAmmo: 0, emcon: true
+      stall: true, q: 5, suppressed: 1, gunAmmo: 0, spAmmo: 0, emcon: true,
+      psm: { aoa: 0.8, e0: 1 }       // 过失速机动进行中：'psm' 要插在 lowq 与 jammed 之间
     };
     const world = {
       missiles: [{ alive: true, target: p, team: 1, pos: M3d.V(0, 19000, 1500) }],
@@ -4489,6 +4494,8 @@ if (Ent && M3 && me && world) {
     if (ids.join() !== want.join()) bad.push('告警顺序不对：' + ids.join(' > '));
     if (ids[0] !== 'missile') bad.push('导弹逼近没有排在最上面');
     if (!(ids.indexOf('stall') < ids.indexOf('lowq'))) bad.push('失速没有排在动压前面');
+    if (ids.indexOf('psm') < 0) bad.push('过失速机动进行中，告警栈里没有 psm');
+    else if (!(ids.indexOf('lowq') < ids.indexOf('psm') && ids.indexOf('psm') < ids.indexOf('jammed'))) bad.push('psm 没有排在动压与受扰之间');
     for (let i = 1; i < list.length; i++) {
       const prev = list[i - 1];
       const minGap = prev.h + (prev.sub ? prev.subH : 0) - 0.01;
@@ -4496,6 +4503,66 @@ if (Ent && M3 && me && world) {
     }
     if (bad.length) bad.forEach(fail);
     else ok('告警栈：' + ids.join(' > ') + '，逐行下排不重叠');
+  }
+
+  /* ---- 过失速机动（PSM）：门限、收敛、出口 ----
+     详细场景在 tools/test/probes/probe-psm.js；这里只守住接线：noPSM 已声明（reserved）、
+     各条门限各给各的原因、一把完整的 PSM 能收敛、出口速度连续、松开即结束且无冷却。 */
+  {
+    const G = sandbox.Game, Ent = sandbox.Ent, AI = sandbox.AI, M3d = sandbox.M3;
+    const bad = [];
+    G.startMission(0);
+    const w = G.__world(), pl = G.__player();
+    pump(2);
+    const decl = sandbox.Tags.declared().noPSM;
+    if (!decl || !decl.reserved) bad.push('noPSM 没有声明为 reserved');
+
+    const put = (alt, spd, aim) => {
+      pl.pos = M3d.V(0, alt, 0); pl.fwd = M3d.V(0, 0, 1); pl.up = M3d.V(0, 1, 0); pl.right = M3d.V(1, 0, 0);
+      pl.speed = spd; pl.vel = M3d.mul(pl.fwd, spd); pl.throttle = 1;
+      pl.psm = null; pl.psmLevel = false; pl.psmRecover = 0; pl.tags = {};
+      pl.aimDir = aim ? M3d.norm(aim) : null;
+    };
+    const back = M3d.V(0, 0, -1);
+    const gate = (name, setup, reason) => {
+      setup();
+      const g = Ent.psmGate(pl, w, pl.aimDir);
+      if (g.ok || g.reason !== reason) bad.push('门限「' + name + '」应拒绝为 ' + reason + '，实际 ' + JSON.stringify(g));
+    };
+    gate('光标在前方', () => put(3000, 500, M3d.V(0, 0, 1)), 'front');
+    gate('高度不足', () => put(1000, 500, back), 'low');
+    gate('能量不足', () => put(2500, 150, back), 'energy');
+    gate('光标偏 30°', () => put(3000, 500, M3d.rotAxis(M3d.V(0, 0, 1), M3d.V(0, 1, 0), 30 * Math.PI / 180)), 'front');
+    gate('没有光标', () => put(3000, 500, null), 'noAim');
+    gate('noPSM', () => { put(3000, 500, back); pl.tags = { noPSM: true }; }, 'noPSM');
+
+    put(3000, 500, back);
+    if (!Ent.psmGate(pl, w, pl.aimDir).ok) bad.push('条件齐备时 psmGate 没有放行');
+    Ent.psmStart(pl);
+    let t = 0, lastV = pl.speed, nan = false, held = 0;
+    while (pl.psm && t < 12) {
+      AI.steerTo(pl, pl.aimDir, pl.ctrl, pl, 1 / 60);
+      lastV = M3d.len(pl.vel);
+      Ent.stepAircraft(pl, 1 / 60, w);
+      t += 1 / 60;
+      if (pl.psm && Math.acos(Math.max(-1, Math.min(1, M3d.dot(pl.fwd, pl.aimDir)))) < 3 * Math.PI / 180) {   // 对准后松开 X
+        held += 1 / 60;
+        if (held >= 0.3) Ent.psmAbort(pl, w, 'release');
+      } else held = 0;
+      if (![pl.pos.x, pl.pos.y, pl.pos.z, pl.speed].every(Number.isFinite)) { nan = true; break; }
+    }
+    if (nan) bad.push('PSM 期间出现 NaN');
+    else if (pl.psm) bad.push('PSM 12 s 内没有结束');
+    else {
+      const e = pl.psmEnd;
+      if (!e || e.why !== 'release') bad.push('PSM 没有正常收敛：' + (e && e.why));
+      if (e && e.aoaMax > 100) bad.push('PSM 攻角峰值 ' + e.aoaMax.toFixed(0) + '° 超过 100°');
+      if (Math.abs(M3d.len(pl.vel) - lastV) / lastV > 0.02) bad.push('PSM 出口速度突跳 ' + lastV.toFixed(1) + ' → ' + M3d.len(pl.vel).toFixed(1));
+      if (!(pl.psmRecover > 0) || pl.psmCd !== undefined) bad.push('PSM 松开后应挂恢复且没有冷却');
+    }
+    pl.psm = null; pl.psmRecover = 0; pl.tags = {};
+    if (bad.length) bad.forEach(fail);
+    else ok('过失速机动：noPSM 已声明、六条门限各给原因、光标在正后方 ' + t.toFixed(1) + ' s 收敛、出口速度连续、松开即结束且无冷却');
   }
 
   /* ---- F 键选目标：屏幕内按离瞄准环最近，屏幕外按距离，连按往下走 ----

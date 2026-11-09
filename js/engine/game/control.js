@@ -34,6 +34,7 @@
   function toggleAimMode() {
     $.aimMode = !$.aimMode;
     $.aimInit = false;
+    if (!$.aimMode && $.player && $.player.psm) Ent.psmAbort($.player, $.world, 'abort');   // 键盘直控没有光标
     if ($.aimMode) $.requestAimLock();
     $.player.aimDir = null;
     if (!$.aimMode && document.pointerLockElement === $.cv && document.exitPointerLock) document.exitPointerLock();
@@ -88,19 +89,34 @@
     }
     if ($.player.decoyWarnT > 0) $.player.decoyWarnT -= dt;
 
+    /* 过失速机动期间玩家不能手动转向：飞控照常把机头指向光标（stepPSM 消费 a.ctrl），
+       键盘覆盖与高 G 都屏蔽。键盘直控没有光标，PSM 在那个模式下不成立 —— 一旦发现就中止。 */
+    var psmOn = !!$.player.psm;
+    if (psmOn && !$.aimMode) { Ent.psmAbort($.player, $.world, 'abort'); psmOn = false; }
+
     if ($.aimMode) {
       // 鼠标引导：飞控把机头指向瞄准点，但照样受动压与失速限制
       updateMouseAim(dt);
       var kp = ($.keys.KeyW ? 1 : 0) + ($.keys.KeyS ? -1 : 0);
       var kr = ($.keys.KeyD ? 1 : 0) + ($.keys.KeyA ? -1 : 0);
       var ky = ($.keys.KeyE ? 1 : 0) + ($.keys.KeyQ ? -1 : 0);
-      if (kp) c.pitch = kp;        // 键盘随时可以覆盖飞控
-      if (kr) c.roll = kr;
-      if (ky) c.yaw = ky;
+      if (!psmOn) {
+        if (kp) c.pitch = kp;        // 键盘随时可以覆盖飞控
+        if (kr) c.roll = kr;
+        if (ky) c.yaw = ky;
+      }
     } else {
       c.pitch = ($.keys.KeyW ? 1 : 0) + ($.keys.KeyS ? -1 : 0);
       c.roll = ($.keys.KeyD ? 1 : 0) + ($.keys.KeyA ? -1 : 0);
       c.yaw = ($.keys.KeyE ? 1 : 0) + ($.keys.KeyQ ? -1 : 0);
+    }
+
+    /* 过失速机动被低空中止后的"拉平"：目标换成水平略带爬升的方向，直到脱离低空且不再下降。
+       期间 PSM 被 psmGate 屏蔽。 */
+    if ($.player.psmLevel) {
+      var pf = $.player.fwd;
+      AI.steerTo($.player, M3.norm(M3.V(pf.x, 0.12, pf.z)), c, $.player, dt);
+      if (Ent.agl($.player) > Ent.PSM_LEVEL_AGL && $.player.vel && $.player.vel.y >= 0) $.player.psmLevel = false;
     }
 
     // 单一油门轴：推满自动进加力，收到底自动张减速板。
@@ -132,7 +148,7 @@
        速度掉到 1.3 倍失速以下就自动退出。 */
     var demand = Math.abs(c.pitch) + Math.abs(c.roll);
     var canG = $.player.speed > $.player.phys.vStall * 1.30;
-    var wantG = !!$.keys.KeyG && demand > 0.55 && canG;
+    var wantG = !!$.keys.KeyG && demand > 0.55 && canG && !psmOn;
 
     if (wantG) {
       $.player.gLoad = M3.smooth($.player.gLoad || 1, $.HIG_MAX, 9, dt);
@@ -144,6 +160,20 @@
     $.player.throttle = M3.clamp($.player.throttle, 0, $.THR_MAX);
     $.player.ab = $.player.throttle > 1.0;
     $.player.brake = $.player.throttle < $.THR_IDLE;
+
+    /* 过失速机动：**同时按住高 G 键（G）与减速板状态（Ctrl 收油到减速板）**才进行，任一松开就结束。
+       条件（光标角度 / 高度 / 能量 …）不满足时静默不响应。一把 PSM 结束时键还按着的话，要松开再按才能再起，
+       免得坠落段结束后立刻又起手。 */
+    var pl = $.player;
+    var psmKeys = !!$.keys.KeyG && pl.brake;
+    if (pl.psm) {
+      if (!psmKeys) Ent.psmAbort(pl, $.world, 'release');
+    } else {
+      if (!psmKeys) pl.psmLock = false;
+      else if (pl.psmWas) pl.psmLock = true;
+      if (psmKeys && !pl.psmLock && pl.alive && Ent.psmGate(pl, $.world, $.aimMode ? pl.aimDir : null).ok) Ent.psmStart(pl);
+    }
+    pl.psmWas = !!pl.psm;
 
     var wantGun = $.mouse.left || $.keys.Space;
     if (wantGun) Ent.fireGun($.player, $.world);

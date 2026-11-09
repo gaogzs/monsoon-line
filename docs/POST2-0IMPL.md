@@ -660,6 +660,10 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 - 黄金回放：不触发 PSM 的全部场景与现状逐帧相等（`node tools/test/golden.js`）；
 - smoke：`--only 挂载系统`（`noPSM` 已声明且被用到的标签断言；见 3.3 的标签：它要么先被某机型数据使用，要么在 `Tags.declare` 里标 `reserved: true` 直到批次 6）、`--only 干扰与机动`（门限断言）。
 
+> **3.3 实施偏差（v3.3 已落地，以实际代码与 flight-model.md「过失速机动」一节为准）**：① 速度模型除升力 / 阻力 / 推力 / 重力外**加了一项"速度方向被机头拉着转"**（`PSM_PULL·sin α`）：只靠前四项时 `CLrel` 在 `vStall` 只有 1 g，速度矢量转不动，要么 α 冲到 175°、要么夹在 100° 以内却 12 s 收敛不了；② `stepAircraft` 里抽出了 `effectivePhys` 与 `stepAircraftTail`（早返回不能漏掉装填 / 电子战 / 枪热 / 拖烟 / 尾焰），并在失速 `ctrl *= 0.34` 旁加了 `psmRecover` 一行；③ 控制律不新写，`stepPSM` 消费 `updateMouseAim` 写的 `a.ctrl`；④ 键盘 keydown 块没有 `!paused` 条件，`triggerPsm` 自己判；⑤ SysNote 文案在 `ui/input.json` 而不是 `engine/`；⑥ `noPSM` 标 `reserved`；⑦ dt 0.02 / 0.05 的"收敛时间"放宽到 10%（判据有一步量化），能量损失与结束速度仍 ≤ 5%。
+>
+> **之后的调整（玩家侧）**：⑧ 操作改成**同时按住 `G`（高 G 键）与减速板状态（Ctrl 收油到底）进行、任一松开结束**（不再有 X 键），机头对准光标、超时都不再自动结束（保险只剩速度 `< 0.8·vStall` 与低空下降）；⑨ **去掉玩家侧冷却**（`PSM_CD`、`psmCd`、冷却告警与 HUD 冷却条全删）与全部 PSM 系统提示（起手 / 中止 / 拒绝原因，条件不满足静默不响应）；⑩ 起手角度门限由"光标在机后（> 90°）"降到 `PSM_MIN_ANGLE = 45°`。批次 5 的 AI 复用 `stepPSM` 时没有"松开"这个动作：由 AI 自己在对准后调 `psmAbort`，并保留 `PSM_AI_CD`；⑪ **代价改为快速掉能量**（`PSM_BLEED`，一直按住约 5 s 就进失速，速度耗到 `0.7·vStall` 转入失速坠落段：机头落下、速度矢量跟着重力走，速度回到 `vStall` 且机头朝下才结束，坠落段里松开按键无效）；G 表读实际加速度（含速度转向）；**去掉战报里的 PSM 统计**（`world.psm` 与 `finish.js` 那一行）。
+
 ### 3.4 发版
 
 文档：`game.md`（相机）、`rendering.md`（环境预设）、`missions.md`（`time / sun` 字段）、`flight-model.md`（PSM 一节）、`tags.md`（`noPSM`）、`hud.md`（告警栈 `psm` 条目）、`modules.md`（`Ent.stepPSM`、`Shading.setEnv`）。发 v3.2：`node tools/build/release.js`（含 `stamp-version`；changelog 条目写进 `js/core/changelog.js` 与对应 `locales/*/text/core/changelog.json`）。

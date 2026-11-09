@@ -242,6 +242,33 @@
     ctx.fillStyle = $.DIM;
     ctx.fillRect(gx - 50 + 100 * (1 - G_LO) / (G_HI - G_LO), gy + 14, 1.5, 9);
 
+    /* ---------- 过失速机动：攻角仪表 + 能量条（只在机动中显示）----------
+       框坐在 G 框正上方。攻角条 0–120°，刻度 30 / 60 / 90°；能量条是"当前比能 / 起手比能"，
+       掉得越多越短，让玩家看得见这一把用掉了多少。 */
+    var psm = p.psm;
+    if (psm) {
+      var py = gy - 62;
+      ctx.strokeStyle = $.AMBER; ctx.lineWidth = 1;
+      ctx.strokeRect(gx - 58, py - 26, 116, 56);
+      if (psm) {
+        var aD = Math.abs(psm.aoa) * 180 / Math.PI;
+        $.text(ctx, T('ui.hud.instruments.psm.alpha'), gx - 50, py - 9, $.DIM, $.FS, 'left');
+        $.text(ctx, aD.toFixed(0) + '°', gx + 50, py - 9, aD > 100 ? $.RED : $.AMBER, $.FB, 'right');
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(gx - 50, py - 2, 100, 5);
+        ctx.fillStyle = $.AMBER;
+        ctx.fillRect(gx - 50, py - 2, 100 * M3.clamp(aD / 120, 0, 1), 5);
+        ctx.fillStyle = $.DIM;
+        for (var tk = 30; tk <= 90; tk += 30) ctx.fillRect(gx - 50 + 100 * tk / 120, py - 4, 1.5, 9);
+        var eK = M3.clamp(Ent.psmEnergy(p) / Math.max(1, psm.e0), 0, 1);
+        $.text(ctx, T('ui.hud.instruments.psm.energy'), gx - 50, py + 17, $.DIM, $.FS, 'left');
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(gx - 50, py + 21, 100, 5);
+        ctx.fillStyle = eK < 0.45 ? $.RED : (eK < 0.7 ? $.AMBER : $.GREEN);
+        ctx.fillRect(gx - 50, py + 21, 100 * eK, 5);
+      }
+    }
+
     /* ---------- 油门条不在这里 ----------
        它原来贴在屏幕左下角，而那正好是雷达圆心 —— 雷达在 drawTapes
        之后绘制，所以它一直被盖住看不见。现在搬到了空速带右边，
