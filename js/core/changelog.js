@@ -2,9 +2,25 @@
    由 tools/build/release.js 从 CHANGELOG.md 写出，每次发版后重新生成。
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
-  "current": "v3.2.2",
-  "generated": "2026-11-06T13:42:25+09:00",
+  "current": "v3.2.3",
+  "generated": "2026-11-09T15:35:34+09:00",
   "releases": [
+    {
+      "version": "v3.2.3",
+      "date": "2026-11-09",
+      "title": "热焰弹拖尾",
+      "tag": "小版本",
+      "commit": "d8f423b",
+      "lead": "热焰弹多了一条小尾巴：沿它相对世界的运动反方向拖出，随速度衰减变短、转向。",
+      "sections": [
+        {
+          "h": "新增",
+          "items": [
+            "热焰弹带一条渐隐的小拖尾（长度 = 世界速度 × 0.035 s），尾巴方向跟着绝对运动走：刚抛出时朝机后，被阻力与重力拉向下之后转向上方并缩短；箔丝不加。粒子系统新增 `tail` / `head` 选项，WebGL 与 Canvas 两条渲染路径同步，破片与曳光弹外观不变"
+          ]
+        }
+      ]
+    },
     {
       "version": "v3.2.2",
       "date": "2026-11-06",
