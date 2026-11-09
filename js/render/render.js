@@ -570,14 +570,20 @@ var Renderer = (function () {
       if (r < 0.4 || s.x < -r * 3 || s.x > W + r * 3 || s.y < -r * 3 || s.y > H + r * 3) continue;
       ctx.globalAlpha = Math.max(0, Math.min(1, lifeK)) * (p.alpha === undefined ? 1 : p.alpha);
       ctx.fillStyle = p.color;
-      if (p.streak) {
-        /* 破片：从当前位置往回拉一段（≈ 30 ms 的航迹），看起来是飞散的碎片而不是光点 */
-        var s0 = M3.project(cam, M3.sub(p.pos, M3.mul(p.vel, 0.03)));
+      var tl = p.tail || (p.streak ? 0.03 : 0);
+      if (tl && p.vel) {
+        /* 破片：从当前位置往回拉一段（≈ 30 ms 的航迹），看起来是飞散的碎片而不是光点。
+           p.tail（热焰弹）：往世界速度反方向拖，尾端渐隐，画完再补亮头。 */
+        var s0 = M3.project(cam, M3.sub(p.pos, M3.mul(p.vel, tl)));
         if (s0) {
-          ctx.strokeStyle = p.color;
           ctx.lineWidth = Math.max(1, r * 0.9);
+          if (p.tail) {
+            var gr = ctx.createLinearGradient(s0.x, s0.y, s.x, s.y);
+            gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, p.color);
+            ctx.strokeStyle = gr;
+          } else ctx.strokeStyle = p.color;
           ctx.beginPath(); ctx.moveTo(s0.x, s0.y); ctx.lineTo(s.x, s.y); ctx.stroke();
-          continue;
+          if (!p.head) continue;
         }
       }
       if (r < 1.4) {

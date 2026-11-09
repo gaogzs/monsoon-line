@@ -91,7 +91,7 @@
       return { vao: vao, vbo: vbo, data: new Float32Array(stride * 256), stride: stride, n: 0 };
     }
     var puffI = instVao(P.puff, [['aC', 4, 0], ['aP', 4, 4]], 8);
-    var partI = instVao(P.part, [['aPos', 4, 0], ['aCol', 4, 4], ['aTail', 3, 8]], 11);
+    var partI = instVao(P.part, [['aPos', 4, 0], ['aCol', 4, 4], ['aTail', 3, 8], ['aFade', 1, 11]], 12);
     function grow(I, n) {
       if (I.data.length >= n * I.stride) return;
       var m = I.data.length;
@@ -366,7 +366,7 @@
     /* 与 render.js 的 drawParticles 同一套规则：delay 未到不画，grow 随寿命膨胀，streak 往回拉 30 ms */
     function pushParticles(list) {
       var I = partI;
-      grow(I, I.n + list.length);
+      grow(I, I.n + list.length * 2);     // 带亮头的拖尾粒子占两个实例
       var D = I.data;
       for (var i = 0; i < list.length; i++) {
         var p = list[i];
@@ -374,13 +374,22 @@
         var lifeK = p.life / p.life0;
         var al = Math.max(0, Math.min(1, lifeK)) * (p.alpha === undefined ? 1 : p.alpha);
         if (al <= 0.004) continue;
-        var c = rgb(p.color), o = I.n * 11;
+        var c = rgb(p.color), o = I.n * 12;
         D[o] = p.pos.x; D[o + 1] = p.pos.y; D[o + 2] = p.pos.z;
         D[o + 3] = p.size * (p.grow ? (1.6 - lifeK) : 1);
         D[o + 4] = c[0]; D[o + 5] = c[1]; D[o + 6] = c[2]; D[o + 7] = al;
-        if (p.streak && p.vel) { D[o + 8] = p.vel.x * 0.03; D[o + 9] = p.vel.y * 0.03; D[o + 10] = p.vel.z * 0.03; }
-        else { D[o + 8] = 0; D[o + 9] = 0; D[o + 10] = 0; }
+        /* 拖尾 = 世界速度反方向 × 秒数：p.tail（渐隐，可带亮头）；老的 streak 等价于 0.03 s、等亮、无头 */
+        var tl = p.tail || (p.streak ? 0.03 : 0), fade = p.tail ? 1 : 0;
+        if (tl && p.vel) { D[o + 8] = p.vel.x * tl; D[o + 9] = p.vel.y * tl; D[o + 10] = p.vel.z * tl; }
+        else { D[o + 8] = 0; D[o + 9] = 0; D[o + 10] = 0; tl = 0; }
+        D[o + 11] = fade;
         I.n++;
+        if (tl && p.head) {               // 亮头：同一位置再画一个圆点
+          var o2 = I.n * 12;
+          for (var j = 0; j < 12; j++) D[o2 + j] = D[o + j];
+          D[o2 + 8] = 0; D[o2 + 9] = 0; D[o2 + 10] = 0; D[o2 + 11] = 0;
+          I.n++;
+        }
       }
     }
     function drawParticles(C) {

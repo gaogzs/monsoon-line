@@ -236,12 +236,13 @@
     'in vec4 aPos;',               // xyz, 世界半径
     'in vec4 aCol;',               // rgb(0..1), alpha
     'in vec3 aTail;',              // 破片：往回拉的那一段（世界坐标），否则 0
-    'out vec2 vQ; out vec4 vC; out float vW, vSq;',
+    'in float aFade;',             // 1：拖尾沿线渐隐（热焰弹的尾巴）；0：等亮（破片 / 曳光）
+    'out vec2 vQ; out vec4 vC; out float vW, vSq, vT;',
     'void main() {',
     '  int id = gl_VertexID;',
     '  vec2 q = vec2((id == 1 || id == 2 || id == 4) ? 1.0 : -1.0, (id == 2 || id == 4 || id == 5) ? 1.0 : -1.0);',
     '  vec3 c = toCam(aPos.xyz);',
-    '  vC = aCol; vQ = q; vW = c.z;',
+    '  vC = aCol; vQ = q; vW = c.z; vT = 1.0;',
     '  if (c.z < uNear) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vSq = 0.0; return; }',
     '  float rpx = max(0.7, uFocal * aPos.w / c.z);',
     '  vSq = rpx < 1.4 ? 1.0 : 0.0;',             // 太小的点画方块（与 2D 的 fillRect 一致）
@@ -258,6 +259,7 @@
     '      vec2 px = (q.x < 0.0 ? pa : pb) + nrm * q.y;',
     '      gl_Position = vec4(px / half_ * P.w, P.z, P.w);',
     '      vW = P.w; vSq = 1.0;',
+    '      vT = aFade > 0.5 ? (q.x < 0.0 ? 0.0 : 1.0) : 1.0;',
     '      return;',
     '    }',
     '  }',
@@ -267,10 +269,10 @@
   ].join('\n');
 
   $.FS_PART = COMMON + [
-    'in vec2 vQ; in vec4 vC; in float vW, vSq;',
+    'in vec2 vQ; in vec4 vC; in float vW, vSq, vT;',
     'out vec4 o;',
     'void main() {',
-    '  float a = vC.a;',
+    '  float a = vC.a * vT;',
     '  if (vSq < 0.5) { float r = length(vQ); if (r > 1.0) discard; a *= 1.0 - smoothstep(0.82, 1.0, r); }',
     '  o = vec4(vC.rgb * a, 0.0);',
     '  gl_FragDepth = logDepth(vW);',

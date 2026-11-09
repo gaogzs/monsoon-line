@@ -19,7 +19,10 @@
       grow: !!opt.grow, alpha: opt.alpha === undefined ? 1 : opt.alpha,
       drag: opt.drag || 0, grav: opt.grav || 0,
       /* streak：按速度拉成短线（破片）；delay：先隐身这么多秒再开始（子母弹错开起爆） */
-      streak: !!opt.streak, delay: opt.delay || 0
+      streak: !!opt.streak, delay: opt.delay || 0,
+      /* tail：往世界速度反方向拖一条尾巴（秒，长度 = |vel| × tail），尾端渐隐；
+         head：带 tail 时仍画一个圆点当亮头（破片的 streak 没有头、不渐隐）。 */
+      tail: opt.tail || 0, head: !!opt.head
     });
   }
 

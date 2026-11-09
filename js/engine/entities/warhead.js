@@ -226,7 +226,7 @@
       v = M3.add(v, M3.mul(a.up, -M3.rnd(30, 60)));
       v = M3.add(v, M3.mul(right, side * M3.rnd(6, 18)));
       $.spawnParticle(world.particles, flareOrigin(side), v,
-        M3.rnd(1.3, 2.1), 1.1, '#ff8a1f', { grow: true, drag: 0.35, grav: 0.6 });
+        M3.rnd(1.3, 2.1), 1.1, '#ff8a1f', { grow: true, drag: 0.35, grav: 0.6, tail: 0.035, head: true });
     }
     /* 箔丝（chaff）：淡白色的金属丝云，散得更开、下落更慢、停留更久。
        现代干扰弹是热焰弹与箔丝一起投放的 —— 前者骗红外，后者骗雷达，
