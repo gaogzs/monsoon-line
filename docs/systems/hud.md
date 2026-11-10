@@ -188,6 +188,7 @@ var s = M3.project(cam, p.pos + dir * 24000);
   `THR_IDLE / THR_MAX` 定义在 `Game`（`js/engine/game/vars.js`），`HUD`（`js/ui/hud/instruments.js`）有同名副本，smoke 断言两边一致。
 - **为什么慢车是 0% 而不是 4%**：飞行模型里没有推力，油门只决定一个目标速度
   （`lerp(0.74·vStall, vMil, throttle)`，见 [flight-model.md](flight-model.md)）。
+  空速带右侧另有一道琥珀短横标出**当前高度**的失速速度（`Ent.vStallAt(p)`，随高度实时移动；低于它变红，超出带宽贴边画成三角）。
   以前读数直接是"油门杆 × 100"，松手后停在 4%，看起来像还剩 4% 推力 —— 其实那就是慢车。
 - 减速板在物理上是开 / 关两态（油门低于 `THR_IDLE` 就全开），负数段只表示杆位。
 - 刻度 `−25 / 0 / 25 / 50 / 75 / 100 / 125`；`0%` 与 `100%` 各有一道白线

@@ -78,12 +78,12 @@
     return 0.5 * v * v + $.G * $.PSM_MIN_AGL;
   }
 
-  /* 起手动压上限（Pa）：K × ½ρ₀·vStall²。以失速速度的动压为尺子：重型机失速快、上限也高，
+  /* 起手动压上限（Pa）：K × ½ρ₀·vStall₀²（海平面失速速度，不含高度）。以失速速度的动压为尺子：重型机失速快、上限也高，
      而且是**动压**不是空速 —— 海平面 K = 4 时是 2 倍 vStall，高空空气稀薄同样的上限对应更大的空速，
      HUD 的 Q 表（kPa）上能直接看到。 */
   function qLimit(a) {
     var p = $.effectivePhys(a);
-    return $.PSM_Q_K * 0.5 * $.RHO0 * p.vStall * p.vStall;
+    return $.PSM_Q_K * 0.5 * $.RHO0 * p.vStall0 * p.vStall0;
   }
 
   /* 能不能起手。返回 { ok, reason }，reason 供 SysNote 选文案：

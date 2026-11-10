@@ -45,7 +45,7 @@
       desired = M3.norm(M3.V(desired.x, 0.35, desired.z));
     }
     // 防止陷入纯垂直爬升（会失速）
-    if (a.fwd.y > 0.82 && a.speed < a.phys.vStall * loadoutPenalty(Ent.curLoadFactor(a)).vStall * 1.5) {
+    if (a.fwd.y > 0.82 && a.speed < Ent.vStallAt(a) * 1.5) {
       desired = M3.norm(M3.V(a.fwd.x, -0.3, a.fwd.z));
       ab = true; throttle = 1;
     }

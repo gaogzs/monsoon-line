@@ -4722,7 +4722,7 @@ if (Ent && M3 && me && world) {
         q: Math.round(qq), stall: a.stall,
         // 真正的"操控权限"，q 只是它的代理
         ctrl: q.ctrlFactor(a.pos.y, a.speed, a.ac),
-        ceil: (a.ac && a.ac.ceiling) || 16000,
+        ceil: q.ceilingEff(a),               // 有效升限 = min(数据升限, 失速升限)
         /* 诊断用：它凭什么待在那个高度 ——
            是航线型绕过了升限钳制，还是目标把它拉上去的。 */
         mode: (a.ai && a.ai.mode) || '—',

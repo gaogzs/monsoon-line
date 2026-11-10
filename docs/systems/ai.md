@@ -222,7 +222,7 @@ M8 的 `dz` 是 **+320**，僚机排在长机前方。）
 **5. 升限钳制（所有分支共用）**
 
 ```js
-ceil = (a.ac && a.ac.ceiling) || 16000;
+ceil = Ent.ceilingEff(a);          // min(数据升限, 失速升限)，见 flight-model.md「失速速度随动压变化」
 if (pos.y > ceil && dir.y > -0.08) {
   // 超了，压回来 —— **超得越多压得越狠**（最多 -0.45）
   over = min(1, (pos.y - ceil) / 1500);
@@ -334,7 +334,7 @@ dir  = norm(V(fwd.x*0.35 + perp.x*side*1.5, dive, fwd.z*0.35 + perp.z*side*1.5))
 
 - `pos.y < 900 && fwd.y < 0` → 把 `desired.y` 顶到至少 0.25
 - `pos.y > 19000 && desired.y > 0.35` → 压到 0.35（避免过度爬升损失动压）
-- `fwd.y > 0.82 && speed < vStall * 1.5` → 强制 `V(fwd.x, -0.3, fwd.z)`，
+- `fwd.y > 0.82 && speed < Ent.vStallAt(a) * 1.5`（当前高度、含挂载折算的失速速度） → 强制 `V(fwd.x, -0.3, fwd.z)`，
   `ab = true, throttle = 1`（防止纯垂直爬升失速）
 
 `leadTo()` 的提前量折扣是**固定 0.85**（与武器数据里的 `lead` 无关）：

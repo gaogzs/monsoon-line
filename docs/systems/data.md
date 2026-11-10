@@ -97,7 +97,7 @@ var CALLSIGN = {
 | `faction` / `planformType` / `maker` | string | — | 展示用（图鉴、机库）。前两个各自回退成 `'—'`，`maker` 缺了显示 `undefined` |
 | `npcOnly` | bool | — | 缺省 = **可驾驶**，会出现在机库；`true` 则机库跳过、`preflight` 跳过其挂点检查 |
 | `caps` | string[] | — | `canCarry` 里回退成 `[]`，即"什么门槛都过不了" |
-| `ceiling` | number | — | `AI` 里回退成 `16000` 米 |
+| `ceiling` | number | — | 推力升限；回退成 `16000` 米。实际用的是 `Ent.ceilingEff` = min(`ceiling`, 失速升限)，见 flight-model.md |
 | `ctrlFull` | number | — | `Ent` `ctrlFactor` 回退成 `22000`（只有 `petrel` 写 16500） |
 | `ctrlFloor` | number | — | 回退成 `0.13`（只有 `sailfish` 写 0.34） |
 | `variableSweep` | bool | — | 只有 `frigatebird` 有；`Ent` 据此做变后掠翼插值 |
@@ -522,7 +522,7 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | 想改什么 | 在哪 |
 |---|---|
 | 某机型的飞行性能 | `AIRCRAFT[].phys` |
-| AI 的实用升限 | `AIRCRAFT[].ceiling`（缺省 16000） |
+| AI 的实用升限 | `AIRCRAFT[].ceiling`（缺省 16000）与失速升限取小：`Ent.ceilingEff` |
 | 满操控动压 / 低动压保底 | `AIRCRAFT[].ctrlFull`（默认 22000）/ `ctrlFloor`（默认 0.13） |
 | 机库六维条 | `AIRCRAFT[].stats`（spd/mob/stl/fire/dur/rng） |
 | 最大挂载重量 | `AIRCRAFT[].maxLoad` |
@@ -576,7 +576,7 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | `js/ui/codex/` | `build()` 里遍历 `AIRCRAFT` / `WEAPONS` / **`SHIPS`** 生成三份图鉴 |
 | `unitview.js` | 遍历 `AIRCRAFT` + `SHIPS` 生成单位详情页 |
 | `js/missions/` | `Ent.makeAircraft` 传 `type`；用 `downstreamCallsign()` 取敌机呼号；`spawnShip()` 按 `model` 读 `SHIPS` |
-| `AI` | 读 `AIRCRAFT[].ceiling` |
+| `AI` | 读 `Ent.ceilingEff(a)`（`AIRCRAFT[].ceiling` 与失速升限取小） |
 | `js/render/planform/` / `HUD` | 读 `hardpointGroups` 画俯视图与挂载条 |
 | `tools/test/smoke.js` | 用 `tools/lib/scripts.js` 取脚本清单，在浏览器之外把游戏加载一遍，然后对上述各表做一致性断言（含标签声明 / 使用的双向检查） |
 | `tools/test/snapshot-data.js` | 把数据层导出成快照，对照 `tools/test/baseline/` 看数据有没有被意外改动 |

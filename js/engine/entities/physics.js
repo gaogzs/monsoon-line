@@ -2,6 +2,7 @@
   'use strict';
   var $ = Ent.$;
   $.airDensity = airDensity; $.qOf = qOf; $.ctrlFactor = ctrlFactor; $.terrainY = terrainY; $.groundY = groundY; $.isLand = isLand; $.agl = agl; $.setTerrain = setTerrain; $.airDragK = airDragK; $.turnFactor = turnFactor;
+  $.stallK = stallK; $.ceilingEff = ceilingEff; $.thrustK = thrustK;
 
   $.G = 9.80665;
   $.RHO0 = 1.225;
@@ -41,6 +42,59 @@
       return 0.08803 * Math.pow(T3 / 216.65, -35.16);
     }
     return 0.0132;
+  }
+
+  /* ============================================================
+     失速速度随动压变化与高空推力包线
+     ============================================================
+     失速的是**动压**，不是空速：同样的机翼，同样的升力系数，½ρv² 够不够托住机体才是关键。
+     所以 vStall(y) = vStall₀ · √(ρ₀ / ρ(y))：海平面是 vStall₀，11 km 约 1.8 倍，20 km 约 3.7 倍。
+     （a.speed 一直是真空速；舵效 ctrlFactor、PSM 的动压上限本来就按动压算，现在失速也一致了。）
+
+     推力一侧：旧写法把"推力比 ρ^0.75"直接乘在速度上，14–15 km 就压到了失速速度以下，
+     数据里的升限（10–21 km）更是对不上。现在的模型：
+       机翼升限 coffin：1.1·vStall₀·S(y) = vMil 的高度（"棺材角"：能飞的速度窗口夹到 1.1 倍余量）
+       推力升限 ceiling：机型数据里的升限（保留）
+       有效升限 ceilingEff = min(两者)
+     军推 / 加力的目标速度从 yT = min(11 km, ceilingEff − 2.5 km) 起，在 S 空间里线性压低，
+     到有效升限处刚好是 1.1·vStall(y)；vStall(y) 在 S 里也是线性的，所以整段都留有余量。
+     升限以上继续外推（有下限）—— 速度掉到失速速度以下，自然失速下沉，回到升限以下才改得出来。 */
+  var CEIL_MARGIN = 1.1;
+  $.CEIL_MARGIN = CEIL_MARGIN;
+  var envCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
+
+  function stallK(y) { return Math.sqrt($.RHO0 / airDensity(y)); }
+
+  /* 某架飞机的高空包线参数。按 phys 对象缓存（关卡里给个别机体换了 phys 时各算各的）。 */
+  function envOf(phys, ceiling) {
+    var e = envCache && envCache.get(phys);
+    if (e && e.cap === ceiling) return e;
+    var v0 = phys.vStall, vm = phys.vMil, y;
+    var coffin = 30000;
+    for (y = 0; y <= 30000; y += 50) {
+      if (CEIL_MARGIN * v0 * stallK(y) >= vm) { coffin = y; break; }
+    }
+    var cEff = Math.max(3000, Math.min(ceiling, coffin));
+    var yT = Math.max(0, Math.min(11000, cEff - 2500));
+    var Sy = stallK(yT), Sc = stallK(cEff);
+    e = { cap: ceiling, coffin: coffin, cEff: cEff, yT: yT, Sy: Sy, Sc: Sc,
+          kEnd: CEIL_MARGIN * v0 * Sc / vm };
+    if (envCache) envCache.set(phys, e);
+    return e;
+  }
+
+  /** 这架飞机的有效升限（m）：min(数据升限, 失速升限)。a 是实体或 { ac, phys }。 */
+  function ceilingEff(a) {
+    var ph = a.phys || (a.ac && a.ac.phys);
+    return envOf(ph, (a.ac && a.ac.ceiling) || 16000).cEff;
+  }
+
+  /** 高度 y 处的目标速度系数（乘在 vMil / vMax 上）：yT 以下为 1，往上到有效升限处压到 kEnd，再往上外推（下限 0.3）。 */
+  function thrustK(a, y) {
+    var e = envOf(a.phys || (a.ac && a.ac.phys), (a.ac && a.ac.ceiling) || 16000);
+    if (y <= e.yT) return 1;
+    var t = (stallK(y) - e.Sy) / Math.max(1e-6, e.Sc - e.Sy);
+    return Math.max(0.3, 1 + (e.kEnd - 1) * t);
   }
 
   /** 动压（Pa） */

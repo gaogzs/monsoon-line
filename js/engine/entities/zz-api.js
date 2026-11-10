@@ -7,6 +7,11 @@
   Ent.qOf = $.qOf;
   Ent.ctrlFactor = $.ctrlFactor;
   Ent.turnFactor = $.turnFactor;
+  /* 失速速度随动压变化：vStallAt(a) = 当前高度、含挂载折算的失速真空速；ceilingEff 是 min(数据升限, 失速升限) */
+  Ent.stallK = $.stallK;
+  Ent.ceilingEff = $.ceilingEff;
+  Ent.thrustK = $.thrustK;
+  Ent.vStallAt = function (a) { return $.effectivePhys(a).vStall; };
   Ent.makeAircraft = $.makeAircraft;
   Ent.stepAircraft = $.stepAircraft;
   /* 过失速机动（psm.js）：Game 的 controlPlayer / 按键走这几个公开函数 */

@@ -27,7 +27,9 @@
 
     var p = Ent.makeAircraft({
       type: ac.id, team: 0, isPlayer: true,
-      x: 0, y: $.mission.altStart, z: 0,
+      /* 起手高度不能高过这架飞机的有效升限（min(数据升限, 失速升限)）减 500 m：
+         失速速度随动压变化之后，高空关的 17–19.5 km 对一部分机型已经飞不住 */
+      x: 0, y: Math.min($.mission.altStart, Ent.ceilingEff({ ac: ac, phys: ac.phys }) - 500), z: 0,
       fwd: M3.V(0, 0, 1),
       speed: $.mission.speedStart,
       special: wl.length ? wl[0].wid : null

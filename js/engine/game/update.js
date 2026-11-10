@@ -52,7 +52,7 @@
         a.fwd = M3.V(0, 0, 1);
         a.up = M3.V(0, 1, 0);
         a.right = M3.V(1, 0, 0);
-        a.speed = Math.max(a.phys.vStall * 1.4, 180);
+        a.speed = Math.min(Math.max(Ent.vStallAt(a) * 1.4, 180), a.phys.vMax * 1.1);
         a.vel = M3.mul(a.fwd, a.speed);
         a.stall = false;
         a.wdStill = 0;

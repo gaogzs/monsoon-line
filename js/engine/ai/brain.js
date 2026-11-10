@@ -171,7 +171,7 @@
      这比让它僵在 18 公里更像"识趣的对手"。 */
   function clampCeiling(a, dir) {
     if (!dir) return dir;
-    var ceil = (a.ac && a.ac.ceiling) || 16000;
+    var ceil = Ent.ceilingEff(a);               // min(数据升限, 失速升限)，见 physics.js
     if (a.pos.y > ceil && dir.y > -0.08) {
       /* 已经超了：主动压回来 —— 而且**超得越多压得越狠**。
 

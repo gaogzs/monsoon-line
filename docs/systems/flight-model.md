@@ -187,12 +187,7 @@ if (yIn) { ang =  dYaw   * yIn; a.fwd = rotAxis(a.fwd, a.up, ang); a.right = rot
 
 ```js
 th = clamp(a.throttle, 0, 1);                       // 加力区在 1 以上，插值前夹回
-vTarget = lerp(vStall * 0.74, a.ab ? vMax : vMil, th);
-
-if (y > 11000) {                                    // 高空推力衰减，跟着密度走
-  k = clamp(pow(airDensity(y) / RHO_TROPO, 0.75), 0.20, 1);   // RHO_TROPO = 0.3639
-  vTarget = lerp(vStall * 0.55, vTarget, k);
-}
+vTarget = lerp(vStall * 0.74, (a.ab ? vMax : vMil) * thrustK(a, y), th);   // vStall 已含高度：见下「失速速度随动压变化」
 
 if (a.brake) vTarget = min(vTarget, vStall * 0.92);
 
@@ -220,10 +215,28 @@ a.pos += a.vel * dt;
   乘上 `ctrl`，动压越高、拉出的过载越大、掉得越多；动压掉光后转不动，
   也就不怎么掉了 —— 持续满杆转弯会自然收敛到角点速度附近。
   实测：D-14 加力、3 km、满杆拉杆 10 s，566 → 约 226 m/s。
-- 高空推力以 11 km 密度归一化，在对流层顶连续；20 km ≈ 0.35，
-  最低保底 0.20 —— 自适应循环发动机的物理依据见
+- 高空推力不再是"ρ^0.75 直接乘在速度上"（旧写法把推力比当成速度比，14–15 km 就压到失速速度以下），
+  改成按升限包线（`thrustK`），见下一节。自适应循环发动机的物理依据见
   [world/SETTING.md](../world/SETTING.md) 的发动机一节。
 - 减速板（`brake`）把目标速度压到 `vStall * 0.92`，减速率乘 1.8。
+
+### 失速速度随动压变化与高空包线（`physics.js` / `effectivePhys`）
+
+失速的是**动压**：`vStall(y) = vStall₀ · √(ρ₀/ρ(y))`（`Ent.stallK(y)`）。海平面是数据里的 `vStall`，3 km 约 1.16 倍，
+11 km 约 1.83 倍，17 km 约 2.94 倍，20 km 约 3.73 倍。`a.speed` 一直是真空速；舵效 `ctrlFactor` 和 PSM 的动压上限本来就按动压算，现在失速也一致。
+`effectivePhys(a)` 每帧写出带高度的 `p.vStall`（同时保留不含高度的 `p.vStall0`），`stepAircraft` 与 `stepPSM` 里所有 `p.vStall`
+（失速判定、低头力矩、下沉、怠速锚点 0.74、减速板 0.92、速度下限 0.42、PSM 升力 `(v/vStall)²`、坠落改出）自动按高度走；
+`Ent.vStallAt(a)` 是同一个值的公开入口（HUD 刻度、`canG`、看门狗复位、AI 强制俯冲都读它）。
+
+**升限分两层**：数据里的 `ceiling` 是推力升限；机翼升限 `coffin` 是 `1.1·vStall₀·S(y) = vMil` 的高度（"棺材角"，余量 `CEIL_MARGIN = 1.1`）；
+有效升限 `ceilingEff = min(两者)`（`Ent.ceilingEff(a)`，按 `phys` 缓存）。军推 / 加力目标速度乘 `thrustK(a, y)`：
+`yT = min(11 km, ceilingEff − 2.5 km)` 以下为 1，往上在 S 空间里线性压低，到有效升限处刚好是 `1.1·vStall(y)`；
+`vStall(y)` 在 S 里也是线性的，所以整段都留有余量。升限以上继续外推（`thrustK` 下限 0.3）——速度掉到失速速度以下，
+自然**失速下沉**，坠回升限以下才改得出来。`clampCeiling`（AI）、`lock.js` 的目标筛选、机型页的"有效升限"都读 `ceilingEff`；
+玩家开局高度夹到 `ceilingEff − 500 m`（高空关 m3 / m6 / m12）。
+17 个机型的有效升限见 `node tools/test/probes/probe-stall-alt.js` 末尾的表（例：D-14 / F-9 21 km → 约 18.5 km，ROK-40 16 km → 10.65 km，MERLI 21 km → 16.9 km，低升限机型不变）。
+
+HUD：空速带右侧一道琥珀短横标出当前高度的失速速度（低于它变红，超出带宽贴边画成三角）。
 
 ### 载荷因数（HUD 的 G 表）
 
@@ -298,7 +311,7 @@ sweepPt(62, 2.2, 1.4)   // 后掠位，翼尖 (5.0, -6.1)
 ```js
 if (a.loadFactor) {
   var lp = loadoutPenalty(a.loadFactor);      // js/data/rules.js 里唯一一份系数
-  p = {
+  p = {                                       // 现在 effectivePhys 原位写 a._pe，并另乘 stallK(y)
     vMax:   p.vMax   * lp.vMax,
     vMil:   p.vMil   * lp.vMil,
     vStall: p.vStall * lp.vStall,
@@ -327,7 +340,7 @@ NPC 由 `Ent` 的 `buildNpcMounts()`（`entities/mounts.js`）按 `mountPlan()` 
 
 ## 失速
 
-`speed < p.vStall` 时置 `a.stall = true`，然后：
+`speed < p.vStall`（**当前高度的**失速速度）时置 `a.stall = true`，然后：
 
 1. **舵效雪上加霜**：`ctrl *= 0.34`
 2. **低头力矩**：`y > 60` 时按失速深度施加自动低头
@@ -373,7 +386,7 @@ PSM 是**速度矢量与机头解耦**的独立分支：`stepAircraft` 在 `if (
 | `level` | 正处于低空拉平（见中止） |
 | `front` | 光标与机头夹角 ≤ `PSM_MIN_ANGLE = 45°`（常规转弯够用）；原来是 90°（必须在机后） |
 | `low` | 离地高度 `< PSM_MIN_AGL = 2000` m |
-| `fast` | 动压 `½ρ·v²` > `PSM_Q_K(4) × ½ρ₀·vStall²`（`psmQLimit`）。**动态上限**：以本机型失速速度的海平面动压为尺子，海平面是 2 倍 `vStall`，高空空气稀薄同一动压对应更大的空速；HUD 的 Q 条上有一道琥珀刻度标出它 |
+| `fast` | 动压 `½ρ·v²` > `PSM_Q_K(4) × ½ρ₀·vStall²`（`psmQLimit`，用海平面失速速度 `vStall₀`，不含高度）。**动态上限**：以本机型失速速度的海平面动压为尺子，海平面是 2 倍 `vStall`，高空空气稀薄同一动压对应更大的空速；HUD 的 Q 条上有一道琥珀刻度标出它 |
 | `energy` | 比能 `½v² + g·agl` 低于 `energyMin`：速度至少 `vStall + PSM_E_VK(0.1)·(vMax − vStall)` 且在最低高度之上 |
 
 ### 过程
@@ -723,7 +736,7 @@ if (!(Math.random() < chance)) continue;
 | 无动力弹阻力 / 弹翼耗速（0.00006 / 0.3） | `physics.js` 的 `BOMB_DRAG` / `FIN_BLEED` |
 | 激光照射锥（25°，休眠分支） | `physics.js` 的 `LASER_CONE` |
 | 推力渐弱区间（1.0） | `physics.js` 的 `THRUST_TAPER` |
-| 高空推力衰减曲线（ρ 比的 0.75 次幂） | `stepAircraft()` 里 `y > 11000` 那段 |
+| 失速速度随动压（√(ρ₀/ρ)）与高空推力包线（`CEIL_MARGIN` 1.1、`yT`、S 空间线性） | `physics.js` 的 `stallK` / `thrustK` / `ceilingEff` |
 | 实时过载（G 表） | `stepAircraft()` 末尾的 `a.gNow`；HUD 在 `ui/hud/` 动压框右侧 |
 | 速度钳位（0.42·vStall – 1.12·vMax） | `stepAircraft()` 的最后一行 |
 | 硬天花板（23 000 m） | `stepAircraft()` 的 `pos.y > 23000` |

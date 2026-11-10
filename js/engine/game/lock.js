@@ -170,7 +170,7 @@
 
          派了也咬不到 —— 它只会硬爬到没有舵效的高度，
          最后停在那儿既打不着人、也甩不掉别人。 */
-      if (m.ac && best.pos.y > ((m.ac.ceiling || 16000) + 1500)) continue;
+      if (m.ac && best.pos.y > (Ent.ceilingEff(m) + 1500)) continue;
       if (n >= 3) break;
       m.ai.target = best;
       m.ai.retargetT = 6;                       // 六秒内不自己重选

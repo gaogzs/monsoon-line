@@ -147,7 +147,7 @@
        代价是动能：角速度放大后转弯掉速也跟着放大（见 stepAircraft），
        速度掉到 1.3 倍失速以下就自动退出。 */
     var demand = Math.abs(c.pitch) + Math.abs(c.roll);
-    var canG = $.player.speed > $.player.phys.vStall * 1.30;
+    var canG = $.player.speed > Ent.vStallAt($.player) * 1.30;
     var wantG = !!$.keys.KeyG && demand > 0.55 && canG && !psmOn;
 
     if (wantG) {

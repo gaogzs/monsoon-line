@@ -176,6 +176,19 @@
     var m = $.gap(132, W, 0.15);
     var x = m;
     tape(ctx, x, top, hgt, p.speed, 50, 200, 1, 'M/S', $.CY, 0.85);
+    /* 失速速度刻度：失速的是动压，所以这个速度随高度实时变（海平面 vStall，11 km 约 1.8 倍，20 km 约 3.7 倍）。
+       琥珀短横标在带子右侧；超出带宽时贴边，并画成三角提示它在带外。 */
+    var vSt = Ent.vStallAt(p);
+    var sy = cy + (p.speed - vSt) * 0.85;
+    var syc = M3.clamp(sy, top + 3, top + hgt - 3);
+    ctx.fillStyle = (p.speed < vSt) ? $.RED : $.AMBER;
+    if (sy === syc) ctx.fillRect(x + 1, syc - 1, 22, 3);
+    else {
+      ctx.beginPath();
+      if (sy > syc) { ctx.moveTo(x + 12, syc + 3); ctx.lineTo(x + 6, syc - 3); ctx.lineTo(x + 18, syc - 3); }
+      else { ctx.moveTo(x + 12, syc - 3); ctx.lineTo(x + 6, syc + 3); ctx.lineTo(x + 18, syc + 3); }
+      ctx.closePath(); ctx.fill();
+    }
     /* 大数字和刻度同一单位（m/s）。以前大数字是没标单位的 km/h，和刻度对不上，
        看着像速度读数和指针不一致 */
     $.text(ctx, p.speed.toFixed(0), x - 46, cy + 5, '#eaf4fb', $.FB, 'right');

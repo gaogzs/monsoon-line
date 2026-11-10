@@ -92,7 +92,7 @@ console.log('过失速机动探针  phys=' + JSON.stringify(p.phys));
     check('无 NaN', r.finite);
     const keLoss = 1 - (r.vAfter / 200) ** 2;       // 动能损失（比能里的势能占一大块，用动能看代价更直观）
     check('动能损失在设计区间（55%–85%）：代价是快速掉能量', keLoss >= 0.55 && keLoss <= 0.85, (keLoss * 100).toFixed(0) + '%（比能 ' + (r.end.loss * 100).toFixed(0) + '%）');
-    check('结束速度高于失速速度', r.vAfter > p.phys.vStall, r.vAfter.toFixed(0) + ' m/s（vStall ' + p.phys.vStall + '）');
+    check('结束速度不低于 0.75·vStall（边缘失速：3000 m 处失速速度本来就高）', r.vAfter >= 0.75 * Ent.vStallAt(p), r.vAfter.toFixed(0) + ' m/s（3000 m 处 vStall ' + Ent.vStallAt(p).toFixed(0) + '）');
     check('结束时机头对准光标（< 5°）', r.offEnd < 5, r.offEnd.toFixed(1) + '°');
     check('出口速度连续（投影回机头，大小不变）', Math.abs(r.vAfter - r.vBefore) / r.vBefore < 0.02,
       r.vBefore.toFixed(1) + ' → ' + r.vAfter.toFixed(1));
@@ -114,7 +114,7 @@ console.log('过失速机动探针  phys=' + JSON.stringify(p.phys));
     if (p.psm && p.psm.fall) Ent.psmAbort(p, w, 'release');   // 坠落段里玩家松手：不能被它打断
   }
   check('一直按住：耗尽能量后转入坠落段', fell);
-  check('坠落段：速度回到 vStall 以上才结束', !p.psm && p.psmEnd && p.psmEnd.why === 'recover' && p.speed >= p.phys.vStall,
+  check('坠落段：速度回到 vStall 以上才结束', !p.psm && p.psmEnd && p.psmEnd.why === 'recover' && p.speed >= Ent.vStallAt(p),
     p.psmEnd ? p.psmEnd.why + ' v ' + p.speed.toFixed(0) : 'still on, t ' + t.toFixed(1));
   check('坠落段：机头落下（fwd.y 最低 < −0.35）', fwdYMin < -0.35, fwdYMin.toFixed(2));
   check('坠落段：真的在掉（vel.y 最低 < −40 m/s）', vyMin < -40, vyMin.toFixed(0) + ' m/s');

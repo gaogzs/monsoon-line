@@ -359,7 +359,7 @@ var UnitView = (function () {
       [T('ui.unitview.UnitView.aircraftParams.rows.i0.i0.s1'), esc(a.role || '—')],
       [T('ui.unitview.UnitView.aircraftParams.rows.i1.i0.s1'), esc(a.faction || '—')],
       a.maker ? [T('ui.unitview.UnitView.aircraftParams.rows.i2.i0.s1'), esc(a.maker)] : null,
-      [T('ui.unitview.UnitView.aircraftParams.rows.i3.i0.s1'), p.vMax + ' m/s' + (a.ceiling ? T('ui.unitview.UnitView.aircraftParams.rows.i3.i1.s1') + a.ceiling + ' m' : '')],
+      [T('ui.unitview.UnitView.aircraftParams.rows.i3.i0.s1'), p.vMax + ' m/s' + (a.ceiling ? T('ui.unitview.UnitView.aircraftParams.rows.i3.i1.s1') + Ent.ceilingEff({ ac: a, phys: p }) + ' m' : '')],
       [T('ui.unitview.UnitView.aircraftParams.rows.i4.i0.s1'), p.vMil + ' / ' + p.vStall + ' m/s'],
       [T('ui.unitview.UnitView.aircraftParams.rows.i5.i0.s1'), T('ui.unitview.UnitView.aircraftParams.rows.i5.i1.s1') + p.accel + T('ui.unitview.UnitView.aircraftParams.rows.i5.i1.s2') + p.decel + ' m/s²'],
       [T('ui.unitview.UnitView.aircraftParams.rows.i6.i0.s1'), p.pitch + ' / ' + p.roll + ' / ' + p.yaw + ' rad/s'],

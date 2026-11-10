@@ -171,35 +171,32 @@
     return m.k0 * mass / m.total;
   }
 
-  /* 本机此刻的有效性能参数：phys 按挂载重量打折（stepAircraft 与 stepPSM 共用）。
-     没有挂载拖累时就是 a.phys 本身。 */
+  /* 本机此刻的有效性能参数（stepAircraft 与 stepPSM 共用）：
+     ① phys 按挂载重量打折（没有挂载拖累时乘子为 1）；
+     ② vStall 再乘 √(ρ₀/ρ(高度))：失速的是动压（见 physics.js「失速速度随动压变化」），vStall0 保留不含高度的值。
+     每个实体复用一个临时对象 a._pe，原位覆写，不在每帧分配。 */
   function effectivePhys(a) {
-    var p = a.phys;
+    var ph = a.phys;
+    var p = a._pe || (a._pe = {});
     // 挂载越重越笨拙：加速、转向、滚转都吃一点亏。
     // loadFactor：玩家按机库配置设定（game.js），NPC 由 buildNpcMounts 按实体挂载算。
-    /* 必须放在函数开头：下面的失速判定、姿态旋转、目标速度全都读 p。
-       以前这一段在姿态旋转之后，于是 pitch / roll 惩罚从未生效，
-       失速判定也用的是未打折的 vStall。 */
+    /* 系数来自 loadoutPenalty() —— 和机库面板显示的是同一份，
+       免得界面上的数字与实际手感对不上。
+       每个用到的字段都得列上（漏字段会变 undefined：之前漏过 accel / decel，
+       推油门的速度变化变成瞬时的）。yaw 不受挂载影响，原样带过。 */
     var lf = curLoadFactor(a);
     if (lf) {
-      // 系数来自 loadoutPenalty() —— 和机库面板显示的是同一份，
-      // 免得界面上的数字与实际手感对不上
-      /* 注意：这里是**整体替换** p，所以每个用到的字段都得列上。
-         之前漏了 accel / decel，还写了个根本不存在的 acc ——
-         于是下面 `p.accel` 取到 undefined，加减速彻底失去节流，
-         推油门的速度变化变成瞬时的。yaw 不受挂载影响，原样带过。 */
       var lp = loadoutPenalty(lf);
-      p = {
-        vMax: p.vMax * lp.vMax,
-        vMil: p.vMil * lp.vMil,
-        vStall: p.vStall * lp.vStall,
-        accel: p.accel * lp.accel,
-        decel: p.decel * lp.decel,
-        pitch: p.pitch * lp.pitch,
-        roll: p.roll * lp.roll,
-        yaw: p.yaw
-      };
+      p.vMax = ph.vMax * lp.vMax; p.vMil = ph.vMil * lp.vMil;
+      p.vStall0 = ph.vStall * lp.vStall;
+      p.accel = ph.accel * lp.accel; p.decel = ph.decel * lp.decel;
+      p.pitch = ph.pitch * lp.pitch; p.roll = ph.roll * lp.roll;
+    } else {
+      p.vMax = ph.vMax; p.vMil = ph.vMil; p.vStall0 = ph.vStall;
+      p.accel = ph.accel; p.decel = ph.decel; p.pitch = ph.pitch; p.roll = ph.roll;
     }
+    p.yaw = ph.yaw; p.hp = ph.hp;
+    p.vStall = p.vStall0 * $.stallK(a.pos.y);
     return p;
   }
 
@@ -290,15 +287,9 @@
     // 油门轴可能超过 1（加力区），插值前先夹回 0..1；
     // 是否加力由 a.ab 单独决定，见 game.js controlPlayer()
     var th = M3.clamp(a.throttle, 0, 1);
-    var vTarget = M3.lerp(p.vStall * 0.74, a.ab ? p.vMax : p.vMil, th);
-
-    /* 高空推力衰减：跟着密度走，而不是另起一条直线。
-       以 11 km 为基准归一化，保证在对流层顶连续；0.75 次幂是
-       涡扇推力随密度衰减的常见近似。20 km ≈ 0.35，最低保底 0.20。 */
-    if (a.pos.y > 11000) {
-      var k = M3.clamp(Math.pow($.airDensity(a.pos.y) / $.RHO_TROPO, 0.75), 0.20, 1);
-      vTarget = M3.lerp(p.vStall * 0.55, vTarget, k);
-    }
+    /* 高空包线：军推 / 加力的目标速度乘 thrustK(y)，到有效升限处刚好是 1.1·vStall(y)，
+       见 physics.js「失速速度随动压变化」。怠速目标仍锚在当前高度的失速速度上。 */
+    var vTarget = M3.lerp(p.vStall * 0.74, (a.ab ? p.vMax : p.vMil) * $.thrustK(a, a.pos.y), th);
 
     // 可变后掠翼：低速展开（改善低速盘旋），高速后掠（减小波阻）
     if (a.ac && a.ac.variableSweep) {

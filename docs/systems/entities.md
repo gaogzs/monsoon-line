@@ -408,7 +408,7 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 
 6. **槽数组是**按武器**建的，渲染是**按挂点组**遍历的。** `Game` `pushStores()`（`ui/frame.js`）必须自己维护 `used[wid]` 起始下标，否则两组挂同一种弹时会共用前两个槽，出现"打掉一个、两组同时消失"。**推进 `used[wid]` 必须发生在适配检查之后**——否则一个挂不上的组也会占掉下标，把它后面的挂架整体顶偏。
 
-7. **挂载重量是整体替换 `p`，不是就地缩放。** `stepAircraft()`（`entities/aircraft.js`）里 `p = { vMax, vMil, vStall, accel, decel, pitch, roll, yaw }`——少列一个字段（历史上漏过 `accel`/`decel`）就会让那个字段变成 `undefined`，加速变成瞬时。加字段时记得同步这里。**这一段还必须在函数开头**：以前它在姿态旋转之后，pitch / roll 惩罚从未生效、失速判定用的是未打折的 `vStall`。
+7. **挂载重量是整体替换 `p`，不是就地缩放。** `effectivePhys()`（`entities/aircraft.js`，现在原位写每个实体的 `a._pe`，另含 `vStall0` / `hp`，且 `vStall` 乘了 `stallK(高度)`）里 `p.vMax / vMil / vStall0 / accel / decel / pitch / roll / yaw / hp`——少写一个字段（历史上漏过 `accel`/`decel`）就会让那个字段变成 `undefined`，加速变成瞬时。加字段时记得同步这里。**这一段还必须在函数开头**：以前它在姿态旋转之后，pitch / roll 惩罚从未生效、失速判定用的是未打折的 `vStall`。
 
 8. **AI 每次开火前都会重新选弹，而且它现在也有 `slotCd` 了。** `AI` 调 `Ent.chooseWeapon()` 挑一件（对空 / 对面 + 够得着的里面射程最短），`Ent.setWeapon()` 把它设成 `a.special`——这就是"AI 换武器"的全部，没有独立的选弹状态。以前 NPC 的 `slotCd` 是空对象，`launch()` 对它退回单冷却 `spCd`；现在 `buildNpcMounts()` 会按挂点数建槽（实体挂载要靠它判断"这一发还在不在"）。这不改变 AI 的射速 —— `AI` 的 `s.shootT = rnd(2.6, 5.2) × (1.6 − 0.6·skill)` 通常比槽冷却长。
 

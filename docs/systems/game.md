@@ -336,7 +336,7 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 
   加力（`> 1.0`）与减速板（`< THR_IDLE`，0.04）都是**按住才有效的瞬时态**：松手后自动回落到军推区间的边界，回落速率 `dt * 1.6` 比推进的 `0.62` 快、又不是瞬间弹回。这正是 [hud.md](hud.md#引擎出力带thrtape) 警告“别拿它们当稳定读数去测”的原因。`player.ab = throttle > 1.0`、`player.brake = throttle < THR_IDLE`。HUD 读数按慢车 0% / 军推 100% 标度，见 [hud.md](hud.md#引擎出力带thrtape)。
 - **过失速机动（同时按住 `G` 与减速板状态）**：`controlPlayer` 末尾（`player.brake` 算出之后）每帧判 `KeyG && player.brake`：满足且过 `Ent.psmGate` 就 `psmStart`（条件不满足静默忽略，无提示），任一松开走 `psmAbort`；结束时键还按着则 `psmLock` 到松开为止。`controlPlayer` 在 `updateMouseAim` 之后：`player.psm` 活动中时**屏蔽键盘覆盖与高 G**（`psmOn`），飞控照常把机头指向光标，`stepPSM` 消费 `a.ctrl`；键盘直控（没有光标）或 `toggleAimMode` 切走时中止；低空中止后 `player.psmLevel` 期间目标换成水平略带爬升的方向（高于 `PSM_LEVEL_AGL` 且不再下降才解除）。细节见 [flight-model.md](flight-model.md#过失速机动psm玩家侧)。
-- 高 G 机动（`G`）：只有 `demand = |pitch| + |roll| > 0.55` 且 `speed > vStall * 1.30` 才生效 —— 否则它就成了一个无脑常开的加速器。生效时 `gLoad` 用 `M3.smooth(..., HIG_MAX, 9, dt)` 拉起；速度代价由 `stepAircraft` 的转弯掉速自然产生（角速度放大约 1.9 倍，掉速随之放大）；松手用 `M3.smooth(..., 1, 6, dt)` 落回。
+- 高 G 机动（`G`）：只有 `demand = |pitch| + |roll| > 0.55` 且 `speed > Ent.vStallAt(player) * 1.30`（当前高度的失速速度）才生效 —— 否则它就成了一个无脑常开的加速器。生效时 `gLoad` 用 `M3.smooth(..., HIG_MAX, 9, dt)` 拉起；速度代价由 `stepAircraft` 的转弯掉速自然产生（角速度放大约 1.9 倍，掉速随之放大）；松手用 `M3.smooth(..., 1, 6, dt)` 落回。
 - 机炮：`wantGun = mouse.left || keys.Space` → `Ent.fireGun`，`SFX.gun(wantGun && player.gunAmmo > 0)`（有按键没弹时不出声）。
 
 ---
@@ -506,7 +506,7 @@ player.lockInCone = (对空 ? off : Ent.lockOff(...)) < cone;              // HU
 var WD_LIMIT = 1.5;
 ```
 
-`watchdog(dt)`（`engine/game/update.js`）遍历 `world.actors`，把位置变化（三个分量绝对值之和）小于 `0.02` 的帧累加进 `a.wdStill`；超过 1.5 秒就：用 `console.warn` 打一条含 `name / wdStill / speed / fwd / ctrl / pos / hp` 的记录；把姿态重置成 `fwd=(0,0,1) up=(0,1,0) right=(1,0,0)`、速度设为 `max(vStall * 1.4, 180)`、`vel = fwd * speed`、清 `stall`；`wdStill = 0` 让它继续飞。
+`watchdog(dt)`（`engine/game/update.js`）遍历 `world.actors`，把位置变化（三个分量绝对值之和）小于 `0.02` 的帧累加进 `a.wdStill`；超过 1.5 秒就：用 `console.warn` 打一条含 `name / wdStill / speed / fwd / ctrl / pos / hp` 的记录；把姿态重置成 `fwd=(0,0,1) up=(0,1,0) right=(1,0,0)`、速度设为 `min(max(vStallAt * 1.4, 180), vMax * 1.1)`（`vStallAt` 是当前高度的失速速度）、`vel = fwd * speed`、清 `stall`；`wdStill = 0` 让它继续飞。
 
 **兜的是什么**：有飞机在空中“钉住”过（位置完全不动、速度读数却正常），根因至今没定位到，所以这是纯粹的兜底。**为什么值得兜**：玩家分不清“这架飞机卡住了”和“我打不着它”，一架悬停的敌机会让整场战斗都显得坏了。**为什么留 `console.warn`**：万一真被触发，那条记录就是下次定位根因的起点。`mission` 结束后 `update()` 不再运行，所以“结算时的静止”不会被误判成卡死。
 
@@ -567,7 +567,7 @@ var queue = [], timer = 0, box = null, live = [];
 | 油门量程上限 / 减速板阈值（慢车） | `THR_MAX = 1.25` / `THR_IDLE = 0.04` |
 | 油门推进 / 回落 / 加力阈值 | `controlPlayer()` 里的 `0.62` / `dt * 1.6` / `1.0` |
 | 高 G 倍率 | `HIG_MAX = 1.90`（掉速见 `Ent` 的 `TURN_BLEED`） |
-| 高 G 触发门槛 | `controlPlayer()` 里的 `demand > 0.55`、`vStall * 1.30` |
+| 高 G 触发门槛 | `controlPlayer()` 里的 `demand > 0.55`、`Ent.vStallAt * 1.30` |
 | 极点冻结 / 定速偏航 | `vars.js` 的 `POLE_HOLD`（sin 3°）/ `POLE_TURN_START`（sin 8°）/ `POLE_TURN_FULL`（sin 35°）/ `POLE_SWING_RATE`（40 rad/s）；`camera.js` 的 `POLE_FRAME_START`（70°） |
 | 追尾镜头的偏航/俯仰平滑与位置跟随 | `1.2` / `9` / `7.5`（`exp` 时间常数） |
 | 相机自由视角速度与回中 | 方向键的 `1.3` / `0.9`、`M3.smooth(..., 2.2, dt)` |
