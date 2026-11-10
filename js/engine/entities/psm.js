@@ -1,7 +1,7 @@
 (function (Ent) {
   'use strict';
   var $ = Ent.$;
-  $.stepPSM = stepPSM; $.psmGate = psmGate; $.psmStart = psmStart; $.psmAbort = psmAbort; $.psmEnergy = energy; $.clRel = clRel; $.cdRel = cdRel;
+  $.stepPSM = stepPSM; $.psmGate = psmGate; $.psmStart = psmStart; $.psmAbort = psmAbort; $.psmEnergy = energy; $.psmQLimit = qLimit; $.clRel = clRel; $.cdRel = cdRel;
 
   /* ============================================================
      过失速机动（PSM）：按住 X 进行，松开结束
@@ -30,10 +30,12 @@
   $.PSM_FALL_VANE = 1.0;           // 坠落段风标：机头被拉向速度方向的角速率（rad/s）
   $.PSM_FALL_AUTH = 0.25;          // 坠落段舵效
   $.PSM_FALL_MAX_T = 12;           // 坠落段保险超时（s）
-  $.PSM_BLEED = 1.2;               // 额外掉速 = decel × 这个系数（沿速度反向）：PSM 的代价是能量，用久了必然失速
+  $.PSM_BLEED_MIN = 0.35;          // 额外掉速随速度（v/vMax）变化，但低速也有这个下限，保证一直按住必然耗尽
+  $.PSM_BLEED = 0.9;               // 额外掉速 = decel × 这个系数（沿速度反向）：PSM 的代价是能量，用久了必然失速
   $.PSM_RECOVER_S = 0.8;           // 结束后低舵效恢复（s），stepAircraft 读 a.psmRecover
   $.PSM_AUTH_MIN = 0.45;           // 90° 攻角时的舵效系数
-  $.PSM_E_VK = 0.2;                // 起手所需速度 = vStall + K·(vMax − vStall)
+  $.PSM_Q_K = 4;                   // 起手动压上限 = K × 失速速度下的海平面动压（Pa）；随机型与高度变化
+  $.PSM_E_VK = 0.1;                // 起手所需速度 = vStall + K·(vMax − vStall)
   $.PSM_LIFT_MAX = 8;              // 升力加速度上限（g）
   $.PSM_LIFT_K = 1;                // 升力放大（高攻角下速度被拉向机头的快慢）
   $.PSM_PULL = 0.8;                // 机头带动速度方向转向机头的角速率上限（rad/s），随 sin α 变化
@@ -76,14 +78,23 @@
     return 0.5 * v * v + $.G * $.PSM_MIN_AGL;
   }
 
+  /* 起手动压上限（Pa）：K × ½ρ₀·vStall²。以失速速度的动压为尺子：重型机失速快、上限也高，
+     而且是**动压**不是空速 —— 海平面 K = 4 时是 2 倍 vStall，高空空气稀薄同样的上限对应更大的空速，
+     HUD 的 Q 表（kPa）上能直接看到。 */
+  function qLimit(a) {
+    var p = $.effectivePhys(a);
+    return $.PSM_Q_K * 0.5 * $.RHO0 * p.vStall * p.vStall;
+  }
+
   /* 能不能起手。返回 { ok, reason }，reason 供 SysNote 选文案：
-     noPSM / noAim / level / front / low / energy（现在不再提示，调用方静默忽略） */
+     noPSM / noAim / level / front / low / fast / energy（现在不再提示，调用方静默忽略） */
   function psmGate(a, world, aimDir) {
     if (a.tags && a.tags.noPSM) return { ok: false, reason: 'noPSM' };
     if (!aimDir) return { ok: false, reason: 'noAim' };
     if (a.psmLevel) return { ok: false, reason: 'level' };
     if (M3.dot(aimDir, a.fwd) > Math.cos($.PSM_MIN_ANGLE * D)) return { ok: false, reason: 'front' };
     if ($.agl(a) < $.PSM_MIN_AGL) return { ok: false, reason: 'low' };
+    if ($.qOf(a.pos.y, a.speed) > qLimit(a)) return { ok: false, reason: 'fast' };
     if (energy(a) < energyMin(a)) return { ok: false, reason: 'energy' };
     return { ok: true };
   }
@@ -242,7 +253,7 @@
     var vel0 = vel;
     var acc = M3.mul(a.fwd, p.accel * $.PSM_THRUST_K * th);
     acc = M3.add(acc, M3.mul(nHat, liftA * sgn));
-    acc = M3.add(acc, M3.mul(vh, -dragA - p.decel * $.PSM_BLEED));
+    acc = M3.add(acc, M3.mul(vh, -dragA - p.decel * $.PSM_BLEED * Math.max($.PSM_BLEED_MIN, v / p.vMax)));
     acc.y -= $.G;
     vel = M3.add(vel, M3.mul(acc, dt));
     /* 速度方向被机头拉着转：只用升力，速度矢量在 vStall 附近 1 g 的升力下几乎转不动

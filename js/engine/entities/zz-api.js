@@ -15,6 +15,7 @@
   Ent.psmStart = $.psmStart;
   Ent.psmAbort = $.psmAbort;
   Ent.psmEnergy = $.psmEnergy;
+  Ent.psmQLimit = $.psmQLimit;
   Ent.PSM_SAFE_AGL = $.PSM_SAFE_AGL;
   Ent.PSM_LEVEL_AGL = $.PSM_LEVEL_AGL;
   /* 挂点适配与 NPC 的挂载分配 —— game.js 的 pushStores 渲染实体挂载时

@@ -4529,14 +4529,15 @@ if (Ent && M3 && me && world) {
       const g = Ent.psmGate(pl, w, pl.aimDir);
       if (g.ok || g.reason !== reason) bad.push('门限「' + name + '」应拒绝为 ' + reason + '，实际 ' + JSON.stringify(g));
     };
-    gate('光标在前方', () => put(3000, 500, M3d.V(0, 0, 1)), 'front');
-    gate('高度不足', () => put(1000, 500, back), 'low');
-    gate('能量不足', () => put(2500, 150, back), 'energy');
-    gate('光标偏 30°', () => put(3000, 500, M3d.rotAxis(M3d.V(0, 0, 1), M3d.V(0, 1, 0), 30 * Math.PI / 180)), 'front');
-    gate('没有光标', () => put(3000, 500, null), 'noAim');
-    gate('noPSM', () => { put(3000, 500, back); pl.tags = { noPSM: true }; }, 'noPSM');
+    gate('光标在前方', () => put(3000, 200, M3d.V(0, 0, 1)), 'front');
+    gate('高度不足', () => put(1000, 200, back), 'low');
+    gate('速度过大', () => put(3000, 500, back), 'fast');
+    gate('能量不足', () => put(2100, 130, back), 'energy');
+    gate('光标偏 30°', () => put(3000, 200, M3d.rotAxis(M3d.V(0, 0, 1), M3d.V(0, 1, 0), 30 * Math.PI / 180)), 'front');
+    gate('没有光标', () => put(3000, 200, null), 'noAim');
+    gate('noPSM', () => { put(3000, 200, back); pl.tags = { noPSM: true }; }, 'noPSM');
 
-    put(3000, 500, back);
+    put(3000, 200, back);
     if (!Ent.psmGate(pl, w, pl.aimDir).ok) bad.push('条件齐备时 psmGate 没有放行');
     Ent.psmStart(pl);
     let t = 0, lastV = pl.speed, nan = false, held = 0;

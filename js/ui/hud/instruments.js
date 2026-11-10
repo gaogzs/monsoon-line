@@ -218,6 +218,11 @@
     // 12 kPa 警戒线
     ctx.fillStyle = $.RED;
     ctx.fillRect(qx - 50 + 100 * 0.2, qy + 14, 1.5, 9);
+    // 过失速机动的动压上限（琥珀）：Q 条停在它左边才能起手，随机型与高度变化
+    if (!(p.tags && p.tags.noPSM)) {
+      ctx.fillStyle = $.AMBER;
+      ctx.fillRect(qx - 50 + 100 * M3.clamp(Ent.psmQLimit(p) / 1000 / 60, 0, 1), qy + 14, 1.5, 9);
+    }
 
     /* 实时过载 G：由 stepAircraft 按实际加速度算（a.gNow），不是由杆量推出来的 ——
        所以低动压下拉满杆、表上也只有一两个 G，这正是"舵面失效"的手感。

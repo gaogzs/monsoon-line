@@ -3,7 +3,7 @@
    过失速机动（PSM）探针（docs/POST2-0IMPL.md 3.3）
 
    验证：
-     1. 主场景：500 m/s、3000 m，光标在正后方 —— 收敛时间有界、α 峰值 ≤ 100°、
+     1. 主场景：200 m/s、3000 m，光标在正后方 —— 收敛时间有界、α 峰值 ≤ 100°、
         无 NaN、能量损失与结束速度落在设计区间
      2. 光标中途移动（±60°）—— 仍收敛到新方向
      3. 门限：光标在前方 / 高度不足 / 能量不足 / 冷却中 / 没有光标 / noPSM，各自被拒并给出对应原因
@@ -84,13 +84,14 @@ console.log('过失速机动探针  phys=' + JSON.stringify(p.phys));
 
 // ---- 1. 主场景 ----
 {
-  const r = run(3000, 500, behind, 1 / 60, 15, true);
+  const r = run(3000, 200, behind, 1 / 60, 15, true);
   check('光标在正后方：触发并收敛', !r.gate && r.end && r.end.why === 'release', r.end ? '（' + r.end.why + '）' : JSON.stringify(r.gate));
   if (r.end) {
     check('收敛时间有界（≤ 6 s）', r.t <= 6, r.t.toFixed(2) + ' s');
     check('α 峰值 ≤ 100°', r.end.aoaMax <= 100, r.end.aoaMax.toFixed(1) + '°');
     check('无 NaN', r.finite);
-    check('能量损失在设计区间（50%–80%）：代价是快速掉能量', r.end.loss >= 0.5 && r.end.loss <= 0.8, (r.end.loss * 100).toFixed(0) + '%');
+    const keLoss = 1 - (r.vAfter / 200) ** 2;       // 动能损失（比能里的势能占一大块，用动能看代价更直观）
+    check('动能损失在设计区间（55%–85%）：代价是快速掉能量', keLoss >= 0.55 && keLoss <= 0.85, (keLoss * 100).toFixed(0) + '%（比能 ' + (r.end.loss * 100).toFixed(0) + '%）');
     check('结束速度高于失速速度', r.vAfter > p.phys.vStall, r.vAfter.toFixed(0) + ' m/s（vStall ' + p.phys.vStall + '）');
     check('结束时机头对准光标（< 5°）', r.offEnd < 5, r.offEnd.toFixed(1) + '°');
     check('出口速度连续（投影回机头，大小不变）', Math.abs(r.vAfter - r.vBefore) / r.vBefore < 0.02,
@@ -101,7 +102,7 @@ console.log('过失速机动探针  phys=' + JSON.stringify(p.phys));
 
 // ---- 1b. 一直按住：能量耗尽 → 失速坠落（机头落下、速度矢量跟着重力走），速度回到 vStall 才结束 ----
 {
-  setup(3000, 500, behind());
+  setup(3000, 200, behind());
   Ent.psmStart(p);
   let t = 0, gMax = 0, gMin = 9, fell = false, tFall = 0, fwdYMin = 1, vyMin = 0, minSpeed = 1e9, y0 = p.pos.y;
   while (p.psm && t < 40) {
@@ -123,7 +124,7 @@ console.log('过失速机动探针  phys=' + JSON.stringify(p.phys));
 
 // ---- 2. 光标中途移动 ----
 for (const sh of [60, -60]) {
-  const r = run(3000, 500, t => t < 1 ? behind() : rotY(behind(), sh), 1 / 60, 15, false);
+  const r = run(3000, 200, t => t < 1 ? behind() : rotY(behind(), sh), 1 / 60, 15, false);
   check('光标中途移动 ' + (sh > 0 ? '+' : '') + sh + '°：仍收敛到新方向',
     !r.gate && r.end && r.end.why === 'release' && r.offEnd < 5 && r.finite,
     r.end ? r.end.why + ' off ' + r.offEnd.toFixed(1) + '° t ' + r.t.toFixed(1) : JSON.stringify(r.gate));
@@ -132,29 +133,30 @@ for (const sh of [60, -60]) {
 // ---- 3. 门限 ----
 {
   const cases = [
-    ['光标在前方', () => setup(3000, 500, M3.V(0, 0, 1)), 'front'],
-    ['高度不足', () => setup(1000, 500, behind()), 'low'],
-    ['能量不足', () => setup(2500, 150, behind()), 'energy'],
-    ['光标只偏 30°', () => setup(3000, 500, rotY(M3.V(0, 0, 1), 30)), 'front'],
-    ['键盘模式（没有光标）', () => setup(3000, 500, null), 'noAim'],
-    ['noPSM 机型', () => { setup(3000, 500, behind()); p.tags = { noPSM: true }; }, 'noPSM'],
-    ['低空拉平屏蔽中', () => { setup(3000, 500, behind()); p.psmLevel = true; }, 'level']
+    ['光标在前方', () => setup(3000, 200, M3.V(0, 0, 1)), 'front'],
+    ['高度不足', () => setup(1000, 200, behind()), 'low'],
+    ['速度过大（动压超上限）', () => setup(3000, 500, behind()), 'fast'],
+    ['能量不足', () => setup(2100, 130, behind()), 'energy'],
+    ['光标只偏 30°', () => setup(3000, 200, rotY(M3.V(0, 0, 1), 30)), 'front'],
+    ['键盘模式（没有光标）', () => setup(3000, 200, null), 'noAim'],
+    ['noPSM 机型', () => { setup(3000, 200, behind()); p.tags = { noPSM: true }; }, 'noPSM'],
+    ['低空拉平屏蔽中', () => { setup(3000, 200, behind()); p.psmLevel = true; }, 'level']
   ];
   for (const [name, fn, reason] of cases) {
     fn();
     const g = Ent.psmGate(p, w, p.aimDir);
     check('门限：' + name + ' → 拒绝（' + reason + '）', !g.ok && g.reason === reason, JSON.stringify(g));
   }
-  setup(3000, 500, behind());
+  setup(3000, 200, behind());
   check('门限：条件齐备 → 通过', Ent.psmGate(p, w, p.aimDir).ok);
-  setup(3000, 500, rotY(M3.V(0, 0, 1), 60));
+  setup(3000, 200, rotY(M3.V(0, 0, 1), 60));
   check('门限：光标偏 60° 就能起手', Ent.psmGate(p, w, p.aimDir).ok);
 }
 
 // ---- 4. 中止路径 ----
 {
   // 4a. 速度低于阈值
-  setup(3000, 500, behind());
+  setup(3000, 200, behind());
   Ent.psmStart(p);
   p.speed = 40; p.vel = M3.mul(p.fwd, 40);              // 0.7 × vStall = 73.5
   AI.steerTo(p, p.aimDir, p.ctrl, p, 1 / 60);
@@ -173,7 +175,7 @@ for (const sh of [60, -60]) {
   check('低空中止：出口速度沿机头、大小连续', Math.abs(M3.dot(M3.norm(p.vel), p.fwd) - 1) < 1e-6 && Math.abs(M3.len(p.vel) - p.speed) < 1e-6);
 
   // 4c. 主动中止
-  setup(3000, 500, behind());
+  setup(3000, 200, behind());
   Ent.psmStart(p);
   for (let i = 0; i < 40; i++) { AI.steerTo(p, p.aimDir, p.ctrl, p, 1 / 60); Ent.stepAircraft(p, 1 / 60, w); }
   const vb = M3.len(p.vel);
@@ -187,8 +189,8 @@ for (const sh of [60, -60]) {
 
 // ---- 5. 数值稳定 ----
 {
-  const a = run(3000, 500, behind, 0.02, 15, false);
-  const b = run(3000, 500, behind, 0.05, 15, false);
+  const a = run(3000, 200, behind, 0.02, 15, false);
+  const b = run(3000, 200, behind, 0.05, 15, false);
   if (a.end && b.end) {
     const rel = (x, y) => Math.abs(x - y) / Math.max(1e-9, Math.abs(x));
     /* 时间放宽到 10%：收敛判据是"进入 ±3° 并保持 0.3 s"，0.05 的步长在判定上有一步的量化；
@@ -202,7 +204,7 @@ for (const sh of [60, -60]) {
 
 // ---- 6. 机动期间尾部结算照常 ----
 {
-  setup(3000, 500, behind());
+  setup(3000, 200, behind());
   p.gunHeat = 5; p.flareCd = 5;
   Ent.psmStart(p);
   for (let i = 0; i < 60; i++) { AI.steerTo(p, p.aimDir, p.ctrl, p, 1 / 60); Ent.stepAircraft(p, 1 / 60, w); }

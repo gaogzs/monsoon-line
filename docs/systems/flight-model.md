@@ -373,7 +373,8 @@ PSM 是**速度矢量与机头解耦**的独立分支：`stepAircraft` 在 `if (
 | `level` | 正处于低空拉平（见中止） |
 | `front` | 光标与机头夹角 ≤ `PSM_MIN_ANGLE = 45°`（常规转弯够用）；原来是 90°（必须在机后） |
 | `low` | 离地高度 `< PSM_MIN_AGL = 2000` m |
-| `energy` | 比能 `½v² + g·agl` 低于 `energyMin`：速度至少 `vStall + 0.2·(vMax − vStall)` 且在最低高度之上 |
+| `fast` | 动压 `½ρ·v²` > `PSM_Q_K(4) × ½ρ₀·vStall²`（`psmQLimit`）。**动态上限**：以本机型失速速度的海平面动压为尺子，海平面是 2 倍 `vStall`，高空空气稀薄同一动压对应更大的空速；HUD 的 Q 条上有一道琥珀刻度标出它 |
+| `energy` | 比能 `½v² + g·agl` 低于 `energyMin`：速度至少 `vStall + PSM_E_VK(0.1)·(vMax − vStall)` 且在最低高度之上 |
 
 ### 过程
 控制律**不新写**：`updateMouseAim` 本来每帧就用 `AI.steerTo` 把机头指向光标并写 `a.ctrl`，`stepPSM` 只消费它，
@@ -388,12 +389,12 @@ PSM 是**速度矢量与机头解耦**的独立分支：`stepAircraft` 在 `if (
 阻力  a_D = (decel / vMax²)·v²·CDrel(α)·(−v̂)      // CDrel(0)=1，90° = 5
 重力
 速度方向被机头拉着转：以 PSM_PULL(0.8 rad/s)·sin α 的角速率追机头，速度大小不变
-额外掉速  a_B = decel × PSM_BLEED(1.2) × (−v̂)       // PSM 的代价：能量快速流失
+额外掉速  a_B = decel × PSM_BLEED(0.9) × max(PSM_BLEED_MIN(0.35), v/vMax) × (−v̂)   // PSM 的代价：能量快速流失，低速也有下限
 ```
 
 **最后一项是文档原设计里没有的。** 只靠前四项时，升力在 `vStall` 附近只有 1 g，速度矢量几乎转不动：机头 180° 掉头，
 α 冲到 175°，或者把 α 夹在 100° 以内、速度又追不上（12 s 内收敛不了，能量损失近 80%）。加上"气流跟着机体走"这一项后
-（500 m/s、3000 m，光标正后方）：3.3 s 收敛，α 峰值约 74°，能量损失约 70%，松开时速度约 147 m/s（`vStall` 105）。**代价是能量**：一直按住，速度耗到 `PSM_MIN_SPEED_K = 0.7` × `vStall` 以下就转入**失速坠落段**（`st.fall`，`stepFall`）。机头相对速度的领先角另有封顶 `PSM_ALPHA_MAX = 100°`。
+（200 m/s、3000 m，光标正后方；500 m/s 会因动压超上限被拒）：3.3 s 收敛，α 峰值约 77°，动能损失约 75%，松开时速度约 106 m/s（`vStall` 105）。**代价是能量**：一直按住，速度耗到 `PSM_MIN_SPEED_K = 0.7` × `vStall` 以下就转入**失速坠落段**（`st.fall`，`stepFall`）。机头相对速度的领先角另有封顶 `PSM_ALPHA_MAX = 100°`。
 
 三段（拉升 / 过顶回转 / 收敛）由 α 与机头—光标夹角**推出**（`a.psm.phase`），只用于 HUD 与统计；
 **机头对准光标不会自动结束**：什么时候松开 G 或减速板什么时候结束，按住期间速度矢量继续被机头拉着转、阻力继续耗能。机动期间照常调 `stepAircraftTail`
