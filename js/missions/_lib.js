@@ -161,6 +161,7 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
     // role 用 drone 而不是 wingman：无人机没有判断力，
     // 目标永远来自长机的授权，长机活着时也不自主接战。
     role: 'drone', skill: 0.62,
+    leader: w.player,        // 长机 = 玩家（僚机—长机关系，整备时僚机跟着长机一起补给）
     /* 默认指令显式写出来 —— 落在最保守的 focus（只打长机授权的目标）。
        玩家按 1/2/3 才会切到 spread / cover。 */
     cmd: 'focus',

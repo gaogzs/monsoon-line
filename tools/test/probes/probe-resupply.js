@@ -228,6 +228,14 @@ function runwayEnds(carrier) {
 }
 
 /* ---------- NPC：触发 → 延迟消失 → 延迟后在重置位置出现 ---------- */
+/* 非僚机的我方 AI 飞机（role 'escort'）：僚机不会自主整备，所以自主整备周期要用它来测 */
+function makeEscort(S, w) {
+  const a = S.sandbox.Ent.makeAircraft({ type: 'folded_wing', team: 0, x: w.player.pos.x + 400, y: 3000, z: w.player.pos.z + 400, fwd: S.sandbox.M3.V(0, 0, 1), speed: 250 });
+  S.sandbox.AI.attach(a, { role: 'escort', skill: 0.5 });
+  a.name = a.label = 'ESCORT-1';
+  w.actors.push(a);
+  return a;
+}
 function npcCase(label, missionId, setup, check) {
   const S = Sim.load({ seed: 1 });
   const G = S.sandbox.Game;
@@ -235,8 +243,7 @@ function npcCase(label, missionId, setup, check) {
   S.start(MI);
   const w = G.__world(), p = G.__player();
   p.hp = p.maxHp = 1e9;
-  const a = w.wings[2];
-  if (!a) { chk(label + '：找到僚机', false, '该关没有 wings[2]'); return; }
+  const a = makeEscort(S, w);
   const full = clone({ ammoPool: a.ammoPool, gunAmmo: a.gunAmmo, flares: a.flares, hp: a.hp });
   const ctx = setup(S, w, a);
   ctx.far();                                      // 先在范围外走一帧：武装
@@ -282,6 +289,113 @@ npcCase('NPC·平台（m9，reset 缺省 keep）', 'm9', (S, w, a) => {
 }, (S, w, a, ctx) => {
   chk('NPC·keep：原位置重新出现（不被挪到别处）', Math.abs(a.pos.x - (ctx.rig.pos.x + 300)) < 5 && Math.abs(a.pos.z - ctx.rig.pos.z) < 5 && Math.abs(a.pos.y - 2500) < 5, JSON.stringify(a.pos));
 });
+
+/* ---------- 玩家的僚机：不自主整备；跟着玩家整备 ---------- */
+const wingFull = a => clone({ ammoPool: a.ammoPool, gunAmmo: a.gunAmmo, flares: a.flares, hp: a.hp });
+{
+  // 不自主整备：残了、就在整备点上，也永远不触发
+  const S = Sim.load({ seed: 1 });
+  const G = S.sandbox.Game;
+  S.start(S.sandbox.MISSIONS.findIndex(m => m.id === 'm8'));
+  const w = G.__world(), p = G.__player(), a = w.wings[2], c = w.refs.carrier;
+  p.hp = p.maxHp = 1e9;
+  drain(a);
+  for (let i = 0; i < 12 * 60; i++) { a.pos.x = c.pos.x + 300; a.pos.z = c.pos.z; a.pos.y = 3000; p.pos.x = c.pos.x + 20000; S.step(1 / 60); }
+  chk('玩家僚机：弹药打光、停在整备点上 12 s，也不自主整备', w.actors.indexOf(a) >= 0 && !(a.rs && a.rs.cyc) && w.resupply.away.length === 0 && w.rearmCount === 0);
+}
+function wingCase(label, missionId, drive, check) {
+  const S = Sim.load({ seed: 1 });
+  const G = S.sandbox.Game;
+  S.start(S.sandbox.MISSIONS.findIndex(m => m.id === missionId));
+  const w = G.__world(), p = G.__player(), a = w.wings[2];
+  const full = wingFull(a);
+  const ctx = drive.setup(S, w, p);
+  drain(a); drain(p); p.hp = Math.max(p.hp, 17);
+  for (let i = 0; i < 9 * 60 && !G.__rearmOpen(); i++) { ctx.place(); p.hp = Math.max(p.hp, 17); a.hp = Math.min(a.hp, 17); S.step(1 / 60); }
+  if (!G.__rearmOpen()) { chk(label + '：玩家整备已打开', false); return; }
+  const before = { x: a.pos.x, y: a.pos.y, z: a.pos.z };
+  G.__confirmRearm();
+  check(S, w, p, a, full, before, ctx);
+}
+wingCase('僚机·航母（m8）', 'm8', {
+  setup: (S, w) => { const c = w.refs.carrier; return { c, place: () => { const p = w.player; p.pos.x = c.pos.x + 300; p.pos.z = c.pos.z; p.pos.y = 3000; } }; }
+}, (S, w, p, a, full, before, ctx) => {
+  const wings = Object.values(w.wings).filter(x => x && x.team === 0);
+  chk('僚机·航母：玩家整备完成的同一刻，僚机全部从战场消失（alive 仍为 true）', wings.length >= 1 && wings.every(x => w.actors.indexOf(x) < 0 && x.alive === true) && !w.flags.allyDown);
+  const t0 = w.time, seen = new Map();
+  for (let i = 0; i < 12 * 60; i++) {
+    S.step(1 / 60);
+    for (const x of wings) if (!seen.has(x) && w.actors.indexOf(x) >= 0) seen.set(x, { t: w.time - t0, pos: { x: x.pos.x, z: x.pos.z }, snap: wingFull(x) });
+    if (seen.size === wings.length) break;
+  }
+  const ts = [...seen.values()].map(v => v.t).sort((x, y) => x - y);
+  chk('僚机·航母：玩家重置后约 4 s 第一架在跑道出现，全部都回来了', seen.size === wings.length && Math.abs(ts[0] - 4) < 0.3, 'ts=' + ts.map(v => v.toFixed(2)).join(','));
+  let spaced = true;
+  for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] < 1.95) spaced = false;
+  chk('僚机·航母：同一个出口放出的僚机至少错开 2 s（' + wings.length + ' 架）', spaced);
+  const ends = runwayEnds(ctx.c);
+  chk('僚机·航母：每架都出现在某条跑道的末端（< 5 m）', [...seen.values()].every(v => ends.some(e => hd(e, v.pos) < 5)));
+  chk('僚机·航母：弹药 / 机炮 / 干扰弹 / 血量补满', [...seen.values()].every(v => diff(full, v.snap).length === 0) || diff(full, seen.get(a).snap).length === 0, '');
+});
+wingCase('僚机·界外区（m1）', 'm1', {
+  setup: (S, w) => { const ar = w.arenaDef; return { place: () => { const p = w.player; p.pos.x = ar.cx; p.pos.z = ar.cz - ar.half + 2500; p.pos.y = 5000; } }; }
+}, (S, w, p, a, full, before) => {
+  const dd = diff(full, wingFull(a));
+  chk('僚机·界外区：玩家整备完成的同一刻，僚机立刻补满', dd.length === 0, dd.join(','));
+  const s = a.ai.formation;
+  const want = S.sandbox.M3.add(p.pos, S.sandbox.M3.add(S.sandbox.M3.mul(p.right, s.dx), S.sandbox.M3.add(S.sandbox.M3.mul(p.fwd, s.dz), S.sandbox.M3.V(0, s.dy, 0))));
+  chk('僚机·界外区：重置到跟随玩家的默认阵型位置', w.actors.indexOf(a) >= 0 && Math.hypot(a.pos.x - want.x, a.pos.y - want.y, a.pos.z - want.z) < 0.01, JSON.stringify(a.pos));
+  chk('僚机·界外区：与玩家同航向（平飞背对界外）同速度', Math.abs(a.fwd.z - p.fwd.z) < 1e-9 && Math.abs(a.fwd.y) < 1e-9 && a.speed === p.speed);
+});
+wingCase('僚机·平台（m9，reset 缺省 keep）', 'm9', {
+  setup: (S, w) => { const r = w.refs.rigA; return { place: () => { const p = w.player; p.pos.x = r.pos.x + 300; p.pos.z = r.pos.z; p.pos.y = 2500; } }; }
+}, (S, w, p, a, full, before) => {
+  const dd = diff(full, wingFull(a));
+  chk('僚机·平台：立刻补满', dd.length === 0, dd.join(','));
+  chk('僚机·平台：原地不动', w.actors.indexOf(a) >= 0 && a.pos.x === before.x && a.pos.y === before.y && a.pos.z === before.z);
+});
+
+/* ---------- 僚机—长机关系不限于玩家：NPC 长机带自己的僚机 ---------- */
+{
+  const S = Sim.load({ seed: 1 });
+  const G = S.sandbox.Game, Ent = S.sandbox.Ent, M3 = S.sandbox.M3, AI = S.sandbox.AI;
+  S.start(S.sandbox.MISSIONS.findIndex(m => m.id === 'm1'));
+  const w = G.__world(), p = G.__player(), ar = w.arenaDef;
+  p.hp = p.maxHp = 1e9;
+  const mk = (role, leader, formation, name) => {
+    const a = Ent.makeAircraft({ type: 'folded_wing', team: 0, x: p.pos.x + 300, y: 5000, z: p.pos.z + 300, fwd: M3.V(0, 0, 1), speed: 250 });
+    AI.attach(a, { role, skill: 0.5, leader, formation });
+    a.name = a.label = name; w.actors.push(a); return a;
+  };
+  const L = mk('escort', null, null, 'LEADER-1');
+  const W1 = mk('wingman', L, { dx: 120, dy: 30, dz: -180 }, 'WING-A');
+  const W2 = mk('wingman', L, { dx: -120, dy: 30, dz: -180 }, 'WING-B');
+  const R = S.sandbox.Resupply;
+  chk('leaderOf：显式 ai.leader 优先；没写的老式僚机默认跟玩家；普通 AI 没有长机',
+    R.leaderOf(w, W1) === L && R.leaderOf(w, L) === null && R.leaderOf(w, w.wings[2]) === p);
+  chk('wingmenOf(NPC 长机) = 它的两架僚机；wingmenOf(玩家) 不含它们', R.wingmenOf(w, L).length === 2 && !R.wingmenOf(w, p).includes(W1));
+  const full = [L, W1, W2].map(wingFull);
+  const zone = { x: ar.cx + 100, z: ar.cz - ar.half + 2500 };
+  const put = (a, dx) => { a.pos.x = zone.x + dx; a.pos.z = zone.z; a.pos.y = 5000; };
+  [L, W1, W2].forEach(a => { a.pos.x = ar.cx; a.pos.z = ar.cz; a.pos.y = 5000; });
+  S.step(1 / 60);                                     // 范围外走一帧：长机武装
+  [L, W1, W2].forEach(drain);
+  let wingSelf = false, lReturn = null;
+  const t0 = w.time;
+  for (let i = 0; i < 14 * 60; i++) {
+    if (w.actors.indexOf(L) >= 0 && !(L.rs && L.rs.cyc && L.rs.cyc.t > 0 && false)) put(L, 0);
+    put(W1, 200); put(W2, -200);                      // 僚机也一直待在整备区里、弹药打光
+    S.step(1 / 60);
+    if ((W1.rs && W1.rs.cyc) || (W2.rs && W2.rs.cyc) || w.actors.indexOf(W1) < 0 || w.actors.indexOf(W2) < 0) wingSelf = true;
+    if (lReturn === null && w.resupply.away.length === 0 && w.actors.indexOf(L) >= 0 && w.time - t0 > 6) { lReturn = w.time - t0; break; }
+  }
+  chk('NPC 长机的僚机：弹药打光、停在整备区里，也不自主整备（在长机重新出现之前全程在场）', !wingSelf);
+  chk('NPC 长机：约 7 s（3 s 消失 + 4 s）后重新出现', lReturn !== null && Math.abs(lReturn - 7) < 0.4, 'lReturn=' + lReturn);
+  const dd = [L, W1, W2].map((a, i) => diff(full[i], wingFull(a)));
+  chk('长机重新出现的同一刻：长机与两架僚机都补满', dd.every(d => d.length === 0), JSON.stringify(dd));
+  const near = (a, s) => { const want = M3.add(L.pos, M3.add(M3.mul(L.right, s.dx), M3.add(M3.mul(L.fwd, s.dz), M3.V(0, s.dy, 0)))); return Math.hypot(a.pos.x - want.x, a.pos.y - want.y, a.pos.z - want.z) < 0.01; };
+  chk('僚机回到跟随 NPC 长机的阵型位置（同航向）', near(W1, W1.ai.formation) && near(W2, W2.ai.formation) && Math.abs(W1.fwd.z - L.fwd.z) < 1e-9);
+}
 
 /* ---------- swap:false：不弹界面，直接补满 ---------- */
 {

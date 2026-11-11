@@ -97,6 +97,8 @@ HUD 中心是准星（CMD），青色标记是机头，二者之间有虚线；T
 
 ## AI 状态：`attach(a, opt)`
 
+> `ai.leader`（v3.5.0，可选）：僚机—长机关系，指向长机飞机。目前只被整备点读（`Resupply.leaderOf`：有长机的飞机不自主整备，长机整备时僚机一同补给）；僚机的跟随行为仍读 `world.player`，批次 5 做长机泛化时再统一。没写 `leader` 的 `role: 'wingman' / 'drone'` 默认跟玩家。
+
 | 字段 | 初值 | 含义 |
 |---|---|---|
 | `role` | `'enemy'` | `enemy` / `drone` / `wingman`（`drone` 是 AI 角色，与机型标签 `tags.unmanned` 是两回事；战果归属等处读的是后者）；预警机由 `spawnAewc()` 改成 `support`（它带 `route`，不走状态机） |

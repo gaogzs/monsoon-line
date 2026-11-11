@@ -385,7 +385,20 @@ AI 侧：独立行动的 AI 在警告区内被软转向拉回中心（见 [ai.md
 
 **玩家**确认整备后立刻套用 `reset`，镜头瞬移（`$.snapCamera`）跟过去。界外整备完之后有 15 s 宽限（`EDGE_GRACE`）：这段时间内整备区里仍不渐黑，给"深入界外"的玩家掉头的时间；宽限过了赖在界外就照常渐黑（所以它不是"躲在界外永远安全"）。
 
-**NPC**（`team 0` 的 AI 飞机，含僚机）：进入整备范围、且需要补给（特种弹药不足一半 / 机炮不足三成 / 血量低于六成）时触发，不用驻留；开局就在范围里的要先离开一次。过 `npcDelay` 秒后从 `world.actors` 里**摘出去**（`alive` 仍为 `true`，所以不触发"僚机损失"；追它的 AI / 导弹丢目标），再过 `npcAway` 秒补满（`Ent.rebuildMounts`）、套用 `reset`、放回战场。同一个出口两次放出至少隔 2 s，免得叠在同一点。
+**NPC**（`team 0` 的 AI 飞机）：进入整备范围、**并且**处于需要补给的状态（特种弹药不足一半 / 机炮不足三成 / 血量低于六成）时触发，不用驻留；开局就在范围里的要先离开一次。过 `npcDelay` 秒后从 `world.actors` 里**摘出去**（`alive` 仍为 `true`，所以不触发"僚机损失"；追它的 AI / 导弹丢目标），再过 `npcAway` 秒补满（`Ent.rebuildMounts`）、套用 `reset`、放回战场。同一个出口两次放出至少隔 2 s，免得叠在同一点。
+
+**僚机—长机关系**（不限于玩家）：有长机的飞机是僚机——`a.ai.leader` 指向长机（`spawnWingman` 写 `leader: w.player`；没写 `leader` 的 `role: 'wingman' / 'drone'` 是老式的玩家僚机，默认跟玩家，见 `Resupply.leaderOf`）。规则：
+
+- 僚机**永远不自主整备**（它们不会自己进入补给状态）。
+- 长机整备完成时，它的僚机**一同补给**，不管离得多远（`Resupply.squadRearm`）。长机可以是玩家（确认整备那一刻），也可以是 NPC（NPC 长机**重新出现**的那一刻）——以后 NPC 有了自己的僚机，同一套机制直接适用。按补给点的 `reset` 分三种：
+
+| `reset` | 僚机怎么处理 |
+|---|---|
+| `'runway'`（航母 / 机场） | 立刻从战场消失（`alive` 仍为 `true`），过 `npcAway` 秒（缺省 4）后照常从跑道末端随机一条出现；同一出口按 2 s 错开 |
+| `'inward'` / 自定义 | 立刻补满，并重置到跟随长机的**默认阵型位置**（`ai.formation` 的槽位：右 `dx`、上 `dy`、前 `dz`，同航向同速度） |
+| `'keep'`（缺省） | 立刻补满，原地不动 |
+
+`Resupply.wingmenOf(world, leader)` 取长机在场的僚机；已经摘出去、在离场周期里的不算。**僚机的跟随行为**目前仍读 `world.player`（`brain.js`），`ai.leader` 现在只用来决定"谁跟着谁整备"；批次 5 做"长机泛化"时再让跟随行为也读它。
 
 各关现状：m8 引用座头鲸号（`carrier`，r 1500、hold 4、`reset: 'runway'`）；m9 引用三座补给平台（`rigA/B/C`，hold 4，平台没有跑道，`reset` 缺省 `keep`）；其余 11 关用 `edge: '-z'`（玩家身后，hold 6、`reset: 'inward'`）。均为无限次。
 流程与细则见 [game.md](game.md#整备界面与-rearmopen) 与 [loadout.md](loadout.md#整备点复用-loadoutapply)。

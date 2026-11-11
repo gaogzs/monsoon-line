@@ -62,7 +62,7 @@
 | `M3` | `core/math3d.js` | 见 [math3d.md](math3d.md) |
 | `Shading` | `core/shading.js` | `LIGHT`（同一对象，原地改）`AMBIENT` `DIFFUSE` `FOG_*` `SKY` `SEA` `CLOUD` `brightness` `fog` `quant`；关卡天色：`setEnv(env, axis)` `sunAt(hour)` `envVersion` `DEFAULT_LIGHT` / `DEFAULT_AMBIENT` / `DEFAULT_DIFFUSE`（见 [rendering.md](rendering.md#关卡时间与天色shadingsetenv)） |
 | `Arena` | `engine/world/arena.js` | `state(arena, pos)` → `{ zone: 'in'|'warn'|'out', depth, edgeDist }`；`inEdge(arena, pos, side)`；`validate(arena)` |
-| `Resupply` | `engine/world/resupply.js` | `init(world, mission)` `update(world, p, dt)` `suppressesArena(world, p)` `refill(p, ac, lo)` `resetPose(world, entry, a)` `applyPose(a, pose)` `launched(world, entry)` `validate(mission, world)`；NPC 整备周期在 `update` 里 |
+| `Resupply` | `engine/world/resupply.js` | `init(world, mission)` `update(world, p, dt)` `suppressesArena(world, p)` `refill(p, ac, lo)` `resetPose(world, entry, a)` `applyPose(a, pose)` `launched(world, entry)` `leaderOf(world, a)` `wingmenOf(world, leader)` `squadRearm(world, entry, leader)` `validate(mission, world)`；NPC 整备周期在 `update` 里 |
 | `Combat` `Turret` `Route` `Ballistics` `SFX` | `engine/*.js` | 见各自的 systems 文档 |
 | `Renderer` `RenderGL` | `render/render.js` `render/render-gl.js` | 见 [rendering.md](rendering.md) |
 | `UnitView` `HudFx` `Radio` `SysNote` `CODEX` | `ui/` | 见 [unitview.md](unitview.md)、[hud.md](hud.md)、[codex.md](codex.md) |

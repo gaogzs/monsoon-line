@@ -22,9 +22,16 @@
      npcAway  消失后再过多少秒在重置位置出现（缺省 4）
 
    玩家：驻留满 hold 秒 → update 返回 { open: 条目 } → Game 弹界面 / 直接补满 → refill + reset。
-   NPC（team 0 的 AI 飞机，含僚机）：进入范围、且弹药不足一半 / 机炮不足三成 / 血量低于六成时触发；
-     不用驻留。过 npcDelay 秒后**从 world.actors 摘出**（alive 仍为 true，所以不触发"僚机损失"），
-     再过 npcAway 秒补满、套用 reset、放回 world.actors。开局就在范围里的 NPC 要先离开一次才会触发。
+   NPC（team 0 的 AI 飞机，**不含玩家的僚机**）：进入范围、**并且**处于需要补给的状态（弹药不足一半 /
+     机炮不足三成 / 血量低于六成）时触发；不用驻留。过 npcDelay 秒后**从 world.actors 摘出**（alive 仍为 true，
+     所以不触发"僚机损失"），再过 npcAway 秒补满、套用 reset、放回 world.actors。开局就在范围里的 NPC 要先离开一次才会触发。
+   **僚机—长机关系**（不限于玩家）：有长机的飞机是僚机（a.ai.leader；没写 leader 的 role wingman / drone 默认
+   跟玩家）。僚机**不会自主触发**整备——它们不会自己进入补给状态；而是在**长机**整备完成时一起补满
+   （Resupply.squadRearm），不管它们离得多远。长机可以是玩家，也可以是 NPC（NPC 长机在重新出现的那一刻
+   触发它的僚机），以后 NPC 有了自己的僚机，同一套机制直接适用：
+       reset 'runway'（航母 / 机场）  立刻从战场消失，过 npcAway 秒后照常从跑道末端出现（出口间隔 ≥ LAUNCH_GAP）
+       reset 'inward' / 自定义        立刻补满，并重置到跟随玩家的默认阵型位置（ai.formation 的槽位，同航向同速度）
+       reset 'keep'（缺省）            立刻补满，原地不动
 
      Resupply.init(world, mission)        开局（mission.spawn 之后）：解析引用，建 world.resupply
      Resupply.update(world, p, dt)        每帧：NPC 周期、玩家计时 / 状态；返回 null 或事件 { open } / { hint }
@@ -33,6 +40,9 @@
      Resupply.resetPose(world, e, a)      按条目的 reset 算出位姿 { x, y, z, fwd, speed } 或 null（keep）
      Resupply.applyPose(a, pose)          把位姿落到飞机上（位置 / 朝向平飞 / 速度 / 控制量清零）
      Resupply.launched(world, e)          记一次"放出"（同一出口的 NPC 会错开 LAUNCH_GAP 秒）
+     Resupply.leaderOf(world, a)          飞机 a 的长机（没有就是 null）
+     Resupply.wingmenOf(world, leader)    长机的僚机（在场的；已在离场周期里的不算）
+     Resupply.squadRearm(world, e, leader) 长机整备完成后，让它的僚机一同补给（见上）
      Resupply.validate(mission, world)    声明检查（探针用）：返回错误串数组
 
    world.resupply = { entries, status, away } ；status = { kind, … } 给 HUD 只读：
@@ -84,6 +94,34 @@ var Resupply = (function () {
     }
     world.resupply = { entries: entries, status: { kind: 'none' }, away: [] };
     world.rearmCount = 0;
+    // 开局状态当基线：补满就是补回这个（干扰弹数、机炮弹数）。mission.spawn 之后调，所以僚机都是满的
+    for (var j = 0; j < world.actors.length; j++) {
+      var a = world.actors[j];
+      if (a.team === 0 && !a.isPlayer && a.ai) ensureRs(a);
+    }
+  }
+
+  function ensureRs(a) {
+    if (!a.rs) a.rs = { base: { flares: a.flares, gunAmmo: a.gunAmmo }, armed: [], cyc: null };
+    return a.rs;
+  }
+
+  /* 僚机—长机关系：显式的 ai.leader 优先；没写的 role wingman / drone 是老式的玩家僚机，默认跟玩家。 */
+  function leaderOf(world, a) {
+    if (!a.ai) return null;
+    if (a.ai.leader) return a.ai.leader;
+    if (a.ai.role === 'wingman' || a.ai.role === 'drone') return world.player || null;
+    return null;
+  }
+
+  /* 长机的僚机：在场的（world.actors 里的）。已经摘出去、在离场周期里的不算。 */
+  function wingmenOf(world, leader) {
+    var out = [];
+    for (var i = 0; i < world.actors.length; i++) {
+      var a = world.actors[i];
+      if (a !== leader && a.alive && a.team === leader.team && leaderOf(world, a) === leader) out.push(a);
+    }
+    return out;
   }
 
   /* 有导弹正在追我、或一枚敌方弹进了 EVADE_R 以内 */
@@ -213,6 +251,7 @@ var Resupply = (function () {
     a.ctrl = { pitch: 0, roll: 0, yaw: 0 };
     world.actors.push(a);
     launched(world, e);
+    squadRearm(world, e, a);                     // 它若是长机：僚机一同补给（没有僚机则什么也不发生）
   }
 
   function npcStep(world, R, dt) {
@@ -230,8 +269,8 @@ var Resupply = (function () {
     for (i = 0; i < world.actors.length; i++) {
       a = world.actors[i];
       if (!a.alive || a.isPlayer || a.team !== 0 || !a.ai || a.route) continue;
-      if (!a.rs) a.rs = { base: { flares: a.flares, gunAmmo: a.gunAmmo }, armed: [], cyc: null };
-      var rs = a.rs;
+      var rs = ensureRs(a);                         // 第一次见到就记下开局基线（僚机也记：它们整备时要补回这个）
+      if (leaderOf(world, a)) continue;             // 僚机不自主整备，跟着长机
       if (rs.cyc) {
         rs.cyc.t += dt;
         var delay = rs.cyc.entry.def.npcDelay === undefined ? NPC_DELAY : rs.cyc.entry.def.npcDelay;
@@ -255,6 +294,37 @@ var Resupply = (function () {
           rs.cyc = { entry: e, t: 0 };
           break;
         }
+      }
+    }
+  }
+
+  /* 跟随长机的默认阵型位置：长机身后 / 侧后的槽位（ai.formation = { dx 右, dy 上, dz 前 }），同航向同速度 */
+  function formationPose(leader, a) {
+    var s = (a.ai && a.ai.formation) || (a.ai && a.ai.role === 'drone' ? { dx: 140, dy: 25, dz: -190 } : { dx: 120, dy: 30, dz: -180 });
+    var pos = M3.add(leader.pos, M3.add(M3.mul(leader.right, s.dx), M3.add(M3.mul(leader.fwd, s.dz), M3.V(0, s.dy, 0))));
+    return { x: pos.x, y: pos.y, z: pos.z, fwd: M3.clone(leader.fwd), speed: leader.speed };
+  }
+
+  /* 长机整备完成（reset 已套用）后调：它的僚机一同补给，不管离得多远。
+       runway   立刻从战场消失，npcAway 秒后照常从跑道末端出现
+       formation（inward / 自定义）立刻补满，并回到跟随长机的阵型位置
+       keep     立刻补满，原地不动 */
+  function squadRearm(world, e, leader) {
+    var R = world.resupply;
+    if (!R || !e || !leader) return;
+    var rs = e.def.reset;
+    var mode = rs === 'runway' ? 'runway' : (rs === 'inward' || (rs && typeof rs === 'object')) ? 'formation' : 'keep';
+    var away = e.def.npcAway === undefined ? NPC_AWAY : e.def.npcAway;
+    var wings = wingmenOf(world, leader);
+    for (var k = 0; k < wings.length; k++) {
+      var a = wings[k];
+      ensureRs(a);
+      if (mode === 'runway') {
+        vanish(world, a);
+        R.away.push({ a: a, entry: e, t: 0, dur: away });
+      } else {
+        refillNpc(a);
+        if (mode === 'formation') applyPose(a, formationPose(leader, a));
       }
     }
   }
@@ -368,6 +438,6 @@ var Resupply = (function () {
 
   return {
     init: init, update: update, suppressesArena: suppressesArena, refill: refill,
-    resetPose: resetPose, applyPose: applyPose, launched: launched, validate: validate
+    resetPose: resetPose, applyPose: applyPose, launched: launched, leaderOf: leaderOf, wingmenOf: wingmenOf, squadRearm: squadRearm, validate: validate
   };
 })();

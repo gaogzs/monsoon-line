@@ -23,6 +23,10 @@
       target: null,
       retargetT: M3.rnd(0, 1.2),
       formation: opt.formation || null,   // {lead, dx, dy, dz}
+      /* 长机（僚机—长机关系，docs/POST2-0IMPL.md 批次 4.2）：有长机的飞机是僚机。
+         目前只用来决定"谁跟着谁整备"（Resupply.leaderOf / wingmenOf）；僚机的跟随行为仍读 world.player，
+         批次 5 做"长机泛化"时再改成读这里。没写 leader 的 role wingman / drone 默认跟玩家。 */
+      leader: opt.leader || null,
       wander: M3.rnd(0, 6.28),
       /* 默认指令是 focus（只打长机授权的目标），不是 spread。
 

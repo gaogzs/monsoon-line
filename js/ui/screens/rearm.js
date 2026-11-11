@@ -66,6 +66,7 @@
     var pose = Resupply.resetPose($.world, curEntry, p);
     if (pose) { Resupply.applyPose(p, pose); $.snapCamera(p); }
     Resupply.launched($.world, curEntry);
+    Resupply.squadRearm($.world, curEntry, p);      // 玩家的僚机一同补给（界外：回阵型；航母：几秒后从跑道出现）
     if (direct !== true) closeRearm();
     SFX.confirm();
     $.banner = { t: 2.6, title: T('ui.screens.rearm.banner.title'), sub: T('ui.screens.rearm.banner.sub'), col: HUD.CY };
