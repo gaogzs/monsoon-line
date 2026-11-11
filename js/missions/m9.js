@@ -30,6 +30,7 @@ Registry.mission({
   speedStart: 360,
   timeLimit: 0,
   axis: 160,
+  arena: { cx: 0, cz: 11000, half: 34000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
   time: { hour: 14.5 },                 // 午后，太阳高 51°，在右舷
 
   prose: T('missions.m9.prose'),

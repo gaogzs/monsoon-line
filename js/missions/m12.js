@@ -16,6 +16,7 @@ Registry.mission({
   speedStart: 480,
   timeLimit: 0,
   axis: 140,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  arena: { cx: 0, cz: 15000, half: 42000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
   sun: { az: 89, el: 1.5 },    // 0550L：17 km 高处地平线下沉约 4°，太阳比地面早出——显式给 sun（az 为真方位）
 
   prose: T('missions.m12.prose'),

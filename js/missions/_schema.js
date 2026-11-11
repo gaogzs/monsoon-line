@@ -21,6 +21,11 @@
    （正午 / 上午午后 / 金色时段 / 黄昏），不做夜战；真方位按本关 axis 换成世界方向。
    注意 mission.time 是"一天中的时刻"，与 world.time（本局已过时间）无关。
 
+   战区边界（每关都写）：
+     arena: { cx, cz, half, warn }   世界米，方形；half = 真边界到中心的距离，warn = 警告区宽度
+   越过边界玩家会渐黑并失败，AI 在警告区内被软转向拉回；取值依据见 tools/test/probes/probe-extent.js。
+   判定见 js/engine/world/arena.js（Arena.state / validate）。
+
    map 里的标记用**世界坐标**，与 spawn 里的数一致；type 'start' 是玩家进入点
    （dir = 世界航向，0 = +z）。地图由 drawMap 旋到北朝上。
    ============================================================ */

@@ -10,6 +10,7 @@ Registry.mission({
   speedStart: 380,
   timeLimit: 0,
   axis: 175,
+  arena: { cx: 0, cz: 12000, half: 34000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
   time: { hour: 16.17 },                 // 午后偏晚的金色光线（太阳高 27°，在右舷）
 
   prose: T('missions.m11.prose'),

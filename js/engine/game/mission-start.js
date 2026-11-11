@@ -20,6 +20,9 @@
     $.world.timeLeft = $.world.timeLimit;
     // 本关世界 +z 轴的真方位（罗盘、方位报读、简报地图都按它换算）
     $.world.axis = $.mission.axis || 0;
+    /* 战区边界：mission.arena 落到世界上；world.arena 是本帧玩家的边界状态（update 每帧写） */
+    $.world.arenaDef = $.mission.arena || null;
+    $.world.arena = { zone: 'in', depth: 0, edgeDist: Infinity };
 
     var ac = AIRCRAFT[$.selectedAC];
     var lo = $.getLoadout(ac);

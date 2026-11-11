@@ -203,6 +203,10 @@
     }
     f2.hpSeen = php;
 
+    /* 战区边界：每帧对玩家算一次，结果放 world.arena（HUD 只读 world）。
+       玩家死了就不再算，保留最后一帧的状态。 */
+    if ($.player.alive) $.world.arena = Arena.state($.world.arenaDef, $.player.pos);
+
     // 胜负
     /* 时限判负在同一处兜住：声明了 timeLimit 的关卡不需要在自己的 lose()
        里再写一遍倒计时判断，避免十个关卡十种写法。 */

@@ -10,6 +10,7 @@ Registry.mission({
   speedStart: 350,
   timeLimit: 0,
   axis: 180,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  arena: { cx: 0, cz: -1000, half: 37000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
 
   prose: T('missions.sk1.prose'),
 

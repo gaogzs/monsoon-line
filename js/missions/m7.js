@@ -16,6 +16,7 @@ Registry.mission({
   speedStart: 330,
   timeLimit: 0,
   axis: 215,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  arena: { cx: 2000, cz: 0, half: 34000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
   time: { hour: 18.83 },                 // 日落后的暮色（取最暗的黄昏预设）：云下 900 m，雾
 
   prose: T('missions.m7.prose'),

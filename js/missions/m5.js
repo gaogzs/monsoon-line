@@ -16,6 +16,7 @@ Registry.mission({
   speedStart: 400,
   timeLimit: 0,
   axis: 175,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
+  arena: { cx: 0, cz: 15000, half: 40000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
   time: { hour: 18 },                 // 日落（太阳贴着右舷地平线）：航标熄灭，贴合"静默"
 
   prose: T('missions.m5.prose'),
