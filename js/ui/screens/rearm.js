@@ -35,6 +35,7 @@
     var p = $.player;
     if (!p || !p.alive || $.rearmOpen) return;
     curEntry = entry || null;
+    $.closeMap();
     if (!entry || !entry.def.swap) { confirmRearm(true); return; }     // 不能换挂载：直接补满
     $.rearmOpen = true;
     // 和打开暂停菜单一样：松开指针、止住持续音

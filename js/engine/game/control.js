@@ -51,6 +51,7 @@
 
   function controlPlayer(dt) {
     $.updateTargetKey();
+    $.updateMapKey();            // 按住 M 的战场地图（input.js）
     if (!$.player.alive) return;
     var c = $.player.ctrl;
 

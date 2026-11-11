@@ -25,6 +25,7 @@
     /* 本关天色：按 mission.time / sun 设一次；没写就设缺省预设，上一关的天色不残留 */
     Shading.setEnv({ hour: ($.mission.time || {}).hour, sun: $.mission.sun }, $.mission.axis || 0);
     $.world = $.newWorld();
+    $.closeMap();
     $.stats = { startTime: 0, endTime: 0 };
 
     /* 关卡时限落到世界上。任务脚本声明 timeLimit，主循环负责倒计时与判负。 */

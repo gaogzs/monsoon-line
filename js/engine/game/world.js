@@ -13,6 +13,7 @@
       wings: {},
       player: null,
       flags: {},
+      mapOpen: false,              // 战场地图（按住 M）是否显示：input.js 写、HUD 读
       refs: {},                    // 关卡给单位起的名字（spawnShip / spawnPlatform 的 o.ref），mission.resupply 按它引用
       objective: '', objectiveSub: '',
       detected: false,

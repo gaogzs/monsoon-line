@@ -26,6 +26,11 @@
   Game.openRearm = function (e) { $.beginRearm(e); };
   Game.closeRearm = function () { $.closeRearm(); };
   Game.__confirmRearm = function () { $.confirmRearm(); };
+  // 战场地图（按住 M）：测试用，now 是毫秒时间戳
+  Game.__mapKeyDown = function (now) { $.mapKeyDown(now); };
+  Game.__mapKeyUp = function (now) { $.mapKeyUp(now); };
+  Game.__updateMapKey = function (now) { $.updateMapKey(now); };
+  Game.__aimMode = function () { return $.aimMode; };
   Game.__rearmOpen = function () { return $.rearmOpen; };
   Game.__updateLock = $.updateLock;
   Game.__cycleTarget = $.cycleTarget;

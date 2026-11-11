@@ -133,6 +133,7 @@
 
   function beginFail() {
     if ($.failing) return;
+    $.closeMap();
     var fr = failReason(), w = $.world, lines = [], i;
     if (fr.death) {
       var sp = failSpeaker();

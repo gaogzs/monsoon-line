@@ -114,6 +114,7 @@
     $.drawTargetBearing(ctx, W, H, p, p.target);
     $.drawAlerts(ctx, W, H, p, world);
     $.drawObjective(ctx, W, H, world);
+    $.drawTacMap(ctx, W, H, p, world);        // 按住 M 的战场地图：盖在最上面
 
     ctx.restore();
     /* 全屏滤镜（干扰 / 受伤闪红）在 hudOpacity 之外画 —— 见 hudfx.js */

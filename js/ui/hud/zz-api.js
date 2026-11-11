@@ -21,5 +21,7 @@
   HUD.__ghostStep = $.ghostStep;
   HUD.__ghosts = function () { return $.ghosts; };
   HUD.glitch = $.glitch;
+  // 战场地图：离线预览要单独画一帧（tools/test 的 SVG 录制）
+  HUD.__drawTacMap = $.drawTacMap;
   HUD.RED = $.RED;
 })(HUD);
