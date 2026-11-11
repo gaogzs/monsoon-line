@@ -31,6 +31,11 @@ Registry.mission({
   timeLimit: 0,
   axis: 160,
   arena: { cx: 0, cz: 11000, half: 34000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
+  resupply: [
+    { ref: 'rigA', r: 1500, hold: 4, uses: 1, swap: true },
+    { ref: 'rigB', r: 1500, hold: 4, uses: 1, swap: true },
+    { ref: 'rigC', r: 1500, hold: 4, uses: 1, swap: true }
+  ],   // 三座补给平台，每座一次
   time: { hour: 14.5 },                 // 午后，太阳高 51°，在右舷
 
   prose: T('missions.m9.prose'),
@@ -66,9 +71,9 @@ Registry.mission({
     w.guarded = [
       /* 血量比 PLATFORMS 的默认值低：这三座是满载油罐的补给平台，挨炮比空平台脆 ——
          也让"玩家不管就 3–4 分钟失守"成立 */
-      spawnPlatform(w, { platform: 'breakwater', x: 0, z: 0, team: 0, label: T('missions.m9.spawn.guarded.i0.label'), hp: 800 }),
-      spawnPlatform(w, { platform: 'shoal', x: -3200, z: 1600, team: 0, label: T('missions.m9.spawn.guarded.i1.label'), hp: 650 }),
-      spawnPlatform(w, { platform: 'breakwater', x: 3200, z: 1600, yaw: Math.PI, team: 0, label: T('missions.m9.spawn.guarded.i2.label'), hp: 800 })
+      spawnPlatform(w, { platform: 'breakwater', x: 0, z: 0, team: 0, label: T('missions.m9.spawn.guarded.i0.label'), hp: 800, ref: 'rigA' }),
+      spawnPlatform(w, { platform: 'shoal', x: -3200, z: 1600, team: 0, label: T('missions.m9.spawn.guarded.i1.label'), hp: 650, ref: 'rigB' }),
+      spawnPlatform(w, { platform: 'breakwater', x: 3200, z: 1600, yaw: Math.PI, team: 0, label: T('missions.m9.spawn.guarded.i2.label'), hp: 800, ref: 'rigC' })
     ];
     var full = 0;
     for (var g = 0; g < w.guarded.length; g++) full += w.guarded[g].maxHp;

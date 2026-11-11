@@ -1,5 +1,6 @@
 Registry.platform({
   order: 50,
+  tags: ['resupply'],
   id: 'cairn', model: 'cairn', hull: T('platforms.cairn.hull'), name: 'Cairn', cn: T('platforms.cairn.cn'),
   cls: T('platforms.cairn.cls'), faction: T('platforms.cairn.faction'), operator: T('platforms.cairn.operator'),
   role: T('platforms.cairn.role'), dim: [48, 48, 24], speed: 0, fixed: true, crew: 60,

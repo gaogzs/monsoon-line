@@ -356,6 +356,7 @@ function spawnShip(w, o) {
       if (o.ssmStagger) tu.cd = M3.rnd(0, o.ssmStagger);
     }
   }
+  if (o.ref) (w.refs || (w.refs = {}))[o.ref] = t;     // 关卡按 ref 引用本单位（mission.resupply）
   w.targets.push(t);
   return t;
 }
@@ -385,6 +386,7 @@ function spawnPlatform(w, o) {
   t.platform = s;
   t.shipCls = s.cls;      // 锁定框写"海上平台 · 类型"（hud.js）
   if ((s.mounts || s.launchers) && typeof Turret !== 'undefined') Turret.attach(t, s.mounts, s.launchers);
+  if (o.ref) (w.refs || (w.refs = {}))[o.ref] = t;
   w.targets.push(t);
   return t;
 }

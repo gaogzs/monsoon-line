@@ -18,6 +18,7 @@ Registry.mission({
   timeLimit: 0,
   axis: 150,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
   arena: { cx: -1000, cz: 16000, half: 40000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
+  resupply: [{ edge: '-z', hold: 6, uses: 1, swap: true }],   // 没有母舰 / 机场：玩家身后（-z）的警告区与界外区就是整备区
   time: { hour: 6.33 },                 // 18 km 高空的清晨，低角度暖光
 
   prose: T('missions.m6.prose'),

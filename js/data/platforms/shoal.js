@@ -1,5 +1,6 @@
 Registry.platform({
   order: 10,
+  tags: ['resupply'],
   id: 'shoal', model: 'shoal', hull: T('platforms.shoal.hull'), name: 'Shoal', cn: T('platforms.shoal.cn'),
   cls: T('platforms.shoal.cls'), faction: T('platforms.shoal.faction'), operator: T('platforms.shoal.operator'),
   role: T('platforms.shoal.role'), dim: [36, 36, 20], speed: 0, fixed: true, crew: 46,

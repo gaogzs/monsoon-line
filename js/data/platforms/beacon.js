@@ -1,5 +1,6 @@
 Registry.platform({
   order: 60,
+  tags: ['resupply'],
   id: 'beacon', model: 'beacon', hull: T('platforms.beacon.hull'), name: 'Beacon', cn: T('platforms.beacon.cn'),
   cls: T('platforms.beacon.cls'), faction: T('platforms.beacon.faction'), operator: T('platforms.beacon.operator'),
   role: T('platforms.beacon.role'), dim: [12, 12, 9], speed: 0, fixed: true, crew: 0,

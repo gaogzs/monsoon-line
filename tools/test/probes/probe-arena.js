@@ -107,4 +107,36 @@ for (const mi of [0, 4, 8, 11]) {
   chk(S.sandbox.MISSIONS[mi].id + ' 自然对战 90 s：没有 AI 持续越界（最多 < 10 s）', worst < 10, 'worst=' + worst.toFixed(1));
 }
 
+/* ---------- 整备点声明（批次 4.2 数据）---------- */
+{
+  const S = Sim.load({ seed: 1 });
+  const G = S.sandbox.Game, A = S.sandbox.Arena, MS = S.sandbox.MISSIONS;
+  const bad = [];
+  for (let mi = 0; mi < MS.length; mi++) {
+    const m = MS[mi];
+    if (!Array.isArray(m.resupply) || !m.resupply.length) { bad.push(m.id + ' 没有 resupply'); continue; }
+    S.start(mi);
+    const w = G.__world();
+    for (const r of m.resupply) {
+      if (!(r.hold > 0) || !(r.uses >= 1) || typeof r.swap !== 'boolean') bad.push(m.id + ' 条目缺 hold / uses / swap：' + JSON.stringify(r));
+      if (r.ref) {
+        const t = w.refs[r.ref], tg = t && ((t.ship || t.platform || {}).tags || {});
+        if (!t) bad.push(m.id + ' 的 ref "' + r.ref + '" 没有对应单位');
+        else if (t.team !== 0) bad.push(m.id + ' 的 ' + r.ref + ' 不是我方（team ' + t.team + '）');
+        else if (!tg.resupply) bad.push(m.id + ' 的 ' + r.ref + ' 没有 resupply 标签');
+        if (!(r.r > 0)) bad.push(m.id + ' 的 ' + r.ref + ' 缺 r');
+      } else if (!/^[+-][xz]$/.test(r.edge || '')) bad.push(m.id + ' 条目既没有 ref 也没有合法的 edge：' + JSON.stringify(r));
+    }
+  }
+  chk('每关都有合法的 resupply 声明（ref 可解析且为我方整备点，edge 合法）', !bad.length, bad.join('；'));
+
+  // inEdge：m1 的 arena（cx 2000, cz -1000, half 42000, warn 6000）
+  const ar = { cx: 0, cz: 0, half: 40000, warn: 6000 };
+  chk('inEdge：-z 侧警告区内为真', A.inEdge(ar, { x: 0, z: -35000 }, '-z') === true);
+  chk('inEdge：-z 侧界外为真', A.inEdge(ar, { x: 0, z: -45000 }, '-z') === true);
+  chk('inEdge：界内不算', A.inEdge(ar, { x: 0, z: -20000 }, '-z') === false);
+  chk('inEdge：另一侧不算', A.inEdge(ar, { x: 0, z: 35000 }, '-z') === false && A.inEdge(ar, { x: 35000, z: 0 }, '-z') === false);
+  chk('inEdge：角落归偏得更多的那根轴', A.inEdge(ar, { x: 36000, z: -35000 }, '+x') === true && A.inEdge(ar, { x: 36000, z: -35000 }, '-z') === false);
+}
+
 process.exit(ok ? 0 : 1);

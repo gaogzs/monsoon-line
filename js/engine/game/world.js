@@ -13,6 +13,7 @@
       wings: {},
       player: null,
       flags: {},
+      refs: {},                    // 关卡给单位起的名字（spawnShip / spawnPlatform 的 o.ref），mission.resupply 按它引用
       objective: '', objectiveSub: '',
       detected: false,
       killed: 0, hitsLanded: 0, shotsFired: 0, gunRounds: 0, gunHits: 0,

@@ -1,5 +1,6 @@
 Registry.platform({
   order: 30,
+  tags: ['resupply'],
   id: 'sluice', model: 'sluice', hull: T('platforms.sluice.hull'), name: 'Sluice', cn: T('platforms.sluice.cn'),
   cls: T('platforms.sluice.cls'), faction: T('platforms.sluice.faction'), operator: T('platforms.sluice.operator'),
   role: T('platforms.sluice.role'), dim: [50, 40, 18], speed: 0, fixed: true, crew: 120,

@@ -1,5 +1,6 @@
 Registry.ship({
   order: 30,
+  tags: ['resupply'],
   id: 'humpback',
   model: 'humpback',
   hull: T('ships.humpback.hull'),

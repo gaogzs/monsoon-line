@@ -27,6 +27,19 @@ var Arena = (function () {
     return { zone: 'in', depth: 0, edgeDist: edge };
   }
 
+  /* 界外整备区：战场某一侧（side = '+x' | '-x' | '+z' | '-z'）的警告区或界外。
+     "这一侧"按主导方向算：偏离中心最多的那根轴的符号；四个角落归偏得更多的那根轴，
+     所以每个位置至多属于一侧。 */
+  function inEdge(arena, pos, side) {
+    if (!arena || !pos || !side) return false;
+    var dx = pos.x - arena.cx, dz = pos.z - arena.cz;
+    var v = side.charAt(1) === 'x' ? dx : dz;
+    var o = side.charAt(1) === 'x' ? dz : dx;
+    if (v * (side.charAt(0) === '-' ? -1 : 1) <= 0) return false;      // 不在这一侧
+    if (Math.abs(v) < Math.abs(o)) return false;                      // 主导方向不是这一侧
+    return arena.half - Math.abs(v) < arena.warn;                     // 进了警告区（含越界）
+  }
+
   /** 校验 mission.arena 的字段（smoke 调）；返回错误串或 null */
   function validate(arena) {
     if (arena === undefined) return null;
@@ -39,5 +52,5 @@ var Arena = (function () {
     return null;
   }
 
-  return { state: state, validate: validate };
+  return { state: state, inEdge: inEdge, validate: validate };
 })();

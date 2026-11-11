@@ -1,5 +1,6 @@
 Registry.platform({
   order: 20,
+  tags: ['resupply'],
   id: 'breakwater', model: 'breakwater', hull: T('platforms.breakwater.hull'), name: 'Breakwater', cn: T('platforms.breakwater.cn'),
   cls: T('platforms.breakwater.cls'), faction: T('platforms.breakwater.faction'), operator: T('platforms.breakwater.operator'),
   role: T('platforms.breakwater.role'), dim: [56, 48, 15], speed: 0, fixed: true, crew: 80,

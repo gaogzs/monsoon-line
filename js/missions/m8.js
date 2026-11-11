@@ -45,6 +45,7 @@ Registry.mission({
   timeLimit: 0,
   axis: 170,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
   arena: { cx: 0, cz: 5000, half: 44000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
+  resupply: [{ ref: 'carrier', r: 1500, hold: 4, uses: 2, swap: true }],   // 座头鲸号：驻留 4 s 整备，两次
   time: { hour: 8.25 },                 // 上午（太阳高 33°，在左后方）
 
   prose: T('missions.m8.prose'),
@@ -90,7 +91,7 @@ Registry.mission({
        蓝鲸只有近防炮，不算防空火力（weapon: null）。 */
     var fb = spawnShip(w, {
       model: 'humpback', team: 0, callsign: NAVAL_NAMED.humpback,
-      x: 0, z: -6000, hp: 2600, weapon: 'ss6', fireCd: 8
+      x: 0, z: -6000, hp: 2600, weapon: 'ss6', fireCd: 8, ref: 'carrier'
     });
     w.baseTarget = fb;
     w.baseHpFull = fb.maxHp;

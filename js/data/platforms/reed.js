@@ -1,5 +1,6 @@
 Registry.platform({
   order: 40,
+  tags: ['resupply'],
   id: 'reed', model: 'reed', hull: T('platforms.reed.hull'), name: 'Reed', cn: T('platforms.reed.cn'),
   cls: T('platforms.reed.cls'), faction: T('platforms.reed.faction'), operator: T('platforms.reed.operator'),
   role: T('platforms.reed.role'), dim: [18, 20, 12], speed: 0, fixed: true, crew: 14,

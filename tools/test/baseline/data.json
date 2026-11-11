@@ -61,7 +61,7 @@
   "SHIPS": {
    "orca": "36151043a7a5",
    "bluewhale": "736f79d105e9",
-   "humpback": "8b7dfc52b985",
+   "humpback": "35a742e9fb7d",
    "spermwhale": "ba763fbe69d2",
    "dolphin": "4d03f203f8bb",
    "trilobite": "62aabb14e58b",
@@ -78,12 +78,12 @@
    "$order": "61f2901c5359"
   },
   "PLATFORMS": {
-   "shoal": "a1b8b763b664",
-   "breakwater": "9710fbeb1049",
-   "sluice": "b70d69c2c209",
-   "reed": "9ee9d5eb1af4",
-   "cairn": "be42dad59394",
-   "beacon": "9272cb90a415",
+   "shoal": "9908476461b6",
+   "breakwater": "4c2ce0d6a4ef",
+   "sluice": "0edde2a4846a",
+   "reed": "091c68eaf2e7",
+   "cairn": "e9a41fcec26c",
+   "beacon": "e16b01c764d9",
    "$order": "a61f82c4a14a"
   },
   "WEAPONS": {
@@ -376,18 +376,18 @@
   "beacon_wreck": "a4059e0a5139"
  },
  "missions": {
-  "m1@0": "458ba3f8f6b6",
-  "m2@1": "fc628ec4357c",
-  "m3@2": "d7df98c5bf6b",
-  "m4@3": "77e90dc2b6c2",
-  "m5@4": "dd72a7008493",
-  "m6@5": "eda6533f0db9",
-  "m7@6": "c251f594f31a",
-  "m8@7": "f43afd5fb4b7",
-  "m10@8": "85792c7f6974",
-  "m12@9": "6e4ac8b559a1",
-  "sk1@10": "d21bbc9ff378",
-  "m9@11": "4ef6ec7d4633",
-  "m11@12": "71a902df306b"
+  "m1@0": "1eb2484eebab",
+  "m2@1": "283788587147",
+  "m3@2": "ae4e18860abb",
+  "m4@3": "8c5cd11135b9",
+  "m5@4": "9cb38b049a89",
+  "m6@5": "134f9be61483",
+  "m7@6": "7b773278b291",
+  "m8@7": "c77a345420bb",
+  "m10@8": "22e5d621db7f",
+  "m12@9": "00cee227be5b",
+  "sk1@10": "fcbbee65529f",
+  "m9@11": "99a5da1a81d3",
+  "m11@12": "5baea0389576"
  }
 }

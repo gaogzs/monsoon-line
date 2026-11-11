@@ -26,6 +26,15 @@
    越过边界玩家会渐黑并失败，AI 在警告区内被软转向拉回；取值依据见 tools/test/probes/probe-extent.js。
    判定见 js/engine/world/arena.js（Arena.state / validate）。
 
+   整备点（每关都写）：mission.resupply = [ 条目… ]，条目二选一：
+     { ref, r, hold, uses, swap }   单位整备点：ref 是 spawnShip / spawnPlatform 的 o.ref，
+                                    那个单位必须是 team 0 且带 resupply 标签；r 水平半径（m），
+                                    hold 驻留秒数，uses 可用次数，swap 是否弹出重选挂载界面
+     { edge, hold, uses, swap }     界外整备区：edge = '+x' | '-x' | '+z' | '-z'，玩家身处战场那一侧的
+                                    警告区或界外区（Arena.inEdge）时驻留 hold 秒就整备。
+                                    关卡里没有母舰 / 机场时用它，具体哪一侧按关卡写（玩家身后通常是 -z）。
+                                    整备区里不触发越界渐黑；uses 用完才恢复。
+
    map 里的标记用**世界坐标**，与 spawn 里的数一致；type 'start' 是玩家进入点
    （dir = 世界航向，0 = +z）。地图由 drawMap 旋到北朝上。
    ============================================================ */
