@@ -89,56 +89,96 @@
   }
 
   /* ---- 战区边界（docs/POST2-0IMPL.md 4.1）----
-     警告线（边界内缩 warn）：一排单斜线；真边界：交叉斜线（X）。斜线朝边界外侧。
-     端点用与 radarXY 同一套"镜头朝向 → 雷达坐标"换算，但**不做越界夹取**
-     （夹取会让线变形）；超出雷达圆的部分由 drawRadar 的圆形 clip 裁掉。
-     只画离本机 range 以内的那几条边。 */
-  var ARENA_TICK_GAP = 6;                 // 斜线间距（U 单位）
-  var ARENA_EDGES = [                     // 外法线（世界）与边的方向
+     **整个区域填满斜线**，不是只在分界线上画一排：
+       警告区（边界内侧 warn 宽的带）  单斜线 "/"，半透明
+       界外区（真边界以外的全部）      交叉斜线 "X"，更实
+     每一侧的区域是一个梯形：四条对角线从战区中心穿过方形的四个角，把"警告带 / 界外"分给四侧
+     （与 Arena.inEdge 的"主导方向"划分一致）。多边形端点用与 radarXY 同一套
+     "镜头朝向 → 雷达坐标"换算，但**不做越界夹取**（夹取会让形状变形）；
+     先 clip 到多边形、再铺斜线，超出雷达圆的部分由 drawRadar 的圆形 clip 裁掉。
+     分界处各留一条细线。只画离本机 range 以内的那几块。
+     rs = world.resupply：还有次数的界外整备区那一侧**换一种填法**：警告带不铺斜线，改成淡青**纯色半透明填充**
+     （界外区仍是交叉斜线，只是改青色）—— 和其它侧的斜线一眼区分，看出"这一侧是整备区"。 */
+  var ARENA_HATCH_GAP = 6;                // 斜线间距（U 单位）
+  var ARENA_FAR = 12;                     // 界外区多边形伸到 half 的多少倍远（足够盖满雷达圆）
+  var ARENA_EDGES = [                     // 外法线（世界）
     { nx: 1, nz: 0, side: '+x' }, { nx: -1, nz: 0, side: '-x' }, { nx: 0, nz: 1, side: '+z' }, { nx: 0, nz: -1, side: '-z' }
   ];
+  var ARENA_COL = {
+    warn: [255, 176, 58], out: [255, 74, 74], res: [79, 224, 255]
+  };
+  var ARENA_ALPHA = { warn: 0.34, out: 0.62, line: 0.85, resFill: 0.2 };
 
-  /* rs = world.resupply：还有次数的界外整备区那一侧，边界线改画淡青 —— 玩家一眼看出"这一侧是整备区" */
   function drawArenaEdges(ctx, cx, cy, R, range, p, ar, rs) {
-    var resSide = {};
-    if (rs) for (var ri = 0; ri < rs.entries.length; ri++) {
-      if (rs.entries[ri].def.edge && rs.entries[ri].uses > 0) resSide[rs.entries[ri].def.edge] = true;
-    }
     var k = R / range;
     function pt(wx, wz) {
       var u = radarDir(wx - p.pos.x, wz - p.pos.z);
       return { x: cx + u.x * k, y: cy + u.y * k };
     }
-    function edges(h, col, cross) {
-      for (var e = 0; e < 4; e++) {
-        var n = ARENA_EDGES[e];
-        ctx.strokeStyle = resSide[n.side] ? 'rgba(79,224,255,0.85)' : col; ctx.lineWidth = 1;
-        var dist = h - (n.nx * (p.pos.x - ar.cx) + n.nz * (p.pos.z - ar.cz));
-        if (dist > range * 1.1) continue;
-        // 边的两个端点：沿切向各到 ±h
-        var tx = -n.nz, tz = n.nx;
-        var A = pt(ar.cx + n.nx * h - tx * h, ar.cz + n.nz * h - tz * h);
-        var B = pt(ar.cx + n.nx * h + tx * h, ar.cz + n.nz * h + tz * h);
-        var dx = B.x - A.x, dy = B.y - A.y, L = Math.sqrt(dx * dx + dy * dy);
-        if (L < 1) continue;
-        var ux = dx / L, uy = dy / L;
-        var o = radarDir(n.nx, n.nz), ol = Math.sqrt(o.x * o.x + o.y * o.y);
-        var ox = o.x / ol, oy = o.y / ol;
-        var tick = $.U(5), step = $.U(ARENA_TICK_GAP);
-        ctx.beginPath();
-        ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y);
-        for (var s = 0; s <= L; s += step) {
-          var qx = A.x + ux * s, qy = A.y + uy * s;
-          var ddx = qx - cx, ddy = qy - cy;
-          if (ddx * ddx + ddy * ddy > (R + tick * 2) * (R + tick * 2)) continue;
-          ctx.moveTo(qx, qy); ctx.lineTo(qx + ox * tick + ux * tick, qy + oy * tick + uy * tick);
-          if (cross) { ctx.moveTo(qx, qy); ctx.lineTo(qx + ox * tick - ux * tick, qy + oy * tick - uy * tick); }
-        }
-        ctx.stroke();
-      }
+    var resSide = {};
+    if (rs) for (var ri = 0; ri < rs.entries.length; ri++) {
+      if (rs.entries[ri].def.edge && rs.entries[ri].uses > 0) resSide[rs.entries[ri].def.edge] = true;
     }
-    edges(ar.half - ar.warn, 'rgba(255,176,58,0.75)', false);
-    edges(ar.half, 'rgba(255,74,74,0.85)', true);
+    var gap = $.U(ARENA_HATCH_GAP);
+
+    /* 这一侧、离中心 h 处的点：沿外法线 h，沿切向 s×h（s = ±1，落在对角线上） */
+    function corner(n, h, s) { return pt(ar.cx + n.nx * h - n.nz * h * s, ar.cz + n.nz * h + n.nx * h * s); }
+
+    function hatch(poly, rgb, alpha, cross) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(poly[0].x, poly[0].y);
+      for (var i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+      ctx.closePath();
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + alpha + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (var t = -2 * R; t <= 2 * R; t += gap) {
+        ctx.moveTo(cx - R + t, cy + R); ctx.lineTo(cx + R + t, cy - R);          // "/"
+        if (cross) { ctx.moveTo(cx - R + t, cy - R); ctx.lineTo(cx + R + t, cy + R); }   // "\"，叠成 X
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    /* 纯色半透明填充：整备区那一侧的警告带 */
+    function fillPoly(poly, rgb, alpha) {
+      ctx.fillStyle = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + alpha + ')';
+      ctx.beginPath();
+      ctx.moveTo(poly[0].x, poly[0].y);
+      for (var i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function line(a, b, rgb, alpha) {
+      ctx.strokeStyle = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + alpha + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+
+    var hIn = ar.half - ar.warn;
+    for (var e = 0; e < 4; e++) {
+      var n = ARENA_EDGES[e];
+      var res = !!resSide[n.side];
+      var wRgb = res ? ARENA_COL.res : ARENA_COL.warn, oRgb = res ? ARENA_COL.res : ARENA_COL.out;
+      // 离本机多远：到警告带内缘 / 到真边界（负数 = 已经越过）
+      var dRel = n.nx * (p.pos.x - ar.cx) + n.nz * (p.pos.z - ar.cz);
+      var dIn = hIn - dRel, dOut = ar.half - dRel;
+      if (dIn > range * 1.1) continue;                      // 警告带内缘都够不着，整侧不画
+
+      // 警告带：内缘 hIn 与真边界 half 之间的梯形（整备区那一侧：纯色填充；其它侧：单斜线）
+      var warnPoly = [corner(n, hIn, -1), corner(n, hIn, 1), corner(n, ar.half, 1), corner(n, ar.half, -1)];
+      if (res) fillPoly(warnPoly, wRgb, ARENA_ALPHA.resFill);
+      else hatch(warnPoly, wRgb, ARENA_ALPHA.warn, false);
+      // 界外区：真边界以外一直伸到很远
+      hatch([corner(n, ar.half, -1), corner(n, ar.half, 1), corner(n, ar.half * ARENA_FAR, 1), corner(n, ar.half * ARENA_FAR, -1)],
+        oRgb, ARENA_ALPHA.out, true);
+      // 分界细线
+      line(corner(n, hIn, -1), corner(n, hIn, 1), wRgb, ARENA_ALPHA.line * 0.6);
+      if (dOut <= range * 1.1) line(corner(n, ar.half, -1), corner(n, ar.half, 1), oRgb, ARENA_ALPHA.line);
+    }
   }
 
   /* 单位整备点的触发范围：以该单位为圆心、半径 r 的淡青圈（还有次数时才画；裁剪由 drawRadar 的圆形 clip 负责） */

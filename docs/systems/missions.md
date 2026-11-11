@@ -363,7 +363,7 @@ AI 侧：独立行动的 AI 在警告区内被软转向拉回中心（见 [ai.md
 | 形式 | 字段 | 含义 |
 |---|---|---|
 | 单位整备点 | `{ ref, r, hold, uses, swap }` | `ref` 是 `spawnShip / spawnPlatform` 的 `o.ref`（登记在 `world.refs`），该单位必须 `team 0` 且带 `resupply` 标签；玩家**水平**距离进到 `r` 以内驻留 `hold` 秒整备；3×`r` 以内告警栏显示距离 |
-| 界外整备区 | `{ edge, hold, uses, swap }` | `edge` = `'+x' | '-x' | '+z' | '-z'`。关卡里没有母舰 / 机场时用。玩家身处战场**那一侧**的警告区或界外区（`Arena.inEdge`）驻留 `hold` 秒整备；**整备区内不触发越界渐黑**（`uses` 用完才恢复）；雷达上那一侧的边界线改画淡青 |
+| 界外整备区 | `{ edge, hold, uses, swap }` | `edge` = `'+x' | '-x' | '+z' | '-z'`。关卡里没有母舰 / 机场时用。玩家身处战场**那一侧**的警告区或界外区（`Arena.inEdge`）驻留 `hold` 秒整备；**整备区内不触发越界渐黑**（`uses` 用完才恢复）；雷达上那一侧的警告带改画淡青纯色填充 |
 
 `uses` 是可用次数，`swap` 为 `true` 时弹出重选挂载界面、`false` 直接补满。各关现状：m8 引用座头鲸号（`carrier`，r 1500、hold 4、2 次）；m9 引用三座补给平台（`rigA/B/C`，各 1 次）；其余 11 关用 `edge: '-z'`（玩家身后，hold 6、1 次）。
 流程与细则见 [game.md](game.md#整备界面与-rearmopen) 与 [loadout.md](loadout.md#整备点复用-loadoutapply)。
