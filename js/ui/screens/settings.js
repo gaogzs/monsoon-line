@@ -230,7 +230,8 @@
   var KEYMAP = [
     [T('ui.screens.settings.KEYMAP.i0.i0.s1'), T('ui.screens.settings.KEYMAP.i0.i1.s1')],
     [T('ui.screens.settings.KEYMAP.i1.i0.s1'), T('ui.screens.settings.KEYMAP.i1.i1.s1')],
-    ['M', T('ui.screens.settings.KEYMAP.i2.i1.s1')],
+    ['C', T('ui.screens.settings.KEYMAP.i2.i1.s1')],
+    ['M', T('ui.screens.settings.KEYMAP.map')],
     ['W / S', T('ui.screens.settings.KEYMAP.i3.i1.s1')],
     ['A / D', T('ui.screens.settings.KEYMAP.i4.i1.s1')],
     ['Q / E', T('ui.screens.settings.KEYMAP.i5.i1.s1')],

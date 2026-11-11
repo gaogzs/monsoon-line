@@ -286,15 +286,15 @@ AI（友军、敌军一样）用同一套门槛：被压制时只能对 `clearR`
 
 ### 战场地图（按住 M，`drawTacMap`，`ui/hud/tacmap.js`）
 
-按住 `M` 超过 `MAP_HOLD`（0.22 s）显示，松开关闭；**游戏不暂停**。点一下 `M` 仍是切换鼠标引导——和 F / Tab 一样靠松开时的按住时长区分。
-状态链：`input.js` 的 `mapKeyDown` 记时刻 → 每帧 `updateMapKey`（`controlPlayer` 里调）按住够久就把 `world.mapOpen` 置真 → HUD 只读 `world.mapOpen`（不跨命名空间读 `Game.$`）。
+按住 `M` 显示，松开关闭；**游戏不暂停**。（鼠标引导 / 键盘直控的切换在 `C`。）
+状态链：`input.js` 的 `mapKeyDown` 记「按下」→ 每帧 `updateMapKey`（`controlPlayer` 里调）把 `world.mapOpen` 置真 → HUD 只读 `world.mapOpen`（不跨命名空间读 `Game.$`）。
 打开暂停菜单 / 整备界面 / 失败画面、失去焦点、开局时都会 `closeMap()`，并清掉按键状态——回来之后地图不会自己冒出来，得重新按。
 
 - **范围与朝向**：画整个战区（`mission.arena` 的外接范围），**北朝上**：世界坐标按 `world.axis` 旋成东 / 北，与简报地图 `drawMap` 同一个约定；没有 `arena` 的关卡退回所有单位的外包盒。网格 10 km，比例尺 10 KM，指北。
 - **区域画法**与雷达一致：警告带半透明单斜线（琥珀）、界外区交叉斜线（红）；还有次数的界外整备区那一侧，警告带改淡青纯色填充、界外区改青色，并标「整备区」。单位整备点画一个半径 `r` 的青色虚圈。
 - **单位**：玩家（绿，带呼号）、友军飞机（青）、友军 / 中立舰船与平台（带舰名，舰船按 `dim` 画成朝向正确的小船）、**已掌握**的敌方（红，实心）。
 - **"已掌握"** = 离玩家或任一架在场友机 **12 km** 以内（与雷达量程同一个数，等于友机之间共享数据链）。其余敌人不画——开地图不会白送情报。调节单元（`cullFar`）不画。
-- 验证：`tools/test/probes/probe-tacmap.js`（点按 / 长按 / 关闭时机、13 关渲染、已掌握规则）。
+- 验证：`tools/test/probes/probe-tacmap.js`（按住 / 松开 / 关闭时机、13 关渲染、已掌握规则）。
 
 ### 威胁环（RWR）
 
@@ -628,7 +628,8 @@ ctx.strokeText(t, x, y);
 |---|---|---|
 | 鼠标移动 | 转动世界瞄准方向（默认，指针锁定） | `mousemove` → `aimYaw / aimPitch` |
 | 点击画布 | 锁定指针 | `requestAimLock()` |
-| `M` | **点一下**（< 0.22 s）切换鼠标引导 / 键盘直控；**按住**显示战场地图，松开关闭 | `mapKeyDown / mapKeyUp / updateMapKey`（`ui/input.js`）→ `toggleAimMode()` / `world.mapOpen` |
+| `C` | 切换鼠标引导 / 键盘直控（原来在 `M`，让给了战场地图） | `toggleAimMode()` |
+| `M`（按住） | 显示战场地图，松开关闭 | `mapKeyDown / mapKeyUp / updateMapKey`（`ui/input.js`）→ `world.mapOpen` |
 | `W`/`S` | 抬头 / 低头（鼠标引导时按住临时覆盖飞控） | `controlPlayer()` |
 | `A`/`D` | 左滚 / 右滚（同上） | 同上 |
 | `Q`/`E` | 方向舵（同上） | 同上 |

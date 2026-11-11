@@ -5798,6 +5798,39 @@ try {
 });
 
 /* ============================================================
+   战场地图键位：按住 M 显示地图（松开关闭），C 切换鼠标引导 / 键盘直控。
+   走真实的 keydown / keyup 监听器，不是直接调内部函数。
+   ============================================================ */
+section('战场地图键位', () => {
+console.log('\n战场地图键位');
+try {
+  const G = sandbox.Game, bad = [];
+  G.startMission(0);
+  const w = G.__world();
+  const kd = docListeners['keydown'] || [], ku = docListeners['keyup'] || [];
+  if (!kd.length || !ku.length) throw new Error('没有捕获到 keydown / keyup 监听器');
+  const down = code => kd.forEach(fn => fn({ code, repeat: false, preventDefault() {} }));
+  const up = code => ku.forEach(fn => fn({ code, preventDefault() {} }));
+
+  const a0 = G.__aimMode();
+  down('KeyM'); G.__updateMapKey();
+  if (!w.mapOpen) bad.push('按住 M 没有显示战场地图');
+  if (G.__aimMode() !== a0) bad.push('M 不该再切换鼠标引导');
+  up('KeyM');
+  if (w.mapOpen) bad.push('松开 M 之后地图没有关闭');
+  down('KeyC'); up('KeyC');
+  if (G.__aimMode() === a0) bad.push('C 没有切换鼠标引导 / 键盘直控');
+  down('KeyC'); up('KeyC');
+  if (G.__aimMode() !== a0) bad.push('C 再按一次没有切回来');
+  if (w.mapOpen) bad.push('按 C 不该影响地图');
+  if (bad.length) bad.forEach(fail);
+  else ok('战场地图键位：按住 M 显示、松开关闭；C 切换鼠标引导 / 键盘直控，互不影响');
+} catch (e) {
+  fail('战场地图键位测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+});
+
+/* ============================================================
    整备界面（批次 4.2）：Resupply 触发后弹出，复用机库的挂载编辑器（自己一套元素 id）。
    ============================================================ */
 section('整备界面', () => {

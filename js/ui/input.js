@@ -14,9 +14,8 @@
       if ($.state === 'playing' && $.failing && e.code === 'KeyH') $.endFail();   // 失败提示期间 H / Esc 都当作"结束"
       if ($.state === 'playing' && !$.failing && !$.rearmOpen) {
         if (e.code === 'KeyH') $.togglePause();
-        /* M：点一下 = 切换鼠标引导 / 键盘直控；按住超过 MAP_HOLD 秒 = 显示战场地图，松开关闭。
-           和 F / Tab 一样靠松开时的按住时长区分（见 mapKeyUp）。 */
-        if (e.code === 'KeyM' && !e.repeat) $.mapKeyDown();
+        if (e.code === 'KeyM' && !e.repeat) $.mapKeyDown();       // 按住 M：战场地图（松开关闭，见 mapKeyUp）
+        if (e.code === 'KeyC' && !e.repeat) $.toggleAimMode();    // C：切换鼠标引导 / 键盘直控（原来是 M，让给了地图）
         /* F / Tab：松开时切换目标；按住超过 TGT_HOLD 秒则取消选择（见 updateTargetKey）。
            切换放在松开时，长按才不会先切一次再取消。 */
         if ((e.code === 'KeyF' || e.code === 'Tab') && !e.repeat) {
@@ -162,30 +161,21 @@
     SFX.confirm();
   }
 
-  /* ---- M：点按切换鼠标引导，按住看战场地图 ----
-     keydown 只记时刻；每帧 updateMapKey（控制层调，见 control.js）看按了多久：够了就把 world.mapOpen 置真，
-     地图由 HUD 的 drawTacMap 读它来画（不暂停游戏）。松开时：按得短 = 一次"点按"→ 切换鼠标引导；
-     按得长 = 看地图，松开只是关地图。closeMap 同时清掉按键状态，所以打开暂停 / 整备 / 失败画面再回来，
-     地图不会自己冒出来，得重新按。now 参数给测试用（缺省取 performance.now()）。 */
-  var MAP_HOLD = 0.22;
+  /* ---- M：按住看战场地图 ----
+     keydown 只记「按下」；每帧 updateMapKey（控制层调，见 control.js）把 world.mapOpen 置真，
+     地图由 HUD 的 drawTacMap 读它来画（不暂停游戏）；松开关闭。
+     closeMap 同时清掉按键状态：打开暂停 / 整备 / 失败画面再回来，地图不会自己冒出来，得重新按。
+     （鼠标引导 / 键盘直控的切换在 C 上，见 keydown。）now 参数给测试用，缺省取 performance.now()。 */
   var mapKey = { down: 0 };
   function mapNow(now) { return now === undefined ? performance.now() : now; }
 
   $.mapKeyDown = function (now) { if (!mapKey.down) mapKey.down = mapNow(now) || 1e-6; };
 
-  $.mapKeyUp = function (now) {
-    var d = mapKey.down;
-    $.closeMap();
-    if (!d) return;
-    var held = (mapNow(now) - d) / 1000;
-    if (held < MAP_HOLD && $.state === 'playing' && !$.failing && !$.rearmOpen && $.player) $.toggleAimMode();
-  };
+  $.mapKeyUp = function () { $.closeMap(); };
 
-  $.updateMapKey = function (now) {
+  $.updateMapKey = function () {
     if (!$.world) return;
-    var on = mapKey.down && $.state === 'playing' && !$.paused && !$.rearmOpen && !$.failing &&
-      (mapNow(now) - mapKey.down) / 1000 >= MAP_HOLD;
-    $.world.mapOpen = !!on;
+    $.world.mapOpen = !!(mapKey.down && $.state === 'playing' && !$.paused && !$.rearmOpen && !$.failing);
   };
 
   $.closeMap = function () {

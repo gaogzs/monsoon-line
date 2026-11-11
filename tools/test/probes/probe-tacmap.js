@@ -2,9 +2,8 @@
 /* ============================================================
    战场地图探针（按住 M）
 
-   按键：
-     · 点一下 M（< 0.22 s）= 切换鼠标引导 / 键盘直控，不显示地图
-     · 按住 M（≥ 0.22 s）= world.mapOpen 置真，松开置假；松开**不**切换鼠标引导
+   按键（M 只管地图；鼠标引导 / 键盘直控在 C，见 smoke 的「战场地图键位」段）：
+     · 按住 M：world.mapOpen 置真；松开置假；M 不会切换鼠标引导
      · 打开整备界面 / 失败画面时关地图，且不会自己冒出来（得重新按）
    画面：
      · 每一关开着地图整帧渲染不抛错（含没有 arena 的退化取景）
@@ -28,32 +27,24 @@ function chk(name, cond, detail) {
   const w = G.__world();
 
   const a0 = G.__aimMode();
-  G.__mapKeyDown(1000); G.__updateMapKey(1100);
-  chk('按下 0.1 s：还没显示地图', w.mapOpen === false);
-  G.__mapKeyUp(1100);
-  chk('点一下 M（0.1 s）：切换鼠标引导', G.__aimMode() !== a0 && w.mapOpen === false);
-  G.__mapKeyDown(2000); G.__mapKeyUp(2100);       // 再点一下，切回去
-
-  const a1 = G.__aimMode();
-  G.__mapKeyDown(5000);
-  G.__updateMapKey(5100);
-  chk('按住 0.1 s：不显示', w.mapOpen === false);
-  G.__updateMapKey(5300);
-  chk('按住 0.3 s：显示地图', w.mapOpen === true);
-  G.__updateMapKey(8000);
-  chk('一直按着：一直显示（游戏没有因此暂停）', w.mapOpen === true);
-  G.__mapKeyUp(8000);
-  chk('松开：地图关闭，且不切换鼠标引导', w.mapOpen === false && G.__aimMode() === a1);
+  G.__updateMapKey();
+  chk('没按 M：不显示地图', w.mapOpen === false);
+  G.__mapKeyDown(); G.__updateMapKey();
+  chk('按住 M：立刻显示地图（游戏不暂停）', w.mapOpen === true);
+  G.__updateMapKey();
+  chk('一直按着：一直显示', w.mapOpen === true);
+  G.__mapKeyUp();
+  chk('松开：地图关闭，且 M 不切换鼠标引导', w.mapOpen === false && G.__aimMode() === a0);
 
   // 按住时打开整备界面：地图关闭，整备结束后不会自己冒出来
-  G.__mapKeyDown(10000); G.__updateMapKey(10500);
+  G.__mapKeyDown(); G.__updateMapKey();
   chk('（再次按住）显示地图', w.mapOpen === true);
   G.openRearm({ def: { swap: true } });
   chk('打开整备界面：地图关闭', w.mapOpen === false);
   G.__confirmRearm();
-  G.__updateMapKey(20000);
+  G.__updateMapKey();
   chk('整备结束后仍按着 M：地图不会自己冒出来（得重新按）', w.mapOpen === false);
-  G.__mapKeyUp(20000);
+  G.__mapKeyUp();
 }
 
 /* ---------- 渲染 ---------- */
