@@ -86,7 +86,7 @@
      ============================================================ */
   /* 优先级（上 → 下）：雷达 / 导弹 > 低高度 > 失速 > 动压 > 其它状态。
      低高度排在失速前面：它意味着下一秒就是海面。 */
-  $.ALERT_ORDER = ['missile', 'lit', 'damage', 'terrain', 'stall', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
+  $.ALERT_ORDER = ['missile', 'lit', 'arena', 'damage', 'terrain', 'stall', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
 
   $.alertsBottom = 0;
 
@@ -109,6 +109,17 @@
       /* 导弹已经在路上时不再单独报"被照射" —— 那是同一件事的前半段。
          被对空雷达截获（DETECTED）并进 SPIKE：同一件事，只是照射源不同 */
       list.push({ id: 'lit', txt: th.lit ? T('ui.hud.panels.drawAlerts.txt.s1') : T('ui.hud.panels.drawAlerts.txt.s2'), col: $.AMBER, font: BIG, on: true, h: $.U(34) });
+    }
+    /* 战区边界：警告区琥珀慢闪，越界红色快闪并显示剩余秒数（渐黑到底即失败）。
+       状态由 Game 的 arenaTick 写在 world.arena / world.arenaFade，这里只读。 */
+    if (world && world.arena && world.arena.zone !== 'in') {
+      if (world.arena.zone === 'out') {
+        var left = Math.max(0, Math.ceil((1 - (world.arenaFade || 0)) * 8));
+        list.push({ id: 'arena', txt: T('ui.hud.panels.drawAlerts.arena_out'), col: $.RED, font: BIG, on: blFast, h: $.U(34),
+          sub: left + ' S', subH: $.U(26) });
+      } else {
+        list.push({ id: 'arena', txt: T('ui.hud.panels.drawAlerts.arena_warn'), col: $.AMBER, font: F1, on: bl, h: $.U(30) });
+      }
     }
     if (Ent.agl(p) < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: T('ui.hud.panels.drawAlerts.txt_2'), col: $.RED, font: F1, on: bl, h: $.U(30) });
     if (p.stall) list.push({ id: 'stall', txt: T('ui.hud.panels.drawAlerts.txt_3'), col: $.RED, font: F1, on: bl, h: $.U(30) });

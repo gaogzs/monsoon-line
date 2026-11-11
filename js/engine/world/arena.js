@@ -30,12 +30,12 @@ var Arena = (function () {
   /** 校验 mission.arena 的字段（smoke 调）；返回错误串或 null */
   function validate(arena) {
     if (arena === undefined) return null;
-    if (!arena) return 'arena 为空';
+    if (!arena) return 'arena is empty';
     var ks = ['cx', 'cz', 'half', 'warn'];
     for (var i = 0; i < ks.length; i++) {
-      if (typeof arena[ks[i]] !== 'number' || !isFinite(arena[ks[i]])) return 'arena.' + ks[i] + ' 不是有限数字';
+      if (typeof arena[ks[i]] !== 'number' || !isFinite(arena[ks[i]])) return 'arena.' + ks[i] + ' is not a finite number';
     }
-    if (arena.half <= 0 || arena.warn <= 0 || arena.warn >= arena.half) return 'arena.half / warn 取值不合理';
+    if (arena.half <= 0 || arena.warn <= 0 || arena.warn >= arena.half) return 'arena.half / warn out of range';
     return null;
   }
 

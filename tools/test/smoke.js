@@ -931,6 +931,21 @@ if (!badStore) ok('全部武器都有挂载属性');
   if (!bad) ok('全部可发射武器都有 speed / life');
 }
 
+// 战区边界（js/engine/world/arena.js）：每一关都声明了合格的 arena，且玩家出生点（原点）在界内、不在警告区
+{
+  const A = sandbox.Arena, bad = [];
+  if (!A) bad.push('Arena 没有加载（脚本清单漏了 js/engine/world/arena.js？）');
+  else for (const m of sandbox.MISSIONS) {
+    if (!m.arena) { bad.push(m.id + ' 没有 arena'); continue; }
+    const e = A.validate(m.arena);
+    if (e) { bad.push(m.id + '：' + e); continue; }
+    const s = A.state(m.arena, { x: 0, z: 0 });
+    if (s.zone !== 'in') bad.push(m.id + ' 的玩家出生点不在界内（' + s.zone + '）');
+  }
+  if (bad.length) bad.forEach(fail);
+  else ok('每一关都有合格的 arena，玩家出生点在界内');
+}
+
 // 机制标签（js/core/tags.js）：数据里用到的标签都已声明（注册时就会抛错），
 // 声明过的标签也都得有人用 —— 没人用的标签是死声明，要么删要么标 reserved: true
 {
@@ -5770,6 +5785,11 @@ try {
   // 在假画布上画一遍不出错
   p.suppressed = 1; p.hp = 10; F.draw(sandbox.Renderer.ctx || {}, 800, 600, p);
   F.reset();
+  // 越界渐黑：夹在 0..1，reset 清零，画一遍不出错
+  F.setArenaFade(2); if (F.arenaLevel() !== 1) bad.push('渐黑进度没有夹到 1');
+  F.setArenaFade(-1); if (F.arenaLevel() !== 0) bad.push('渐黑进度没有夹到 0');
+  F.setArenaFade(0.5); F.draw(sandbox.Renderer.ctx || {}, 800, 600, p);
+  F.reset(); if (F.arenaLevel() !== 0) bad.push('reset 没有清掉渐黑');
   if (bad.length) bad.forEach(fail);
   else ok('HUD 滤镜：受伤闪红随单次伤害加重、约半秒退掉；受损告警；干扰强度与不透明度上限');
 } catch (e) {

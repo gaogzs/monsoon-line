@@ -73,6 +73,7 @@ var HudFx = (function () {
 
   var lastT = 0;
   var hurtK = 0;           // 当前红色强度 0..1
+  var arenaK = 0;          // 越界渐黑进度 0..1（Game 的 arenaTick 推进，经 setArenaFade 推进来）
   var alertT = 0;          // 告警剩余时间
   var lastHp = null, lastP = null;
   var noise = null;        // 预渲染噪点图
@@ -161,13 +162,21 @@ var HudFx = (function () {
     ctx.restore();
   }
 
+  /* 越界渐黑：整层盖一层黑，k = 0..1。盖在干扰 / 受伤之上。 */
+  function drawFade(ctx, W, H, k) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,' + k.toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
   /* HUD.draw 的最后调一次。画到叠加层上；拿不到叠加层（工具脚本）就画在传进来的 ctx 上。 */
   function draw(ctx, W, H, p) {
     if (!p) return;
     var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     step(p, now);
     var j = jamLevel(p);
-    var on = j > FX.jamMin || hurtK > 0.01;
+    var on = j > FX.jamMin || hurtK > 0.01 || arenaK > 0.01;
     var g = on ? getLayer() : null;
     if (g) {
       var dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 2);
@@ -181,6 +190,7 @@ var HudFx = (function () {
     }
     if (j > FX.jamMin) drawJam(g, W, H, Math.min(1, j), now);
     if (hurtK > 0.01) drawHurt(g, W, H, hurtK);
+    if (arenaK > 0.01) drawFade(g, W, H, arenaK);
     if (g !== ctx) setBlur(j > FX.jamMin ? FX.jamBlur * Math.min(1, j) : 0);
   }
 
@@ -188,6 +198,8 @@ var HudFx = (function () {
     FX: FX, draw: draw, step: step, noteDamage: noteDamage, jamLevel: jamLevel, beginFrame: beginFrame,
     hurtLevel: function () { return hurtK; },
     alertOn: function () { return alertT > 0; },
-    reset: function () { hurtK = 0; alertT = 0; lastHp = null; lastP = null; lastT = 0; }
+    setArenaFade: function (k) { arenaK = k < 0 ? 0 : k > 1 ? 1 : k; },
+    arenaLevel: function () { return arenaK; },
+    reset: function () { hurtK = 0; arenaK = 0; alertT = 0; lastHp = null; lastP = null; lastT = 0; }
   };
 })();

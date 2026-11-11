@@ -54,6 +54,9 @@
     ctx.beginPath(); ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.sin(sweep) * R, cy - Math.cos(sweep) * R); ctx.stroke();
 
+    // 战区边界（在光点之下）
+    if (world && world.arenaDef) drawArenaEdges(ctx, cx, cy, R, range, p, world.arenaDef);
+
     // 目标
     drawBlips(ctx, cx, cy, R, range, p, world);
 
@@ -82,6 +85,54 @@
       $.text(ctx, card[ci][0], cx + pts[ci].x * lr, cy + pts[ci].y * lr + $.U(4),
         ci === 0 ? $.AMBER : $.DIM, $.FS, 'center');
     }
+  }
+
+  /* ---- 战区边界（docs/POST2-0IMPL.md 4.1）----
+     警告线（边界内缩 warn）：一排单斜线；真边界：交叉斜线（X）。斜线朝边界外侧。
+     端点用与 radarXY 同一套"镜头朝向 → 雷达坐标"换算，但**不做越界夹取**
+     （夹取会让线变形）；超出雷达圆的部分由 drawRadar 的圆形 clip 裁掉。
+     只画离本机 range 以内的那几条边。 */
+  var ARENA_TICK_GAP = 6;                 // 斜线间距（U 单位）
+  var ARENA_EDGES = [                     // 外法线（世界）与边的方向
+    { nx: 1, nz: 0 }, { nx: -1, nz: 0 }, { nx: 0, nz: 1 }, { nx: 0, nz: -1 }
+  ];
+
+  function drawArenaEdges(ctx, cx, cy, R, range, p, ar) {
+    var k = R / range;
+    function pt(wx, wz) {
+      var u = radarDir(wx - p.pos.x, wz - p.pos.z);
+      return { x: cx + u.x * k, y: cy + u.y * k };
+    }
+    function edges(h, col, cross) {
+      ctx.strokeStyle = col; ctx.lineWidth = 1;
+      for (var e = 0; e < 4; e++) {
+        var n = ARENA_EDGES[e];
+        var dist = h - (n.nx * (p.pos.x - ar.cx) + n.nz * (p.pos.z - ar.cz));
+        if (dist > range * 1.1) continue;
+        // 边的两个端点：沿切向各到 ±h
+        var tx = -n.nz, tz = n.nx;
+        var A = pt(ar.cx + n.nx * h - tx * h, ar.cz + n.nz * h - tz * h);
+        var B = pt(ar.cx + n.nx * h + tx * h, ar.cz + n.nz * h + tz * h);
+        var dx = B.x - A.x, dy = B.y - A.y, L = Math.sqrt(dx * dx + dy * dy);
+        if (L < 1) continue;
+        var ux = dx / L, uy = dy / L;
+        var o = radarDir(n.nx, n.nz), ol = Math.sqrt(o.x * o.x + o.y * o.y);
+        var ox = o.x / ol, oy = o.y / ol;
+        var tick = $.U(5), step = $.U(ARENA_TICK_GAP);
+        ctx.beginPath();
+        ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y);
+        for (var s = 0; s <= L; s += step) {
+          var qx = A.x + ux * s, qy = A.y + uy * s;
+          var ddx = qx - cx, ddy = qy - cy;
+          if (ddx * ddx + ddy * ddy > (R + tick * 2) * (R + tick * 2)) continue;
+          ctx.moveTo(qx, qy); ctx.lineTo(qx + ox * tick + ux * tick, qy + oy * tick + uy * tick);
+          if (cross) { ctx.moveTo(qx, qy); ctx.lineTo(qx + ox * tick - ux * tick, qy + oy * tick - uy * tick); }
+        }
+        ctx.stroke();
+      }
+    }
+    edges(ar.half - ar.warn, 'rgba(255,176,58,0.75)', false);
+    edges(ar.half, 'rgba(255,74,74,0.85)', true);
   }
 
   /* 雷达的"上方"（镜头水平朝向，drawRadar 每帧更新）与世界方向 → 雷达单位向量（y 向下） */

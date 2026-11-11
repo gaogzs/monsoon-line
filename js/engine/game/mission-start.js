@@ -23,6 +23,9 @@
     /* 战区边界：mission.arena 落到世界上；world.arena 是本帧玩家的边界状态（update 每帧写） */
     $.world.arenaDef = $.mission.arena || null;
     $.world.arena = { zone: 'in', depth: 0, edgeDist: Infinity };
+    $.world.arenaFade = 0;           // 越界渐黑进度 0..1（update 的 arenaTick 推进）
+    $.world.arenaRadioT = -99;       // 上次警告无线电的时刻
+    if (typeof HudFx !== 'undefined') { HudFx.reset(); HudFx.setArenaFade(0); }
 
     var ac = AIRCRAFT[$.selectedAC];
     var lo = $.getLoadout(ac);

@@ -18,7 +18,9 @@
           "txt_6": "DAMAGE  受损警告",
           "txt_7": "WINCHESTER  弹药耗尽",
           "txt_8": "EMCON-Δ  电磁静默",
-          "psm_active": "过失速机动"
+          "psm_active": "过失速机动",
+          "arena_warn": "LEAVE AREA  离开战区",
+          "arena_out": "OUT OF AREA  已越出战区"
         }
       }
     }

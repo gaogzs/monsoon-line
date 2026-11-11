@@ -60,6 +60,38 @@
     }
   }
 
+  /* ============================================================
+     战区边界（docs/POST2-0IMPL.md 4.1）
+     每帧对玩家算一次 Arena.state，结果放 world.arena（HUD 只读 world）。
+     越界时 world.arenaFade 以 1/ARENA_FADE_S 的速度涨到 1（HudFx 画渐黑），
+     回到界内同样速度退回；涨满后走失败流程（见 update 里的胜负段）。
+     指挥无线电：进入警告区 / 越界时各报一次，之后每 ARENA_RADIO_GAP 秒重复。
+     台词的随机用私有 LCG，不碰 Math.random，不扰动黄金回放。
+     ============================================================ */
+  var ARENA_FADE_S = 8, ARENA_RADIO_GAP = 18;
+  var arenaSeed = 1;
+  function arenaRnd() {
+    arenaSeed = (arenaSeed * 1664525 + 1013904223) >>> 0;
+    return arenaSeed / 4294967296;
+  }
+
+  function arenaTick(dt) {
+    var w = $.world;
+    if ($.failing) {
+      if (w.fail && w.fail.key === 'arena') w.arenaFade = 1;     // 失败停留期间保持全黑
+    } else if ($.player.alive) {
+      var prev = w.arena.zone;
+      var a = w.arena = Arena.state(w.arenaDef, $.player.pos);
+      w.arenaFade = M3.clamp(w.arenaFade + (a.zone === 'out' ? dt : -dt) / ARENA_FADE_S, 0, 1);
+      if (a.zone !== 'in' && (a.zone !== prev || w.time - w.arenaRadioT > ARENA_RADIO_GAP)) {
+        w.arenaRadioT = w.time;
+        Radio.raw({ who: 'SEXTANT', cls: 'cmd', gap: 1.0,
+          tx: T.pick('engine.game.update.arena.' + a.zone, arenaRnd) });
+      }
+    }
+    if (typeof HudFx !== 'undefined') HudFx.setArenaFade(w.arenaFade);
+  }
+
   function update(dt) {
     $.world.time += dt;
     Radio.update(dt);
@@ -203,9 +235,7 @@
     }
     f2.hpSeen = php;
 
-    /* 战区边界：每帧对玩家算一次，结果放 world.arena（HUD 只读 world）。
-       玩家死了就不再算，保留最后一帧的状态。 */
-    if ($.player.alive) $.world.arena = Arena.state($.world.arenaDef, $.player.pos);
+    arenaTick(dt);
 
     // 胜负
     /* 时限判负在同一处兜住：声明了 timeLimit 的关卡不需要在自己的 lose()
@@ -215,6 +245,9 @@
        所以这里不能 return 跳过后面的 updateCamera；也不再判胜负。 */
     if ($.failing) {
       if ($.world.time - $.failing.t0 >= $.failing.hold) $.endFail();
+    } else if ($.world.arenaFade >= 1) {
+      $.world.fail = { key: 'arena' };      // 越界渐黑到底：失败原因 fail.arena
+      $.beginFail();
     } else if ($.world.timeLimit > 0 && $.world.timeLeft <= 0) {
       $.beginFail();
     } else if ($.mission.lose($.world)) {
