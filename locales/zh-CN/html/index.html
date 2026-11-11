@@ -227,6 +227,42 @@
   </div>
 </div>
 
+<div id="rearm" class="overlay">
+  <div class="rearm-box">
+    <div class="rearm-head">
+      <h2>整备</h2>
+      <span class="rearm-sub">弹药、机炮、干扰弹与机体将补满 · 可重新选择挂载</span>
+    </div>
+
+    <div class="ac-panel">
+      <div class="ac-main">
+        <div class="ac-name" id="rearmAcName">—</div>
+        <div class="ac-role" id="rearmAcRole">—</div>
+        <div class="stat" id="rearmAcStats"></div>
+      </div>
+
+      <div class="ac-view">
+        <canvas id="rearmPlanCv" width="640" height="440"></canvas>
+        <div class="ac-view-cap" id="rearmPlanCap">—</div>
+      </div>
+
+      <div class="ac-weapons">
+        <div class="sp-head">挂载</div>
+        <div class="hp-stores">
+          <div class="hp-groups" id="rearmHpList"></div>
+          <div class="hp-picker" id="rearmHpPicker"></div>
+          <div class="hp-nav" id="rearmHpNav"></div>
+        </div>
+        <div class="ac-loadout" id="rearmAcLoadout"></div>
+      </div>
+    </div>
+
+    <div class="rearm-foot">
+      <button class="btn primary" id="btnRearmConfirm">确认整备</button>
+    </div>
+  </div>
+</div>
+
 <div id="failing" class="overlay failing">
   <div class="fail-box">
     <div class="fail-t">任务失败 / MISSION FAILED</div>
@@ -479,6 +515,7 @@
 <script src="js/engine/game/vars.js"></script>
 <script src="js/engine/game/world.js"></script>
 <script src="js/engine/world/arena.js"></script>
+<script src="js/engine/world/resupply.js"></script>
 <script src="js/engine/ai/zz-api.js"></script>
 <script src="js/engine/entities/zz-api.js"></script>
 <script src="js/render/render-gl.js"></script>
@@ -539,6 +576,7 @@
 <script src="js/ui/screens/hardpoints.js"></script>
 <script src="js/ui/screens/nav.js"></script>
 <script src="js/ui/screens/pause.js"></script>
+<script src="js/ui/screens/rearm.js"></script>
 <script src="js/ui/screens/settings.js"></script>
 <script src="js/ui/codex/zz-seal.js"></script>
 <script src="js/ui/hud/zz-api.js"></script>

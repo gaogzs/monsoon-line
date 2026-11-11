@@ -20,6 +20,13 @@
   Game.__update = function (dt) { if ($.state === 'playing' && $.world && $.player) $.update(dt); };
   // 画面回归（tools/test/golden-render.js）：只画一帧，不推进逻辑
   Game.__render = function () { $.render(); };
+  // 主循环的一帧（含暂停 / 整备门限）：断言要能确认整备界面打开时 update 不推进
+  Game.__frame = function (dt) { if ($.state === 'playing' && $.world && $.player) $.frame(dt); };
+  // 整备界面：Resupply 触发后由 update 调；这里露出来给测试
+  Game.openRearm = function (e) { $.beginRearm(e); };
+  Game.closeRearm = function () { $.closeRearm(); };
+  Game.__confirmRearm = function () { $.confirmRearm(); };
+  Game.__rearmOpen = function () { return $.rearmOpen; };
   Game.__updateLock = $.updateLock;
   Game.__cycleTarget = $.cycleTarget;
   // 弹体命中结算：断言要能单独喂一发子弹进来，量它实际打掉多少血（机炮抗性）

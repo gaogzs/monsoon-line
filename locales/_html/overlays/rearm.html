@@ -1,0 +1,36 @@
+<!-- ============ 整备（驻留在整备点后弹出；整备期间游戏时间冻结，复用机库的挂载编辑器） ============ -->
+<div id="rearm" class="overlay">
+  <div class="rearm-box">
+    <div class="rearm-head">
+      <h2>{{html.rearm.title}}</h2>
+      <span class="rearm-sub">{{html.rearm.sub}}</span>
+    </div>
+
+    <div class="ac-panel">
+      <div class="ac-main">
+        <div class="ac-name" id="rearmAcName">—</div>
+        <div class="ac-role" id="rearmAcRole">—</div>
+        <div class="stat" id="rearmAcStats"></div>
+      </div>
+
+      <div class="ac-view">
+        <canvas id="rearmPlanCv" width="640" height="440"></canvas>
+        <div class="ac-view-cap" id="rearmPlanCap">—</div>
+      </div>
+
+      <div class="ac-weapons">
+        <div class="sp-head">{{html.rearm.sp-head}}</div>
+        <div class="hp-stores">
+          <div class="hp-groups" id="rearmHpList"></div>
+          <div class="hp-picker" id="rearmHpPicker"></div>
+          <div class="hp-nav" id="rearmHpNav"></div>
+        </div>
+        <div class="ac-loadout" id="rearmAcLoadout"></div>
+      </div>
+    </div>
+
+    <div class="rearm-foot">
+      <button class="btn primary" id="btnRearmConfirm">{{html.rearm.btnConfirm}}</button>
+    </div>
+  </div>
+</div>

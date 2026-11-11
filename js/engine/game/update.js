@@ -82,6 +82,8 @@
     } else if ($.player.alive) {
       var prev = w.arena.zone;
       var a = w.arena = Arena.state(w.arenaDef, $.player.pos);
+      /* 还有次数的界外整备区里：当作界内（不渐黑、不报警告，由整备状态接管提示） */
+      if (Resupply.suppressesArena(w, $.player)) a = w.arena = { zone: 'in', depth: 0, edgeDist: a.edgeDist };
       w.arenaFade = M3.clamp(w.arenaFade + (a.zone === 'out' ? dt : -dt) / ARENA_FADE_S, 0, 1);
       if (a.zone !== 'in' && (a.zone !== prev || w.time - w.arenaRadioT > ARENA_RADIO_GAP)) {
         w.arenaRadioT = w.time;
@@ -90,6 +92,19 @@
       }
     }
     if (typeof HudFx !== 'undefined') HudFx.setArenaFade(w.arenaFade);
+  }
+
+  /* 整备点：Resupply 算状态与计时，满了就开整备界面；界外整备区第一次进入时指挥频道提示一句。
+     台词的随机用私有 LCG（同 arenaRnd）。 */
+  function resupplyTick(dt) {
+    if ($.failing) return;
+    var ev = Resupply.update($.world, $.player, dt);
+    if (!ev) return;
+    if (ev.hint) {
+      Radio.raw({ who: 'SEXTANT', cls: 'cmd', gap: 1.0, tx: T.pick('engine.game.update.resupply.edgeIn', arenaRnd) });
+    } else if (ev.open) {
+      $.beginRearm(ev.open);
+    }
   }
 
   function update(dt) {
@@ -236,6 +251,7 @@
     f2.hpSeen = php;
 
     arenaTick(dt);
+    resupplyTick(dt);
 
     // 胜负
     /* 时限判负在同一处兜住：声明了 timeLimit 的关卡不需要在自己的 lose()

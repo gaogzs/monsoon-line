@@ -20,7 +20,12 @@
           "txt_8": "EMCON-Δ  电磁静默",
           "psm_active": "过失速机动",
           "arena_warn": "LEAVE AREA  离开战区",
-          "arena_out": "OUT OF AREA  已越出战区"
+          "arena_out": "OUT OF AREA  已越出战区",
+          "resupply_near": "RESUPPLY  整备点 {{d}}",
+          "resupply_hold": "REARMING  整备中 {{n}}/{{t}} s",
+          "resupply_edge": "REARM ZONE  整备区 {{n}}/{{t}} s",
+          "resupply_busy": "规避中无法整备",
+          "resupply_empty": "补给耗尽"
         }
       }
     }

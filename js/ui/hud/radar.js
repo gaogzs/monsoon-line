@@ -55,7 +55,8 @@
     ctx.lineTo(cx + Math.sin(sweep) * R, cy - Math.cos(sweep) * R); ctx.stroke();
 
     // 战区边界（在光点之下）
-    if (world && world.arenaDef) drawArenaEdges(ctx, cx, cy, R, range, p, world.arenaDef);
+    if (world && world.arenaDef) drawArenaEdges(ctx, cx, cy, R, range, p, world.arenaDef, world.resupply);
+    if (world && world.resupply) drawResupplyZones(ctx, cx, cy, R, range, p, world.resupply);
 
     // 目标
     drawBlips(ctx, cx, cy, R, range, p, world);
@@ -94,19 +95,24 @@
      只画离本机 range 以内的那几条边。 */
   var ARENA_TICK_GAP = 6;                 // 斜线间距（U 单位）
   var ARENA_EDGES = [                     // 外法线（世界）与边的方向
-    { nx: 1, nz: 0 }, { nx: -1, nz: 0 }, { nx: 0, nz: 1 }, { nx: 0, nz: -1 }
+    { nx: 1, nz: 0, side: '+x' }, { nx: -1, nz: 0, side: '-x' }, { nx: 0, nz: 1, side: '+z' }, { nx: 0, nz: -1, side: '-z' }
   ];
 
-  function drawArenaEdges(ctx, cx, cy, R, range, p, ar) {
+  /* rs = world.resupply：还有次数的界外整备区那一侧，边界线改画淡青 —— 玩家一眼看出"这一侧是整备区" */
+  function drawArenaEdges(ctx, cx, cy, R, range, p, ar, rs) {
+    var resSide = {};
+    if (rs) for (var ri = 0; ri < rs.entries.length; ri++) {
+      if (rs.entries[ri].def.edge && rs.entries[ri].uses > 0) resSide[rs.entries[ri].def.edge] = true;
+    }
     var k = R / range;
     function pt(wx, wz) {
       var u = radarDir(wx - p.pos.x, wz - p.pos.z);
       return { x: cx + u.x * k, y: cy + u.y * k };
     }
     function edges(h, col, cross) {
-      ctx.strokeStyle = col; ctx.lineWidth = 1;
       for (var e = 0; e < 4; e++) {
         var n = ARENA_EDGES[e];
+        ctx.strokeStyle = resSide[n.side] ? 'rgba(79,224,255,0.85)' : col; ctx.lineWidth = 1;
         var dist = h - (n.nx * (p.pos.x - ar.cx) + n.nz * (p.pos.z - ar.cz));
         if (dist > range * 1.1) continue;
         // 边的两个端点：沿切向各到 ±h
@@ -133,6 +139,17 @@
     }
     edges(ar.half - ar.warn, 'rgba(255,176,58,0.75)', false);
     edges(ar.half, 'rgba(255,74,74,0.85)', true);
+  }
+
+  /* 单位整备点的触发范围：以该单位为圆心、半径 r 的淡青圈（还有次数时才画；裁剪由 drawRadar 的圆形 clip 负责） */
+  function drawResupplyZones(ctx, cx, cy, R, range, p, rs) {
+    ctx.strokeStyle = 'rgba(79,224,255,0.38)'; ctx.lineWidth = 1;
+    for (var i = 0; i < rs.entries.length; i++) {
+      var e = rs.entries[i];
+      if (e.def.edge || e.uses <= 0 || !e.unit || !e.unit.alive) continue;
+      var u = radarDir(e.unit.pos.x - p.pos.x, e.unit.pos.z - p.pos.z);
+      ctx.beginPath(); ctx.arc(cx + u.x * R / range, cy + u.y * R / range, e.def.r * R / range, 0, Math.PI * 2); ctx.stroke();
+    }
   }
 
   /* 雷达的"上方"（镜头水平朝向，drawRadar 每帧更新）与世界方向 → 雷达单位向量（y 向下） */

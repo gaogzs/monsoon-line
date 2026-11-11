@@ -57,6 +57,7 @@
     $.player = p;
 
     $.mission.spawn($.world);
+    Resupply.init($.world, $.mission);       // 整备点：解析 ref（要在 spawn 之后）
 
     // 初始镜头；瞄准方向下一帧从机头重新取
     $.aimInit = false;
@@ -77,8 +78,11 @@
     $.hideAll();
     $.state = 'playing';
     $.paused = false;
+    $.rearmOpen = false;
     $.failing = null;
     document.getElementById('pause').classList.remove('on');
+    var rearmEl = document.getElementById('rearm');
+    if (rearmEl) rearmEl.classList.remove('on');
     document.getElementById('failing').classList.remove('on');
 
     // 选择初始目标

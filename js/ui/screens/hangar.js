@@ -33,9 +33,10 @@
 
   function buildHangar(view) {
     view = view || $.hangarView;
+    /* 机型列表 / 描述 / 3D 预览是可选元素：整备界面（rearm.js）只换挂载、不换机型，没有这三块 */
     var list = $.viewEl(view, 'acList');
-    list.innerHTML = '';
-    for (var i = 0; i < AIRCRAFT.length; i++) {
+    if (list) list.innerHTML = '';
+    for (var i = 0; i < AIRCRAFT.length && list; i++) {
       // 敌方制式机不进机库（但资料库里能查到）
       if (AIRCRAFT[i].npcOnly) continue;
       (function (idx) {
@@ -127,7 +128,8 @@
         '</span></div>';
     }
     $.viewEl(view, 'acStats').innerHTML = sh;
-    $.viewEl(view, 'acDesc').innerHTML = ac.desc;
+    var descEl = $.viewEl(view, 'acDesc');
+    if (descEl) descEl.innerHTML = ac.desc;
 
     $.buildHardpointEditor(ac, lo, view);
 
@@ -177,7 +179,7 @@
     $.viewEl(view, 'acLoadout').innerHTML = sum;
 
     /* ---- 3D 预览：机体 + 当前挂载，改了挂载立刻换模型（转角保留） ---- */
-    if (typeof UnitView !== 'undefined') {
+    if (typeof UnitView !== 'undefined' && $.viewEl(view, 'hangar3d')) {
       UnitView.mountModel($.viewEl(view, 'hangar3d'), UnitView.composeLoadout(ac, lo), true);
     }
 

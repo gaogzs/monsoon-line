@@ -226,6 +226,7 @@
       [T('engine.game.finish.finish.rows.i8.i0.s1'), $.world.timeLimit > 0
         ? fmtTime($.world.time) + ' / ' + fmtTime($.world.timeLimit)
         : fmtTime($.world.time)],
+      [T('engine.game.finish.finish.rows.rearm'), $.world.rearmCount || 0],
       [T('engine.game.finish.finish.rows.i9.i0.s1'), score]
     ];
     var html = '';

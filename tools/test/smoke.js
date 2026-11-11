@@ -5798,6 +5798,56 @@ try {
 });
 
 /* ============================================================
+   整备界面（批次 4.2）：Resupply 触发后弹出，复用机库的挂载编辑器（自己一套元素 id）。
+   ============================================================ */
+section('整备界面', () => {
+console.log('\n整备界面');
+try {
+  const G = sandbox.Game, bad = [];
+  G.startMission(0);
+  const w = G.__world();
+  const ov = byId.get('rearm');
+  if (!ov) throw new Error('index.html 缺少 #rearm（整备界面的 DOM 片段没有进页面？）');
+  G.openRearm({ def: { swap: true } });
+  if (!G.__rearmOpen()) bad.push('openRearm 之后 rearmOpen 不是 true');
+  if (!ov.__cls.has('on')) bad.push('整备界面没有显示（#rearm 没有 .on）');
+  const picker = byId.get('rearmHpPicker'), list = byId.get('rearmHpList');
+  const cards = picker ? picker.children.filter(c => /pk-card/.test(c.className || '')) : [];
+  if (!cards.length) bad.push('整备界面的挂载卡片没有生成');
+  const rows = list ? list.children.filter(c => /hp-row/.test(c.className || '')) : [];
+  const ac = sandbox.AIRCRAFT.filter(a => !a.npcOnly)[0];
+  if (rows.length !== ac.hardpointGroups.length) bad.push('整备界面挂载点组 ' + rows.length + ' 行，应为 ' + ac.hardpointGroups.length);
+  if (!(byId.get('rearmAcStats').__html || '')) bad.push('整备界面没有生成属性条');
+
+  // 点一张卡片 = 换挂载（与机库同一条路：就地改 loadouts[ac.id] 并存档）
+  const lo = G.__saveState().loadouts[ac.id], before = JSON.stringify(lo);
+  let changed = false;
+  for (const c of cards) { c.fire('click'); if (JSON.stringify(G.__saveState().loadouts[ac.id]) !== before) { changed = true; break; } }
+  if (!changed) bad.push('点击整备界面的挂载卡片没有改动挂载');
+
+  // 打开期间主循环不推进
+  const t0 = w.time;
+  for (let i = 0; i < 30; i++) G.__frame(1 / 60);
+  if (w.time !== t0) bad.push('整备界面打开期间 world.time 仍在走');
+
+  // 确认：界面关闭、状态重算
+  const btn = byId.get('btnRearmConfirm');
+  if (!btn || typeof btn.onclick !== 'function') bad.push('#btnRearmConfirm 没有绑定点击');
+  else btn.onclick();
+  if (G.__rearmOpen()) bad.push('确认之后 rearmOpen 还是 true');
+  if (ov.__cls.has('on')) bad.push('确认之后整备界面还在显示');
+  for (let i = 0; i < 30; i++) G.__frame(1 / 60);
+  if (!(w.time > t0)) bad.push('确认之后主循环没有恢复');
+  if (bad.length) bad.forEach(fail);
+  else ok('整备界面：打开 → 挂载卡片 / 点组 / 属性条 → 换挂载 → 冻结时间 → 确认关闭并恢复');
+  // 把改过的挂载还原，别影响后面的段
+  G.__saveState().loadouts[ac.id] = JSON.parse(before);
+} catch (e) {
+  fail('整备界面测试抛出异常 —— ' + e.message + '\n' + e.stack);
+}
+});
+
+/* ============================================================
    航线型单位：到点按水平距离判（航点写在海平面，飞机在高空），
    随队干扰机在玩家一方任何单位进入范围时开机、冷却后再开。
    ============================================================ */

@@ -3,6 +3,9 @@
   var $ = Game.$;
   $.state = 'title';
   $.paused = false;
+  /* 整备界面打开中（js/ui/screens/rearm.js）：和 paused 一样不推进 update，但不是暂停菜单，
+     所以另设一个标志；主循环、键鼠输入都要认它。 */
+  $.rearmOpen = false;
 
   /* 失败后的停留画面（state 仍是 'playing' 的子状态）：{ t0, hold, fail }，
      beginFail 写、endFail 清。非空时世界继续模拟、输入冻结，几秒后或点"结束"才进结算页。 */

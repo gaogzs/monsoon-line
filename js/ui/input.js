@@ -12,7 +12,7 @@
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].indexOf(e.code) >= 0) e.preventDefault();
 
       if ($.state === 'playing' && $.failing && e.code === 'KeyH') $.endFail();   // 失败提示期间 H / Esc 都当作"结束"
-      if ($.state === 'playing' && !$.failing) {
+      if ($.state === 'playing' && !$.failing && !$.rearmOpen) {
         if (e.code === 'KeyH') $.togglePause();
         if (e.code === 'KeyM') $.toggleAimMode();
         /* F / Tab：松开时切换目标；按住超过 TGT_HOLD 秒则取消选择（见 updateTargetKey）。
@@ -29,7 +29,7 @@
         if (e.code === 'KeyN' && $.player) toggleEmcon();
       }
       if (e.code === 'Escape') {
-        if ($.state === 'playing') { if ($.failing) $.endFail(); else $.togglePause(); }
+        if ($.state === 'playing' && !$.rearmOpen) { if ($.failing) $.endFail(); else $.togglePause(); }
         else if (['hangar', 'codex', 'help', 'brief', 'campaign', 'changelog'].indexOf($.state) >= 0) $.show('title');
       }
     });
@@ -44,13 +44,13 @@
     window.addEventListener('blur', function () {
       $.keys = {};
       $.mouse.left = $.mouse.right = false;
-      if ($.state === 'playing' && !$.paused && !$.failing) $.togglePause();
+      if ($.state === 'playing' && !$.paused && !$.rearmOpen && !$.failing) $.togglePause();
     });
 
     $.cv.addEventListener('mousedown', function (e) {
       SFX.unlock();
       // 鼠标引导要锁定指针：瞄准方向由位移驱动，指针跑出窗口就断了
-      if ($.state === 'playing' && !$.paused && !$.failing) $.requestAimLock();
+      if ($.state === 'playing' && !$.paused && !$.rearmOpen && !$.failing) $.requestAimLock();
       if (e.button === 0) $.mouse.left = true;
       if (e.button === 2) { $.mouse.right = true; fireSpecial(); }
     });
@@ -66,7 +66,7 @@
       $.mouse.y = e.clientY - r.top;
       /* 鼠标位移转动瞄准方向。没拿到指针锁时 movementX/Y 照样有，
          只是指针会碰到窗口边缘 —— 能飞，但锁定后才是完整的手感。 */
-      if ($.state === 'playing' && $.aimMode && !$.paused && !$.failing && $.aimInit) {
+      if ($.state === 'playing' && $.aimMode && !$.paused && !$.rearmOpen && !$.failing && $.aimInit) {
         var mx = e.movementX || 0, my = e.movementY || 0;
         /* 丢掉位移尖峰。浏览器偶尔会报一个几百上千像素的 movementX/Y：
            Chrome 锁定指针时的已知毛病，以及没锁定时光标移出画布再移回来的

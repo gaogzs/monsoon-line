@@ -11,6 +11,12 @@
   /* ============================================================
      主循环
      ============================================================ */
+  /* 对局中的一帧：暂停菜单或整备界面打开时只画不推进（时间、timeLimit、AI 全部冻结） */
+  $.frame = function (dt) {
+    if (!($.paused || $.rearmOpen)) $.update(dt);
+    $.render();
+  };
+
   function loop(ts) {
     requestAnimationFrame(loop);
     var dt = (ts - $.last) / 1000;
@@ -19,12 +25,7 @@
     if (dt > 0.05) dt = 0.05;
 
     if ($.state === 'playing') {
-      if (!$.paused) {
-        $.update(dt);
-        $.render();
-      } else {
-        $.render();
-      }
+      $.frame(dt);
     } else {
       if ($.player && $.world) $.render();
       else {
@@ -310,6 +311,7 @@
     document.getElementById('pauseSetReset').onclick = function () { SFX.click(); $.resetSettings(); };
     document.getElementById('btnFailEnd').onclick = function () { SFX.click(); $.endFail(); };
     document.getElementById('btnResume').onclick = function () { $.togglePause(); };
+    $.bindRearm();                     // 整备界面的"确认整备"按钮
     document.getElementById('btnAbort').onclick = function () {
       SFX.click();
       $.paused = false;

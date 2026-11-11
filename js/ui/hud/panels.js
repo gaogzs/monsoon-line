@@ -86,7 +86,7 @@
      ============================================================ */
   /* 优先级（上 → 下）：雷达 / 导弹 > 低高度 > 失速 > 动压 > 其它状态。
      低高度排在失速前面：它意味着下一秒就是海面。 */
-  $.ALERT_ORDER = ['missile', 'lit', 'arena', 'damage', 'terrain', 'stall', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
+  $.ALERT_ORDER = ['missile', 'lit', 'arena', 'resupply', 'damage', 'terrain', 'stall', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
 
   $.alertsBottom = 0;
 
@@ -119,6 +119,20 @@
           sub: left + ' S', subH: $.U(26) });
       } else {
         list.push({ id: 'arena', txt: T('ui.hud.panels.drawAlerts.arena_warn'), col: $.AMBER, font: F1, on: bl, h: $.U(30) });
+      }
+    }
+    /* 整备：靠近（距离）/ 驻留中（n/hold）/ 规避中拒绝 / 补给耗尽。状态由 Resupply.update 写在 world.resupply.status。 */
+    var rs = world && world.resupply && world.resupply.status;
+    if (rs && rs.kind !== 'none' && rs.kind !== 'open') {
+      if (rs.kind === 'near') {
+        var rd = rs.dist < 1000 ? Math.round(rs.dist) + ' M' : (rs.dist / 1000).toFixed(1) + ' KM';
+        list.push({ id: 'resupply', txt: T('ui.hud.panels.drawAlerts.resupply_near', { d: rd }), col: $.CY, font: F2, on: true, h: $.U(30) });
+      } else if (rs.kind === 'hold') {
+        list.push({ id: 'resupply', txt: T('ui.hud.panels.drawAlerts.' + (rs.edge ? 'resupply_edge' : 'resupply_hold'), { n: rs.t.toFixed(1), t: rs.hold }), col: $.CY, font: F1, on: true, h: $.U(30) });
+      } else if (rs.kind === 'busy') {
+        list.push({ id: 'resupply', txt: T('ui.hud.panels.drawAlerts.resupply_busy'), col: $.AMBER, font: F2, on: bl, h: $.U(30) });
+      } else if (rs.kind === 'empty') {
+        list.push({ id: 'resupply', txt: T('ui.hud.panels.drawAlerts.resupply_empty'), col: 'rgba(255,176,58,0.62)', font: F2, on: true, h: $.U(30) });
       }
     }
     if (Ent.agl(p) < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: T('ui.hud.panels.drawAlerts.txt_2'), col: $.RED, font: F1, on: bl, h: $.U(30) });
