@@ -35,8 +35,8 @@ var NAVAL_CS = {
 
 /* 剧情船的固定呼号 —— 关卡里直接写 callsign: NAVAL_NAMED.xxx */
 var NAVAL_NAMED = {
-  spermwhale: T('data.callsigns.naval.NAVAL_NAMED.spermwhale'),     // 抹香鲸级：m8 守浮岛、m11 带队南压的旗舰
-  humpback: T('data.callsigns.naval.NAVAL_NAMED.humpback'),       // 座头鲸级浮岛：m8
+  spermwhale: T('data.callsigns.naval.NAVAL_NAMED.spermwhale'),     // 抹香鲸级：m8 守航母、m11 带队南压的旗舰
+  humpback: T('data.callsigns.naval.NAVAL_NAMED.humpback'),       // 座头鲸级航母：m8
   bluewhale: T('data.callsigns.naval.NAVAL_NAMED.bluewhale'),      // 蓝鲸级支援舰：m8
   cameroceras1: T('data.callsigns.naval.NAVAL_NAMED.cameroceras1'),   // 房角石级一号舰：m4
   cameroceras2: T('data.callsigns.naval.NAVAL_NAMED.cameroceras2'),   // 房角石级二号舰：m11

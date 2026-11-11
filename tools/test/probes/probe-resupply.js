@@ -227,6 +227,49 @@ function runwayEnds(carrier) {
   chk('+z 侧警告区（不是整备侧）：不整备', !G.__rearmOpen() && w.rearmCount === 0);
 }
 
+/* ---------- 航母模型与数据对得上（座头鲸号）---------- */
+{
+  const S = Sim.load({ seed: 1 });
+  const m = S.sandbox.MODELS.humpback, sh = S.sandbox.SHIPS.find(x => x.id === 'humpback');
+  /* (x, z) 处最高的那层表面的 y（竖直射线穿模型，三角扇 + 重心坐标）；没有面给 null */
+  function topY(px, pz) {
+    let best = null;
+    for (const f of m.f) {
+      const id = f.i;
+      if (id.length < 3) continue;
+      for (let t = 1; t < id.length - 1; t++) {
+        const A = m.v[id[0]], B = m.v[id[t]], C = m.v[id[t + 1]];
+        const d = (B[2] - C[2]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[2] - C[2]);
+        if (Math.abs(d) < 1e-9) continue;
+        const w1 = ((B[2] - C[2]) * (px - C[0]) + (C[0] - B[0]) * (pz - C[2])) / d;
+        const w2 = ((C[2] - A[2]) * (px - C[0]) + (A[0] - C[0]) * (pz - C[2])) / d;
+        const w3 = 1 - w1 - w2;
+        if (w1 < -0.02 || w2 < -0.02 || w3 < -0.02) continue;
+        const y = w1 * A[1] + w2 * B[1] + w3 * C[1];
+        if (best === null || y > best) best = y;
+      }
+    }
+    return best;
+  }
+  let lo = [1e9, 1e9], hi = [-1e9, -1e9];
+  for (const v of m.v) { lo = [Math.min(lo[0], v[0]), Math.min(lo[1], v[2])]; hi = [Math.max(hi[0], v[0]), Math.max(hi[1], v[2])]; }
+  chk('航母模型：长度 = dim[0]、最宽处（含斜角甲板）= dim[1]', Math.abs((hi[1] - lo[1]) - sh.dim[0]) < 1 && Math.abs((hi[0] - lo[0]) - sh.dim[1]) < 1, 'model ' + (hi[1] - lo[1]) + ' × ' + (hi[0] - lo[0]) + '，dim ' + sh.dim);
+  chk('航母尺寸是现代大型航母的量级（长 ≥ 300 m、飞行甲板 ≥ 70 m 宽、≥ 8 万吨）', sh.dim[0] >= 300 && sh.dim[1] >= 70 && sh.disp >= 80000);
+  const bad = [];
+  for (const r of sh.runways) { const t = topY(r.x, r.z); if (t === null || Math.abs(t - r.y) > 0.3) bad.push('跑道(' + r.x + ',' + r.z + ') 表面 ' + t); }
+  chk('每条跑道的起飞端都落在甲板（弹射器轨道）上，高度与数据一致', !bad.length, bad.join('；'));
+  const bad2 = [];
+  for (const q of sh.mounts.concat(sh.launchers)) {
+    const pos = q.pos || q.p, t = topY(pos[0], pos[2]);
+    if (t === null || t > 25 || Math.abs(t - pos[1]) > 1.0) bad2.push(q.id + ' 表面 ' + t);
+  }
+  chk('炮位 / 发射架都落在飞行甲板上（不悬空、不埋进舰岛）', !bad2.length, bad2.join('；'));
+  // 斜角甲板：艉部左舷伸出去，腰部以前没有这块（与直甲板的区别）
+  const aft = topY(-44, -150), mid = topY(-44, 30);
+  chk('斜角甲板：艉部左舷（x -44, z -150）有甲板，腰部同一 x 处没有', aft !== null && Math.abs(aft - 19.2) < 0.3 && (mid === null || mid < 15), 'aft=' + aft + ' mid=' + mid);
+  chk('舰岛在右舷靠后、是全船最高处', topY(26, -30) > 35 && topY(-20, 0) < 20);
+}
+
 /* ---------- NPC：触发 → 延迟消失 → 延迟后在重置位置出现 ---------- */
 /* 非僚机的我方 AI 飞机（role 'escort'）：僚机不会自主整备，所以自主整备周期要用它来测 */
 function makeEscort(S, w) {

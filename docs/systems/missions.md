@@ -326,7 +326,7 @@ HUD 不标 10 km 外的（`js/ui/hud/radar.js` 的 `farCell()`，罗盘 / 雷达
 |---|---|---|
 | `objective` / `objectiveSub` | 全部关卡 | HUD 目标行 |
 | `flags` | 全部关卡 | 自由字典，一次性触发 |
-| `baseTarget` / `baseHpFull` | m2、m8 | 必须保护的前进基地 / 浮岛；`baseHpFull` 写入后无人读取 |
+| `baseTarget` / `baseHpFull` | m2、m8 | 必须保护的前进基地 / 航母；`baseHpFull` 写入后无人读取 |
 | `baseWarnT` | m2 | 低血量反复提醒的节流计时 |
 | `dangerAltitude` | m2 / m4 / m5 / m7 / m10 | 低于此高度可躲地面雷达（`js/engine/game/combat.js` 的 `updateTargets` 读）；**默认 1500**，m2 / m7 设 1500，m4 / m5 / m10 设 2600 / 1800 / 2000 |
 | `detected` | m2 / m4 / m5 / m7 / m10 | 被雷达照射；防空阵地开火的前置条件。**由任务脚本自己写**（一帧延迟） |

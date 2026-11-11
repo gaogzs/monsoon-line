@@ -19,7 +19,7 @@
    "f5": "cdd3ad3320ec",
    "f6": "87ffe358583e",
    "f7": "e09b493fd864",
-   "cmp1": "ca42da19abbb",
+   "cmp1": "cc6645304fcb",
    "cmp2": "148ae102938e",
    "t5": "11cf7f2a536f",
    "inv1": "edf91cc95f57",
@@ -39,7 +39,7 @@
    "$order": "d1d8e86cbcd2"
   },
   "AIRCRAFT": {
-   "frigatebird": "fc9a344b560d",
+   "frigatebird": "4fd1053f894c",
    "sailfish": "076d0281d9ce",
    "booby": "8a6b9316693d",
    "petrel": "bca3c14e9e9e",
@@ -61,7 +61,7 @@
   "SHIPS": {
    "orca": "36151043a7a5",
    "bluewhale": "736f79d105e9",
-   "humpback": "49bb0f0004c0",
+   "humpback": "96ae5da3098c",
    "spermwhale": "ba763fbe69d2",
    "dolphin": "4d03f203f8bb",
    "trilobite": "62aabb14e58b",
@@ -157,9 +157,9 @@
    "$order": "924b2b5f1e75"
   },
   "VOICES": {
-   "m1": "474abd18cb34",
+   "m1": "bd54b543e402",
    "m10": "3215e67f23f3",
-   "m11": "c33a1909846c",
+   "m11": "717d021e0e80",
    "m12": "125749590693",
    "m2": "843d9a9a6731",
    "m3": "7fec3b2686db",
@@ -167,7 +167,7 @@
    "m5": "2f7f2f579d2a",
    "m6": "c158200894ea",
    "m7": "d12e74fff789",
-   "m8": "f8dc87610547",
+   "m8": "bbaf5cf1a419",
    "m9": "e27be789de12",
    "sk1": "d1cf9b7e8d7b",
    "$order": "92653d3d9b67"
@@ -321,7 +321,7 @@
   "dunkleosteus": "40db956caa2c",
   "folded_wing": "3b5e38e20a2d",
   "frigatebird": "879773ce5e8a",
-  "humpback": "a27cc36aa384",
+  "humpback": "03a13edc4871",
   "icecore": "cd6c1fa2c89b",
   "lnch_base": "7a12502f348a",
   "lnch_gun": "9b16bcf6d1b6",
@@ -383,11 +383,11 @@
   "m5@4": "23294d62793e",
   "m6@5": "3a27a50ce21c",
   "m7@6": "9bd32d455344",
-  "m8@7": "3d81b0962d85",
+  "m8@7": "d522e31c4c2f",
   "m10@8": "0a5d04156d54",
   "m12@9": "bc325a7ebfe7",
   "sk1@10": "98267664bb45",
-  "m9@11": "52bd82b6293c",
-  "m11@12": "494ae47ef14b"
+  "m9@11": "d384422a968e",
+  "m11@12": "233f098fec65"
  }
 }

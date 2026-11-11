@@ -75,7 +75,7 @@
 | `depot` | 燃油 / 弹药补给库 | 40 | 24 | `ground` `sea` | `radius: 12` |
 | `cmdpost` | 指挥 / 通信中枢 | 22 | 18 | `ground` `sea` | `radius: 9` |
 | `station` | 第 7 号控制平台 | 88 | 88 | `ground` `sea` | `radius: 56`，地标级 |
-| `humpback` | 座头鲸级航空母舰 / 浮岛（上游） | 40.0 | 280 | `ground` `sea` | `radius: 84`，飞行甲板 + 舰岛 |
+| `humpback` | 座头鲸级航空母舰（上游） | 78.0 | 330 | `ground` `sea` | `radius: 100`；三块凸多边形拼成的斜角飞行甲板（9° 着舰区 + 拦阻索）、三具弹射器、三部升降机、右舷靠后的舰岛 |
 | `bluewhale` | 蓝鲸级快速战斗支援舰（上游） | 26.6 | 210 | `ground` `sea` | `radius: 62`，三座补给门架 |
 | `spermwhale` | 抹香鲸级巡洋舰（上游） | 20.4 | 168 | `ground` `sea` | `radius: 50`，四面大相控阵 |
 | `orca` | 虎鲸级护航驱逐舰（上游） | 18.4 | 148 | `ground` `sea` | `radius: 44` |
