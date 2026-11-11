@@ -29,9 +29,12 @@
     rebuild: function () { $.buildHangar($.rearmView); }
   };
 
+  var curEntry = null;      // 触发这次整备的条目（确认时按它的 reset 重置位置）
+
   function beginRearm(entry) {
     var p = $.player;
     if (!p || !p.alive || $.rearmOpen) return;
+    curEntry = entry || null;
     if (!entry || !entry.def.swap) { confirmRearm(true); return; }     // 不能换挂载：直接补满
     $.rearmOpen = true;
     // 和打开暂停菜单一样：松开指针、止住持续音
@@ -58,6 +61,11 @@
     var ac = AIRCRAFT[direct === true ? $.selectedAC : $.rearmView.ac];
     Resupply.refill(p, ac, $.getLoadout(ac));
     $.syncWeapon(p);
+    /* 补给结束后的位置（条目的 reset）：航母 → 甲板跑道末端；界外整备区 → 同一位置背对界外平飞；
+       keep → 不动。位置变了镜头要跟着瞬移。 */
+    var pose = Resupply.resetPose($.world, curEntry, p);
+    if (pose) { Resupply.applyPose(p, pose); $.snapCamera(p); }
+    Resupply.launched($.world, curEntry);
     if (direct !== true) closeRearm();
     SFX.confirm();
     $.banner = { t: 2.6, title: T('ui.screens.rearm.banner.title'), sub: T('ui.screens.rearm.banner.sub'), col: HUD.CY };

@@ -28,6 +28,7 @@
   Ent.hostile = $.hostile;
   Ent.fitsKind = $.fitsKind;
   Ent.mountPlan = $.mountPlan;
+  Ent.rebuildMounts = $.rebuildMounts;      // 整备点给 NPC 补满（Resupply）
   Ent.storePos = $.storePos;
   Ent.storeHy = $.storeHy;
   Ent.nozzlesOf = $.nozzlesOf;

@@ -14,6 +14,9 @@ Registry.ship({
   dim: [280, 40, 11],
   speed: 30,
   crew: 2400,
+  /* 甲板跑道（补给后 reset:'runway' 用）：本地坐标 x 右舷、z 舰首、y 甲板高；z 是跑道的
+     起飞端，yaw 是相对舰首的偏角（rad）。平甲板 40 × 276 m，左右两条平行跑道，起飞端都在舰首。 */
+  runways: [{ x: -9, y: 19.2, z: 128, yaw: 0 }, { x: 9, y: 19.2, z: 128, yaw: 0 }],
   hp: 2600, radius: 84, value: 1400,
   gunResist: 0.995,
   label: T('ships.humpback.label'),

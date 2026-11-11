@@ -17,7 +17,7 @@ Registry.mission({
   timeLimit: 0,
   axis: 215,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
   arena: { cx: 2000, cz: 0, half: 34000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
-  resupply: [{ edge: '-z', hold: 6, uses: 1, swap: true }],   // 没有母舰 / 机场：玩家身后（-z）的警告区与界外区就是整备区
+  resupply: [{ edge: '-z', hold: 6, swap: true, reset: 'inward' }],   // 没有母舰 / 机场：玩家身后（-z）的警告区与界外区就是整备区；无限次；补给完机头背对界外平飞
   time: { hour: 18.83 },                 // 日落后的暮色（取最暗的黄昏预设）：云下 900 m，雾
 
   prose: T('missions.m7.prose'),

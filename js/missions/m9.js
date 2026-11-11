@@ -32,10 +32,10 @@ Registry.mission({
   axis: 160,
   arena: { cx: 0, cz: 11000, half: 34000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
   resupply: [
-    { ref: 'rigA', r: 1500, hold: 4, uses: 1, swap: true },
-    { ref: 'rigB', r: 1500, hold: 4, uses: 1, swap: true },
-    { ref: 'rigC', r: 1500, hold: 4, uses: 1, swap: true }
-  ],   // 三座补给平台，每座一次
+    { ref: 'rigA', r: 1500, hold: 4, swap: true },
+    { ref: 'rigB', r: 1500, hold: 4, swap: true },
+    { ref: 'rigC', r: 1500, hold: 4, swap: true }
+  ],   // 三座补给平台，无限次；平台没有跑道，补给完不改动飞机位置（reset 缺省 keep）
   time: { hour: 14.5 },                 // 午后，太阳高 51°，在右舷
 
   prose: T('missions.m9.prose'),

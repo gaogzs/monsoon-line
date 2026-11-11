@@ -402,6 +402,8 @@ for (sj = 0; sj < wl[wi].salvo; sj++)
 
 ## NPC 的挂载
 
+> 整备点给 NPC 补满走 `Ent.rebuildMounts(a)`（v3.5.0）：先清空 `ammoPool / slotCd` 再调 `buildNpcMounts`，所以重复调用不会累加；`loadModel` 随之重算。见 [missions.md §3.1](missions.md#31-战区边界与整备点v350)。
+
 同一套"槽 = 挂点数 + 弹药池"的机制也用在 NPC 身上，但**入口不同**：
 
 | 谁 | 弹种从哪来 | 适配表 |

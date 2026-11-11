@@ -11,7 +11,7 @@ Registry.mission({
   timeLimit: 0,
   axis: 175,
   arena: { cx: 0, cz: 12000, half: 34000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
-  resupply: [{ edge: '-z', hold: 6, uses: 1, swap: true }],   // 没有母舰 / 机场：玩家身后（-z）的警告区与界外区就是整备区
+  resupply: [{ edge: '-z', hold: 6, swap: true, reset: 'inward' }],   // 没有母舰 / 机场：玩家身后（-z）的警告区与界外区就是整备区；无限次；补给完机头背对界外平飞
   time: { hour: 16.17 },                 // 午后偏晚的金色光线（太阳高 27°，在右舷）
 
   prose: T('missions.m11.prose'),

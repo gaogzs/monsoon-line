@@ -112,23 +112,12 @@ for (const mi of [0, 4, 8, 11]) {
   const S = Sim.load({ seed: 1 });
   const G = S.sandbox.Game, A = S.sandbox.Arena, MS = S.sandbox.MISSIONS;
   const bad = [];
+  const RS = S.sandbox.Resupply;
   for (let mi = 0; mi < MS.length; mi++) {
-    const m = MS[mi];
-    if (!Array.isArray(m.resupply) || !m.resupply.length) { bad.push(m.id + ' 没有 resupply'); continue; }
     S.start(mi);
-    const w = G.__world();
-    for (const r of m.resupply) {
-      if (!(r.hold > 0) || !(r.uses >= 1) || typeof r.swap !== 'boolean') bad.push(m.id + ' 条目缺 hold / uses / swap：' + JSON.stringify(r));
-      if (r.ref) {
-        const t = w.refs[r.ref], tg = t && ((t.ship || t.platform || {}).tags || {});
-        if (!t) bad.push(m.id + ' 的 ref "' + r.ref + '" 没有对应单位');
-        else if (t.team !== 0) bad.push(m.id + ' 的 ' + r.ref + ' 不是我方（team ' + t.team + '）');
-        else if (!tg.resupply) bad.push(m.id + ' 的 ' + r.ref + ' 没有 resupply 标签');
-        if (!(r.r > 0)) bad.push(m.id + ' 的 ' + r.ref + ' 缺 r');
-      } else if (!/^[+-][xz]$/.test(r.edge || '')) bad.push(m.id + ' 条目既没有 ref 也没有合法的 edge：' + JSON.stringify(r));
-    }
+    bad.push(...RS.validate(MS[mi], G.__world()));        // 字段 / 引用 / 标签 / reset 的检查在 Resupply.validate 里
   }
-  chk('每关都有合法的 resupply 声明（ref 可解析且为我方整备点，edge 合法）', !bad.length, bad.join('；'));
+  chk('每关都有合法的 resupply 声明（ref 可解析且为我方整备点，edge / reset 合法）', !bad.length, bad.join('；'));
 
   // inEdge：m1 的 arena（cx 2000, cz -1000, half 42000, warn 6000）
   const ar = { cx: 0, cz: 0, half: 40000, warn: 6000 };

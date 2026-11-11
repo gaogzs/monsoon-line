@@ -1,7 +1,7 @@
 (function (Ent) {
   'use strict';
   var $ = Ent.$;
-  $.fitsKind = fitsKind; $.clearMountIssues = clearMountIssues; $.weaponMatchesTarget = weaponMatchesTarget; $.targetClass = targetClass; $.chooseWeapon = chooseWeapon; $.setWeapon = setWeapon; $.mountPlan = mountPlan; $.buildNpcMounts = buildNpcMounts; $.surfaceBelow = surfaceBelow; $.storeHy = storeHy; $.storePos = storePos; $.forEachStoreSlot = forEachStoreSlot; $.storeForSlot = storeForSlot;
+  $.fitsKind = fitsKind; $.clearMountIssues = clearMountIssues; $.weaponMatchesTarget = weaponMatchesTarget; $.targetClass = targetClass; $.chooseWeapon = chooseWeapon; $.setWeapon = setWeapon; $.mountPlan = mountPlan; $.buildNpcMounts = buildNpcMounts; $.rebuildMounts = rebuildMounts; $.surfaceBelow = surfaceBelow; $.storeHy = storeHy; $.storePos = storePos; $.forEachStoreSlot = forEachStoreSlot; $.storeForSlot = storeForSlot;
 
   /* ============================================================
      挂点适配：玩家一张表，NPC 另一张
@@ -233,6 +233,14 @@
     }
     a.mountWids = plan;
     $.setStealth(a, null);
+  }
+
+  /* 整备：把 NPC 的弹药池与发射槽从零重建（buildNpcMounts 对 ammoPool 是逐项赋值、对 slotCd 是整个数组重新赋值，
+     都是重置而不是累加；先清空再调，保证没有旧的键残留）。loadModel 也随之重算。 */
+  function rebuildMounts(a) {
+    a.ammoPool = {};
+    a.slotCd = {};
+    buildNpcMounts(a);
   }
 
   /* 挂载物的世界坐标。

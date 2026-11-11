@@ -264,8 +264,9 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 
 驻留计时满了（`resupplyTick`）→ `$.beginRearm(entry)`（`js/ui/screens/rearm.js`）：`swap:false` 直接 `confirmRearm(true)` 补满；否则 `$.rearmOpen = true`、释放指针、止住持续音、
 `$.rearmView = { ac, group, ids, rebuild }`（元素 id 全带 `rearm` 前缀）交给 `buildHangar`（机库的构建函数，机型列表 / 描述 / 3D 预览是可选元素，缺则跳过），显示 `#rearm`（`locales/_html/overlays/rearm.html`，z-index 850，在暂停菜单之上）。
+`$.snapCamera(p)`（`mission-start.js`）：把镜头瞬移到飞机身后、重置瞄准；开局与整备后重置位置都用它。
 `rearmOpen` 和 `paused` 一样让主循环不进 `update`，另外屏蔽键鼠输入（`input.js` 的 `mousemove / mousedown / blur / H / Esc` 与键盘块都认它）。**不复用 `togglePause`**：那个只管暂停菜单。
-界面里点挂载卡片 = 改 `$.getLoadout(ac)` 并存档（与机库同一条路）；确认 → `Resupply.refill(p, ac, lo)` + `$.syncWeapon(p)` → 关界面、恢复指针锁、横幅「整备完成」。**没有取消**（次数在打开时已扣）。战报多一行「整备次数」（`world.rearmCount`）。
+界面里点挂载卡片 = 改 `$.getLoadout(ac)` 并存档（与机库同一条路）；确认 → `Resupply.refill(p, ac, lo)` + `$.syncWeapon(p)` → 按条目的 `reset` 重置飞机位置（`Resupply.resetPose / applyPose`，位置变了就 `$.snapCamera(p)` 把镜头瞬移过去）→ 关界面、恢复指针锁、横幅「整备完成」。**没有取消按钮**（打开时条目已置为"未武装"，要离开范围再回来才会再次触发）。战报多一行「整备次数」（`world.rearmCount`）。
 
 ### 存档（2.6）
 `engine/game/save.js`。设置早就持久化了（`monsoonline.settings.v1`，`settings.js`）；这里只补两样，存进另一个键 `monsoonline.save.v1`，内容 `{ v: 1, cleared, loadouts }`：

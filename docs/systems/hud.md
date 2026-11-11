@@ -521,7 +521,7 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 | 10 | `emcon` | `p.emcon` | `EMCON-Δ 电磁静默`（青，**不闪** —— 它是状态不是告警） |
 
 `ALERT_ORDER` 现为 `missile / lit / arena / resupply / damage / terrain / stall / lowq / psm / jammed / winchester / emcon`。
-`arena`：警告区琥珀慢闪「LEAVE AREA 离开战区」，越界红色快闪「OUT OF AREA 已越出战区」并显示渐黑剩余秒数；
+`arena`：警告区琥珀慢闪「LEAVING AREA 即将离开战区」（是警告，不是命令——所以写进行时态），越界红色快闪「OUT OF AREA 已越出战区」并显示渐黑剩余秒数；
 `resupply`：靠近时青色距离、驻留中「REARMING n/hold s」（界外整备区写「REARM ZONE」）、规避中拒绝（琥珀闪）、补给耗尽。状态都由 `Game` / `Resupply` 写在 `world.arena / world.arenaFade / world.resupply.status`，HUD 只读，不跨命名空间读 `Game.$`。
 
 雷达 / 导弹 > 失速 > 动压是定下来的顺序；低高度排在失速前面，因为它意味着下一秒就是海面。

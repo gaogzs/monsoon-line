@@ -19,7 +19,7 @@
           "txt_7": "WINCHESTER  弹药耗尽",
           "txt_8": "EMCON-Δ  电磁静默",
           "psm_active": "过失速机动",
-          "arena_warn": "LEAVE AREA  离开战区",
+          "arena_warn": "LEAVING AREA  即将离开战区",
           "arena_out": "OUT OF AREA  已越出战区",
           "resupply_near": "RESUPPLY  整备点 {{d}}",
           "resupply_hold": "REARMING  整备中 {{n}}/{{t}} s",

@@ -194,6 +194,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `disp` / `dim` / `speed` / `crew` | number / number[] | 满载吨位 t / 主尺度 `[长, 宽, 吃水]` m / 航速 **kn** / 编制人数 | `inv3`、`unitview` |
 | `hp` / `radius` / `value` | number | 交战数值：结构值 / 受击半径 / 任务价值分 | `spawnShip`（任务可用 `o.hp` 等覆盖） |
 | `gunResist` | number | 机炮抗性（小口径航炮伤害 ×(1 − gunResist)，小艇 0 → 航母 0.995）；`spawnShip` 传给 `makeTarget` | `Ent.gunResistK` |
+| `runways` | `[{ x, y, z, yaw }]` | 甲板跑道（可选）：本地坐标，x 右舷、z 舰首、y 甲板高，`z` 是起飞端，`yaw` 相对舰首的偏角（rad）。整备点 `reset: 'runway'` 用它决定补给后飞机放在哪（多条随机取一条）；目前只有 `humpback` | `Resupply.resetPose` |
 | `mounts` / `launchers` | 数组 | 炮位 / 导弹发射器（原来的 `SHIP_MOUNTS` / `SHIP_LAUNCHERS`），用 `data/_lib.js` 的 `_m()` / `_L()` 构造，`ARC_*` 是射界常量；**只有 11 艘 / 8 艘带**。`smoke.js` 断言 `mounts` 的炮数与 `arms` 文本一致，发射器不算炮。封存时拼出 `allMounts`（炮位 + 有实体模型的发射架）给预览缓存用 | `Turret`、`unitview`、渲染预览 |
 | `vials` | string[] | 要害列表（打哪里收益最大） | `inv3`（目前只展示，没有分区判定） |
 | `arms` | string[] | 舰载武备用**自然语言**描述（不给新编号，见下） | `inv3` |

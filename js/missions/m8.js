@@ -45,7 +45,7 @@ Registry.mission({
   timeLimit: 0,
   axis: 170,                     // 世界 +z 的真方位（°）—— 敌方来向，见文件头说明
   arena: { cx: 0, cz: 5000, half: 44000, warn: 6000 },   // 战区边界（世界米，方形），见 Arena
-  resupply: [{ ref: 'carrier', r: 1500, hold: 4, uses: 2, swap: true }],   // 座头鲸号：驻留 4 s 整备，两次
+  resupply: [{ ref: 'carrier', r: 1500, hold: 4, swap: true, reset: 'runway' }],   // 座头鲸号：驻留 4 s 整备，无限次；补给完放到甲板跑道末端、刚离舰的样子
   time: { hour: 8.25 },                 // 上午（太阳高 33°，在左后方）
 
   prose: T('missions.m8.prose'),

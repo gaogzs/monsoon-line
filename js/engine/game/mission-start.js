@@ -6,6 +6,18 @@
   /* ============================================================
      开始任务
      ============================================================ */
+  /* 把镜头瞬移到飞机身后（开局、整备后把飞机重置到别处时都要）：不然镜头会从旧位置一路甩过来 */
+  $.snapCamera = function (p) {
+    $.aimInit = false;
+    $.camFwd = M3.clone(p.fwd);
+    $.camUp = M3.V(0, 1, 0);
+    $.camPos = M3.add(p.pos, M3.add(M3.V(0, 30, 0), M3.mul(p.fwd, -110)));
+    $.camOff = null;
+    $.camSpeedBack = null;
+    $.camExtra = 0;
+    $.camExtraHold = 0;
+  };
+
   function startMission(idx) {
     $.requestAimLock();
     $.missionIdx = idx;
@@ -59,15 +71,7 @@
     $.mission.spawn($.world);
     Resupply.init($.world, $.mission);       // 整备点：解析 ref（要在 spawn 之后）
 
-    // 初始镜头；瞄准方向下一帧从机头重新取
-    $.aimInit = false;
-    $.camFwd = M3.clone(p.fwd);
-    $.camUp = M3.V(0, 1, 0);
-    $.camPos = M3.add(p.pos, M3.V(0, 30, -110));
-    $.camOff = null;
-    $.camSpeedBack = null;
-    $.camExtra = 0;
-    $.camExtraHold = 0;
+    $.snapCamera(p);    // 初始镜头；瞄准方向下一帧从机头重新取
 
     Radio.clear();
     SysNote.clear();
