@@ -48,22 +48,28 @@
      失速速度随动压变化与高空推力包线
      ============================================================
      失速的是**动压**，不是空速：同样的机翼，同样的升力系数，½ρv² 够不够托住机体才是关键。
-     所以 vStall(y) = vStall₀ · √(ρ₀ / ρ(y))：海平面是 vStall₀，11 km 约 1.8 倍，20 km 约 3.7 倍。
+     所以 vStall(y) = vStall₀ · (ρ₀ / ρ(y))^STALL_EXP（纯物理指数 0.5，游戏里取 0.42，见下）：海平面是 vStall₀，11 km 约 1.6 倍，20 km 约 2.9 倍。
      （a.speed 一直是真空速；舵效 ctrlFactor、PSM 的动压上限本来就按动压算，现在失速也一致了。）
 
      推力一侧：旧写法把"推力比 ρ^0.75"直接乘在速度上，14–15 km 就压到了失速速度以下，
      数据里的升限（10–21 km）更是对不上。现在的模型：
-       机翼升限 coffin：1.1·vStall₀·S(y) = vMil 的高度（"棺材角"：能飞的速度窗口夹到 1.1 倍余量）
+       机翼升限 coffin：CEIL_MARGIN·vStall₀·S(y) = vMil 的高度（"棺材角"：能飞的速度窗口夹到 1.05 倍余量）
        推力升限 ceiling：机型数据里的升限（保留）
        有效升限 ceilingEff = min(两者)
      军推 / 加力的目标速度从 yT = min(11 km, ceilingEff − 2.5 km) 起，在 S 空间里线性压低，
-     到有效升限处刚好是 1.1·vStall(y)；vStall(y) 在 S 里也是线性的，所以整段都留有余量。
+     到有效升限处刚好是 CEIL_MARGIN·vStall(y)；vStall(y) 在 S 里也是线性的，所以整段都留有余量。
      升限以上继续外推（有下限）—— 速度掉到失速速度以下，自然失速下沉，回到升限以下才改得出来。 */
-  var CEIL_MARGIN = 1.1;
-  $.CEIL_MARGIN = CEIL_MARGIN;
+  /* 两个游戏性取值：
+       CEIL_MARGIN 1.05   升限处军推速度比失速速度高 5%
+       STALL_EXP   0.42   失速速度 = vStall₀·(ρ₀/ρ)^STALL_EXP。纯物理是 0.5（失速的是动压）；
+                          取 0.42 把中高空的紧张程度压低约 10%（12 km 约 1.7 倍、20 km 约 2.9 倍，纯物理是 2.0 / 3.7），
+                          免得改完之后所有机型在中高空都贴着失速边缘。*/
+  var CEIL_MARGIN = 1.05;
+  var STALL_EXP = 0.42;
+  $.CEIL_MARGIN = CEIL_MARGIN; $.STALL_EXP = STALL_EXP;
   var envCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
 
-  function stallK(y) { return Math.sqrt($.RHO0 / airDensity(y)); }
+  function stallK(y) { return Math.pow($.RHO0 / airDensity(y), STALL_EXP); }
 
   /* 某架飞机的高空包线参数。按 phys 对象缓存（关卡里给个别机体换了 phys 时各算各的）。 */
   function envOf(phys, ceiling) {

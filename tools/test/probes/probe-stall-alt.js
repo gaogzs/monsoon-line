@@ -2,8 +2,8 @@
 /* ============================================================
    失速速度随动压变化探针
 
-   vStall(y) = vStall₀·√(ρ₀/ρ(y))；推力一侧的包线（physics.js「失速速度随动压变化」）：
-     有效升限 ceilingEff = min(数据升限, 失速升限)，目标速度到升限处刚好是 1.1·vStall(y)。
+   vStall(y) = vStall₀·(ρ₀/ρ(y))^0.42（纯物理 0.5，游戏性压缩）；推力一侧的包线（physics.js「失速速度随动压变化」）：
+     有效升限 ceilingEff = min(数据升限, 失速升限)，目标速度到升限处刚好是 1.05·vStall(y)。
 
    验证（每个机型）：
      1. 海平面 vStallAt 等于数据值；高度越高越大，且正好是 √(ρ₀/ρ) 倍
@@ -70,11 +70,11 @@ for (const ac of G.AIRCRAFT) {
     const v = Ent.vStallAt(probe);
     if (v < prev) mono = false;
     prev = v;
-    const want = ph.vStall * Math.sqrt(1.225 / Ent.airDensity(y));
+    const want = ph.vStall * Math.pow(1.225 / Ent.airDensity(y), 0.42);
     if (Math.abs(v - want) > 1e-6) exact = false;
   }
   check(id + '：vStall 随高度单调增大', mono);
-  check(id + '：vStall = vStall₀·√(ρ₀/ρ)', exact);
+  check(id + '：vStall = vStall₀·(ρ₀/ρ)^0.42', exact);
 
   // 2. 升限
   const cEff = Ent.ceilingEff(probe);
@@ -82,11 +82,11 @@ for (const ac of G.AIRCRAFT) {
   const vTopC = ph.vMil * Ent.thrustK(probe, cEff);
   const vStC = Ent.vStallAt(probe);
   check(id + '：ceilingEff ≤ 数据升限', cEff <= ceilD, cEff + ' vs ' + ceilD);
-  check(id + '：升限处军推速度 ≥ 1.1·vStall', vTopC >= 1.1 * vStC * 0.98, vTopC.toFixed(0) + ' vs ' + (1.1 * vStC).toFixed(0));
+  check(id + '：升限处军推速度 ≥ 1.05·vStall', vTopC >= 1.05 * vStC * 0.98, vTopC.toFixed(0) + ' vs ' + (1.05 * vStC).toFixed(0));
   let kOk = true;
   for (let y = 0; y <= cEff; y += 500) {
     probe.pos.y = y;
-    if (ph.vMil * Ent.thrustK(probe, y) < Ent.vStallAt(probe) * 1.05) { kOk = false; break; }
+    if (ph.vMil * Ent.thrustK(probe, y) < Ent.vStallAt(probe) * 1.03) { kOk = false; break; }
   }
   check(id + '：升限以下整段军推速度都高于 vStall 余量', kOk);
 
@@ -115,7 +115,7 @@ for (const ac of G.AIRCRAFT) {
 
 console.log('\n机型           vStall₀  vMil  数据升限  有效升限  11km失速速度');
 for (const r of rows) {
-  const v11 = (r[1] * Math.sqrt(1.225 / Ent.airDensity(11000))).toFixed(0);
+  const v11 = (r[1] * Math.pow(1.225 / Ent.airDensity(11000), 0.42)).toFixed(0);
   console.log('  ' + String(r[0]).padEnd(13) + String(r[1]).padStart(6) + String(r[2]).padStart(7) + String(r[3]).padStart(9) + String(r[4]).padStart(9) + String(v11).padStart(10));
 }
 

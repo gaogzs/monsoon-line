@@ -222,19 +222,20 @@ a.pos += a.vel * dt;
 
 ### 失速速度随动压变化与高空包线（`physics.js` / `effectivePhys`）
 
-失速的是**动压**：`vStall(y) = vStall₀ · √(ρ₀/ρ(y))`（`Ent.stallK(y)`）。海平面是数据里的 `vStall`，3 km 约 1.16 倍，
-11 km 约 1.83 倍，17 km 约 2.94 倍，20 km 约 3.73 倍。`a.speed` 一直是真空速；舵效 `ctrlFactor` 和 PSM 的动压上限本来就按动压算，现在失速也一致。
+失速的是**动压**：`vStall(y) = vStall₀ · (ρ₀/ρ(y))^STALL_EXP`（`Ent.stallK(y)`）。**纯物理指数是 0.5，游戏里取 `STALL_EXP = 0.42`**（游戏性压缩，免得所有机型在中高空都贴着失速边缘）：
+海平面是数据里的 `vStall`，3 km 约 1.13 倍，11 km 约 1.6 倍，17 km 约 2.3 倍，20 km 约 2.9 倍（纯物理 1.16 / 1.83 / 2.94 / 3.73）。`a.speed` 一直是真空速；舵效 `ctrlFactor` 和 PSM 的动压上限本来就按动压算，现在失速也一致。
 `effectivePhys(a)` 每帧写出带高度的 `p.vStall`（同时保留不含高度的 `p.vStall0`），`stepAircraft` 与 `stepPSM` 里所有 `p.vStall`
 （失速判定、低头力矩、下沉、怠速锚点 0.74、减速板 0.92、速度下限 0.42、PSM 升力 `(v/vStall)²`、坠落改出）自动按高度走；
 `Ent.vStallAt(a)` 是同一个值的公开入口（HUD 刻度、`canG`、看门狗复位、AI 强制俯冲都读它）。
 
-**升限分两层**：数据里的 `ceiling` 是推力升限；机翼升限 `coffin` 是 `1.1·vStall₀·S(y) = vMil` 的高度（"棺材角"，余量 `CEIL_MARGIN = 1.1`）；
+**升限分两层**：数据里的 `ceiling` 是推力升限；机翼升限 `coffin` 是 `CEIL_MARGIN·vStall₀·S(y) = vMil` 的高度（"棺材角"，余量 `CEIL_MARGIN = 1.05`）；
 有效升限 `ceilingEff = min(两者)`（`Ent.ceilingEff(a)`，按 `phys` 缓存）。军推 / 加力目标速度乘 `thrustK(a, y)`：
-`yT = min(11 km, ceilingEff − 2.5 km)` 以下为 1，往上在 S 空间里线性压低，到有效升限处刚好是 `1.1·vStall(y)`；
+`yT = min(11 km, ceilingEff − 2.5 km)` 以下为 1，往上在 S 空间里线性压低，到有效升限处刚好是 `1.05·vStall(y)`；
 `vStall(y)` 在 S 里也是线性的，所以整段都留有余量。升限以上继续外推（`thrustK` 下限 0.3）——速度掉到失速速度以下，
 自然**失速下沉**，坠回升限以下才改得出来。`clampCeiling`（AI）、`lock.js` 的目标筛选、机型页的"有效升限"都读 `ceilingEff`；
 玩家开局高度夹到 `ceilingEff − 500 m`（高空关 m3 / m6 / m12）。
-17 个机型的有效升限见 `node tools/test/probes/probe-stall-alt.js` 末尾的表（例：D-14 / F-9 21 km → 约 18.5 km，ROK-40 16 km → 10.65 km，MERLI 21 km → 16.9 km，低升限机型不变）。
+17 个机型的有效升限见 `node tools/test/probes/probe-stall-alt.js` 末尾的表：除 ROK-40（15.6 km，数据 16 km）外都等于数据升限。
+为此改了两个机型的海平面失速速度：ROK-40 `vStall` 132 → 110，MERLI 78 → 72（单型降幅 ≤ 17%，翼面积 / 增升的合理范围；ROK-40 是重型慢机，不再往下压）。
 
 HUD：空速带右侧一道琥珀短横标出当前高度的失速速度（低于它变红，超出带宽贴边画成三角）。
 
@@ -736,7 +737,7 @@ if (!(Math.random() < chance)) continue;
 | 无动力弹阻力 / 弹翼耗速（0.00006 / 0.3） | `physics.js` 的 `BOMB_DRAG` / `FIN_BLEED` |
 | 激光照射锥（25°，休眠分支） | `physics.js` 的 `LASER_CONE` |
 | 推力渐弱区间（1.0） | `physics.js` 的 `THRUST_TAPER` |
-| 失速速度随动压（√(ρ₀/ρ)）与高空推力包线（`CEIL_MARGIN` 1.1、`yT`、S 空间线性） | `physics.js` 的 `stallK` / `thrustK` / `ceilingEff` |
+| 失速速度随动压（`STALL_EXP` 0.42，纯物理 0.5）与高空推力包线（`CEIL_MARGIN` 1.05、`yT`、S 空间线性） | `physics.js` 的 `stallK` / `thrustK` / `ceilingEff` |
 | 实时过载（G 表） | `stepAircraft()` 末尾的 `a.gNow`；HUD 在 `ui/hud/` 动压框右侧 |
 | 速度钳位（0.42·vStall – 1.12·vMax） | `stepAircraft()` 的最后一行 |
 | 硬天花板（23 000 m） | `stepAircraft()` 的 `pos.y > 23000` |
