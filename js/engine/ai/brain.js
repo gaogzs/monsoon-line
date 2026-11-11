@@ -190,6 +190,50 @@
     return dir;
   }
 
+  /* 战区边界软转向（docs/POST2-0IMPL.md 4.1）：
+     警告区内把期望方向的水平分量朝战区中心拉，权重 = 深度 × ARENA_PULL_K（封顶 1，深度到 1/K 就取满），
+     越界则取满；规避中（evade）在警告区内权重减半 —— 躲导弹优先，但越过真边界就不再让步。
+     只改水平方向，俯仰（高度）照旧。僚机 / 无人机跟着长机，不单独处理；
+     航线型单位走 updateRoute，根本不经过这里（沿航线飞出去的轰炸机不受影响）。 */
+  /* 起拉要早：高空低动压时转弯半径大，等权重涨起来再掉头就来不及了 */
+  var ARENA_PULL_K = 1.8;
+  function arenaSteer(a, dir, world) {
+    var s = a.ai;
+    if (!dir || !world.arenaDef || s.role === 'wingman' || s.role === 'drone') return dir;
+    var st = Arena.state(world.arenaDef, a.pos);
+    if (st.zone === 'in') { s.arenaSide = 0; return dir; }
+    var w = st.zone === 'out' ? 1 : Math.min(1, st.depth * ARENA_PULL_K);
+    if (s.mode === 'evade' && st.zone === 'warn') w *= 0.5;     // 越过真边界就不再让步
+    var cx = world.arenaDef.cx - a.pos.x, cz = world.arenaDef.cz - a.pos.z;
+    var cl = Math.sqrt(cx * cx + cz * cz);
+    if (cl < 1) return dir;
+    cx /= cl; cz /= cl;
+    var hl = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
+    var hx = hl > 1e-6 ? dir.x / hl : cx, hz = hl > 1e-6 ? dir.z / hl : cz;
+    var bx = hx * (1 - w) + cx * w, bz = hz * (1 - w) + cz * w;
+    var bl = Math.sqrt(bx * bx + bz * bz);
+    if (bl < 1e-6) { bx = cx; bz = cz; bl = 1; }       // 正好背向中心且权重 0.5：直接朝中心
+    bx /= bl; bz /= bl;
+    /* 机头背着中心冲出去时，期望方向正对机尾：转向控制没有明确的转弯侧，
+       只会沿竖直面拉杆爬升而不转弯。所以往靠中心的一侧（机体左 / 右）连续地偏：
+       偏量 k 随"机头与回中心方向的夹角"从 0（夹角 ≤ 90°）平滑加到 1.5（正相反，约偏 56°）。
+       转弯侧在整个出界期间固定（s.arenaSide，回到界内才清除），否则两侧来回切会让操纵抖动。 */
+    var fl = Math.sqrt(a.fwd.x * a.fwd.x + a.fwd.z * a.fwd.z);
+    if (fl > 0.2) {
+      var fc = (a.fwd.x * cx + a.fwd.z * cz) / fl;          // 机头水平朝向与"回中心"的余弦
+      if (fc < 0) {
+        var rl = Math.sqrt(a.right.x * a.right.x + a.right.z * a.right.z) || 1;
+        var rx = a.right.x / rl, rz = a.right.z / rl;
+        if (!s.arenaSide) s.arenaSide = (rx * cx + rz * cz) >= 0 ? 1 : -1;
+        var k = Math.min(1.5, -fc * 1.5) * s.arenaSide;
+        bx = bx + rx * k; bz = bz + rz * k;
+        bl = Math.sqrt(bx * bx + bz * bz) || 1; bx /= bl; bz /= bl;
+      }
+    }
+    var hh = Math.sqrt(Math.max(0, 1 - dir.y * dir.y));  // 保持原俯仰：水平分量长度不变
+    return M3.V(bx * hh, dir.y, bz * hh);
+  }
+
   function update(a, dt, world) {
     if (!a.alive || !a.ai) return;
     // 航线型单位完全不走下面那套
@@ -471,6 +515,7 @@
     /* 所有分支都汇到这里，所以升限钳制放在这一处就够了 ——
        无论是追击、规避还是编队，都不会为了追人钻到没有机动能力的高度。 */
     desired = clampCeiling(a, desired);
+    desired = arenaSteer(a, desired, world);
 
     $.steerTo(a, desired, ctrl, a);
 
