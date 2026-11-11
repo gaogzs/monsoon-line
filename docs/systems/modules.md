@@ -61,6 +61,8 @@
 | `ModelLib` | `models/_lib.js` 等 | 模型构建器：`V` `C` `MB` `mast` `house` `done` `orientClosed` `seaBase` `jacket` `pDeck`，收尾遍 `finish` |
 | `M3` | `core/math3d.js` | 见 [math3d.md](math3d.md) |
 | `Shading` | `core/shading.js` | `LIGHT`（同一对象，原地改）`AMBIENT` `DIFFUSE` `FOG_*` `SKY` `SEA` `CLOUD` `brightness` `fog` `quant`；关卡天色：`setEnv(env, axis)` `sunAt(hour)` `envVersion` `DEFAULT_LIGHT` / `DEFAULT_AMBIENT` / `DEFAULT_DIFFUSE`（见 [rendering.md](rendering.md#关卡时间与天色shadingsetenv)） |
+| `Arena` | `engine/world/arena.js` | `state(arena, pos)` → `{ zone: 'in'|'warn'|'out', depth, edgeDist }`；`inEdge(arena, pos, side)`；`validate(arena)` |
+| `Resupply` | `engine/world/resupply.js` | `init(world, mission)` `update(world, p, dt)` `suppressesArena(world, p)` `refill(p, ac, lo)` `applyNpc(a)`（占位，批次 5）`validate(mission, world)` |
 | `Combat` `Turret` `Route` `Ballistics` `SFX` | `engine/*.js` | 见各自的 systems 文档 |
 | `Renderer` `RenderGL` | `render/render.js` `render/render-gl.js` | 见 [rendering.md](rendering.md) |
 | `UnitView` `HudFx` `Radio` `SysNote` `CODEX` | `ui/` | 见 [unitview.md](unitview.md)、[hud.md](hud.md)、[codex.md](codex.md) |
@@ -69,7 +71,10 @@
 
 `buildHangar(view)` / `buildHardpointEditor(ac, lo, view)` 不再读写全局的 `selectedAC` / `activeHpGroup`，
 只读一个视图对象：`ac`（机型下标）、`group`（选中的挂载点组）、`ids`（元素 id 表，键缺省时用键名本身）、
-`rebuild`（改动之后怎么重画）。批次 4 的整备界面传一套自己的 id 就能复用同一份编辑器。
+`rebuild`（改动之后怎么重画）。整备界面（`js/ui/screens/rearm.js`）就是这么复用的：`Game.$.rearmView = { ac, group, ids, rebuild }`，元素 id 全带 `rearm` 前缀；机型列表 / 描述 / 3D 预览是可选元素，没有就跳过。
+
+`Arena` / `Resupply` 是 v3.5.0 新增的两个独立全局（IIFE，不进别的命名空间的 `$`），在 `engine` 层新建的 `js/engine/world/` 里。`gen-index.js` 的 `LAYERS` 不用改：层内规则是 `_` 开头最先、`zz` 开头最后、其余按目录再按文件名，所以 `world/*` 自动排在 `game/*` 之后、`zz-api` 之前；它们只在函数体内引用 `Ent` / `Loadout`。
+`Ent.rebuildMounts`（NPC 整备要用）**还没有**：`buildNpcMounts` 是 `Ent.$` 上的私有函数，批次 5 做 NPC 整备时再导出。
 
 ## 旧文件 → 新位置
 

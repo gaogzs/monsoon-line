@@ -8,7 +8,7 @@ locales/
 ├── _html/                          与语言无关的页面模板片段
 │   ├── shell.html                  <head>、<body> 骨架；{{> 片段}} 插入各屏；{{scripts}} 插入脚本块
 │   ├── screens/  title campaign hangar brief debrief settings codex help changelog（各一个 .html）
-│   └── overlays/ radio sysnote pause（各一个 .html）
+│   └── overlays/ radio sysnote pause rearm failing（各一个 .html；`rearm` 是 v3.5.0 的整备界面）
 └── zh-CN/                          一种语言一个目录（以后加 en/ 同构）
     ├── text/**.json                文本（含 text/html/*.json：页面里的静态文字，每个片段一个文件，shell.json 是骨架）
     ├── text.gen.js                 生成：该语言的 Text.load(...)

@@ -274,6 +274,12 @@ ry = dz * fz + dx * fx;     // 前
 AI（友军、敌军一样）用同一套门槛：被压制时只能对 `clearR` 以内的目标开火（`Ent.jamLockOK`），
 锁定距离 × `jamLockK`，开火概率也 × `jamLockK`（`AI` 的 `fireAtTarget`）。
 
+**战区边界与整备圈**（v3.5.0，`drawArenaEdges` / `drawResupplyZones`，画在光点之下、由圆形 clip 裁剪）：
+- 边界用与 `radarXY` 同一套"镜头朝向 → 雷达坐标"换算，但**不做越界夹取**（夹取会让线变形）；只画离本机 12 km 以内的那几条边。
+- 警告线（边界内缩 `warn`）是一排**单斜线**（琥珀），真边界是**交叉斜线**（红），斜线朝边界外侧。
+- 界外整备区那一侧（还有次数时）的两条线改画淡青，一眼看出"这一侧是整备区"。
+- 单位整备点画一个以该单位为圆心、半径 `r` 的淡青圈（还有次数时才画）。
+
 **注意**：油门条原来就压在这个圆心上，是本次搬走的（见上）。
 改左下角任何元素前，先确认它不会与雷达圆心重叠。
 
@@ -513,6 +519,10 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 | 9 | `winchester` | `gunAmmo <= 0 && spAmmo <= 0` | `WINCHESTER 弹药耗尽`（琥珀） |
 | 10 | `emcon` | `p.emcon` | `EMCON-Δ 电磁静默`（青，**不闪** —— 它是状态不是告警） |
 
+`ALERT_ORDER` 现为 `missile / lit / arena / resupply / damage / terrain / stall / lowq / psm / jammed / winchester / emcon`。
+`arena`：警告区琥珀慢闪「LEAVE AREA 离开战区」，越界红色快闪「OUT OF AREA 已越出战区」并显示渐黑剩余秒数；
+`resupply`：靠近时青色距离、驻留中「REARMING n/hold s」（界外整备区写「REARM ZONE」）、规避中拒绝（琥珀闪）、补给耗尽。状态都由 `Game` / `Resupply` 写在 `world.arena / world.arenaFade / world.resupply.status`，HUD 只读，不跨命名空间读 `Game.$`。
+
 雷达 / 导弹 > 失速 > 动压是定下来的顺序；低高度排在失速前面，因为它意味着下一秒就是海面。
 `threatState()` 只算导弹与照射的数据；RWR 环上仍然保留方位点，两者互补：
 **一个告诉你"有威胁"，一个告诉你"威胁在哪个方向"。**
@@ -727,6 +737,7 @@ ctx.strokeText(t, x, y);
 `HUD.draw` 最后调 `HudFx.draw(ctx, W, H, p)`，画在 `hudOpacity` 的 save/restore 之外，滤镜不跟着 HUD 变淡。
 
 **独立图层（v2.0 后）**：HudFx 画在自己的全屏 canvas 上，`z-index 300` —— 压在 `#radio`（200）与 `#sysnote`（210）之上、`.overlay` 暂停层（800）之下（旧：画进 HUD 的 ctx，盖不住无线电）。受扰时再加 CSS `backdrop-filter: blur`，最大 `FX.jamBlur` 1.2 px × 受扰强度。`Renderer.begin` 每帧调 `HudFx.beginFrame` 清屏，所以离开战斗就消失。没有图层（tools）时退回画到传入的 ctx。
+**越界渐黑**（v3.5.0）：`HudFx.setArenaFade(k)`（0..1）由 `Game` 的 `arenaTick` 每帧推进，`draw` 的"on"判定把 `arenaK > 0.01` 算进去，画一层纯黑盖在受扰 / 受伤之上；`reset()` 清零，`arenaLevel()` 读当前值。失败停留画面（`#failing`，z-index 800）在它之上，所以失败提示直接显示在黑屏上。
 参数全在 `HudFx.FX`。
 
 | 效果 | 触发 | 强度 | 上限（保证 UI 可读） |

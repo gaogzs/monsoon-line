@@ -309,6 +309,8 @@ HUD 不标 10 km 外的（`js/ui/hud/radar.js` 的 `farCell()`，罗盘 / 雷达
 | `loc` / `date` | 简报页 | 地点、任务时间 |
 | `altStart` / `speedStart` | `startMission` | 初始高度/速度，**会被 `spawn()` 覆盖**（见坑 §8.1） |
 | `timeLimit` | `startMission`（`js/engine/game/mission-start.js`）→ `world.timeLimit/timeLeft`；`js/engine/game/update.js` 主循环、`js/ui/hud/` 的 `drawObjective`、`finish()` | 关卡时限（秒）。`0` = 无时限。**归零即判负，由主循环统一处理**，任务脚本不需要自己写倒计时（`m10` 用了 300 秒） |
+| `arena` | `js/engine/world/arena.js` 的 `Arena.state`（`update` 每帧对玩家算）；雷达边界线；AI 软转向（`engine/ai/brain.js`） | 战区边界 `{ cx, cz, half, warn }`（世界米，方形）。**每关必写**，取值见 §3.1 |
+| `resupply` | `js/engine/world/resupply.js` 的 `Resupply.init / update`；雷达整备圈；告警栏 | 整备点声明数组，每关必写，条目格式见 §3.1 |
 | `prose` | 简报正文（`innerHTML`） | 允许 HTML；写 `T('missions.<id>.prose')` |
 | `objectives[]` | 简报目标列表 | `T(...)` 字符串数组 |
 | `threats[]` | 简报威胁列表 | `T(...)` 字符串数组，样式类 `th` |
@@ -336,6 +338,35 @@ HUD 不标 10 km 外的（`js/ui/hud/radar.js` 的 `farCell()`，罗盘 / 雷达
 | `timeLimit` / `timeLeft` | `newWorld()` | 关卡时限；`startMission` 从 `mission.timeLimit` 落进来；归零时主循环播一句"时间到"并 `finish(false)` |
 | `groundKilled` | `newWorld()`，`Ent.killGround` 累加 | 被摧毁的地面/海面目标数（结算单列一行，`js/engine/game/finish.js` 的 `finish()` 里 `gk * 400`；低于一架飞机的 1000，免得"打不还手的设施"成为刷分捷径） |
 | `friendlyLoss` | `js/engine/game/combat.js` 的 `hitTarget` 写、`finish()` 读 | 误伤扣分（玩家打掉 `friendlyAsset` 一次 +1） |
+
+### 3.1 战区边界与整备点（v3.5.0）
+
+**`arena = { cx, cz, half, warn }`**：世界米，方形战区。`half` 是真边界到中心的距离，`warn` 是边界内侧警告区的宽度（各关统一 6000）。
+判定用切比雪夫距离：`edge = half − max(|x−cx|, |z−cz|)`；`edge ≤ 0` 为越界（`out`），`0 < edge < warn` 为警告（`warn`），其余在界内。
+没有 `arena` 的关卡恒为界内（老场景不受影响）。取值依据是 `tools/test/probes/probe-extent.js`：出生点 + 航线点 + 120 s 实际位置的外包盒，加 8 km 余量取整到 1 km。
+
+| 关 | cx | cz | half | 关 | cx | cz | half |
+|---|---|---|---|---|---|---|---|
+| m1 | 2000 | −1000 | 42000 | m8 | 0 | 5000 | 44000 |
+| m2 | 1000 | 1000 | 35000 | m9 | 0 | 11000 | 34000 |
+| m3 | 0 | 8000 | 24000 | m10 | 0 | 14000 | 39000 |
+| m4 | 0 | 4000 | 34000 | m11 | 0 | 12000 | 34000 |
+| m5 | 0 | 15000 | 40000 | m12 | 0 | 15000 | 42000 |
+| m6 | −1000 | 16000 | 40000 | sk1 | 0 | −1000 | 37000 |
+| m7 | 2000 | 0 | 34000 | | | | |
+
+玩家侧：警告区告警栏 + 指挥无线电；越界后画面 8 s（`ARENA_FADE_S`，`update.js`）渐黑，渐黑到底判负（失败原因 `fail.arena`），折返同速恢复。
+AI 侧：独立行动的 AI 在警告区内被软转向拉回中心（见 [ai.md](ai.md)）；僚机、无人机、航线单位不受影响。
+
+**`resupply = [条目…]`**，条目二选一：
+
+| 形式 | 字段 | 含义 |
+|---|---|---|
+| 单位整备点 | `{ ref, r, hold, uses, swap }` | `ref` 是 `spawnShip / spawnPlatform` 的 `o.ref`（登记在 `world.refs`），该单位必须 `team 0` 且带 `resupply` 标签；玩家**水平**距离进到 `r` 以内驻留 `hold` 秒整备；3×`r` 以内告警栏显示距离 |
+| 界外整备区 | `{ edge, hold, uses, swap }` | `edge` = `'+x' | '-x' | '+z' | '-z'`。关卡里没有母舰 / 机场时用。玩家身处战场**那一侧**的警告区或界外区（`Arena.inEdge`）驻留 `hold` 秒整备；**整备区内不触发越界渐黑**（`uses` 用完才恢复）；雷达上那一侧的边界线改画淡青 |
+
+`uses` 是可用次数，`swap` 为 `true` 时弹出重选挂载界面、`false` 直接补满。各关现状：m8 引用座头鲸号（`carrier`，r 1500、hold 4、2 次）；m9 引用三座补给平台（`rigA/B/C`，各 1 次）；其余 11 关用 `edge: '-z'`（玩家身后，hold 6、1 次）。
+流程与细则见 [game.md](game.md#整备界面与-rearmopen) 与 [loadout.md](loadout.md#整备点复用-loadoutapply)。
 
 ---
 

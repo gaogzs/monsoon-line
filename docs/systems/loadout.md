@@ -292,6 +292,13 @@ p.loadFactor = min(1, 挂载总重 / maxLoad);
 p.loadout = lo;                             // 原始配置，HUD 缩略图用
 ```
 
+### 整备点复用 `Loadout.apply`
+
+整备（`Resupply.refill`，`js/engine/world/resupply.js`）把玩家补回开局状态，走的就是这一套：`Loadout.resolve` + `Loadout.apply` **本来就从零重建** `ammoPool / slotCd / spAmmo / spSalvo / loadModel / armor / lockRangeK / ecm / 匿踪`，所以补满不需要新参数（`{ refill: true }` 这种选项**不存在**）。
+唯一的坑是 `apply` 对干扰弹是 `p.flares += pe.flareBonus`（累加）：调用前必须先把 `flares` 复位成基数 80，否则吊舱加成会一次次叠上去。
+`refill` 另补：`hp = maxHp`、机炮弹（`WEAPONS[ac.gun].ammo`）、`flareCd = 0`、清 `stall / psm / psmRecover / psmLevel`；调用方再 `$.syncWeapon(p)`。
+`tools/test/probes/probe-resupply.js` 断言补满后与 `startMission` 的初始值逐项相等，换挂载后与"同一份挂载开局"逐项相等。
+
 ### `syncWeapon(a)`（`js/engine/game/world.js`）
 
 把 `wpIdx` 指向的那一条同步到既有代码路径用的三个字段：

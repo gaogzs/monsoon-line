@@ -54,6 +54,8 @@
 | `__player` | `__player()` | 返回当前 `player`，未开局为 `null` |
 | `__world` | `__world()` | 返回当前 `world`，未开局为 `null` |
 | `__pushStores` | `__pushStores(a)` | 直接暴露内部的 `pushStores`：断言要能单独喂一架飞机进来，数它画了几个挂载 |
+| `__frame` | `(dt)` | 主循环的一帧（含暂停 / 整备门限）：断言整备界面打开时 `update` 不推进 |
+| `openRearm` / `closeRearm` / `__confirmRearm` / `__rearmOpen` | `(entry)` / `()` / `()` / `()` | 整备界面的开合与确认；测试用 |
 | `__update` / `__render` | `(dt)` / `()` | 只推进逻辑 / 只画一帧，给 `tools/lib/sim.js` 与 `tools/test/golden-render.js` 用 |
 | `__updateTargets` / `__updateLock` / `__cycleTarget` / `__scanShot` | 同名内部函数 | 单独喂一帧做断言 |
 | `__camFrame` / `__thr` | 对象 | 相机出画处理、油门分界点，供断言脱离整局单独验算（相机基走 `Game.$.camBasis`） |
@@ -151,8 +153,7 @@ function loop(ts) {
   if (!isFinite(dt) || dt <= 0) dt = 0.016; // 首帧/异常时间戳的兜底
   if (dt > 0.05) dt = 0.05;                 // 上限
   if (state === 'playing') {
-    if (!paused) { update(dt); render(); }
-    else         { render(); }              // 暂停：只画，不推进
+    frame(dt);                              // = if (!(paused || rearmOpen)) update(dt); render();
   } else {
     if (player && world) render();          // 结算页背后继续画战场快照
     else { Renderer.begin(); Renderer.end(); }
@@ -161,6 +162,7 @@ function loop(ts) {
 ```
 
 - **`dt` 上限 0.05s**：切标签页再切回来时，两帧间的真实间隔可能是几秒；不夹的话一次 `update` 会把飞机瞬移出几公里、导弹瞬间命中。0.05 = 20 FPS，是“最慢的可玩帧率”的等价步长。
+- **`$.frame(dt)`**（`boot/main.js`）是对局中的一帧：暂停菜单（`paused`）或整备界面（`rearmOpen`）打开时只画不推进，时间、`timeLimit`、AI 全部冻结。
 - **暂停时只停 `update`，`render` 照跑** —— 这是设置能热调整的前提：玩家在暂停菜单里拖 FOV / 镜头距离滑块，画面立刻变。见 [DESIGN.md §4.2](../DESIGN.md#42-主循环)。
 - 首帧的 `last`（`$.last`）不是 0：`init()` 结尾用 `requestAnimationFrame(function (t) { last = t; requestAnimationFrame(loop); })` 把第一帧时间戳先吃掉，避免第一帧 `dt` 巨大。
 - 正常玩下来 **`update` 永远在 `render` 之前**，而相机计算是 `update` 的最后一步。
@@ -170,6 +172,9 @@ function loop(ts) {
 
 ```
 world.time += dt;  Radio.update(dt)                     ← 字幕计时
+（…玩家受击台词之后、胜负之前：）
+arenaTick(dt)                                          ← 战区边界：world.arena / arenaFade / 无线电；整备区内暂停渐黑
+resupplyTick(dt)                                       ← 整备点：Resupply.update；满了 → beginRearm
 if (player.alive) controlPlayer(dt) else SFX.gun(false)
 Ent.stepAircraft(player);  updateEWAuto(dt)             ← 协处理器可能已自主开机
                            updateLock(dt);  updateDEW(dt, player)
@@ -253,7 +258,14 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 2. 把机库配置落到飞机上：`wl = Loadout.resolve(ac, lo)` 展开成武器列表，`Ent.makeAircraft` 造机后 `Loadout.apply(p, ac, lo, wl)`（`js/engine/loadout.js`）一次性写好：`p.loadoutList`；`p.ammoPool[wid] = ammo`；`p.slotCd[wid]` **一个挂点一个槽**（长度 = `e.salvo`），储备少于挂架数时多出来的槽填 `Ent.SLOT_EMPTY`（`1e9`，语义是“这个挂架本来就空着”，`stepAircraft` 里永不装填）；`p.loadFactor`；被动吊舱经 `Ent.passiveEffects()` 汇成 `p.armor / p.lockRangeK / p.flares`，`p.lockResist` 由 `Ent.setStealth(p, pe, 各组武器)` 写入（机体匿踪被外挂折损后与吊舱抗锁定合并）；`p.loadModel` 记录每类弹的拖累份额，`Ent.curLoadFactor` 每帧按弹药池折算（弹打出去拖累随之减轻，吊舱恒定）；`p.loadout = lo` 留一份给 HUD 画挂载俯视图。（旧版这些逻辑是 `startMission` 里手写的 `resolveLoadout / passiveEffects`。）
 3. `p.name = p.label = CALLSIGN.player`；入 `world.actors`；写回 `$.player`；`mission.spawn(world)` —— 敌机、平台、僚机全由任务脚本自己造。
 4. 初始镜头 `camFwd = p.fwd`、`camUp = (0,1,0)`、`camPos = p.pos + (0, 30, -110)`；`Radio.clear()` → `Radio.play(mission.id, 'start')`；横幅 `banner = { t: 3.4, ... }`。
-5. `hideAll(); state = 'playing'; paused = false;` 摘掉暂停层，`p.target = null`。
+5. `hideAll(); state = 'playing'; paused = false; rearmOpen = false;` 摘掉暂停层与整备层，`p.target = null`。`mission.spawn` 之后 `Resupply.init(world, mission)` 解析整备点引用；`world.arenaDef / arena / arenaFade / arenaRadioT` 与 `HudFx.reset()` 也在这里初始化。
+
+### 整备界面与 `rearmOpen`
+
+驻留计时满了（`resupplyTick`）→ `$.beginRearm(entry)`（`js/ui/screens/rearm.js`）：`swap:false` 直接 `confirmRearm(true)` 补满；否则 `$.rearmOpen = true`、释放指针、止住持续音、
+`$.rearmView = { ac, group, ids, rebuild }`（元素 id 全带 `rearm` 前缀）交给 `buildHangar`（机库的构建函数，机型列表 / 描述 / 3D 预览是可选元素，缺则跳过），显示 `#rearm`（`locales/_html/overlays/rearm.html`，z-index 850，在暂停菜单之上）。
+`rearmOpen` 和 `paused` 一样让主循环不进 `update`，另外屏蔽键鼠输入（`input.js` 的 `mousemove / mousedown / blur / H / Esc` 与键盘块都认它）。**不复用 `togglePause`**：那个只管暂停菜单。
+界面里点挂载卡片 = 改 `$.getLoadout(ac)` 并存档（与机库同一条路）；确认 → `Resupply.refill(p, ac, lo)` + `$.syncWeapon(p)` → 关界面、恢复指针锁、横幅「整备完成」。**没有取消**（次数在打开时已扣）。战报多一行「整备次数」（`world.rearmCount`）。
 
 ### 存档（2.6）
 `engine/game/save.js`。设置早就持久化了（`monsoonline.settings.v1`，`settings.js`）；这里只补两样，存进另一个键 `monsoonline.save.v1`，内容 `{ v: 1, cleared, loadouts }`：
