@@ -12,6 +12,14 @@
       role: opt.role || 'enemy',
       skill: opt.skill === undefined ? (opt.rank && RANKS[opt.rank] ? RANKS[opt.rank].skill : 0.6) : opt.skill,
       rank: opt.rank || null,
+      rs: $.seedRng(),     // 私有随机流（skill.js）
+      aim: { x: 0, y: 0 }, // 机炮准星偏移（OU 漂移）
+      aimFor: null,        // 偏移当前针对的目标（变了就重抽）
+      gunT: 0,             // 机炮反应计时（持续式）
+      strafe: false,       // 扫射状态（带滞回）
+      missT: 0,            // 导弹反应计时（持续式）
+      flareReact: 0,       // 干扰弹首发的反应计时（登记式）
+      lostT: null,         // 目标丢失后的换目标反应计时（null = 没在等）
       mode: 'pursue',
       modeT: 0,
       evadeT: 0,
@@ -258,7 +266,15 @@
     perceive(a, s, world, dt);
     decide(a, s, world, dt);
     maneuver(a, s, world, dt);
-    fire(a, s, world);
+    fire(a, s, world, dt);
+  }
+
+  /* 目标丢了 / 死了之后要等一个反应延迟才重选（登记一次，持续式）；返回 true = 还在等。 */
+  function lostWait(s, dt) {
+    if (s.target && !s.target.alive) { s.target = null; s.lostT = 0; }
+    if (s.lostT === null) return false;
+    s.lostT += dt;
+    return s.lostT < $.SKILL.reactT(s);
   }
 
   /* 感知层：把"谁在照我、我被压制多久"这类状态算进 a / s，不做任何决策。 */
@@ -364,7 +380,8 @@
         // 长机阵亡时不自主接战（设定：无人机没有接管战局的能力，只会盘旋）
         s.target = leadOk ? dLead.target : (dLead && dLead.alive ? $.nearestEnemy(a, world, $.WING_FREE_R) : null);
       }
-    } else if (s.retargetT <= 0 || !s.target || !s.target.alive) {
+    } else if ((s.retargetT <= 0 || !s.target || !s.target.alive) && !lostWait(s, dt)) {
+      s.lostT = null;
       s.retargetT = $.SKILL.retarget(s);
       if (s.role === 'wingman' && s.cmd === 'focus' && world.player && world.player.target) {
         s.target = world.player.target;
@@ -428,6 +445,10 @@
   /* 机动层：按模式 / 角色出期望方向与油门，过覆盖链（升限、战区边界、垂直改出、近地保护），写 a.throttle / a.ab / a.target。 */
   function maneuver(a, s, world, dt) {
     var ctrl = a.ctrl;
+    if (s.mode !== 'evade') s.flareReact = 0;      // 干扰弹首发的反应计时：威胁没了就清零
+    // 机炮准星偏移：换目标时重抽；之后 OU 漂移；没有（空中）目标时衰减
+    if (s.aimFor !== s.target) { s.aimFor = s.target; if (s.target) $.aimReset(s); }
+    $.aimStep(s, dt, !!(s.target && s.target.alive && s.target.kind !== 'target'));
     /* ---------- 4. 分派行为 ---------- */
     var desired;
     var throttle = 0.85, ab = false;
@@ -442,10 +463,12 @@
          几乎骗不到弹 —— 同一枚弹被反复投放会越来越难骗，
          但一组都没骗到就等于没放。连放的后续几组在下面统一处理，
          这样中途切出 evade 也会把这一串放完。 */
-      if (s.flareT <= 0 && !s.flareBurst && a.flares > 0 && a.flareCd <= 0) {
+      s.flareReact += dt;
+      if (s.flareReact >= $.SKILL.reactT(s) && s.flareT <= 0 && !s.flareBurst && a.flares > 0 && a.flareCd <= 0) {
         s.flareBurst = 2 + Math.floor(Math.random() * 4);
       }
     } else if (s.mode === 'extend') {
+      s.flareReact = 0;
       // 向低威胁方向脱离，同时保持能量
       var away = $.nearestEnemy(a, world, 20000);
       if (away) desired = M3.norm(M3.sub(a.pos, away.pos));
@@ -522,6 +545,10 @@
     } else if (s.target) {
       var res = $.pursue(a, s.target, world);
       desired = res.dir;
+      /* 机炮瞄准偏移：机头去对准"提前量点 + aim"，子弹跟着机头打偏。只在近距、对空、有炮时叠加。 */
+      if (WEAPONS[a.gun] && M3.dist(a.pos, s.target.pos) < $.SKILL.AIM_RANGE) {
+        desired = M3.norm(M3.add(desired, M3.add(M3.mul(a.right, s.aim.x), M3.mul(a.up, s.aim.y))));
+      }
       throttle = res.throttle;
       ab = res.ab;
     } else {
@@ -579,14 +606,14 @@
   }
 
   /* 开火层：机炮与导弹。读 s.target / s.mode，写 a.firingGun，经 world.fireMissile 发射。 */
-  function fire(a, s, world) {
+  function fire(a, s, world, dt) {
     /* ---------- 5. 开火 ---------- */
     if (s.mode === 'evade' || s.mode === 'extend') {
-      a.firingGun = false;
+      a.firingGun = false; s.gunT = 0; s.missT = 0; s.strafe = false;
       return;
     }
     var t = s.target;
-    if (!t || !t.alive) { a.firingGun = false; return; }
+    if (!t || !t.alive) { a.firingGun = false; s.gunT = 0; s.missT = 0; s.strafe = false; return; }
 
     // 侦察 / 播撒构型在受损前不主动接战
     if (a.behavior === 'recon' && a.hp >= a.maxHp * 0.88) {
@@ -606,13 +633,25 @@
        走到开火段就会抛异常；后来改成 return，又把下面的导弹段一起截掉了：
        M5 的巡航弹载机、M8 的轰炸机挂着弹却一发都没打出去过。 */
     var gunW = WEAPONS[a.gun];
+    var wasFiring = a.firingGun;
     a.firingGun = false;
     if (gunW) {
       var gunRange = (a.pos.y > 18000 ? gunW.highRange : gunW.range);
       var gunCone = $.SKILL.gunCone(s);
-      a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
+      var inRange = dist < gunRange * 0.9 && a.gunAmmo > 0;
+      var inCone = inRange && off < gunCone * 3.2;      // 门限按真实视线角判，不含准星偏移
+      /* 扫射（"气氛组"）：机头误差 e 落在当前偏移散布圈 r 以内就继续打，不看 gunCone；
+         进入 e ≤ r，退出 e > r × 1.3（滞回）。 */
+      var aimR = Math.sqrt(s.aim.x * s.aim.x + s.aim.y * s.aim.y);
+      if (!inRange) s.strafe = false;
+      else if (s.strafe) { if (off > aimR * $.SKILL.STRAFE_EXIT) s.strafe = false; }
+      else if (off <= aimR) s.strafe = true;
+      // 反应延迟（持续式）：满足开火条件开始计时，任一不成立清零
+      if (inCone || s.strafe) s.gunT += dt; else s.gunT = 0;
+      a.firingGun = (inCone || s.strafe) && s.gunT >= $.SKILL.reactT(s);
     }
     if (a.firingGun) {
+      if (!wasFiring) $.aimReset(s);                    // 每一串新的射击都是新的一次掷骰
       Ent.fireGun(a, world);
       /* 别人开火的声音。
 
@@ -635,6 +674,7 @@
        远距弹（CLA-17 的 12.5 km）与对地弹的投放包线差了好几倍，
        够不够得着由每件武器自己的 lockDist 判。 */
     var pick = Ent.chooseWeapon(a, t, dist);
+    var missEval = false;
     if (pick) {
       Ent.setWeapon(a, pick);
       var spW = WEAPONS[pick];
@@ -679,11 +719,15 @@
           var lim = Math.min(spW.lockDist || Infinity, $.SKILL.useNez(s) ? env.nez : env.rmax);
           envOK = dist < lim * (t.kind === "target" ? $.AI_RANGE_MARGIN_SURF : $.AI_RANGE_MARGIN_AIR);
         }
-        if (okDist && okAng && envOK && dist > minR && Math.random() < $.SKILL.fireWill(s) * jamK) {
+        var lockOK = okDist && okAng && envOK && dist > minR;
+        missEval = true;
+        if (lockOK) s.missT += dt; else s.missT = 0;          // 反应延迟（持续式）
+        if (lockOK && s.missT >= $.SKILL.reactT(s) && Math.random() < $.SKILL.fireWill(s) * jamK) {
           if (world.fireMissile) world.fireMissile(a, t);
           s.shootT = M3.rnd(2.6, 5.2) * $.SKILL.shootGap(s);
         }
       }
     }
+    if (!missEval) s.missT = 0;
   }
 })(AI);
