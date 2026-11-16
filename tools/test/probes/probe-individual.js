@@ -76,7 +76,7 @@ const mk = (o) => {
     const foe = E.makeAircraft({ type: 'albatross', team: 0, x: 0, y: 6000, z: 14000, fwd: M.V(0, 0, 1), speed: 200, special: null }); foe.hp = foe.maxHp = 1e9;
     A.attach(foe, { role: 'ally', skill: 0.3 }); foe.ai.cmd = 'hold';
     const esc = E.makeAircraft({ type: 'albatross', team: 1, x: 0, y: 6000, z: 3000, fwd: M.V(0, 0, 1), speed: 250, special: 'dl6' }); esc.hp = esc.maxHp = 1e9;
-    A.attach(esc, { role: 'enemy', skill: 0.6, rank: 'pawn', temperament: temper, ward });
+    A.attach(esc, { role: 'enemy', skill: 0.6, rank: 'pawn', temperament: temper, leader: ward });
     w.actors.push(ward, foe, esc);
     let maxD = 0;
     for (let f = 0; f < 60 * 50; f++) { S2.step(1 / 60); p.alive = true; p.hp = p.maxHp; maxD = Math.max(maxD, M.dist(esc.pos, ward.pos)); }
