@@ -52,7 +52,7 @@
       if (s.evalT > 0) {
         s.evalT -= dt;
         if (s.evalT <= 0) {
-          if ($.rnd01(s) < $.retreatProb(a, s)) s.retreating = true;
+          if ($.rnd01(s) < $.retreatProb(a, s)) { s.retreating = true; Chatter.emit(world, 'rtb', a); }
           else s.retreatCd = $.RETREAT.COOLDOWN;
         }
       }

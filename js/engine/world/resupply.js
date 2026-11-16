@@ -259,6 +259,7 @@ var Resupply = (function () {
     a.ctrl = { pitch: 0, roll: 0, yaw: 0 };
     world.actors.push(a);
     launched(world, e);
+    Chatter.rearmed(world, a);                   // 整备完成的无线电，并重置 Chatter 的轮询标记
     squadRearm(world, e, a);                     // 它若是长机：僚机一同补给（没有僚机则什么也不发生）
   }
 

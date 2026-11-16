@@ -8,6 +8,9 @@
      C. story 的最长等待 ≤ STORY_MAX_WAIT + 当前一句的间隔
      D. 同事件同说话人（key）去重；日志最多 30 条
      E. 显示时长随字数：life = clamp(6 + 0.12 × 字数, 7, 14)
+   F. 暂停菜单「无线电记录」页签接线
+   G. Chatter：无呼号不播、同（事件，说话人）冷却、全场时间窗上限、fox 概率、敌方只在附近听得到、
+      弹药 / 血量 / 击杀 / 规避的轮询事件、撤离与整备钩子、不用 Math.random
    用法：node tools/test/probes/probe-radio.js
    ============================================================ */
 'use strict';
@@ -116,8 +119,106 @@ const shown = () => Radio.log().filter(e => !e.dropped);
   const G = S.sandbox.Game;
   Radio.clear(); Radio.raw(line('story', 900)); run(2);
   let threw = null;
-  try { G.switchPauseTab('radio'); G.renderRadioLog(); } catch (e) { threw = e; }
+  try { G.$.switchPauseTab('radio'); G.$.renderRadioLog(); } catch (e) { threw = e; }
   chk('切到记录页签并渲染不抛错', !threw, threw ? String(threw.stack).split('\n')[0] : '');
+}
+
+/* ---------- G. Chatter ---------- */
+{
+  const fs = require('fs'), path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'js/engine/chatter.js'), 'utf8');
+  chk('chatter.js 不用 Math.random（私有 LCG，不影响 golden）', !/Math\.random\s*\(/.test(src));
+
+  const S2 = Sim.load({ seed: 1 });
+  const { M3, Ent, AI, Chatter, Radio: R2, MISSIONS } = S2.sandbox;
+  S2.start(MISSIONS.findIndex(m => m.id === 'm1'));
+  const G = S2.sandbox.Game, w = G.__world(), p = G.__player(), ar = w.arenaDef;
+  const logOf = () => { for (let i = 0; i < 300; i++) R2.update(1 / 60); return R2.log(); };   // 先让队列走完再看日志
+  const reset = () => { R2.clear(); w.chat = null; };
+  const mk = (team, label, x, z) => {
+    const a = Ent.makeAircraft({ type: 'albatross', team, x: p.pos.x + x, y: 4000, z: p.pos.z + z, fwd: M3.V(1, 0, 0), speed: 250, special: 'dl6' });
+    AI.attach(a, { role: team === 0 ? 'ally' : 'enemy', skill: 0.55, rank: 'pawn' });
+    a.label = label; a.hp = a.maxHp = 100; w.actors.push(a);
+    return a;
+  };
+  const al = [mk(0, 'ALPHA-1', 500, 0), mk(0, 'ALPHA-2', 600, 0), mk(0, 'ALPHA-3', 700, 0), mk(0, 'ALPHA-4', 800, 0)];
+  const nolabel = mk(0, null, 900, 0);
+  p.hp = p.maxHp = 1e9;
+
+  reset();
+  chk('无呼号的单位不播', Chatter.emit(w, 'rtb', nolabel) === false && logOf().length === 0);
+  w.time = 100;
+  chk('第一次播', Chatter.emit(w, 'rtb', al[0]) === true);
+  chk('同（事件，说话人）冷却内不重复', Chatter.emit(w, 'rtb', al[0]) === false);
+  w.time = 100.5; Chatter.emit(w, 'rtb', al[1]); Chatter.emit(w, 'rtb', al[2]);
+  chk('全场时间窗内最多 GLOBAL_MAX 条', Chatter.emit(w, 'rtb', al[3]) === false, 'max=' + Chatter.GLOBAL_MAX);
+  w.time = 100 + Chatter.GLOBAL_WIN + 1;
+  chk('时间窗过去后又能播', Chatter.emit(w, 'rtb', al[3]) === true);
+
+  // fox 概率
+  reset(); w.time = 500;
+  let hit = 0; const N = 2000;
+  Chatter.fox(w, al[0]);      // 先建状态
+  for (let i = 0; i < N; i++) { w.chat.cd = {}; w.chat.win = []; if (Chatter.fox(w, al[0])) hit++; }
+  const rate = hit / N;
+  chk('fox：每次发射约 FOX_P 概率喊话', Math.abs(rate - Chatter.FOX_P) < 0.04, 'rate=' + rate.toFixed(3));
+  reset(); w.time = 700; Chatter.emit(w, 'fox', al[1]);
+  chk('fox 走 chatter 优先级', logOf().some(e => e.who === 'ALPHA-2' && e.pri === 'chatter'));
+  R2.clear(); w.chat = null; w.time = 800;
+  // 敌方：远了听不到，近了听得到
+  const foeFar = mk(1, 'FLINT-1', 60000, 60000), foeNear = mk(1, 'FLINT-2', 3000, 0);
+  chk('敌方台词：离玩家太远不播', Chatter.emit(w, 'defensive', foeFar) === false);
+  chk('敌方台词：附近播，且是 chatter 优先级', Chatter.emit(w, 'defensive', foeNear) === true);
+  chk('敌方台词用敌方声线（cls enemy）', logOf().some(e => e.who === 'FLINT-2' && e.cls === 'enemy' && e.pri === 'chatter'));
+
+  // 轮询事件
+  reset(); w.time = 900;
+  const u = al[0];
+  u.ammoPool = { drm: 8 }; Chatter.update(w, 1);           // 记下弹药上限
+  u.ammoPool = { drm: 1 }; Chatter.update(w, 1);
+  chk('bingoAmmo：弹药 < 25%', logOf().some(e => e.who === 'ALPHA-1'));
+  reset(); w.time = 1000; u.chat = null;
+  u.ammoPool = { drm: 8 }; Chatter.update(w, 1);
+  u.ammoPool = { drm: 0 }; Chatter.update(w, 1);
+  chk('winchester：弹药全空', logOf().some(e => e.who === 'ALPHA-1'));
+  reset(); w.time = 1100; u.chat = null; u.hp = 100; Chatter.update(w, 1);
+  u.hp = 40; Chatter.update(w, 1);
+  chk('damaged：血量跨 50%', logOf().some(e => e.who === 'ALPHA-1'));
+  reset(); w.time = 1200; u.chat = null; u.hp = 100; Chatter.update(w, 1);
+  u.ai.mode = 'evade'; Chatter.update(w, 1);
+  chk('defensive：进入规避', logOf().some(e => e.who === 'ALPHA-1'));
+  reset(); w.time = 1300;
+  const victim = mk(1, 'V', 2000, 0); victim.alive = false; victim.killedBy = al[1];
+  Chatter.update(w, 0.1);
+  chk('splash：我方 AI 击落敌机', logOf().some(e => e.who === 'ALPHA-2'));
+  u.ai.mode = 'pursue';
+  w.actors = w.actors.filter(a => a === p);          // 清掉测试机，下面用干净世界测钩子
+}
+
+/* ---------- G2. 撤离 / 整备钩子 ---------- */
+{
+  const S3 = Sim.load({ seed: 5 });
+  const { M3, Ent, AI, MISSIONS } = S3.sandbox;
+  S3.start(MISSIONS.findIndex(m => m.id === 'm1'));
+  const G = S3.sandbox.Game, w = G.__world(), p = G.__player(), ar = w.arenaDef, R3 = S3.sandbox.Radio, T3 = S3.sandbox.T;
+  for (const a of w.actors) if (a !== p) a.alive = false;
+  w.actors = w.actors.filter(a => a === p); w.targets.length = 0;
+  p.pos.x = ar.cx; p.pos.z = ar.cz - (ar.half - ar.warn - 4000) + 1500; p.hp = p.maxHp = 1e9;
+  const sentinel = Ent.makeAircraft({ type: 'albatross', team: 1, x: ar.cx - 30000, y: 4000, z: ar.cz + 30000, fwd: M3.V(1, 0, 0), speed: 250, special: 'dl6' });
+  AI.attach(sentinel, { role: 'enemy', skill: 0.55, rank: 'pawn' }); sentinel.hp = sentinel.maxHp = 1e9; w.actors.push(sentinel);
+  const a = Ent.makeAircraft({ type: 'albatross', team: 0, x: ar.cx, y: 4000, z: ar.cz - (ar.half - ar.warn - 4000), fwd: M3.V(1, 0, 0), speed: 250, special: 'dl6' });
+  AI.attach(a, { role: 'ally', skill: 0.55, rank: 'pawn' }); a.label = 'ALPHA-9'; a.hp = a.maxHp = 100; w.actors.push(a);
+  w.retreatOn = true; R3.clear();
+  a.hp = 20; a.ai.retreating = false;
+  // 直接让它撤：评估必中（概率设 1）
+  S3.sandbox.AI.$.retreatProb = () => 1;
+  for (let f = 0; f < 60; f++) { a.hp = Math.min(a.hp, 20); S3.step(1 / 60); p.alive = true; p.hp = p.maxHp; a.hp -= (f === 5 ? 1 : 0); }
+  for (let f = 0; f < 60 * 150; f++) { S3.step(1 / 60); p.alive = true; p.hp = p.maxHp; if (w.actors.indexOf(a) >= 0 && a.hp === a.maxHp && f > 600) break; }
+  for (let f = 0; f < 600; f++) { S3.step(1 / 60); p.alive = true; p.hp = p.maxHp; }
+  const lg = R3.log().filter(e => e.who === 'ALPHA-9');
+  const rtbTx = T3.all('radio.rtb.ally.variants'), reTx = T3.all('radio.rearmed.ally.variants');
+  chk('撤离开始：rtb 钩子播出', lg.some(e => rtbTx.indexOf(e.tx) >= 0), 'lines=' + lg.length);
+  chk('整备完成：rearmed 钩子播出', lg.some(e => reTx.indexOf(e.tx) >= 0), lg.map(e => e.tx).join(' | '));
 }
 
 process.exit(ok ? 0 : 1);

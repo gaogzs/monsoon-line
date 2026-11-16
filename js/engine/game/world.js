@@ -46,6 +46,7 @@
       if (m && $.player && actor !== $.player) {
         SFX.missileAt(M3.dist(actor.pos, $.player.pos));
       }
+      if (m && actor !== $.player) Chatter.fox(w, actor);      // 概率喊话（气氛，不是威胁报告）
       return m;
     };
     w.radio = Radio;
