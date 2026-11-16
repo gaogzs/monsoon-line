@@ -15,7 +15,7 @@
   var STEAL_PENALTY = 1.5;      // ally 对"玩家正盯着的敌机"的评分系数
   var STEAL_HP_FRAC = 0.35;     // 那架敌机血量低于此比例就不再回避（可以补刀）
   var R_LONG = 7000;            // 有效射程 ≥ 此值的对空弹 = 远距武器
-  $.DIR = { PILE: 0.6 /* 每多一个同队攻击者，评分距离 ×(1 + PILE) */, TICK: TICK, R_LONG: R_LONG, T_FURBALL: 25, T_STANDOFF: 45, RING_K: 0.6 };
+  $.DIR = { STICKY: 0.7, PILE: 1.0 /* 每多一个同队攻击者，评分距离 ×(1 + PILE) */, TICK: TICK, R_LONG: R_LONG, T_FURBALL: 25, T_STANDOFF: 45, RING_K: 0.6 };
 
   function snapshot(world) {
     var t = world.time || 0;
@@ -69,6 +69,7 @@
         var sc = Math.sqrt(d2);
         var n = attackers(d, a, e);
         if (n > 0) sc *= 1 + $.DIR.PILE * n;
+        if (e === a.ai.target) sc *= $.DIR.STICKY;       // 黏性：当前目标打折，免得在相近的候选之间来回切（接近会变慢）
         if (sec) {
           // 敌机方位（相对 ally 队质心）与本机扇区中心比较
           var ang = Math.atan2(e.pos.x - d.cx, e.pos.z - d.cz);

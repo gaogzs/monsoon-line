@@ -2,8 +2,8 @@
 /* ============================================================
    反挤团探针（docs/POST2-0IMPL.md 5.2 Director 的目标分配惩罚）
 
-   8 对 8 的空战（一方 ally、一方 enemy，同机型同位格），把 $.DIR.PILE 置 0（旧行为：各打各的最近敌机）
-   与默认值对比"扎堆指数" = 平均每次采样里、与别的同队飞机盯着同一个目标的飞机占有目标飞机的比例。
+   8 对 8 的空战（一方 ally、一方 enemy，同机型同位格），把 $.DIR.PILE 置 0、STICKY 置 1（旧行为：各打各的最近敌机）
+   与默认参数对比"扎堆指数" = 平均每次采样里、与别的同队飞机盯着同一个目标的飞机占有目标飞机的比例。
      A. 默认值下扎堆指数比 PILE=0 至少降低 50%
      B. 交战不坍塌：开打 60 s 后，两边合计仍有飞机互相造成伤害，且仍有目标（不是全员无所事事）
    用法：node tools/test/probes/probe-spacing.js
@@ -16,7 +16,7 @@ function chk(name, cond, detail) {
   if (!cond) ok = false;
 }
 
-function run(pile, seed) {
+function run(pile, seed, sticky) {
   const S = Sim.load({ seed });
   const { M3, Ent, AI } = S.sandbox;
   S.start(0);
@@ -26,7 +26,7 @@ function run(pile, seed) {
   w.targets.length = 0;
   p.pos.x += 90000;
   w.arenaDef = null;                 // 玩家被挪到场外，不能让越界渐黑结束这一局
-  AI.$.DIR.PILE = pile;
+  if (pile !== null) { AI.$.DIR.PILE = pile; AI.$.DIR.STICKY = sticky; }     // null = 用默认参数
   const mk = (team, i, z, fz) => {
     const a = Ent.makeAircraft({ type: 'albatross', team, x: (i - 3.5) * 650, y: 3000, z, fwd: M3.V(0, 0, fz), speed: 250, special: 'dl6' });
     AI.attach(a, { role: team === 0 ? 'ally' : 'enemy', skill: 0.6, rank: 'pawn' });
@@ -59,13 +59,13 @@ function run(pile, seed) {
 }
 
 const seeds = [1, 2, 3];
-const avg = (pile) => {
-  const r = seeds.map(s => run(pile, s));
+const avg = (pile, sticky) => {
+  const r = seeds.map(s => run(pile, s, sticky));
   return { idx: r.reduce((s, x) => s + x.idx, 0) / r.length, dmg: r.reduce((s, x) => s + x.dmg, 0) / r.length,
            idle: r.reduce((s, x) => s + x.idle, 0), active: r.reduce((s, x) => s + x.active, 0) };
 };
-const off = avg(0), on = avg(0.6);
-console.log('扎堆指数 PILE=0: ' + off.idx.toFixed(3) + '   PILE=0.6: ' + on.idx.toFixed(3));
+const off = avg(0, 1), on = avg(null);        // off = 旧行为（只看最近）；on = 默认参数
+console.log('扎堆指数 旧行为: ' + off.idx.toFixed(3) + '   默认: ' + on.idx.toFixed(3));
 chk('扎堆指数降低 ≥ 50%', off.idx > 0 && on.idx <= off.idx * 0.5, 'off=' + off.idx.toFixed(3) + ' on=' + on.idx.toFixed(3));
 chk('交战不坍塌：有伤害产生', on.dmg > 0, 'dmg=' + on.dmg.toFixed(0));
 chk('交战不坍塌：存活者多数仍有目标', on.active === 0 || on.idle / on.active < 0.5, 'idle=' + on.idle + '/' + on.active);
