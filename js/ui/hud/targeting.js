@@ -180,6 +180,18 @@
   }
   $.ownSarhMissile = ownSarhMissile;
 
+  /* AI 进入过失速机动（a.psm）时，在它身上标一行"高攻角机动"：与玩家自己的 PSM 提示同一类信息，让玩家读得懂对手在干什么 */
+  function drawPsmHints(ctx, W, H, p, world) {
+    for (var i = 0; i < world.actors.length; i++) {
+      var e = world.actors[i];
+      if (!e.alive || e === p || !e.psm || e.team === p.team) continue;
+      var s = M3.projectUnclamped(Renderer.getCam(), e.pos);
+      if (s.behind || s.x < 0 || s.x > W || s.y < 0 || s.y > H) continue;
+      $.text(ctx, T('ui.hud.targeting.drawPsmHints.hint'), s.x, s.y - 26, $.AMBER, $.FS, 'center');
+    }
+  }
+  $.drawPsmHints = drawPsmHints;
+
   function drawIllumStatus(ctx, W, H, p, world) {
     var m = ownSarhMissile(p, world);
     if (!m) return;

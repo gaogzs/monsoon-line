@@ -768,6 +768,21 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 
 > **批次 5 分片进度**：**5a 已完成（未发版，版本号由你定）**：5.0 分层、5.1 位格 / `AI.SKILL`、5.2 外围游走 / 回头 + Director、5.3 `ally`、5.4 撤离（含去整备点）、以及 5.7 里的「反应延迟与机炮偏移」。**顺延到后续批次**：5.5 Radio 2.0 与 `Chatter`、5.6 半主动雷达弹 / `FovWatch`、5.7 其余项、5.8 AI 过失速机动。
 
+### 5e 实施记录（AI 过失速机动，已完成，未发版）
+
+代码：`ai/psm.js`、`brain.js`（`mode: 'psm'`、覆盖链跳过）、`hud/targeting.js drawPsmHints`；探针 `probe-psm-ai`。**批次 5 到此全部完成**（5a–5e；仍顺延的见下）。出入：
+
+| 设计 | 实际 |
+|---|---|
+| `probe-psm.js` 增 AI 场景 | 单独的 `probe-psm-ai.js`（`probe-psm.js` 末尾是汇总退出，不便追加）；"非 ace 不进 psm"的断言放在探针里，没有加 smoke 段 |
+| 摆脱锁定的成败由 `FovWatch` 的 `onLockLost` 判 | 未接：`psmAbort` 只看对准 / 超时 / 目标没了 |
+| 假撤退回头优先用 PSM | 未做，回头只有加力 + 先机发射 |
+| 长机做 PSM 僚机不跟 | 僚机各自按自己的位格与威胁评估，没有"跟随"逻辑，所以天然不跟 |
+| 私有随机流 | `s.rs` 的种子与 Sim 种子无关（每个沙盒里相同），探针里按种子手动错开 |
+| golden | 不变（golden 场景里没有 ace 被咬尾 / 被导弹锁定） |
+
+**批次 5 仍顺延的项目**：5.7 的个体模型（过载 / 性格 / 失误）、态势记忆、编队协同（escort、队形、电子战协同、友军呼救）、导演与系统（ambient、调试可视化）；5.6 的 AI 高技能偏置转向、给机型 / 关卡配 `tether` 的预设；5.8 的 `FovWatch` 判成败与假撤退用 PSM。
+
 ### 5d 实施记录（战术行为，已完成，未发版）
 
 代码：`ai/energy.js`、`ai/strike.js`、`tactics.js evade`、`retreat.js`（假撤退、`umbrellaPoint`）、`director.js`（bait / flank）、`brain.js`、`util.js surfaceTargetFor`；探针 `probe-tactics`、`probe-strike`，`probe-retreat` 增 F / G。详见 [ai.md](systems/ai.md)。出入：

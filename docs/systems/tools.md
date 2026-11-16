@@ -48,6 +48,7 @@ tools/
 | 半主动雷达弹（照射保持 / 丢锁宽限 / AI 照射 / HUD） | `probe-sarh.js` |
 | AI 战术（按导弹类型防御 / 加力 / 诱饵侧击） | `probe-tactics.js` |
 | 低空突防 | `probe-strike.js` |
+| AI 过失速机动（ace 触发 / 非 ace 与 noPSM / 无人机不触发 / TTI 门限 / 冷却） | `probe-psm-ai.js`（玩家侧的 PSM 在 `probe-psm.js`） |
 | FovWatch（保守调度与暴力检查逐事件一致、迟滞） | `probe-fovwatch.js` |
 | `render-gl.js` / `render.js` / `shading.js` | `probe-render.js`（要 Chrome） |
 | 模型、挂载、俯视图、详情页 | 对应的 `render/` 预览器（肉眼看） |

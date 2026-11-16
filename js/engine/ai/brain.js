@@ -31,6 +31,8 @@
       lowStrike: false,    // 低空突防中（跳过近地保护，$.skimDir 自己守 80 m 下限）
       subrole: null,       // 'bait' / 'flank'（Director 给成对的 skill>=0.6 敌机分配）
       flankSide: 1,
+      psmAI: null,         // AI 过失速机动 {kind: counter|break, src, t}（ai/psm.js）
+      psmCd: 0, psmEval: null, psmSeen: false,
       fake: null,          // 假撤退 {t, dur, from}（retreat.js）
       fakeBoostT: 0,
       umbT: 0,
@@ -382,6 +384,11 @@
     if ((s.retreating || s.fake) && s.mode !== 'evade') s.mode = 'retreat';
     else if (!s.retreating && !s.fake && s.mode === 'retreat') s.mode = 'pursue';
 
+    /* ---------- 2c. 过失速机动（5.8）：进行中的 PSM 凌驾于规避 / 追击之上；结束后回 pursue ---------- */
+    $.psmWatch(a, s, world, dt);
+    if ($.psmActive(a, s)) s.mode = 'psm';
+    else if (s.mode === 'psm') s.mode = 'pursue';
+
     /* ---------- 3. 选择目标 ---------- */
     if (s.role === 'drone') {
       /* 无人僚机没有判断力：目标来自**长机的授权**，
@@ -479,7 +486,7 @@
        缠斗（< 1800 m）累计 T_FURBALL 以上：脱离（extend）4–7 s 再重来 */
   function decideRange(a, s, world, dt) {
     var D = $.DIR, t = s.target;
-    if (s.mode === 'retreat') return;
+    if (s.mode === 'retreat' || s.mode === 'psm') return;
     var air = t && t.alive && t.kind !== 'target';
     if (!air || s.mode === 'evade' || s.mode === 'extend' || !$.SKILL.standoff(s)) {
       if (s.mode === 'standoff' || s.mode === 'closeIn') s.mode = 'pursue';
@@ -517,7 +524,11 @@
     var throttle = 0.85, ab = false;
     s.lowStrike = false;
 
-    if (s.mode === 'evade' && s.msl) {
+    if (s.mode === 'psm') {
+      /* 过失速机动：机头去对准 psmAim（甩向攻击者 / 远离来袭弹），推力全开；stepAircraft 看 a.psm 转 stepPSM，消费这里 steerTo 写的 ctrl */
+      desired = $.psmAim(a, s) || a.fwd;
+      throttle = 1; ab = false;
+    } else if (s.mode === 'evade' && s.msl) {
       var r = $.evade(a, s.msl, world);
       desired = r.dir;
       throttle = r.throttle;
@@ -641,8 +652,9 @@
 
     /* 所有分支都汇到这里，所以升限钳制放在这一处就够了 ——
        无论是追击、规避还是编队，都不会为了追人钻到没有机动能力的高度。 */
-    desired = clampCeiling(a, desired);
-    if (s.mode !== 'retreat' || s.fake) desired = arenaSteer(a, desired, world);   // 撤离就是要出去，不被软转向拉回来
+    var inPsm = s.mode === 'psm';             // PSM 期间显式跳过升限、战区软转向、垂直改出、近地保护（5.0 / 5.8）
+    if (!inPsm) desired = clampCeiling(a, desired);
+    if ((s.mode !== 'retreat' || s.fake) && !inPsm) desired = arenaSteer(a, desired, world);   // 撤离就是要出去，不被软转向拉回来
 
     $.steerTo(a, desired, ctrl, a);
 
@@ -659,14 +671,15 @@
 
        要有记忆：只在阈值上判断会在线附近来回摆 —— 压到线下，steerTo 接管
        又抬回去。一旦开始改出，就压到机头低于 0.2 才交还。 */
-    if (a.fwd.y > 0.5 && desired.y < 0.3) s.vertRecover = true;
+    if (inPsm) s.vertRecover = false;
+    else if (a.fwd.y > 0.5 && desired.y < 0.3) s.vertRecover = true;
     if (s.vertRecover) {
       if (a.fwd.y < 0.2) s.vertRecover = false;
       else { ctrl.pitch = (a.up.y >= 0) ? -1 : 1; ctrl.roll = 0; }
     }
 
     // 硬性保护：撞地前强行拉起
-    if (Ent.agl(a) < 420 && a.fwd.y < 0.05 && !s.lowStrike) {
+    if (Ent.agl(a) < 420 && a.fwd.y < 0.05 && !s.lowStrike && !inPsm) {
       desired = M3.norm(M3.V(a.fwd.x, 0.5, a.fwd.z));
       $.steerTo(a, desired, ctrl, a);
       throttle = 1; ab = true;
