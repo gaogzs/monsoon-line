@@ -12,6 +12,8 @@ const S = Sim.load({ seed: SEED });
 const G = S.sandbox.Game;
 const MISSIONS = S.sandbox.MISSIONS;
 const EntP = S.sandbox.Ent;
+const RANKS = S.sandbox.RANKS;
+const rankBad = new Set();
 
 console.log('== 可完成性探针：清空敌人后能否取胜 ==\n');
 const rows = [];
@@ -35,6 +37,10 @@ for (let mi = 0; mi < MISSIONS.length; mi++) {
     for (let f = 0; f < FPS * LIMIT; f++) {
       // 每 0.5 秒清一次：新生成的增援/波次也一并清掉
       if (f % 30 === 0) {
+        // 位格：每个战斗 AI（spawnEnemy 出来的）都必须带合法 rank（逼着新关、新单位写位格）
+        for (const a of w.actors) {
+          if (a.ai && a.ai.role === 'enemy' && !(a.rank && RANKS[a.rank])) rankBad.add(m.id + ':' + a.type + ':' + a.rank);
+        }
         for (const a of w.actors) if (a.team === 1) a.alive = false;
         for (const t of w.targets) if (t.team === 1) { t.alive = false; t.dead = true; }
         // 玩家无敌（每帧都被 stepAircraft 写回，所以这里也补一次）
@@ -96,4 +102,5 @@ for (const r of rows) {
 }
 console.log('\n' + (bad.length ? '问题：\n  ' + bad.join('\n  ')
   : '全部 ' + rows.length + ' 关：清空敌人后都能取胜，且没有 NPC 挂载问题'));
+if (rankBad.size) { bad.push('rank 缺失或不在 RANKS：' + [...rankBad].join(', ')); }
 process.exitCode = bad.length ? 1 : 0;      // 有关卡打不赢 / 抛异常 / NPC 挂载写错 → 非零，可当门禁

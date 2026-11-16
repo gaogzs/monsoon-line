@@ -81,7 +81,12 @@ function spawnEnemy(w, o) {
      那个既不是呼号也不是型号，纯粹是把内部编号漏了出来。 */
   a.name = ac.name + ' ' + ac.cn;
   a.label = o.callsign || null;
-  AI.attach(a, { role: 'enemy', skill: o.skill === undefined ? 0.55 : o.skill });
+  /* 位格：显式 rank > 机型默认 rank > 按 skill 就近映射；skill 缺省取位格缺省值（有 rank 时）否则 0.55 */
+  var rank = o.rank || ac.rank || null;
+  var skill = o.skill !== undefined ? o.skill : (rank ? RANKS[rank].skill : 0.55);
+  if (!rank) rank = rankFromSkill(skill);
+  AI.attach(a, { role: 'enemy', skill: skill, rank: rank });
+  a.rank = rank;
   a.ai.cmd = o.behavior || 'pursue';
   // 护航机不算任务目标：任务简报说的是"测绘编队 5 架"，
   // 把它们算进去会让"剩余 N"对不上

@@ -84,6 +84,22 @@ function exposedPoints(ac, wids) {
   return n;
 }
 
+/**
+ * 位格（docs/POST2-0IMPL.md 5.1）：NPC 飞机的档次，枚举值，不是标签。
+ * skill 是该位格的缺省技巧值，关卡 / 机型可以用 skill 覆盖，覆盖后 rank 不变。
+ */
+var RANKS = {
+  rookie: { skill: 0.35 },
+  pawn:   { skill: 0.55 },
+  elite:  { skill: 0.72 },
+  ace:    { skill: 0.90 }
+};
+
+/** 没写 rank 时，按 skill 就近落到某一档（0.45 / 0.65 / 0.85 为分界） */
+function rankFromSkill(skill) {
+  return skill < 0.45 ? 'rookie' : skill < 0.65 ? 'pawn' : skill < 0.85 ? 'elite' : 'ace';
+}
+
 /** 挂载后的实际匿踪值 0..1 */
 function stealthValue(ac, exposed) {
   var s = (ac && ac.stats && ac.stats.stl) || 0;

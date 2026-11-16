@@ -23,7 +23,7 @@
     var dist = M3.len(toT);
     var tGo = dist / Math.max(60, a.speed);
     var tv = t.vel || M3.V(0, 0, 0);
-    var aim = M3.add(t.pos, M3.mul(tv, tGo * 0.85));
+    var aim = M3.add(t.pos, M3.mul(tv, tGo * $.SKILL.leadK()));
     return M3.norm(M3.sub(aim, a.pos));
   }
 

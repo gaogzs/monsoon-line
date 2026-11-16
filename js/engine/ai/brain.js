@@ -10,7 +10,8 @@
     opt = opt || {};
     a.ai = {
       role: opt.role || 'enemy',
-      skill: opt.skill === undefined ? 0.6 : opt.skill,
+      skill: opt.skill === undefined ? (opt.rank && RANKS[opt.rank] ? RANKS[opt.rank].skill : 0.6) : opt.skill,
+      rank: opt.rank || null,
       mode: 'pursue',
       modeT: 0,
       evadeT: 0,
@@ -297,7 +298,7 @@
       if (je.alive && Ent.hostile(je, a) && je.ewPower > 0) { jammedBy = je; break; }
     }
     if (jammedBy) {
-      s.ewResist = Math.min(1, (s.ewResist || 0) + dt * (0.18 + s.skill * 0.30));
+      s.ewResist = Math.min(1, (s.ewResist || 0) + dt * $.SKILL.ewRate(s));
     } else if (s.ewResist > 0) {
       s.ewResist = Math.max(0, s.ewResist - dt * 0.08);
     }
@@ -352,7 +353,7 @@
         s.target = leadOk ? dLead.target : (dLead && dLead.alive ? $.nearestEnemy(a, world, $.WING_FREE_R) : null);
       }
     } else if (s.retargetT <= 0 || !s.target || !s.target.alive) {
-      s.retargetT = 0.35 + (1 - s.skill) * 0.9;
+      s.retargetT = $.SKILL.retarget(s);
       if (s.role === 'wingman' && s.cmd === 'focus' && world.player && world.player.target) {
         s.target = world.player.target;
       } else if (s.role === 'wingman' && s.cmd === 'cover') {
@@ -589,7 +590,7 @@
     a.firingGun = false;
     if (gunW) {
       var gunRange = (a.pos.y > 18000 ? gunW.highRange : gunW.range);
-      var gunCone = 0.028 + (1 - s.skill) * 0.02;
+      var gunCone = $.SKILL.gunCone(s);
       a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
     }
     if (a.firingGun) {
@@ -656,12 +657,12 @@
         var envOK = true;
         if (okDist && okAng && dist > minR && spW.seeker && spW.seeker !== 'none' && !spW.tags.unguided && !spW.tags.passive) {
           var env = $.aiEnvelope(a, s, spW, pick, t);
-          var lim = Math.min(spW.lockDist || Infinity, s.skill >= 0.6 ? env.nez : env.rmax);
+          var lim = Math.min(spW.lockDist || Infinity, $.SKILL.useNez(s) ? env.nez : env.rmax);
           envOK = dist < lim * (t.kind === "target" ? $.AI_RANGE_MARGIN_SURF : $.AI_RANGE_MARGIN_AIR);
         }
-        if (okDist && okAng && envOK && dist > minR && Math.random() < (0.35 + s.skill * 0.45) * jamK) {
+        if (okDist && okAng && envOK && dist > minR && Math.random() < $.SKILL.fireWill(s) * jamK) {
           if (world.fireMissile) world.fireMissile(a, t);
-          s.shootT = M3.rnd(2.6, 5.2) * (1.6 - s.skill * 0.6);
+          s.shootT = M3.rnd(2.6, 5.2) * $.SKILL.shootGap(s);
         }
       }
     }
