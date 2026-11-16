@@ -499,7 +499,7 @@ if (!v || !v[evt]) return;      // 找不到就静默返回
 | sk1 | `start` | `Game` 开局 |
 | 全部 | `allyDown` | `Game` 统一触发（`engine/game/update.js`）—— **但只有 `m1` 定义了这个事件**，其余任务里僚机阵亡这句会静默跳过 |
 
-**已定义但当前无人播的事件**（上面一句"`finish()` 里没有 `Radio.play(..., 'win'/'lose')`"指的是 `js/engine/game/finish.js`）：每个任务（含 `sk1`）的 `win` / `lose`，以及 `m1.playerHit` —— 数组都写好了，但 `finish()` 里没有 `Radio.play(..., 'win'/'lose')`，`playerHit` 也只在 `SFX` 里有同名音效（`audio.js`），无线电侧没有调用点。**这是一批"写好没接上"的台词**，改动前先确认是不是有意保留。
+**已定义但当前无人播的事件**（上面一句"`finish()` 里没有 `Radio.play(..., 'win'/'lose')`"指的是 `js/engine/game/finish.js`）：每个任务（含 `sk1`）的 `win` / `lose`，数组都写好了，但 `finish()` 里没有 `Radio.play(..., 'win'/'lose')`。（`m1.playerHit` 已不是死数据：`engine/game/update.js` 在玩家掉血时触发，25 s 限频。）**这是一批"写好没接上"的台词**，改动前先确认是不是有意保留。
 
 ---
 

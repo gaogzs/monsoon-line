@@ -5,7 +5,7 @@
 ```js
 T('aircraft.frigatebird.desc')           // 取文本
 T('fail.m2.baseLost', { n: 3 })          // 文本里的 {{n}} 从第二个参数按点号路径取值，取不到值直接抛错
-T.pick('radio.fox.variants', rng)        // 叶子是数组时随机挑一条（rng 缺省 Math.random）；T(键) 对数组取第一条
+T.pick('radio.fox.ally.variants', rng)        // 叶子是数组时随机挑一条（rng 缺省 Math.random）；T(键) 对数组取第一条
 T.has('some.key')                        // 键是否存在
 ```
 

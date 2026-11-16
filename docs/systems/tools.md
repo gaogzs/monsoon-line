@@ -44,6 +44,7 @@ tools/
 | AI 反应延迟 / 机炮瞄准偏移 | `probe-aim.js` |
 | AI 目标分配（反扎堆）/ 外围游走 | `probe-spacing.js` |
 | AI 撤离（开关 / 触发 / 出界 / 整备往返） | `probe-retreat.js` |
+| 无线电队列（优先级 / TTL / 日志）与 Chatter | `probe-radio.js` |
 | `render-gl.js` / `render.js` / `shading.js` | `probe-render.js`（要 Chrome） |
 | 模型、挂载、俯视图、详情页 | 对应的 `render/` 预览器（肉眼看） |
 | 要发一个版本 | `release.js vX.Y.Z`，见[版本戳与发版](#版本戳与发版) |

@@ -67,11 +67,15 @@
 | 成员 | 签名 | 语义 |
 |---|---|---|
 | `play` | `play(missionId, evt)` | 把 `VOICES[missionId][evt]` 整组台词压入队列；表或键不存在时静默返回 |
-| `raw` | `raw(line)` | 压入单条台词对象 `{ who, cls, tx, gap, nogarble? }`（`nogarble: true` = 剧情台词，不受干扰乱码影响，失败台词用它） |
+| `raw` | `raw(line)` | 压入单条台词对象 `{ who, cls, tx, gap, nogarble?, pri?, key? }`（`pri` 缺省 `story`；`key` = 事件 + 说话人，队里已有同 key 就丢弃新的）（`nogarble: true` = 剧情台词，不受干扰乱码影响，失败台词用它） |
 | `update` | `update(dt)` | 推进出队计时与淡出。**只有 `update(dt)` 会调它** |
-| `clear` | `clear()` | 清空队列、活动字幕数组与 `#radio` 的 `innerHTML` |
+| `clear` | `clear()` | 清空队列、活动字幕数组、日志与 `#radio` 的 `innerHTML` |
+| `log` | `log()` | 最近 30 条记录的副本（`{t, who, tx, cls, pri, dropped}`，含被丢弃的；最新在最后）。暂停菜单「无线电记录」页签读它 |
+| `gapAfter` / `lifeOf` / `STORY_MAX_WAIT` / `TTL` | | 节奏与时长的纯函数与常量（探针用） |
 | `setDistortion` | `setDistortion(fn)` | 注册电磁干扰度（0–1）的取值函数；`Game` 初始化时挂上玩家的 `suppressed`（`Radio` 不直接读 player） |
 | `garble` | `garble(html, k, rng?)` | 往 html 的文本段里**插入**星号（不替换、不碰标签 / 实体）：个数 ≈ `round(k × 字数 / 6)`，位置随机、互不相邻；`k < 0.05` 原样返回 |
+
+**Radio 2.0（批次 5b，未发版）**：队列带优先级 `pri`：`story`（`raw` / `play` 缺省；永不过期、不丢，排在低优先级之前但不打断当前一句，等满 `STORY_MAX_WAIT` = 4 s 必定下一个出队）> `player` > `ally` > `chatter`；低优先级在队里等超过 `TTL`（player 10 s / ally 6 s / chatter 3 s）被丢弃，记入日志并标 `dropped`。两条上屏之间至少 `gap = clamp(0.8 + 0.06×上一条字数, 1.2, 4)` s（台词自己写的 `gap` 更大时取它）；显示时长 `life = clamp(6 + 0.12×字数, 7, 14)` s（字数不含 HTML 标记）。时间全由 `update(dt)` 累加，暂停时不走。暂停菜单多一个「无线电记录」页签（`ui/screens/pause.js` 的 `renderRadioLog`）。探针：`probe-radio`。
 
 **电磁干扰乱码（2.3）**：台词在队列里保留原文，上屏那一刻（`push`）才按当时的 `suppressed` 处理；`cls ∈ ally / enemy / cmd` 才乱码，`fx`（系统音）、`SysNote`、`nogarble` 台词不处理；`SFX.radio(k)` 的噪声脉冲随干扰度加长 / 加重。被压制（`suppressed > 0.35`）时 `setWingCmd` 仍把指令喊出来（走乱码），但不写 `ai.cmd`、不确认，只弹 SysNote（数据链被压制）。预警机被压制时本来就静默（`updateAewc`）。
 

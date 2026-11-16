@@ -768,6 +768,17 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 
 > **批次 5 分片进度**：**5a 已完成（未发版，版本号由你定）**：5.0 分层、5.1 位格 / `AI.SKILL`、5.2 外围游走 / 回头 + Director、5.3 `ally`、5.4 撤离（含去整备点）、以及 5.7 里的「反应延迟与机炮偏移」。**顺延到后续批次**：5.5 Radio 2.0 与 `Chatter`、5.6 半主动雷达弹 / `FovWatch`、5.7 其余项、5.8 AI 过失速机动。
 
+### 5b 实施记录（Radio 2.0 + Chatter，已完成，未发版）
+
+代码：`js/ui/radio.js`（队列重写）、`js/ui/screens/pause.js` + `locales/_html/overlays/pause.html`（记录页签）、`js/engine/chatter.js`、`locales/zh-CN/text/radio.json`；探针 `probe-radio`。详见 [game.md](systems/game.md)（Radio）、[modules.md](systems/modules.md)（Chatter）。出入：
+
+| 设计 | 实际 |
+|---|---|
+| 声线按阵营（上游 / 下游） | 按队伍：team 0 = 我方声线、其余 = 敌方声线（机型 `faction` 是本地化文本，不能当键）；敌方台词只在离玩家 20 km 内播 |
+| 事件钩子 | `rtb`（`retreat.js`）、`rearmed`（`Resupply.reappear`）、`fox`（`world.fireMissile`）是直接钩子；`bingoAmmo / winchester / damaged / splash / defensive` 由 `Chatter.update` 轮询（击杀每帧扫、其余 0.5 s），不改实体层 |
+| 暂停菜单记录页签 | 做了；smoke 没加段，接线断言放在 `probe-radio` |
+| `VOICES.m1.playerHit` 是死数据 | 核对后**不是**：`engine/game/update.js` 已在玩家掉血时触发（25 s 限频）；文档 `data.md` 已更正 |
+
 ### 5a 实施记录与出入
 
 代码：`js/engine/ai/{skill,director,retreat}.js`、`brain.js`（`perceive / decide / decideRange / maneuver / fire`）、`js/data/rules.js`（`RANKS`、`rankFromSkill`）、`js/engine/world/resupply.js`（`pointFor`、`world.retreatOn`）、`missions/_lib.js`（`spawnAlly`、`spawnEnemy` 的 `rank`）。探针：`probe-aim`、`probe-spacing`、`probe-retreat`，`probe-missions` 新增"每个敌方 AI 都有合法 `rank`"。详见 [ai.md](systems/ai.md)。
