@@ -40,6 +40,7 @@
      Resupply.resetPose(world, e, a)      按条目的 reset 算出位姿 { x, y, z, fwd, speed } 或 null（keep）
      Resupply.applyPose(a, pose)          把位姿落到飞机上（位置 / 朝向平飞 / 速度 / 控制量清零）
      Resupply.launched(world, e)          记一次"放出"（同一出口的 NPC 会错开 LAUNCH_GAP 秒）
+     Resupply.pointFor(world, a)          撤离去向：本队整备点，否则最近出界口 { x, z, entry, exit }
      Resupply.leaderOf(world, a)          飞机 a 的长机（没有就是 null）
      Resupply.wingmenOf(world, leader)    长机的僚机（在场的；已在离场周期里的不算）
      Resupply.squadRearm(world, e, leader) 长机整备完成后，让它的僚机一同补给（见上）
@@ -93,6 +94,7 @@ var Resupply = (function () {
       });
     }
     world.resupply = { entries: entries, status: { kind: 'none' }, away: [] };
+    world.retreatOn = !!(mission && mission.retreat === 'on');     // 撤离开关（缺省 off）
     world.rearmCount = 0;
     // 开局状态当基线：补满就是补回这个（干扰弹数、机炮弹数）。mission.spawn 之后调，所以僚机都是满的
     for (var j = 0; j < world.actors.length; j++) {
@@ -242,7 +244,13 @@ var Resupply = (function () {
     a.gunHeat = 0; a.firingGun = false;
     a.stall = false; a.psm = null; a.psmRecover = 0; a.psmLevel = false;
     a.target = null;
-    if (a.ai) { a.ai.target = null; a.ai.mode = 'pursue'; a.ai.evadeT = 0; a.ai.modeT = 0; a.ai.retargetT = 0; a.ai.flareBurst = 0; }
+    if (a.ai) {
+      var s = a.ai;
+      s.target = null; s.mode = 'pursue'; s.evadeT = 0; s.modeT = 0; s.retargetT = 0; s.flareBurst = 0;
+      s.retreating = false; s.evalT = 0; s.retreatCd = 0;
+      s.aim.x = 0; s.aim.y = 0; s.aimFor = null; s.gunT = 0; s.missT = 0; s.strafe = false; s.flareReact = 0; s.lostT = null;
+      s.furT = 0; s.standT = 0; s.closeT = 0; s.standCool = 0; s.msl = null; s.hpSeen = a.hp;
+    }
   }
 
   function reappear(world, a, e) {
@@ -288,14 +296,38 @@ var Resupply = (function () {
         var inR = inRange(world, a, e);
         if (rs.armed[k] === undefined) rs.armed[k] = !inR;     // 开局就在范围里：先要离开一次
         if (!inR) { rs.armed[k] = true; continue; }
-        if (rs.armed[k] && e.uses > 0 && needsResupply(a)) {
+        if (rs.armed[k] && e.uses > 0 && (needsResupply(a) || a.ai.retreating)) {
           rs.armed[k] = false;
           e.uses--;
           rs.cyc = { entry: e, t: 0 };
+          a.ai.retreating = false;                 // 撤到整备点了：撤离结束，进整备周期
           break;
         }
       }
     }
+  }
+
+  /* 撤离的去向（docs/POST2-0IMPL.md 5.4）：优先本队的整备点（还有次数的单位 / 界外整备区），
+     否则最近的出界口。返回 { x, z, entry|null, exit }；没有战区边界又没有整备点返回 null。 */
+  function pointFor(world, a) {
+    var R = world.resupply, best = null, bd = 1e18, ar = world.arenaDef, i, e, p, d;
+    if (R) for (i = 0; i < R.entries.length; i++) {
+      e = R.entries[i];
+      if (e.uses <= 0 || (e.def.team === undefined ? 0 : e.def.team) !== a.team) continue;
+      if (e.def.edge) {
+        if (!ar) continue;
+        var sg = e.def.edge.charAt(0) === '-' ? -1 : 1, ax = e.def.edge.charAt(1) === 'x';
+        p = { x: ax ? ar.cx + sg * (ar.half - ar.warn * 0.5) : a.pos.x, z: ax ? a.pos.z : ar.cz + sg * (ar.half - ar.warn * 0.5) };
+      } else if (e.unit && e.unit.alive && e.unit.team === a.team) p = { x: e.unit.pos.x, z: e.unit.pos.z };
+      else continue;
+      d = hdist(a.pos, p);
+      if (d < bd) { bd = d; best = { x: p.x, z: p.z, entry: e, exit: false }; }
+    }
+    if (best || !ar) return best;
+    // 最近的出界口：离哪条边最近就往哪条边外飞
+    var dx = a.pos.x - ar.cx, dz = a.pos.z - ar.cz, far = ar.half + 3000;
+    if (Math.abs(dx) >= Math.abs(dz)) return { x: ar.cx + (dx >= 0 ? far : -far), z: a.pos.z, entry: null, exit: true };
+    return { x: a.pos.x, z: ar.cz + (dz >= 0 ? far : -far), entry: null, exit: true };
   }
 
   /* 跟随长机的默认阵型位置：长机身后 / 侧后的槽位（ai.formation = { dx 右, dy 上, dz 前 }），同航向同速度 */
@@ -438,6 +470,6 @@ var Resupply = (function () {
 
   return {
     init: init, update: update, suppressesArena: suppressesArena, refill: refill,
-    resetPose: resetPose, applyPose: applyPose, launched: launched, leaderOf: leaderOf, wingmenOf: wingmenOf, squadRearm: squadRearm, validate: validate
+    resetPose: resetPose, applyPose: applyPose, launched: launched, leaderOf: leaderOf, wingmenOf: wingmenOf, pointFor: pointFor, squadRearm: squadRearm, validate: validate
   };
 })();

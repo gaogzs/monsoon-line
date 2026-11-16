@@ -27,6 +27,9 @@
       orbit: 1,            // standoff 绕圈方向（±1）
       ringR: 0,            // standoff 的环半径
       wclass: null,        // 武器分类：longRange / shortRange / gunOnly
+      retreating: false,   // 撤离中（retreat.js；mission.retreat 为 'on' 才会置真）
+      evalT: 0,            // 撤离评估倒计时（事件之后 RETREAT.EVAL_DELAY 秒评估一次）
+      retreatCd: 0,        // 评估没中之后的冷却
       mode: 'pursue',
       modeT: 0,
       evadeT: 0,
@@ -270,10 +273,11 @@
     if (s.flareT > 0) s.flareT -= dt;
 
     /* 三层（docs/POST2-0IMPL.md 5.0）：感知 → 决策 → 机动 → 开火。
-       mode 取值：pursue / evade / extend / standoff（外围游走）/ closeIn（回头近战）；retreat 由后续步骤接入。 */
+       mode 取值：pursue / evade / extend / standoff（外围游走）/ closeIn（回头近战）/ retreat（撤离，retreat.js）。 */
     perceive(a, s, world, dt);
     decide(a, s, world, dt);
     maneuver(a, s, world, dt);
+    if (!a.alive) return;                    // 撤离飞出战区被移除
     fire(a, s, world, dt);
   }
 
@@ -355,6 +359,11 @@
       s.modeT = M3.rnd(4, 9);
     }
     if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
+
+    /* ---------- 2b. 撤离（mission.retreat 'on'）：evade 优先，其余时间 mode = retreat ---------- */
+    $.retreatWatch(a, s, world, dt);
+    if (s.retreating && s.mode !== 'evade') s.mode = 'retreat';
+    else if (!s.retreating && s.mode === 'retreat') s.mode = 'pursue';
 
     /* ---------- 3. 选择目标 ---------- */
     if (s.role === 'drone') {
@@ -453,6 +462,7 @@
        缠斗（< 1800 m）累计 T_FURBALL 以上：脱离（extend）4–7 s 再重来 */
   function decideRange(a, s, world, dt) {
     var D = $.DIR, t = s.target;
+    if (s.mode === 'retreat') return;
     var air = t && t.alive && t.kind !== 'target';
     if (!air || s.mode === 'evade' || s.mode === 'extend' || !$.SKILL.standoff(s)) {
       if (s.mode === 'standoff' || s.mode === 'closeIn') s.mode = 'pursue';
@@ -510,6 +520,10 @@
       if (away) desired = M3.norm(M3.sub(a.pos, away.pos));
       else desired = a.fwd;
       desired = M3.norm(M3.V(desired.x, 0.06, desired.z));
+      throttle = 1; ab = true;
+    } else if (s.mode === 'retreat') {
+      s.flareReact = 0;
+      desired = $.retreatDir(a, s, world);        // 飞出战区的会在这里被移除（返回 null）
       throttle = 1; ab = true;
     } else if (s.role === 'drone') {
       /* 无人僚机永远待在编队里，不追出去。
@@ -596,7 +610,7 @@
     /* 所有分支都汇到这里，所以升限钳制放在这一处就够了 ——
        无论是追击、规避还是编队，都不会为了追人钻到没有机动能力的高度。 */
     desired = clampCeiling(a, desired);
-    desired = arenaSteer(a, desired, world);
+    if (s.mode !== 'retreat') desired = arenaSteer(a, desired, world);   // 撤离就是要出去，不被软转向拉回来
 
     $.steerTo(a, desired, ctrl, a);
 
@@ -641,7 +655,7 @@
   /* 开火层：机炮与导弹。读 s.target / s.mode，写 a.firingGun，经 world.fireMissile 发射。 */
   function fire(a, s, world, dt) {
     /* ---------- 5. 开火 ---------- */
-    if (s.mode === 'evade' || s.mode === 'extend') {
+    if (s.mode === 'evade' || s.mode === 'extend' || s.mode === 'retreat') {
       a.firingGun = false; s.gunT = 0; s.missT = 0; s.strafe = false;
       return;
     }
