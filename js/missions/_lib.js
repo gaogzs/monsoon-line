@@ -85,7 +85,7 @@ function spawnEnemy(w, o) {
   var rank = o.rank || ac.rank || null;
   var skill = o.skill !== undefined ? o.skill : (rank ? RANKS[rank].skill : 0.55);
   if (!rank) rank = rankFromSkill(skill);
-  AI.attach(a, { role: 'enemy', skill: skill, rank: rank, temperament: o.temperament || null });
+  AI.attach(a, { role: 'enemy', skill: skill, rank: rank, temperament: o.temperament || null, ward: o.ward || null, fm: o.fm || null });
   a.rank = rank;
   a.ai.cmd = o.behavior || 'pursue';
   // 护航机不算任务目标：任务简报说的是"测绘编队 5 架"，

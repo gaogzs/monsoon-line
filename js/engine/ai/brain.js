@@ -32,6 +32,8 @@
       lowStrike: false,    // 低空突防中（跳过近地保护，$.skimDir 自己守 80 m 下限）
       blackT: 0, gT: 0, pDir: null,   // 过载 / 视野变窄（gTrack）
       incId: null, incWait: 0, incDelay: 0, lostX: 0, lostXSet: false,   // 人为失误（skill.js misjudgeT / lostExtra）
+      fm: opt.fm || null,            // 巡航队形 {mode, lead, idx}（coord.js）
+      jamAway: null, jammer: null, helpT: 0, escortT: null, escortOK: null,
       ward: opt.ward || null,        // 护航：被护卫者（loyal 性格的 leash 参照）
       lastKnown: null, lostSightT: 0, searching: false,   // 态势记忆（memory.js）
       subrole: null,       // 'bait' / 'flank'（Director 给成对的 skill>=0.6 敌机分配）
@@ -372,6 +374,7 @@
       var je = world.actors[ji];
       if (je.alive && Ent.hostile(je, a) && je.ewPower > 0) { jammedBy = je; break; }
     }
+    s.jammer = jammedBy;
     if (jammedBy) {
       s.ewResist = Math.min(1, (s.ewResist || 0) + dt * $.SKILL.ewRate(s));
     } else if (s.ewResist > 0) {
@@ -475,6 +478,7 @@
       }
     }
 
+    $.coordStep(a, s, world, dt);                 // 编队解散 / 脱离干扰区 / 友军呼救（coord.js）
     s.searching = $.memStep(a, s, world, dt);
     decideRange(a, s, world, dt);
 
@@ -582,7 +586,7 @@
     } else if (s.mode === 'extend') {
       s.flareReact = 0;
       // 向低威胁方向脱离，同时保持能量
-      var away = $.nearestEnemy(a, world, 20000);
+      var away = (s.jamAway && s.jamAway.alive) ? s.jamAway : $.nearestEnemy(a, world, 20000);
       if (away) desired = M3.norm(M3.sub(a.pos, away.pos));
       else desired = a.fwd;
       desired = M3.norm(M3.V(desired.x, 0.06, desired.z));
@@ -659,11 +663,15 @@
       /* 低空突防（批次 5d）：strike 机型、skill ≥ 0.6 —— 进投放包线前贴海面飞，到包线边缘才拉起、发射后回到低空 */
       var sk = $.skimDir(a, s, desired);
       if (sk) { desired = sk; s.lowStrike = true; throttle = 1; }
+    } else if (s.fm && $.fmDir(a, s, world)) {
+      /* 巡航队形（未交战）：跟着队长走槽位；交战判据成立后 coord.js 会解散（s.fm = null），回到各自的战术角色 */
+      var fd = $.fmDir(a, s, world);
+      desired = fd.dir; throttle = fd.throttle; ab = fd.ab;
     } else if (s.target) {
       var res = $.pursue(a, (s.searching && $.searchGhost(s)) || s.target, world);
       desired = res.dir;
       /* loyal 性格：不离开长机 / 被护卫者超过 leash（缺省长机 = ai.leader，护航 = ai.ward）*/
-      var lead0 = s.leader || s.ward, lash = $.temper(s).leash;
+      var lead0 = s.leader || s.ward, lash = $.temper(s).leash || (s.ward ? $.ESCORT.LEASH : 0);
       if (lash && lead0 && lead0.alive && M3.dist(a.pos, lead0.pos) > lash) desired = M3.norm(M3.sub(lead0.pos, a.pos));
       /* 机炮瞄准偏移：机头去对准"提前量点 + aim"，子弹跟着机头打偏。只在近距、对空、有炮时叠加。 */
       if (WEAPONS[a.gun] && M3.dist(a.pos, s.target.pos) < $.SKILL.AIM_RANGE) {
@@ -688,10 +696,13 @@
       if (s.fakeBoostT > 0) ab = true;            // 假撤退回头：短时加力，缩短回转时间窗
       desired = $.yoyo(a, s, desired, dT);
     } else {
-      // 无目标：巡逻
+      // 无目标：护航机绕着被护卫者转，其余巡逻
+      var wd = s.ward && s.ward.alive ? $.escortDir(a, s) : null;
+      if (wd) { desired = wd; throttle = 0.75; } else {
       s.wander += dt * 0.25;
       desired = M3.norm(M3.V(Math.cos(s.wander), 0.02, Math.sin(s.wander)));
       throttle = 0.62;
+      }
     }
 
     if (!desired) desired = a.fwd;

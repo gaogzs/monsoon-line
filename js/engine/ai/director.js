@@ -21,7 +21,7 @@
     var t = world.time || 0;
     var d = world.aiDir;
     if (d && t >= d.t0 && t - d.t0 < TICK) return d;
-    d = { t0: t, load: [], targets: [], allies: [], cx: 0, cz: 0 };
+    d = { t0: t, load: [], targets: [], allies: [], cx: 0, cz: 0, help: [] };
     var n = 0;
     for (var r = 0; r < world.actors.length; r++) if (world.actors[r].ai) world.actors[r].ai.subrole = null;
     for (var i = 0; i < world.actors.length; i++) {
@@ -31,6 +31,7 @@
         var k = d.targets.indexOf(a.ai.target);
         if (k < 0) { d.targets.push(a.ai.target); d.load.push([a]); } else d.load[k].push(a);
       }
+      if (a.ai.helpT > 0) d.help.push(a);
       if (a.ai.role === 'ally') { d.allies.push(a); d.cx += a.pos.x; d.cz += a.pos.z; n++; }
     }
     if (n) { d.cx /= n; d.cz /= n; }
@@ -79,6 +80,7 @@
         var sc = Math.sqrt(d2);
         var n = attackers(d, a, e);
         if (n > 0) sc *= 1 + $.DIR.PILE * n;
+        if (d.help.length && a.ai.role !== 'drone' && e.target && d.help.indexOf(e.target) >= 0 && e.target !== a && e.target.team === a.team) sc *= 0.6;   // 正在打求援者的敌机：优先过去
         if (e === a.ai.target) sc *= $.DIR.STICKY;       // 黏性：当前目标打折，免得在相近的候选之间来回切（接近会变慢）
         if (sec) {
           // 敌机方位（相对 ally 队质心）与本机扇区中心比较

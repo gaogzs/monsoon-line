@@ -26,7 +26,7 @@ var Chatter = (function () {
   var FOE_RANGE = 20000;          // 敌方台词：离玩家多近才听得到（m）
   var BINGO_FRAC = 0.25;          // 导弹弹药低于此比例 → bingoAmmo
   var CD = {                      // 同一（事件，说话人）的冷却（s）
-    bingoAmmo: 30, winchester: 30, rtb: 30, rearmed: 20, splash: 8, damaged: 8, fox: 20, defensive: 12
+    bingoAmmo: 30, winchester: 30, rtb: 30, rearmed: 20, splash: 8, damaged: 8, fox: 20, defensive: 12, help: 20
   };
   var ATMOS = { fox: 1, defensive: 1 };       // 气氛类：一律 pri chatter（可过期、可被丢弃）
 
