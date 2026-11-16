@@ -33,6 +33,7 @@
       blackT: 0, gT: 0, pDir: null,   // 过载 / 视野变窄（gTrack）
       incId: null, incWait: 0, incDelay: 0, lostX: 0, lostXSet: false,   // 人为失误（skill.js misjudgeT / lostExtra）
       ward: opt.ward || null,        // 护航：被护卫者（loyal 性格的 leash 参照）
+      lastKnown: null, lostSightT: 0, searching: false,   // 态势记忆（memory.js）
       subrole: null,       // 'bait' / 'flank'（Director 给成对的 skill>=0.6 敌机分配）
       flankSide: 1,
       psmAI: null,         // AI 过失速机动 {kind: counter|break, src, t}（ai/psm.js）
@@ -474,6 +475,7 @@
       }
     }
 
+    s.searching = $.memStep(a, s, world, dt);
     decideRange(a, s, world, dt);
 
     // 诱饵连放：一串放完（或放光）之后才开始 1.8 s 的决策冷却
@@ -658,7 +660,7 @@
       var sk = $.skimDir(a, s, desired);
       if (sk) { desired = sk; s.lowStrike = true; throttle = 1; }
     } else if (s.target) {
-      var res = $.pursue(a, s.target, world);
+      var res = $.pursue(a, (s.searching && $.searchGhost(s)) || s.target, world);
       desired = res.dir;
       /* loyal 性格：不离开长机 / 被护卫者超过 leash（缺省长机 = ai.leader，护航 = ai.ward）*/
       var lead0 = s.leader || s.ward, lash = $.temper(s).leash;
@@ -671,6 +673,7 @@
       ab = res.ab;
       // 5d：诱饵 / 侧击；elite 以上按能量定加力与 yo-yo
       var dT = M3.dist(a.pos, s.target.pos);
+      if (s.searching) { dT = 99999; }         // 搜索中：按"远"处理，不做近距的 yo-yo / 侧击
       if (s.subrole === 'flank' && dT > 1200 && s.target.kind !== 'target') {
         var tg = s.target;
         var aim = M3.add(tg.pos, M3.add(M3.mul(tg.right, 2500 * (s.flankSide || 1)), M3.mul(tg.fwd, -1500)));
@@ -749,7 +752,7 @@
       return;
     }
     var t = s.target;
-    if (!t || !t.alive) { a.firingGun = false; s.gunT = 0; s.missT = 0; s.strafe = false; return; }
+    if (!t || !t.alive || s.searching) { a.firingGun = false; s.gunT = 0; s.missT = 0; s.strafe = false; return; }     // 看不见目标就不开火
 
     // 侦察 / 播撒构型在受损前不主动接战
     if (a.behavior === 'recon' && a.hp >= a.maxHp * 0.88) {
