@@ -70,6 +70,7 @@
     $.player = p;
 
     $.mission.spawn($.world);
+    FovWatch.clear();                        // 上一局的视场订阅不带过来
     Resupply.init($.world, $.mission);       // 整备点：解析 ref（要在 spawn 之后）
 
     $.snapCamera(p);    // 初始镜头；瞄准方向下一帧从机头重新取

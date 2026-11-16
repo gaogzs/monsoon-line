@@ -111,6 +111,7 @@
     $.world.time += dt;
     Radio.update(dt);
     Chatter.update($.world, dt);
+    FovWatch.step($.world.time);
 
     /* 关卡时限。超时由 loss 分支统一判负（见下面 mission.lose 那一段）——
        任务脚本不需要自己写倒计时，只要在 mission 上声明 timeLimit。 */

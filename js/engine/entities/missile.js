@@ -2,6 +2,7 @@
   'use strict';
   var $ = Ent.$;
   $.makeMissile = makeMissile; $.stepMissile = stepMissile;
+  $.SARH_GRACE = 2.5;       // 半主动弹丢照射后的宽限（s）：宽限内发射机重锁同一目标就恢复引导，超时永久失去引导
 
   /* ============================================================
      导弹
@@ -309,6 +310,26 @@
         t = null;                 // 停止修正，继续自由落体
       } else {
         m.laserLost = false;
+      }
+    }
+
+    /* ---------- 半主动雷达（标签 sarh）：弹的导引全靠发射机的持续锁定 ----------
+
+       每帧问发射机："你现在还锁着它吗"（owner.lockHeldOn === 本弹目标；玩家在 game/lock.js 写，AI 在 ai/brain.js 写）。
+       没锁着：m.sarhLost = true，本帧不修正（t = null），沿原航向继续飞，但**保留目标引用**；
+       宽限（SARH_GRACE）内重新锁上同一个目标就接着受引导，超时则 m.target = null 永久失去引导。
+       没有 reAcquire：丢了照射不会自己找新目标。 */
+    if (w.tags && w.tags.sarh && t && !boosting) {
+      var illum = m.owner;
+      /* 没有发射机（owner 为空：包线推演、脚本投放）按持续照射算，否则发射包线会算成 0 */
+      if (!illum || (illum.alive && illum.lockHeldOn === t)) {
+        m.sarhLost = false;
+        m.illumT = 0;
+      } else {
+        m.sarhLost = true;
+        m.illumT = (m.illumT || 0) + dt;
+        if (m.illumT > $.SARH_GRACE) m.target = null;
+        t = null;
       }
     }
 

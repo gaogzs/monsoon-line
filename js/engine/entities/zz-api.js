@@ -41,6 +41,7 @@
   Ent.chooseWeapon = $.chooseWeapon;
   Ent.setWeapon = $.setWeapon;
   Ent.targetClass = $.targetClass;
+  Ent.SARH_GRACE = $.SARH_GRACE;
   Ent.curLoadFactor = $.curLoadFactor;
   Ent.contactScan = $.contactScan;
   Ent.weaponMatchesTarget = $.weaponMatchesTarget;

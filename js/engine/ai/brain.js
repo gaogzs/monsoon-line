@@ -27,6 +27,7 @@
       orbit: 1,            // standoff 绕圈方向（±1）
       ringR: 0,            // standoff 的环半径
       wclass: null,        // 武器分类：longRange / shortRange / gunOnly
+      illum: null,         // 半主动弹的照射状态 {missile, target, w, abandoned}（updateIllum）
       retreating: false,   // 撤离中（retreat.js；mission.retreat 为 'on' 才会置真）
       evalT: 0,            // 撤离评估倒计时（事件之后 RETREAT.EVAL_DELAY 秒评估一次）
       retreatCd: 0,        // 评估没中之后的冷却
@@ -343,8 +344,17 @@
 
   /* 决策层：威胁规避 → 脱离 → 选目标 → 诱饵连放。只改 s.mode / s.target / s.*T，不碰操纵量。 */
   function decide(a, s, world, dt) {
+    $.updateIllum(a, s, world, dt);
     /* ---------- 1. 威胁规避优先级最高 ---------- */
     var inc = $.findIncoming(a, world);
+    /* 半主动照射中：来袭弹还远（> 2.5 km）就不转身规避，免得把自己的弹甩丢；进了 2.5 km 一次性判断放不放弃（按技能） */
+    if (inc && $.illumHolds(s)) {
+      if (M3.dist(inc.pos, a.pos) > 2500) inc = null;
+      else if (!s.illum.decided) {
+        s.illum.decided = true;
+        if ($.rnd01(s) < 0.4 + 0.5 * s.skill) s.illum.abandoned = true;
+      }
+    }
     if (inc) {
       s.mode = 'evade';
       s.evadeT = Math.max(s.evadeT, 0.55);
@@ -397,7 +407,7 @@
         // 长机阵亡时不自主接战（设定：无人机没有接管战局的能力，只会盘旋）
         s.target = leadOk ? dLead.target : (dLead && dLead.alive ? $.nearestEnemy(a, world, $.WING_FREE_R) : null);
       }
-    } else if ((s.retargetT <= 0 || !s.target || !s.target.alive) && !lostWait(s, dt)) {
+    } else if ((s.retargetT <= 0 || !s.target || !s.target.alive) && !lostWait(s, dt) && !$.illumHolds(s)) {
       s.lostT = null;
       s.retargetT = s.role === 'ally' ? 8 + 7 * $.rnd01(s) : $.SKILL.retarget(s);   // ally 的重评估间隔 8–15 s（Director）
       /* 被主动雷达照射时优先咬照射者 —— "谁在照我，我先打谁"。
@@ -641,6 +651,7 @@
       throttle = 1; ab = true;
     }
 
+    if ($.illumHolds(s)) ab = false;            // 照射期间不主动加力，免得把目标甩出锥而丢锁
     a.throttle = throttle;
     a.ab = ab;
 

@@ -1,0 +1,118 @@
+#!/usr/bin/env node
+/* ============================================================
+   半主动雷达弹探针（docs/POST2-0IMPL.md 5.6）
+   弹：CLA-6 牵引（tether，标签 sarh）；对照 CLA-4（mrm，主动雷达）。
+
+   A. 发射机持续锁定：弹受引导、命中
+   B. 发射机从未锁定 / 立刻丢锁超过宽限：弹永久失去引导（target 被置空），不命中
+   C. 丢锁后在宽限内重新锁定同一目标：恢复引导、命中；超过宽限：不恢复
+   D. 发射后切目标（lockHeldOn 指向别的东西）：旧弹当帧 sarhLost，宽限满后永久失引导
+   E. 发射机阵亡：弹丢照射（同 B）
+   F. 对照：mrm 不依赖发射机，同样的"发射机不锁定"下照样命中
+   G. AI 照射：AI 持有半主动弹在途时 lockHeldOn、illumHolds；切目标被抑制；丢弃弹后释放
+   用法：node tools/test/probes/probe-sarh.js
+   ============================================================ */
+'use strict';
+const Sim = require('../../lib/sim');
+let ok = true;
+function chk(name, cond, detail) {
+  console.log((cond ? 'PASS ' : 'FAIL ') + name + (detail ? '  ' + detail : ''));
+  if (!cond) ok = false;
+}
+const S = Sim.load({ seed: 1 });
+const { M3, Ent } = S.sandbox;
+
+function mkTarget(z) {
+  const t = Ent.makeAircraft({ type: 'albatross', team: 0, x: 0, y: 4000, z, fwd: M3.V(0, 0, 1), speed: 220, special: null });
+  t.hp = t.maxHp = 1e9;
+  return t;
+}
+/* 剧本：t 秒表 + 回调改发射机状态。返回 { hit, lostAt, sarhLost, targetNull, m } */
+function fly(weapon, script, opts) {
+  opts = opts || {};
+  const tg = mkTarget(opts.range || 7000);
+  const shooter = { alive: true, lockHeldOn: tg, team: 1, pos: M3.V(0, 4000, 0), fwd: M3.V(0, 0, 1) };
+  const w = { actors: [tg], targets: [], missiles: [], particles: [], bullets: [], time: 0, events: [], silent: true, killed: 0 };
+  const m = Ent.makeMissile({ weapon, team: 1, pos: M3.V(0, 4000, 0), fwd: M3.V(0, 0, 1), speed: 600, target: tg, owner: shooter });
+  m.team = 1; w.missiles.push(m);
+  let hp0 = tg.hp, lostAt = null, sawLost = false, minD = 1e9;
+  for (let f = 0; f < 60 * 25 && m.alive; f++) {
+    const t = f / 60;
+    if (script) script(t, shooter, tg);
+    tg.pos.z += tg.speed / 60;            // 目标匀速直飞（不走 stepAircraft，省得它自己飞偏）
+    Ent.stepMissile(m, 1 / 60, w);
+    minD = Math.min(minD, M3.dist(m.pos, tg.pos));
+    if (m.sarhLost) { sawLost = true; if (lostAt === null) lostAt = t; }
+  }
+  const dead = !m.alive;
+  return { m, tg, dead, sawLost, lostAt, minD, targetNull: m.target === null, dmg: hp0 - tg.hp };
+}
+
+/* A */
+{
+  const r = fly('tether', null);
+  chk('A 持续锁定：弹受引导并命中（爆炸 / 近炸）', r.dead && r.m.target !== null && !r.sawLost && r.minD < 40, 'minD=' + r.minD.toFixed(1));
+}
+/* B */
+{
+  const r = fly('tether', (t, sh) => { sh.lockHeldOn = null; });
+  chk('B 从未持锁：当帧 sarhLost，宽限满后目标被置空', r.sawLost && r.targetNull && r.lostAt < 1.5, 'lostAt=' + r.lostAt + ' targetNull=' + r.targetNull);
+}
+/* C */
+{
+  const grace = Ent.SARH_GRACE;
+  const re = fly('tether', (t, sh, tg) => { sh.lockHeldOn = (t > 1.0 && t < 1.0 + grace * 0.6) ? null : tg; });
+  chk('C1 宽限内重锁同一目标：恢复引导（目标引用还在，最终命中）', re.sawLost && !re.targetNull && re.dead && re.minD < 60, 'minD=' + re.minD.toFixed(1) + ' lost=' + re.sawLost + ' target=' + !re.targetNull);
+  const late = fly('tether', (t, sh, tg) => { sh.lockHeldOn = (t > 1.0 && t < 1.0 + grace + 1.5) ? null : tg; });
+  chk('C2 丢锁超过宽限：永久失去引导，之后重锁也不恢复', late.targetNull, 'targetNull=' + late.targetNull);
+}
+/* D */
+{
+  const other = mkTarget(9000);
+  const r = fly('tether', (t, sh) => { if (t > 0.8) sh.lockHeldOn = other; });
+  chk('D 发射后切目标：旧弹丢照射，宽限满后永久失引导', r.sawLost && r.targetNull);
+}
+/* E */
+{
+  const r = fly('tether', (t, sh) => { if (t > 0.8) sh.alive = false; });
+  chk('E 发射机阵亡：弹丢照射并永久失引导', r.sawLost && r.targetNull);
+}
+/* F */
+{
+  const r = fly('mrm', (t, sh) => { sh.lockHeldOn = null; }, { range: 5000 });
+  chk('F 对照：主动雷达弹 mrm 不依赖发射机锁定', !r.sawLost && r.dead && r.minD < 40, 'minD=' + r.minD.toFixed(1));
+}
+
+/* ---------- G. AI 照射 ---------- */
+{
+  const S2 = Sim.load({ seed: 3 });
+  const { M3: M, Ent: E, AI, MISSIONS } = S2.sandbox;
+  S2.start(MISSIONS.findIndex(m => m.id === 'm1'));
+  const G = S2.sandbox.Game, w = G.__world(), p = G.__player();
+  for (const a of w.actors) if (a !== p) a.alive = false;
+  w.actors = w.actors.filter(a => a === p); w.targets.length = 0;
+  p.pos.x += 80000; p.hp = p.maxHp = 1e9;           // 玩家挪远，别参与
+  w.arenaDef = null;
+  const mk = (team, x, z, fz) => { const a = E.makeAircraft({ type: 'albatross', team, x, y: 4000, z, fwd: M.V(0, 0, fz), speed: 250, special: 'tether' }); a.hp = a.maxHp = 1e9; return a; };
+  const sh = mk(1, 0, 0, 1), tg1 = mk(0, 0, 9000, -1), tg2 = mk(0, 1500, 8000, -1);
+  AI.attach(sh, { role: 'enemy', skill: 0.9, rank: 'ace' });
+  AI.attach(tg1, { role: 'ally', skill: 0.3, rank: 'rookie' }); AI.attach(tg2, { role: 'ally', skill: 0.3, rank: 'rookie' });
+  tg1.ai.cmd = 'hold'; tg2.ai.cmd = 'hold';
+  w.actors.push(sh, tg1, tg2);
+  let held = false, tgtAtLaunch = null, retargeted = false, firedAt = -1;
+  for (let f = 0; f < 60 * 40; f++) {
+    S2.step(1 / 60); p.alive = true; p.hp = p.maxHp;
+    const mine = w.missiles.find(m => m.owner === sh && m.w.tags && m.w.tags.sarh);
+    if (mine && firedAt < 0) { firedAt = f / 60; tgtAtLaunch = mine.target; }
+    if (mine && sh.lockHeldOn === mine.target) held = true;
+    if (mine && sh.ai.illum && AI.$.illumHolds(sh.ai) && sh.ai.target !== tgtAtLaunch) retargeted = true;
+    if (firedAt >= 0 && !mine) break;
+  }
+  chk('G1 AI 发射了半主动弹', firedAt >= 0, 'firedAt=' + firedAt.toFixed(1));
+  chk('G2 在途期间 AI 持有 lockHeldOn（持续照射）', held);
+  chk('G3 照射期间不重选目标', !retargeted);
+  S2.step(1 / 60);
+  chk('G4 弹失效后释放：lockHeldOn 清空、illum 清空', sh.lockHeldOn === null && sh.ai.illum === null);
+}
+
+process.exit(ok ? 0 : 1);

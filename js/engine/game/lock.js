@@ -178,7 +178,15 @@
     }
   }
 
+  /* 玩家的锁定判定（updateLockCore）之后，统一写 lockHeldOn：当前武器是半主动弹、且已锁定 → 目标；否则 null。
+     半主动弹读 owner.lockHeldOn（entities/missile.js 的 sarh 分支）。切目标、切武器、丢锁、被压制都落到 null。 */
   function updateLock(dt) {
+    updateLockCore(dt);
+    var p = $.player, w = p && WEAPONS[p.special], t = p && p.target;
+    p.lockHeldOn = (p.locked && t && t.alive && w && w.tags && w.tags.sarh) ? t : null;
+  }
+
+  function updateLockCore(dt) {
     var t = $.player.target;
     $.player.lockInCone = false;            // HUD 用：目标在不在这件弹的锁定锥里（drawConeCue）
     $.player.lockInRange = false;           // HUD 用：目标在不在锁定距离内
