@@ -2,6 +2,8 @@
 
 代码：`AI`（`js/engine/ai/*.js`）· 调用方：`js/missions/` 的 `spawnEnemy()` / `spawnWingman()`、`Game` 的 `updateMouseAim()`（`engine/game/control.js`）
 
+> **批次 5a（未发版）**：`AI.update` 拆成 感知 → 决策 → 机动 → 开火 四层（`brain.js` 的 `perceive / decide / maneuver / fire`）；新增 `skill.js`（`AI.SKILL` 参数表、私有随机流）、`director.js`（目标分配、武器分类）、`retreat.js`（撤离）。见本文末「批次 5a」。
+>
 > v3.0.0 起 `AI` 不再是一个闭包，而是四个按职责命名的文件（私有状态走 `AI.$`，公开接口集中在 `ai/zz-api.js`，规则见 [modules.md](modules.md)）：
 > `util.js`（索敌与工具：`findIncoming` / `nearestEnemy` / `nearestEnemyTo` / `surfaceTargetFor` / `approachSurface` / `leadThreat`）、
 > `steer.js`（控制律 `steerTo` 与 `STEER_*` / `K_*` 常数）、
@@ -97,13 +99,14 @@ HUD 中心是准星（CMD），青色标记是机头，二者之间有虚线；T
 
 ## AI 状态：`attach(a, opt)`
 
-> `ai.leader`（v3.5.0，可选）：僚机—长机关系，指向长机飞机。目前只被整备点读（`Resupply.leaderOf`：有长机的飞机不自主整备，长机整备时僚机一同补给）；僚机的跟随行为仍读 `world.player`，批次 5 做长机泛化时再统一。没写 `leader` 的 `role: 'wingman' / 'drone'` 默认跟玩家。
+> `ai.leader`（v3.5.0，可选）：僚机—长机关系，指向长机飞机。目前只被整备点读（`Resupply.leaderOf`：有长机的飞机不自主整备，长机整备时僚机一同补给）；僚机的跟随行为仍读 `world.player`，批次 5 做长机泛化时再统一。没写 `leader` 的 `role: 'drone'` 默认跟玩家。
 
 | 字段 | 初值 | 含义 |
 |---|---|---|
-| `role` | `'enemy'` | `enemy` / `drone` / `wingman`（`drone` 是 AI 角色，与机型标签 `tags.unmanned` 是两回事；战果归属等处读的是后者）；预警机由 `spawnAewc()` 改成 `support`（它带 `route`，不走状态机） |
+| `role` | `'enemy'` | `enemy` / `ally`（友军自主战斗机，批次 5a）/ `drone`（`drone` 是 AI 角色，与机型标签 `tags.unmanned` 是两回事；战果归属等处读的是后者）；预警机由 `spawnAewc()` 改成 `support`（它带 `route`，不走状态机） |
 | `skill` | 0.6 | 0..1，见「技能等级」 |
-| `mode` | `'pursue'` | `pursue` / `evade` / `extend` |
+| `rank` | `null` | 位格 `rookie / pawn / elite / ace`（`RANKS`），决定缺省 skill 与撤离概率系数 |
+| `mode` | `'pursue'` | `pursue` / `evade` / `extend` / `standoff` / `closeIn` / `retreat` |
 | `modeT` | 0 | `extend` 剩余时间 |
 | `evadeT` | 0 | 规避状态最短维持时间 |
 | `msl` | null | 正在规避的导弹引用 |
@@ -158,9 +161,7 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | `drone` + `focus`（默认） | 继承长机的目标；长机没锁定时打离自己 `WING_FREE_R`（6 km）内最近的敌机，仍守在编队槽位上；长机阵亡则不接战 |
 | `drone` + `cover` | 优先打正在锁定长机的敌机（`leadThreat`）；没有时打离**长机** 6 km 内最近的敌机（`nearestEnemyTo`）；再没有退回长机目标 |
 | `drone` + `spread` | 自主接战：`nearestEnemy(a, world, 9000)` |
-| `wingman` + `focus` | 继承长机的目标 |
-| `wingman` + `cover` | 同 `drone + cover`（共用 `leadThreat()`） |
-| 其余（含 `enemy`） | 被主动雷达照射时优先咬照射者（12 km 内）；否则 `nearestEnemy(a, world, role === 'wingman' ? 11000 : 15000)`；**空中一个都没有时**，带得动对面弹的飞机转去挑面目标（`surfaceTargetFor`） |
+| 其余（含 `enemy`） | 被主动雷达照射时优先咬照射者（12 km 内）；否则 `director.pick(a, world, 15000)`（批次 5a；无同队盯着的、非 ally 时等价于最近敌机）；**空中一个都没有时**，带得动对面弹的飞机转去挑面目标（`surfaceTargetFor`） |
 
 **照射判定（RWR，`a.rwrT / a.rwrSrc`）**：敌对、`target === a`、挂主动雷达弹（`seeker === 'radar'`）才算照射；`silentLock`（标签 `w.tags.silentLock`，被动吊舱汇总进 `a.silentLock`）/ `emcon` 不告警。无人僚机的目标选择里，只有**它自己**被压制（`suppressed > 0.35`）才会放弃目标、只规避不开火；长机电磁静默或被压制只是下不了令，僚机照旧按现有指令攻击。
 **玩家要锁满（`player.locked`）才算** —— 只是选中、锁定环还在走，对方收不到告警，可以贴近了再锁。以前选中即照射。AI 之间仍是"选中即照射"。
@@ -201,7 +202,6 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | `extend` | `norm(a.pos - nearestEnemy(a, world, 20000).pos)`，再强制 `y = 0.06` 拉平 | 1，加力 |
 | drone 且长机在 | 长机编队槽位 | 落后 > 700 m 加力，否则 0.75 |
 | drone 且长机没了 | 切向盘旋，`y = pos.y < 3200 ? 0.12 : -0.05` | 0.6 |
-| wingman 且（无目标或 `spread`） | 编队槽位；有目标时改走 `leadTo` | 落后 > 900 m 加力，否则 0.7；接战 0.95 加力 |
 | 有目标（`target`） | `approachSurface(a, s.target)`：**保持高度**，只把机头转过去 | 0.9 |
 | 有目标（飞机） | `pursue(a, s.target, world)` | 见 `pursue()` |
 | 都没有 | 巡逻：`wander += dt*0.25`，`V(cos(wander), 0.02, sin(wander))` | 0.62 |
@@ -219,7 +219,7 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 （其余各关在同一量级，逐关见 `js/missions/` 的 `spawnWingman` 调用；
 M8 的 `dz` 是 **+320**，僚机排在长机前方。）
 
-`AI` 里的兜底默认值是 drone `{140, 25, -190}`、wingman `{120, 30, -180}`。
+`AI` 里的兜底默认值是 drone `{140, 25, -190}`。
 
 **5. 升限钳制（所有分支共用）**
 
@@ -323,7 +323,7 @@ a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
 
 - 权重 `w = min(1, depth × ARENA_PULL_K)`（`ARENA_PULL_K = 1.8`，深度到约 55% 就取满），越界取满。起拉要早：高空低动压时转弯半径大，等权重涨起来再掉头就来不及。
 - 规避中（`mode === 'evade'`）在**警告区内**权重减半 —— 躲导弹优先；越过真边界就不再让步。
-- 僚机（`role: 'wingman'`）、无人机（`'drone'`）跟着长机，不单独处理；航线型单位走 `updateRoute`，根本不经过这里（沿航线飞出去的轰炸机不受影响）。
+- 无人机（`'drone'`）跟着长机，不单独处理；航线型单位走 `updateRoute`，根本不经过这里（沿航线飞出去的轰炸机不受影响）。
 - **机头背着中心冲出去时**期望方向正对机尾，`steerTo` 没有明确的转弯侧，只会沿竖直面拉杆爬升而不转弯（操纵量在 ±1 之间抖动）。所以往靠中心的一侧连续偏转：偏量随"机头与回中心方向的夹角"从 0（≤ 90°）加到 1.5（正相反），转弯侧记在 `s.arenaSide`，**整个出界期间固定**，回到界内才清零——两侧来回切会让操纵抖动。
 
 `probe-arena.js` 有对照：脱离模式（朝远离玩家的方向一路向外飞）的敌机，无软转向越界 33 s、最远 15 km，开了之后 0 s。
@@ -451,7 +451,7 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
 
 ## 无人僚机（`role: 'drone'`）
 
-与 `role: 'wingman'` 的差别不是参数，而是**有没有判断力**。
+与 `role: 'ally'`（自主友军战斗机）的差别不是参数，而是**有没有判断力**。
 当前所有僚机都由 `spawnWingman()` 生成为 drone。它有三条铁律，
 外加一套由长机指令（`cmd`）决定的授权规则 —— 见上文"目标选择"：
 
@@ -555,3 +555,44 @@ M3 播撒机 0.25、护航 0.58–0.72、
 - 自保的 evade 连放优先；两者共用同一个库存，所以一次 60 s 的统计里消耗可能不是 3 的倍数。
 - `s.envClock` 在 `update` 开头按 `dt` 累计，是包线缓存的时钟。
 - 僚机速度包线：`vMil` / `vStall` 乘 `loadoutPenalty(Ent.curLoadFactor(a))`（`loadoutPenalty` 在 `js/data/rules.js`）（挂载越重、AI 估的可用速度越保守）。
+
+
+---
+
+## 批次 5a：三层、位格与技能、Director、撤离（未发版）
+
+### 三层
+
+`update` 先递减计时器，再依次调用：
+
+| 层 | 函数 | 做什么 |
+|---|---|---|
+| 感知 | `perceive` | RWR（`a.rwrT / rwrSrc`）、对敌方电子战的适应（`ewResist`） |
+| 决策 | `decide` + `decideRange` + `retreatWatch` | 威胁规避 → 低血脱离 → 撤离 → 选目标 → 外围游走 / 回头 → 诱饵连放；只改 `s.mode / s.target / s.*T`，不碰操纵量 |
+| 机动 | `maneuver` | 按模式出期望方向与油门，过覆盖链（升限、战区边界软转向——撤离中跳过、垂直改出、近地保护），写 `a.throttle / a.ab / a.target` |
+| 开火 | `fire` | 机炮（含扫射、反应延迟）与导弹；`evade / extend / retreat` 时不开火 |
+
+### 位格与技能表
+
+`RANKS`（`js/data/rules.js`，枚举非标签）：rookie 0.35 / pawn 0.55 / elite 0.72 / ace 0.90；`rankFromSkill`：< 0.45 rookie、< 0.65 pawn、< 0.85 elite、其余 ace。`spawnEnemy({rank, skill})`：显式 `rank` > 机型 `ac.rank` > 按 `skill` 就近映射；`skill` 缺省取位格缺省值，已写 `skill` 的关卡数值不变。
+
+`AI.SKILL`（`skill.js`，私有 `AI.$.SKILL`）：`retarget / gunCone / fireWill / shootGap / useNez / ewRate / leadK / standoff`，以及 `reactT`、`aimSigma`、`AIM_TAU / AIM_JITTER / AIM_RANGE / STRAFE_EXIT`。数值逐位等于原来散在 `brain.js` / `tactics.js` 里的线性式。
+
+### 反应延迟与机炮偏移
+
+- `reactT = 0.2 + (1 − skill) × 1.4`（rookie ≈ 1.1 s … ace ≈ 0.3 s）。**持续式**：机炮 / 导弹的开火条件成立才计时，任何一帧不成立就清零（`gunT / missT`）；**登记式**：干扰弹首发（`flareReact`）、目标丢失后重选（`lostT`）。
+- 机炮偏移 `a.ai.aim = {x, y}`：OU 漂移 `off ← off·e^(−dt/τ) + σ√(1 − e^(−2dt/τ))·z`，τ = 1.5 s，σ = 0.06 × (1 − skill) rad；换目标与每一串新射击重抽；没有空中目标时衰减回 0。偏移叠到 `pursue` 给出的期望方向上（2500 m 内、有炮才加）；开火门限仍按真实视线角。
+- 扫射：机头误差 `e ≤ r`（`r` = 当前偏移量级）进入，`e > 1.3 r` 退出，只用机炮。
+- 随机数走私有 LCG（`$.seedRng / rnd01 / gauss`），不碰 `Math.random`，不改变原有决策抽签的顺序。
+
+### Director 与距离层
+
+`director.js`：`$.director.pick(a, world, maxR)` 与 `$.weaponClass(a)`；快照每 0.5 s 刷新（`world.aiDir`）。参数在 `$.DIR`：`PILE 1.0`、`STICKY 0.7`、`R_LONG 7000`、`T_FURBALL 25`、`T_STANDOFF 45`、`RING_K 0.6`。规则与门槛见 [POST2-0IMPL.md 的 5a 实施记录](../POST2-0IMPL.md)。`probe-spacing`：8v8 扎堆指数降 ≥ 50%、交战不坍塌、环半径与分类。
+
+### `ally`
+
+自主友军战斗机，team 0，走与敌机同一套空战 AI（含 Director 扇区、不抢人头、外围游走、战区边界软转向）；`spawnAlly(w, o)`（`missions/_lib.js`）仅提供接口，目前没有关卡使用。可写 `leader`（整备时跟着长机）。
+
+### 撤离
+
+`mission.retreat = 'on'` 才有（缺省 off）。事件（掉血 / 弹药池减少，轮询）→ 等 2.5 s → 评估一次（概率：血 < 35% +0.5、< 55% +0.2；无对空导弹 +0.15，且机炮 < 30% +0.4；位格系数 ace ×0.5 / elite ×0.75 / pawn ×1 / rookie ×1.3；上限 0.9）→ 没中冷却 8 s。撤离中 `mode = 'retreat'`：`evade` 优先；去向 `Resupply.pointFor`（本队整备点，否则最近出界口）；到整备点走批次 4 的 NPC 整备周期，出界口出界即移除（`retreated / leftBy = 'retreat' / escaped`）。`noRetreat` 标签（reserved）永不撤；`ai.leader` 指向的僚机随长机撤。`probe-retreat` 覆盖开关、触发率、位格单调、标签、出界移除、整备往返、僚机随长机。

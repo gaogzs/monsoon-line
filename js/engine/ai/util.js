@@ -100,9 +100,9 @@
   }
 
   /* 正在锁定长机的敌机 —— "掩护"这条指令的核心。
-     两个分支（wingman 的 cover、drone 的 cover）共用它。
-     它以前直接写在 wingman 的 cover 分支里面，而那条分支
-     因为僚机都是 drone 而从来没跑到过（见 docs/systems/ai.md）。
+     drone 的 cover 分支用它。
+     它以前写在 wingman 的 cover 分支里（那条分支因为僚机都是 drone 而从来没跑到过，
+     批次 5a 已随死代码清理，见 docs/systems/ai.md）。
 
      注意 `e.target === lead` 要求 **AI 每帧把 s.target 写回 a.target**
      （update() 末尾那一行）—— 在补上那行之前，这里永远找不到人，

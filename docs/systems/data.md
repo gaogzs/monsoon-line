@@ -49,6 +49,7 @@
 | `CS_DOWNSTREAM` | 数组 | 77 条 `{cn,en}`（`callsigns/air.js`） | `js/missions/` |
 | `downstreamCallsign(i)` / `squadCallsign(sq, n)` | 函数（`callsigns/air.js`） | — | `js/missions/`（`CS_RESERVED` 是不再发给小队的保留词；舰船的海军呼号池在 `callsigns/naval.js`） |
 | `missileRange(w)` | 函数（`rules.js`） | — | 目前只剩兼容 / 探针使用（见 [weapons.md](weapons.md)） |
+| `RANKS` / `rankFromSkill(skill)` | 常量 / 函数（`rules.js`，批次 5a） | — | AI 位格 `rookie .35 / pawn .55 / elite .72 / ace .90`（枚举，非标签）与按 skill 就近映射；`spawnEnemy`、`AI.attach` 读 |
 | `canCarry(ac,w)` | 函数（`rules.js`） | — | `Game`、`preflight`、`Ent` |
 | `loadoutPenalty(lf)` | 函数（`rules.js`） | — | `Game` 面板 + `Ent` 物理 |
 | `exposedPoints` / `stealthValue` / `lockCutOf` + `STEALTH_LOCK_CUT` / `STEALTH_LOSS_PER_POINT` | 函数 / 常量（`rules.js`） | — | 匿踪折算，界面与物理共用 |

@@ -71,7 +71,7 @@
 > （`spawnShip` 不替你换算，需要按表取值时自己 ×0.514）。现有关卡多用
 > `loop: true` 的两点往返巡航（8–20 m/s），m10 的登陆舰用 `loop: false` 一路往北开。实现见 [entities.md](entities.md#35-目标物-tkind-target)。
 
-`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'schist'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（**只在没写时**缺省 `'dl6'`；显式 `null` = 不带弹，预警机 / 轰炸机 / 运输用的 GAL-31 都这么传）/ **`loadout`**（逐组挂载，见下一节）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
+`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'schist'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（**只在没写时**缺省 `'dl6'`；显式 `null` = 不带弹，预警机 / 轰炸机 / 运输用的 GAL-31 都这么传）/ **`loadout`**（逐组挂载，见下一节）/ **`rank`**（`rookie / pawn / elite / ace`；缺省取机型 `ac.rank`，再缺省按 `skill` 映射；`skill` 缺省取位格缺省值，没写 rank 也没写 skill 时 0.55）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
 
 `special` 与 `pods` 都**同时管机制和外观**：
 
@@ -674,3 +674,9 @@ spawn()
 | `VOICES`（`js/data/voices.js`）/ `Radio`（`js/ui/radio.js`） | 台词表与播放（`w.radio.play` / `w.radio.raw`） |
 | `world`（`js/engine/game/world.js`） | 任务脚本唯一的写入目标；字段契约见 §3 |
 | `js/engine/game/`、`js/ui/screens/brief.js` | 决定 `spawn/tick/win/lose` 的调用时机、简报渲染、结算计分 |
+
+
+## 批次 5a 新增（未发版）
+
+- **`mission.retreat`**：`'off'`（缺省）/ `'on'`。`on` 时 AI 会按位格概率撤离：本队有整备点就去整备并回来，否则飞出战区边界后被移除（`retreated / leftBy='retreat' / escaped`，不计击杀）。`win()` 数 `team===1 && alive` 的关卡开启前要留意撤离的敌机会让胜利条件提前满足。13 关目前都没开。
+- **`spawnAlly(w, o)`**（`_lib.js`）：`o` 同 `spawnEnemy`，team 固定 0、`role: 'ally'`，可写 `leader`；目前没有关卡使用。

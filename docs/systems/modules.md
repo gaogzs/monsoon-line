@@ -16,9 +16,11 @@
 
 ### `AI` —— AI 控制律与行为
 
-文件：`engine/ai/_state.js`、`engine/ai/brain.js`、`engine/ai/steer.js`、`engine/ai/tactics.js`、`engine/ai/util.js`、`engine/ai/zz-api.js`
+文件：`engine/ai/_state.js`、`engine/ai/brain.js`、`engine/ai/director.js`、`engine/ai/retreat.js`、`engine/ai/skill.js`、`engine/ai/steer.js`、`engine/ai/tactics.js`、`engine/ai/util.js`、`engine/ai/zz-api.js`
 
 公开接口（`AI.xxx`）：`attach`、`update`、`steerTo`、`findIncoming`、`nearestEnemy`、`leadTo`、`strafeTarget`
+
+批次 5a 新增的 `$.SKILL / $.DIR / $.director / $.weaponClass / $.retreatWatch / $.retreatDir / $.retreatProb / $.rnd01 / $.aimStep` 都是私有（`AI.$`），没有导出；探针直接读 `AI.$`。
 
 `util`（索敌与工具）、`steer`（把期望方向翻译成三轴杆量）、`brain`（attach / update 主决策）、`tactics`（追击 / 规避 / 对地）。
 

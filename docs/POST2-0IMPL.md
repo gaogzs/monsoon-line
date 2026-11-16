@@ -766,6 +766,29 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 
 ## 批次 5 · v3.6 AI 强化与半主动雷达弹
 
+> **批次 5 分片进度**：**5a 已完成（未发版，版本号由你定）**：5.0 分层、5.1 位格 / `AI.SKILL`、5.2 外围游走 / 回头 + Director、5.3 `ally`、5.4 撤离（含去整备点）、以及 5.7 里的「反应延迟与机炮偏移」。**顺延到后续批次**：5.5 Radio 2.0 与 `Chatter`、5.6 半主动雷达弹 / `FovWatch`、5.7 其余项、5.8 AI 过失速机动。
+
+### 5a 实施记录与出入
+
+代码：`js/engine/ai/{skill,director,retreat}.js`、`brain.js`（`perceive / decide / decideRange / maneuver / fire`）、`js/data/rules.js`（`RANKS`、`rankFromSkill`）、`js/engine/world/resupply.js`（`pointFor`、`world.retreatOn`）、`missions/_lib.js`（`spawnAlly`、`spawnEnemy` 的 `rank`）。探针：`probe-aim`、`probe-spacing`、`probe-retreat`，`probe-missions` 新增"每个敌方 AI 都有合法 `rank`"。详见 [ai.md](systems/ai.md)。
+
+出入（相对本批设计）：
+
+| 设计 | 实际 |
+|---|---|
+| 反应延迟 | 实现为"持续式"（机炮 / 导弹条件成立才计时、不成立清零）与"登记式"（干扰弹首发、目标丢失后换目标）；`reactT = 0.2 + (1 − skill) × 1.4` |
+| 扫射"准星"定义（e 与 r） | 按文档字面：机头误差 `e` 落入当前偏移散布圈 `r` 内进入扫射，`e > 1.3 r` 退出（滞回）。**待确认**：`r` 取偏移的稳态量级，是否符合预期，要看实机手感 |
+| 机炮偏移 | OU 漂移（τ = 1.5 s，σ = 0.06 × (1 − skill) rad），私有 LCG 随机流（不碰 `Math.random`，否则 golden 提前失配）；偏移只在 2500 m 内、且本机有炮时叠到瞄准点 |
+| Director | 0.5 s 快照 + 评分：距离 ×（1 + `PILE` × 已被同队盯着的数）× 黏性（当前目标 ×0.7，防来回切）；`ally` 另有扇区惩罚与"不抢玩家正盯着且血量 > 35% 的目标"；`ally` 8–15 s 重评估。`PILE` 初版 0.6，8v8 中扎堆指数降 50% 的门限过不稳，调到 1.0（0.875 → 约 0.26） |
+| 外围游走 `standoff` / 回头 `closeIn` | **只给 skill ≥ 0.7（elite 以上）且带远距对空弹（有效射程 ≥ 7000 m）的 AI**，其余照旧直接追击——否则各关难度会整体变动。环半径 `R_s = 0.6 × 最远对空弹射程`（限制在 2500–9000 m）；游走超过 45 s / 远距弹打光 / 贴到 1500 m 内 → `closeIn`，20 s 后回 `pursue`；缠斗（< 1800 m）累计 25 s → 脱离（`extend`）一次 |
+| `ally` | 新角色；`spawnAlly(w, o)` 只提供接口，**没有任何关卡使用**。`role: 'wingman'` 的死代码（`brain.js` 三处、`resupply.js`、两个探针）已清理 |
+| 撤离事件 | 设计是在 `Ent.damage` 与两处弹药扣减处调 `Ent.noteRetreatEvent`；**实际用轮询**（每帧比较 `hpSeen / ammoSeen`），不改实体层。`EVAL_DELAY` 2.5 s、`COOLDOWN` 8 s 不变；没有 `MAX` |
+| 撤离去向 | `Resupply.pointFor(world, a)`：本队有次数的整备点（单位或界外整备区）→ 否则最近出界口。进整备范围后沿用批次 4 的 NPC 整备周期（`needsResupply` 或 `ai.retreating` 触发），回来 `refillNpc` 重置新 AI 字段；出界口走到战区外就移除：`alive = false; retreated = true; leftBy = 'retreat'; escaped = true`（战报不计击杀） |
+| 开关 | `mission.retreat = 'off' \| 'on'`，缺省 off，13 关都没开；on 时 `world.retreatOn` 为真 |
+| `noRetreat` 标签 | `Tags.declare('noRetreat', { owner: 'ai', reserved: true })`，目前没有机型使用 |
+| 无人僚机随长机 | 僚机（`ai.leader` 指向长机，role `ally` / `enemy`）跟着长机一起撤；玩家的无人僚机（`drone`）不撤 |
+| golden | Director 的目标分配惩罚改变了 m3 / sk1 的 AI 选目标，**有意**重存基线（单独提交，附原因）；反应延迟 / 偏移那一步 golden 没有变化（20 s 无敌场景里 AI 几乎没开火） |
+
 > **本批的代码位置约定**（v3.0.0 之后）：AI 在 `js/engine/ai/`（`AI` 命名空间，私有状态 `AI.$`，公开接口只在 `zz-api.js`）；实体在 `js/engine/entities/`（`Ent`）；Game 的世界侧在 `js/engine/game/`，输入在 `js/ui/input.js`；HUD 在 `js/ui/hud/`；`Radio` 是 `js/ui/radio.js` 里的独立全局。引用位置一律写"模块 + 函数名"。
 >
 > **新文件的加载顺序**（`tools/build/gen-index.js`：层内 `_` 开头最先、`zz` 开头最后，其余先按**目录路径**再按文件名字母序）：
