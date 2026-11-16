@@ -768,6 +768,20 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 
 > **批次 5 分片进度**：**5a 已完成（未发版，版本号由你定）**：5.0 分层、5.1 位格 / `AI.SKILL`、5.2 外围游走 / 回头 + Director、5.3 `ally`、5.4 撤离（含去整备点）、以及 5.7 里的「反应延迟与机炮偏移」。**顺延到后续批次**：5.5 Radio 2.0 与 `Chatter`、5.6 半主动雷达弹 / `FovWatch`、5.7 其余项、5.8 AI 过失速机动。
 
+### 5d 实施记录（战术行为，已完成，未发版）
+
+代码：`ai/energy.js`、`ai/strike.js`、`tactics.js evade`、`retreat.js`（假撤退、`umbrellaPoint`）、`director.js`（bait / flank）、`brain.js`、`util.js surfaceTargetFor`；探针 `probe-tactics`、`probe-strike`，`probe-retreat` 增 F / G。详见 [ai.md](systems/ai.md)。出入：
+
+| 设计 | 实际 |
+|---|---|
+| 高技巧 AI 加力（拉开 / 收敛 / 回头 / 保能量） | 按角点速度门限（收敛 1.15×、狗斗 0.9×）与红外威胁判定；"拉开距离时开加力"没单独做；`AB_MIN_E` 未做（方向与角点规则相反） |
+| 能量管理 yo-yo | 简化为：缠斗中速度 < 角点 × 0.8 时压机头换速度；没有上升 yo-yo |
+| 假撤退"回头带一次先机发射 + 优先用 PSM" | 回头 3 s 加力 + `missT` 预置；PSM 在 5e |
+| 撤向防空伞半径 `interceptRange` | 没有这个字段；用对空武器有效射程（无武器 5 km） |
+| 低空突防"与防空圈外"联动 | 不区分有无 SAM：strike 机打面目标一律低空接近 + 包线边缘拉起；strike 机从 25 km 就盯上面目标（golden 因此变） |
+| 诱饵受威胁立即放弃角色 | 角色每 0.5 s 随 Director 快照重算，处于规避中的不计入 |
+| golden | m3 / m8 / sk1 / m11 变化，**有意**重存（单独提交） |
+
 ### 5c 实施记录（半主动雷达弹 + FovWatch，已完成，未发版）
 
 代码：`js/data/weapons/tether.js`（CLA-6 牵引）、`entities/missile.js` 的 `sarh` 分支、`game/lock.js`（`lockHeldOn`）、`js/engine/fovwatch.js`、`ai/illum.js`、HUD（`targeting.js`、`panels.js`）、`input.js` 的 Fox 1；探针 `probe-sarh`、`probe-fovwatch`。出入：

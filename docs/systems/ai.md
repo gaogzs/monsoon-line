@@ -601,3 +601,16 @@ M3 播撒机 0.25、护航 0.58–0.72、
 ### 半主动照射（批次 5c，未发版）
 
 `ai/illum.js`：`$.updateIllum(a, s, world, dt)`（`decide` 开头调）与 `$.illumHolds(s)`。自己有 `sarh` 弹在途、目标活着时写 `a.lockHeldOn`（目标 = 当前 `s.target`、未被压制出 `clear`、未 `emcon`、在这件弹的有效射程内、且目标在锁定锥内——`FovWatch` 提供进 0.85 / 出 1.0 倍锥的迟滞）。**照射期间**（`illumHolds`）：不重选目标（`decide` 的重选条件）、来袭弹 > 2.5 km 不转身规避、不主动加力（`maneuver` 末尾 `ab = false`）；来袭弹进 2.5 km 时一次性判断放不放弃（概率 `0.4 + 0.5 × skill`，放弃则恢复规避）。丢锁 → 弹自己有 `SARH_GRACE` 宽限；弹失效 / 目标被弹置空 → 释放（`s.illum = null`，`lockHeldOn = null`）。**未做**：高技能锁定后的"偏置转向"；给上游战机配 `tether` 的 `npcLoadouts` 预设（顺延，免得 `probe-npc-loadouts` 基线再动）。
+
+
+### 战术行为（批次 5d，未发版）
+
+只给 skill ≥ 0.6（防御 / 诱饵侧击 / 低空突防）或 elite 以上（skill ≥ 0.72：能量与加力、假撤退）；低技能保持原行为。
+
+- **按来袭弹类型选防御**（`tactics.js evade`）：半主动（`sarh`）→ 相对**发射机**把自己放在 3/9 线（打断锁定）；红外 / 光电 → 硬拉爬升（`dir.y` 0.45）且不开加力；其余雷达弹照旧（3/9 线 + 俯冲 + 箔条）。
+- **能量与加力**（`energy.js`）：`$.energy(a) = ½v² + g·h`、`$.cornerSpeed(a)`（失速速度与军推速度的中点）、`$.irThreat`、`$.abPolicy`、`$.yoyo`。elite 以上：收敛（> 2600 m）速度 < 角点 × 1.15 才开加力、狗斗 < 角点 × 0.9 才开、有红外弹以我为目标（< 6 km）不开；缠斗中速度 < 角点 × 0.8 压机头 yo-yo。没有燃油模型，不做 `AB_FUEL`；`AB_MIN_E`（"能量低于门限停止加力"）未做——与上面按角点速度开的规则方向相反，留待实机评估。半主动照射期间仍不开加力（5c）。
+- **诱饵与侧击**（`director.js`）：同一个空中目标被同队 ≥ 2 架 skill ≥ 0.6 的敌机盯着（不在规避中）→ 第一架 `bait`（正面）、其余 `flank`（绕到目标侧后 2.5 km / 1.5 km 处切入，左右交替）；`s.subrole` / `flankSide`。
+- **假撤退**（`retreat.js`）：elite / ace、hp > 60%、有空中目标、非僚机；掉血 / 弹药减少 → 2.5 s 评估 → `FAKE.P`（0.08，ace ×1、elite ×0.7）→ 背着对手飞 8–15 s（`s.fake`，mode `retreat`，**不设 `retreating`**，所以不触发整备、不移除单位，`mission.retreat='off'` 的关卡里也有）；到时间 / 对手追近 3.5 km 内（≥ 3 s 后）→ 回头：`fakeBoostT` 3 s 加力、`missT` 预置（先机发射）、`standCool` 15 s。台词与真撤退同样走 `rtb`（玩家分不出，是卖点）。
+- **撤向防空伞**（`retreat.js umbrellaPoint`）：被追击（有敌机目标在 7 km 内或被照射）、己方带对空火力的 `world.targets`（`sam` 标签 / 近防 / 对空武器）**比追击者更靠近我**时，真撤离优先朝它飞（半径取对空弹有效射程，无武器时 5 km）；进到 0.7 半径内待满 6 s 就结束撤离。
+- **低空突防**（`strike.js skimDir`）：机型 `caps` 含 `strike`、skill ≥ 0.6、目标是面目标：远处贴海面 / 地面（`SKIM.AGL` 120 m，下限 70 m），到武器有效射程 × 1.3 才拉起到 1800 m，发射后回低空；`s.lowStrike` 为真时跳过 `agl < 420` 的近地保护。这类机在 `surfaceTargetFor` 里从 25 km 就盯上面目标（其余仍是射程 × 1.15）。
+- **未做**（5.7 里本批只挑了"战术行为"组；顺延）：个体模型（过载 / 性格 / 失误）、态势记忆、编队协同（escort、队形、电子战协同、友军呼救）、导演与系统（ambient、调试可视化）。
