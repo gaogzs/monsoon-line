@@ -211,6 +211,7 @@
 
     // 任务逻辑
     $.mission.tick($.world, dt);
+    Ambient.update($.world, $.mission, dt);          // mission.ambient（缺省没有）
 
     // 清理
     compact();
