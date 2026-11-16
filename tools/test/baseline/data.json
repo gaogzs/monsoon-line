@@ -124,6 +124,7 @@
    "ssm": "712113d68078",
    "swm": "566626c4b30e",
    "tca11": "34b2766431a9",
+   "tether": "5796c246d687",
    "trm": "8f6a95a8f204",
    "v11": "44f47fcfb275",
    "v17": "b89f65d1a96b",
@@ -138,7 +139,7 @@
    "vsr": "b982cece78ea",
    "vzu": "3a56d8afd988",
    "wasp": "5fb403e211f0",
-   "$order": "f05640ed6a10"
+   "$order": "1b2995eac508"
   },
   "TURRET_GUNS": {
    "aa30": "aeb52d74e586",

@@ -33,6 +33,8 @@ Tags.declare('cullFar',  { owner: 'render',   doc: T('core.tags.doc_17') });
 // 整备点：关卡 mission.resupply 里按 ref 引用它时，我方玩家驻留在附近可补满弹药、重选挂载（js/engine/world/resupply.js）
 Tags.declare('resupply', { owner: 'game',     doc: T('core.tags.doc_19') });
 // reserved：本批没有机型使用，VTOL（批次 6）带上它；读的地方是 psm.js 的 psmGate
+// 半主动雷达制导（Fox 1）：导弹只在发射机对该目标持有有效锁定时受引导，丢锁沿航向飞、宽限内重锁恢复（entities/missile.js）
+Tags.declare('sarh',      { owner: 'entities', doc: T('core.tags.doc_21') });
 // reserved：目前没有机型使用。带上它的 AI 飞机永不撤离（js/engine/ai/retreat.js 的 canRetreat 读它）
 Tags.declare('noRetreat', { owner: 'ai', reserved: true, doc: T('core.tags.doc_20') });
 Tags.declare('noPSM',    { owner: 'entities', reserved: true, doc: T('core.tags.doc_18') });
