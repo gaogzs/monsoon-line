@@ -28,6 +28,8 @@
       ringR: 0,            // standoff 的环半径
       wclass: null,        // 武器分类：longRange / shortRange / gunOnly
       illum: null,         // 半主动弹的照射状态 {missile, target, w, abandoned}（updateIllum）
+      subrole: null,       // 'bait' / 'flank'（Director 给成对的 skill>=0.6 敌机分配）
+      flankSide: 1,
       retreating: false,   // 撤离中（retreat.js；mission.retreat 为 'on' 才会置真）
       evalT: 0,            // 撤离评估倒计时（事件之后 RETREAT.EVAL_DELAY 秒评估一次）
       retreatCd: 0,        // 评估没中之后的冷却
@@ -609,6 +611,15 @@
       }
       throttle = res.throttle;
       ab = res.ab;
+      // 5d：诱饵 / 侧击；elite 以上按能量定加力与 yo-yo
+      var dT = M3.dist(a.pos, s.target.pos);
+      if (s.subrole === 'flank' && dT > 1200 && s.target.kind !== 'target') {
+        var tg = s.target;
+        var aim = M3.add(tg.pos, M3.add(M3.mul(tg.right, 2500 * (s.flankSide || 1)), M3.mul(tg.fwd, -1500)));
+        desired = M3.norm(M3.sub(aim, a.pos));
+      }
+      ab = $.abPolicy(a, s, res, dT, world);
+      desired = $.yoyo(a, s, desired, dT);
     } else {
       // 无目标：巡逻
       s.wander += dt * 0.25;

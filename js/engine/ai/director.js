@@ -23,6 +23,7 @@
     if (d && t >= d.t0 && t - d.t0 < TICK) return d;
     d = { t0: t, load: [], targets: [], allies: [], cx: 0, cz: 0 };
     var n = 0;
+    for (var r = 0; r < world.actors.length; r++) if (world.actors[r].ai) world.actors[r].ai.subrole = null;
     for (var i = 0; i < world.actors.length; i++) {
       var a = world.actors[i];
       if (!a.alive || !a.ai || a.route) continue;
@@ -33,6 +34,15 @@
       if (a.ai.role === 'ally') { d.allies.push(a); d.cx += a.pos.x; d.cz += a.pos.z; n++; }
     }
     if (n) { d.cx /= n; d.cz /= n; }
+    /* 诱饵与侧击：同一个空中目标被同队 ≥ 2 架 skill ≥ 0.6 的敌机盯着时，第一架当诱饵（正面吸引），其余绕侧后切入 */
+    for (var k2 = 0; k2 < d.targets.length; k2++) {
+      if (d.targets[k2].kind === 'target') continue;
+      var grp = [], L2 = d.load[k2];
+      for (var g = 0; g < L2.length; g++) if (L2[g].ai.role === 'enemy' && L2[g].ai.skill >= 0.6 && L2[g].ai.mode !== 'evade') grp.push(L2[g]);
+      if (grp.length < 2) continue;
+      grp[0].ai.subrole = 'bait';
+      for (var h = 1; h < grp.length; h++) { grp[h].ai.subrole = 'flank'; grp[h].ai.flankSide = h % 2 ? 1 : -1; }
+    }
     world.aiDir = d;
     return d;
   }

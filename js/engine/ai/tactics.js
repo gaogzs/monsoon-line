@@ -67,6 +67,23 @@
 
     // 用位置相关的常数选一边，避免左右横跳
     var side = (Math.sin(a.pos.x * 0.01 + a.pos.z * 0.013) > 0) ? 1 : -1;
+
+    /* 按来袭弹的类型选防御（批次 5d；只给 skill ≥ 0.6，低技能保持下面统一的"3/9 线 + 俯冲"）：
+         半主动（sarh）→ 打断锁定：相对**发射机**把自己放在 3/9 线，让它的锥追不上我（它丢锁，弹就瞎）
+         红外        → 硬拉爬升 + 不开加力（加力的热信号只会让它咬得更紧）
+         其余雷达    → 照旧（3/9 线凹口 + 箔条）*/
+    if (a.ai && a.ai.skill >= 0.6 && m.w) {
+      if (m.w.tags && m.w.tags.sarh && m.owner && m.owner.alive) {
+        var toO = M3.norm(M3.sub(m.owner.pos, a.pos));
+        var pO = M3.cross(toO, M3.V(0, 1, 0));
+        if (M3.len(pO) > 0.15) {
+          pO = M3.norm(pO);
+          return { dir: M3.norm(M3.V(a.fwd.x * 0.2 + pO.x * side * 1.6, dist < 900 ? -0.4 : -0.05, a.fwd.z * 0.2 + pO.z * side * 1.6)), throttle: 1, ab: dist < 2600 };
+        }
+      } else if (m.w.seeker === 'ir' || m.w.seeker === 'eo') {
+        return { dir: M3.norm(M3.V(a.fwd.x * 0.25 + perp.x * side * 1.2, 0.45, a.fwd.z * 0.25 + perp.z * side * 1.2)), throttle: 1, ab: false };
+      }
+    }
     // 太近时改为向下俯冲把导弹拖入稠密大气
     var dive = -0.12;
     if (dist < 900) dive = -0.55;
