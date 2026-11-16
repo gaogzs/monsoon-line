@@ -81,7 +81,9 @@
       if (rw > reach) reach = rw;
     }
     if (reach <= 0) return null;
-    return nearestSurfaceTarget(a, world, reach * 1.15);
+    /* 低空突防的攻击机（strike、skill ≥ 0.6）：远处就盯上面目标，才有"接近段贴海面"可言（ai/strike.js）；其余仍只在射程 ×1.15 内才去挑 */
+    var strikeAI = a.ai && a.ai.skill >= 0.6 && a.ac && a.ac.caps && a.ac.caps.indexOf('strike') >= 0;
+    return nearestSurfaceTarget(a, world, strikeAI ? Math.max(reach * 1.15, 25000) : reach * 1.15);
   }
 
   /* 对面目标的接近方向：**保持高度**，只把机头转过去。

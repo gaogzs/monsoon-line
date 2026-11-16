@@ -28,6 +28,7 @@
       ringR: 0,            // standoff 的环半径
       wclass: null,        // 武器分类：longRange / shortRange / gunOnly
       illum: null,         // 半主动弹的照射状态 {missile, target, w, abandoned}（updateIllum）
+      lowStrike: false,    // 低空突防中（跳过近地保护，$.skimDir 自己守 80 m 下限）
       subrole: null,       // 'bait' / 'flank'（Director 给成对的 skill>=0.6 敌机分配）
       flankSide: 1,
       fake: null,          // 假撤退 {t, dur, from}（retreat.js）
@@ -514,6 +515,7 @@
     /* ---------- 4. 分派行为 ---------- */
     var desired;
     var throttle = 0.85, ab = false;
+    s.lowStrike = false;
 
     if (s.mode === 'evade' && s.msl) {
       var r = $.evade(a, s.msl, world);
@@ -606,6 +608,9 @@
          结果是在目标上方反复俯冲-拉起，永远进不了投放包线。 */
       desired = $.approachSurface(a, s.target);
       throttle = 0.9; ab = false;
+      /* 低空突防（批次 5d）：strike 机型、skill ≥ 0.6 —— 进投放包线前贴海面飞，到包线边缘才拉起、发射后回到低空 */
+      var sk = $.skimDir(a, s, desired);
+      if (sk) { desired = sk; s.lowStrike = true; throttle = 1; }
     } else if (s.target) {
       var res = $.pursue(a, s.target, world);
       desired = res.dir;
@@ -661,7 +666,7 @@
     }
 
     // 硬性保护：撞地前强行拉起
-    if (Ent.agl(a) < 420 && a.fwd.y < 0.05) {
+    if (Ent.agl(a) < 420 && a.fwd.y < 0.05 && !s.lowStrike) {
       desired = M3.norm(M3.V(a.fwd.x, 0.5, a.fwd.z));
       $.steerTo(a, desired, ctrl, a);
       throttle = 1; ab = true;
