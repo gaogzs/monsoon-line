@@ -169,7 +169,7 @@
 - `seekers`：导引头数，`w.tags.twinSeeker`（BIN-9）为 2，`breakLock` 每骗中一次先扣一个，扣到 1 才真正脱锁。
 - `dewRolled`：定向能拦截已对哪架飞机掷过骰（`Game` `updateDEW`，`engine/game/combat.js`，每枚弹只判一次）。
 - 运行期追加：`decoy`（`{p, v, t0, p2, done}`，骗走它的那团诱饵云，供 `decoyRecheck`）、`spoofed`（骗到它的飞机，只在 `reLockT > 0` 期间被避开）、
-  `laserLost`（激光照射丢失，当前无武器使用）。
+  `laserLost`（激光照射丢失，当前无武器使用）、`sarhLost` / `illumT`（半主动照射丢失与已丢时长，`w.tags.sarh`；`illumT > Ent.SARH_GRACE` 时 `m.target = null`）。
 
 ### 3.3 子弹 `b`
 

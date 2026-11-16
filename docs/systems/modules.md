@@ -24,6 +24,10 @@
 
 `util`（索敌与工具）、`steer`（把期望方向翻译成三轴杆量）、`brain`（attach / update 主决策）、`tactics`（追击 / 规避 / 对地）。
 
+### `FovWatch` —— 视场 / 锥的进出调度（批次 5c，独立全局）
+
+文件：`engine/fovwatch.js`。`FovWatch.watch({obs, tgt, cone, hyst, onEnter, onExit}) → h`（`h.inside`）、`unwatch`、`step(now)`（`engine/game/update.js` 每帧调）、`subscribe(fn) / lock / unlock`（锁定状态翻转广播口）、`clear()`（`mission-start.js` 开局清空）、`stats`。保守调度：下次检查时间 = 现在 + 离边界余量 / 最大角速度上界（`(|v_观察者|+|v_目标|)/距离 + turnMax`），所以不漏事件；迟滞：进 0.85 倍锥、出 1.0 倍锥。目前只接入 AI 照射（`ai/illum.js`）；玩家 `updateLock` 的锥计算、导弹导引头不走它。探针：`probe-fovwatch`。
+
 ### `Chatter` —— 条件触发的无线电（批次 5b，独立全局）
 
 文件：`engine/chatter.js`。公开接口：`Chatter.update(world, dt)`（`engine/game/update.js` 每帧调）、`emit(world, type, unit)`、`fox(world, actor)`（`world.fireMissile` 里调）、`rearmed(world, unit)`（`Resupply.reappear` 里调）；`ai/retreat.js` 在撤离开始时调 `emit(world, 'rtb', a)`。事件：`bingoAmmo / winchester / rtb / rearmed / splash / damaged / fox / defensive`；说话人 = 单位呼号（`label`，没有就不播）；同（事件，说话人）有冷却，全场 10 s 内最多 3 条，敌方台词只在离玩家 20 km 内播；私有 LCG，不碰 `Math.random`、不改世界状态（golden 不变）。台词在 `locales/zh-CN/text/radio.json`（`radio.<事件>.<ally|foe>.variants`）。

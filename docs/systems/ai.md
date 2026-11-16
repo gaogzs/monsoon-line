@@ -596,3 +596,8 @@ M3 播撒机 0.25、护航 0.58–0.72、
 ### 撤离
 
 `mission.retreat = 'on'` 才有（缺省 off）。事件（掉血 / 弹药池减少，轮询）→ 等 2.5 s → 评估一次（概率：血 < 35% +0.5、< 55% +0.2；无对空导弹 +0.15，且机炮 < 30% +0.4；位格系数 ace ×0.5 / elite ×0.75 / pawn ×1 / rookie ×1.3；上限 0.9）→ 没中冷却 8 s。撤离中 `mode = 'retreat'`：`evade` 优先；去向 `Resupply.pointFor`（本队整备点，否则最近出界口）；到整备点走批次 4 的 NPC 整备周期，出界口出界即移除（`retreated / leftBy = 'retreat' / escaped`）。`noRetreat` 标签（reserved）永不撤；`ai.leader` 指向的僚机随长机撤。`probe-retreat` 覆盖开关、触发率、位格单调、标签、出界移除、整备往返、僚机随长机。
+
+
+### 半主动照射（批次 5c，未发版）
+
+`ai/illum.js`：`$.updateIllum(a, s, world, dt)`（`decide` 开头调）与 `$.illumHolds(s)`。自己有 `sarh` 弹在途、目标活着时写 `a.lockHeldOn`（目标 = 当前 `s.target`、未被压制出 `clear`、未 `emcon`、在这件弹的有效射程内、且目标在锁定锥内——`FovWatch` 提供进 0.85 / 出 1.0 倍锥的迟滞）。**照射期间**（`illumHolds`）：不重选目标（`decide` 的重选条件）、来袭弹 > 2.5 km 不转身规避、不主动加力（`maneuver` 末尾 `ab = false`）；来袭弹进 2.5 km 时一次性判断放不放弃（概率 `0.4 + 0.5 × skill`，放弃则恢复规避）。丢锁 → 弹自己有 `SARH_GRACE` 宽限；弹失效 / 目标被弹置空 → 释放（`s.illum = null`，`lockHeldOn = null`）。**未做**：高技能锁定后的"偏置转向"；给上游战机配 `tether` 的 `npcLoadouts` 预设（顺延，免得 `probe-npc-loadouts` 基线再动）。

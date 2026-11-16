@@ -41,6 +41,7 @@
 | `sam` | game | 地对空发射车：被击毁时触发防空网被打开缺口的结算与无线电 | 设施 `sam` | `engine/game/combat.js` |
 | `cullFar` | render | 数量极多的目标：超出绘制 / 雷达显示距离就不画 | 设施 `cell` | `ui/frame.js`、`ui/hud/radar.js` |
 | `resupply` | game | 整备点：关卡 `mission.resupply` 按 `ref` 引用它时，我方玩家驻留在附近可补满弹药、重选挂载 | 舰船 `humpback`、平台 `beacon / breakwater / cairn / reed / shoal / sluice` | `engine/world/resupply.js`（读 `(t.ship || t.platform).tags`，运行时目标的 `t.tags` 来自 `TARGETS`，读不到舰船 / 平台的标签） |
+| `sarh` | entities | 半主动雷达制导（Fox 1）：弹只在发射机对目标持有有效锁定时受引导，丢锁沿航向飞、宽限内重锁恢复 | 武器 `tether` | `entities/missile.js`（`sarh` 分支）、`game/lock.js`（`lockHeldOn`）、`ai/illum.js`、HUD 状态条 / 引导告警、`input.js launchCall`（Fox 1） |
 | `noRetreat` | ai | 带它的 AI 飞机永不撤离（撤离只在关卡声明 `retreat: 'on'` 时才有）。**`reserved`：目前没有机型使用** | （无） | `ai/retreat.js`（`canRetreat`） |
 | `noPSM` | entities | 该机型不能做过失速机动（PSM）。缺省所有机型可用；VTOL 带上它。**`reserved`：目前没有机型使用** | （无，批次 6 的 VTOL） | `entities/psm.js`（`psmGate`） |
 

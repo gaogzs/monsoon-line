@@ -768,6 +768,18 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 
 > **批次 5 分片进度**：**5a 已完成（未发版，版本号由你定）**：5.0 分层、5.1 位格 / `AI.SKILL`、5.2 外围游走 / 回头 + Director、5.3 `ally`、5.4 撤离（含去整备点）、以及 5.7 里的「反应延迟与机炮偏移」。**顺延到后续批次**：5.5 Radio 2.0 与 `Chatter`、5.6 半主动雷达弹 / `FovWatch`、5.7 其余项、5.8 AI 过失速机动。
 
+### 5c 实施记录（半主动雷达弹 + FovWatch，已完成，未发版）
+
+代码：`js/data/weapons/tether.js`（CLA-6 牵引）、`entities/missile.js` 的 `sarh` 分支、`game/lock.js`（`lockHeldOn`）、`js/engine/fovwatch.js`、`ai/illum.js`、HUD（`targeting.js`、`panels.js`）、`input.js` 的 Fox 1；探针 `probe-sarh`、`probe-fovwatch`。出入：
+
+| 设计 | 实际 |
+|---|---|
+| FovWatch 给玩家 `updateLock` 提供锥进出 | **不做**：`updateLock` 保持原来的锥计算，只在末尾（包一层）写 `lockHeldOn`；FovWatch 目前只接 AI 照射（迟滞）。导弹自身导引头不动（与设计一致） |
+| AI 锁定后"偏置转向"（高技能） | 未做，顺延 |
+| 给部分上游战机 / 下游预警配半主动弹（`npcFits`） | 未做；弹本身 NPC 可挂（`fits` 同 `mrm`），但不给任何机型 / 关卡配预设，保证 golden 与难度不变 |
+| 无发射机的弹 | 按持续照射算（否则 `Ent.envelopeRange` 用 `owner: null` 推演，包线会算成 0 —— AI 永远不开火；调试时发现） |
+| 数据基线 | `snapshot-data` 基线重存（多 `tether` 与 `$order`）；`probe-npc-loadouts` 的 15 处不符在 v3.5.2 已存在，与本批无关，未处理 |
+
 ### 5b 实施记录（Radio 2.0 + Chatter，已完成，未发版）
 
 代码：`js/ui/radio.js`（队列重写）、`js/ui/screens/pause.js` + `locales/_html/overlays/pause.html`（记录页签）、`js/engine/chatter.js`、`locales/zh-CN/text/radio.json`；探针 `probe-radio`。详见 [game.md](systems/game.md)（Radio）、[modules.md](systems/modules.md)（Chatter）。出入：

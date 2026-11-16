@@ -10,7 +10,7 @@
 > | `base.js` | 调色板（`GREEN / AMBER / CY / RED / DIM / BLUE`）、`HUDK` 缩放、`U()` / `gap()` / `applyScale()`、`hmiLayout()`、`draw()`（唯一入口与每帧顺序） |
 > | `instruments.js` | `drawCompass`、`drawBoresight`、`drawTapes` / `tape`、`thrPercent` / `thrTape`、`drawEnginePanel`、`ctrlGauges`；`THR_IDLE / THR_MAX` 的 HUD 副本 |
 > | `radar.js` | `drawRadar`、`farCell`、`radarXY`、`drawBlips`、`drawPitchLadder`、`threatState` / `drawThreatRing`（RWR） |
-> | `targeting.js` | `drawTargets`、`drawLockBox`、`drawConeCue`、`drawLeadReticle`、`drawAllyMark` / `drawPlainMark`、`drawLaserStatus` |
+> | `targeting.js` | `drawTargets`、`drawLockBox`、`drawConeCue`、`drawLeadReticle`、`drawAllyMark` / `drawPlainMark`、`drawLaserStatus`（兼画半主动的 `drawIllumStatus`：照射保持 / ✕ 照射中断 + 宽限倒计时；`ownSarhMissile` 供 `drawConeCue` 用：半主动弹在飞时圈按照射是否保持画实 / 虚线） |
 > | `aids.js` | `drawCcip`、`drawFootprint`、`computeEnvelope` / `computeNEZ`、`offscreenRect` / `edgePoint` / `drawOffscreen` |
 > | `panels.js` | `drawWeaponPanel`、`drawAlerts`（`ALERT_ORDER`）、`drawStores`、`drawFriendlyShots`、`drawIncomingMissiles`、`drawTargetBearing`、`drawObjective` |
 > | `ghosts.js` | 电磁干扰下的假目标与身份乱码（2.3b）：`ghostStep`、`drawGhosts`、`ghostBlips`、`glitch` |
@@ -511,6 +511,8 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 位置同样来自 `hmiLayout()`，与 RWR 环共用一套坐标。
 
 ### 告警栈（屏幕中上方，`drawAlerts()`）
+
+`ALERT_ORDER` 现在以 `guided`（半主动弹**引导中**：在途 `sarh` 弹以玩家为目标且 `!sarhLost`，替代普通 `missile`；发射机丢锁后降级回 `missile`）开头。
 
 屏幕正中上方的告警**只有这一个栈**：先收集、按 `ALERT_ORDER` 排序、从上往下逐行画。
 起点 `max(H * 0.22, U(176))`（让开任务目标块），每行占固定高度，
