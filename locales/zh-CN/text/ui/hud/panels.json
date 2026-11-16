@@ -25,7 +25,8 @@
           "resupply_hold": "REARMING  整备中 {{n}}/{{t}} s",
           "resupply_edge": "REARM ZONE  整备区 {{n}}/{{t}} s",
           "resupply_busy": "规避中无法整备",
-          "resupply_empty": "补给耗尽"
+          "resupply_empty": "补给耗尽",
+          "guided": "▲▲ MISSILE GUIDED  导弹引导中"
         }
       }
     }

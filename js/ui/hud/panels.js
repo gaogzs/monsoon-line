@@ -86,7 +86,7 @@
      ============================================================ */
   /* 优先级（上 → 下）：雷达 / 导弹 > 低高度 > 失速 > 动压 > 其它状态。
      低高度排在失速前面：它意味着下一秒就是海面。 */
-  $.ALERT_ORDER = ['missile', 'lit', 'arena', 'resupply', 'damage', 'terrain', 'stall', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
+  $.ALERT_ORDER = ['guided', 'missile', 'lit', 'arena', 'resupply', 'damage', 'terrain', 'stall', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
 
   $.alertsBottom = 0;
 
@@ -101,7 +101,18 @@
     var list = [];
 
     var th = world ? $.threatState(p, world) : { inb: 0, lit: false };
-    if (th.inb) {
+    /* 半主动弹在引导中：发射机此刻仍持锁（!sarhLost）—— 比普通导弹逼近更高一级。丢锁后降级回普通 missile。 */
+    var guided = false;
+    if (world && world.missiles) {
+      for (var gi = 0; gi < world.missiles.length; gi++) {
+        var gm = world.missiles[gi];
+        if (gm.alive && gm.target === p && gm.w && gm.w.tags && gm.w.tags.sarh && !gm.sarhLost) { guided = true; break; }
+      }
+    }
+    if (th.inb && guided) {
+      var gTxt = th.minD < 1000 ? Math.round(th.minD) + ' M' : (th.minD / 1000).toFixed(1) + ' KM';
+      list.push({ id: 'guided', txt: T('ui.hud.panels.drawAlerts.guided'), col: $.RED, font: BIG, on: blFast, h: $.U(34), sub: gTxt, subH: $.U(26) });
+    } else if (th.inb) {
       var dTxt = th.minD < 1000 ? Math.round(th.minD) + ' M' : (th.minD / 1000).toFixed(1) + ' KM';
       list.push({ id: 'missile', txt: T('ui.hud.panels.drawAlerts.txt_'), col: $.RED, font: BIG, on: blFast, h: $.U(34),
         sub: dTxt, subH: $.U(26) });

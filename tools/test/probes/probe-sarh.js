@@ -115,4 +115,25 @@ function fly(weapon, script, opts) {
   chk('G4 弹失效后释放：lockHeldOn 清空、illum 清空', sh.lockHeldOn === null && sh.ai.illum === null);
 }
 
+/* ---------- H. HUD：整帧渲染不抛错（状态条 / 圈 / 引导告警 / Fox 1 台词） ---------- */
+{
+  const S3 = Sim.load({ seed: 2, trace: true });
+  const { M3: M, Ent: E, MISSIONS } = S3.sandbox;
+  S3.start(0);
+  const G = S3.sandbox.Game, w = G.__world(), p = G.__player();
+  const foe = w.actors.find(a => a.team === 1 && a.alive);
+  p.target = foe;
+  const own = E.makeMissile({ weapon: 'tether', team: 0, pos: M.add(p.pos, M.V(0, 0, 200)), fwd: p.fwd, speed: 600, target: foe, owner: p });
+  own.team = 0; w.missiles.push(own);
+  const inc = E.makeMissile({ weapon: 'tether', team: 1, pos: M.add(p.pos, M.V(0, 0, 3000)), fwd: M.V(0, 0, -1), speed: 700, target: p, owner: foe });
+  inc.team = 1; w.missiles.push(inc);
+  let err = null;
+  try {
+    for (const lost of [false, true]) { own.sarhLost = lost; own.illumT = lost ? 1.0 : 0; inc.sarhLost = lost; p.special = 'tether'; S3.render(); }
+  } catch (e) { err = e; }
+  chk('H 半主动状态条 / 锥圈 / 引导告警：两种状态整帧渲染不抛错', !err, err ? String(err.stack).split('\n').slice(0, 2).join(' | ') : '');
+  const T3 = S3.sandbox.T;
+  chk('H Fox 1 台词文案存在', /Fox 1/.test(T3('ui.input.launchCall.fox1')));
+}
+
 process.exit(ok ? 0 : 1);

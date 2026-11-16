@@ -420,6 +420,7 @@
     lastCallT = now;
     var tx;
     if (w.kind !== 'aam' || w.tags.unguided) tx = T('ui.input.launchCall.s1');
+    else if (w.tags && w.tags.sarh) tx = T('ui.input.launchCall.fox1');       // 半主动：Fox 1（要放在 radar 判断之前）
     else if (w.seeker === 'radar') tx = '<b>Fox 3</b>';
     else tx = '<b>Fox 2</b>';
     Radio.raw({ who: CALLSIGN.player, cls: 'ally', tx: tx, gap: 0.4 });

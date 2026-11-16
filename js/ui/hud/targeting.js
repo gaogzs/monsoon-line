@@ -157,7 +157,7 @@
         }
       }
     }
-    if (!flying) return;
+    if (!flying) { drawIllumStatus(ctx, W, H, p, world); return; }
 
     var y = H * 0.87;
     if (flying.laserLost) {
@@ -166,6 +166,30 @@
         'rgba(185,200,212,0.72)', $.FS, 'center');
     } else {
       $.text(ctx, T('ui.hud.targeting.drawLaserStatus.s5'), W / 2, y, $.AMBER, $.FB, 'center');
+    }
+  }
+
+  /* 自己的半主动弹（标签 sarh）在飞：屏幕下缘一条状态 —— 照射保持 / ✕ 照射中断（x.x s 内重锁可恢复） */
+  function ownSarhMissile(p, world) {
+    if (!world || !world.missiles) return null;
+    for (var i = 0; i < world.missiles.length; i++) {
+      var m = world.missiles[i];
+      if (m.alive && m.owner === p && m.w && m.w.tags && m.w.tags.sarh && m.target) return m;
+    }
+    return null;
+  }
+  $.ownSarhMissile = ownSarhMissile;
+
+  function drawIllumStatus(ctx, W, H, p, world) {
+    var m = ownSarhMissile(p, world);
+    if (!m) return;
+    var y = H * 0.87;
+    if (m.sarhLost) {
+      var left = Math.max(0, Ent.SARH_GRACE - (m.illumT || 0));
+      $.text(ctx, T('ui.hud.targeting.drawIllumStatus.lost', { s: left.toFixed(1) }), W / 2, y, $.RED, $.FB, 'center');
+      $.text(ctx, T('ui.hud.targeting.drawIllumStatus.hint'), W / 2, y + 16, 'rgba(185,200,212,0.72)', $.FS, 'center');
+    } else {
+      $.text(ctx, T('ui.hud.targeting.drawIllumStatus.hold'), W / 2, y, $.AMBER, $.FB, 'center');
     }
   }
 
@@ -433,6 +457,9 @@
     var cone = p.lockCone || w.lockCone;
     var t = p.target && p.target.alive ? p.target : null;
     var hot = !!(t && p.lockInCone && p.lockInRange);
+    /* 半主动弹在飞：圈按"照射是否保持"画 —— 持锁实线醒目，丢照射退回虚线（不再按"目标在圈里"判） */
+    var sm = $.ownSarhMissile(p, $.world);
+    if (sm) hot = !sm.sarhLost;
     ctx.save();
     ctx.strokeStyle = hot ? $.RED : (t ? 'rgba(255,176,58,0.42)' : 'rgba(150,170,180,0.22)');
     ctx.lineWidth = hot ? 1.6 : 1.4;
