@@ -107,4 +107,17 @@ const shown = () => Radio.log().filter(e => !e.dropped);
   chk('台词自己的 gap 更大时取它', Radio.gapAfter({ tx: 'x', gap: 3 }) === 3 && Radio.gapAfter({ tx: 'x', gap: 0.4 }) === 1.2);
 }
 
+/* ---------- F. 暂停菜单「无线电记录」页签接线 ---------- */
+{
+  const fs = require('fs'), path = require('path');
+  const root = path.join(__dirname, '..', '..', '..');
+  const html = fs.readFileSync(path.join(root, 'locales/_html/overlays/pause.html'), 'utf8');
+  chk('pause.html 有 data-ptab="radio" 与 pane-radio / pauseRadio', /data-ptab="radio"/.test(html) && /id="pane-radio"/.test(html) && /id="pauseRadio"/.test(html));
+  const G = S.sandbox.Game;
+  Radio.clear(); Radio.raw(line('story', 900)); run(2);
+  let threw = null;
+  try { G.switchPauseTab('radio'); G.renderRadioLog(); } catch (e) { threw = e; }
+  chk('切到记录页签并渲染不抛错', !threw, threw ? String(threw.stack).split('\n')[0] : '');
+}
+
 process.exit(ok ? 0 : 1);

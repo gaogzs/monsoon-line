@@ -1,7 +1,7 @@
 (function (Game) {
   'use strict';
   var $ = Game.$;
-  $.togglePause = togglePause; $.switchPauseTab = switchPauseTab; $.buildHelpPage = buildHelpPage;
+  $.renderRadioLog = renderRadioLog; $.togglePause = togglePause; $.switchPauseTab = switchPauseTab; $.buildHelpPage = buildHelpPage;
 
   function togglePause() {
     if ($.failing) { $.endFail(); return; }     // 失败提示期间不弹暂停菜单
@@ -28,11 +28,25 @@
     for (var i = 0; i < tabs.length; i++) {
       tabs[i].classList.toggle('on', tabs[i].getAttribute('data-ptab') === name);
     }
-    var panes = ['main', 'settings', 'help'];
+    var panes = ['main', 'settings', 'help', 'radio'];
     for (i = 0; i < panes.length; i++) {
       var el = document.getElementById('pane-' + panes[i]);
       if (el) el.classList.toggle('on', panes[i] === name);
     }
+    if (name === 'radio') renderRadioLog();
+  }
+
+  /* 无线电记录页签：Radio.log()（最近 30 条，含被丢弃的），最新的在最上面；被丢弃的标灰 */
+  function renderRadioLog() {
+    var box = document.getElementById('pauseRadio');
+    if (!box) return;
+    var log = Radio.log(), html = '';
+    for (var i = log.length - 1; i >= 0; i--) {
+      var e = log[i];
+      html += '<div class="rl ' + e.cls + (e.dropped ? ' dropped' : '') + '">' +
+        (e.who ? '<span class="who">' + e.who + '</span>' : '') + '<span class="tx">' + e.tx + '</span></div>';
+    }
+    box.innerHTML = html || '<div class="rl empty">' + T('html.pause.radio_empty') + '</div>';
   }
 
   function buildHelpPage() {

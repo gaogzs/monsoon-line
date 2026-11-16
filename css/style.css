@@ -708,3 +708,11 @@ kbd{ font-family:var(--mono); font-size:11.5px; padding:2px 7px; margin-right:2p
 /* 吊舱叠加上去的 ECM：接在机体值右边，亮绿 */
 .stat-bar b{ position:absolute; top:0; bottom:0; display:block; background:#5fe39a; }
 .stat-row .v em.up{ color:#5fe39a; }
+
+/* 暂停菜单：无线电记录 */
+.radio-log{ max-height:46vh; overflow-y:auto; text-align:left; padding:4px 2px; }
+.radio-log .rl{ padding:5px 10px; margin:0 0 4px; border-left:3px solid var(--cy, #6cf); background:rgba(255,255,255,0.04); font-size:13px; line-height:1.5; }
+.radio-log .rl.enemy{ border-left-color:var(--red); }
+.radio-log .rl .who{ margin-right:8px; opacity:0.75; font-weight:600; }
+.radio-log .rl.dropped{ opacity:0.38; }
+.radio-log .rl.empty{ border-left-color:transparent; opacity:0.55; }
