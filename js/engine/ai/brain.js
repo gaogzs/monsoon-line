@@ -30,6 +30,9 @@
       illum: null,         // 半主动弹的照射状态 {missile, target, w, abandoned}（updateIllum）
       subrole: null,       // 'bait' / 'flank'（Director 给成对的 skill>=0.6 敌机分配）
       flankSide: 1,
+      fake: null,          // 假撤退 {t, dur, from}（retreat.js）
+      fakeBoostT: 0,
+      umbT: 0,
       retreating: false,   // 撤离中（retreat.js；mission.retreat 为 'on' 才会置真）
       evalT: 0,            // 撤离评估倒计时（事件之后 RETREAT.EVAL_DELAY 秒评估一次）
       retreatCd: 0,        // 评估没中之后的冷却
@@ -270,6 +273,7 @@
     if (s.modeT > 0) s.modeT -= dt;
     if (s.evadeT > 0) s.evadeT -= dt;
     if (s.standCool > 0) s.standCool -= dt;
+    if (s.fakeBoostT > 0) s.fakeBoostT -= dt;
     if (s.shootT > 0) s.shootT -= dt;
     s.envClock = (s.envClock || 0) + dt;      // 发射包线缓存的时钟（见 aiEnvelope）
     if (s.burstT > 0) s.burstT -= dt;
@@ -374,8 +378,8 @@
 
     /* ---------- 2b. 撤离（mission.retreat 'on'）：evade 优先，其余时间 mode = retreat ---------- */
     $.retreatWatch(a, s, world, dt);
-    if (s.retreating && s.mode !== 'evade') s.mode = 'retreat';
-    else if (!s.retreating && s.mode === 'retreat') s.mode = 'pursue';
+    if ((s.retreating || s.fake) && s.mode !== 'evade') s.mode = 'retreat';
+    else if (!s.retreating && !s.fake && s.mode === 'retreat') s.mode = 'pursue';
 
     /* ---------- 3. 选择目标 ---------- */
     if (s.role === 'drone') {
@@ -535,7 +539,7 @@
       throttle = 1; ab = true;
     } else if (s.mode === 'retreat') {
       s.flareReact = 0;
-      desired = $.retreatDir(a, s, world);        // 飞出战区的会在这里被移除（返回 null）
+      desired = s.fake ? $.fakeDir(a, s) : $.retreatDir(a, s, world);        // 真撤离飞出战区的会在这里被移除（返回 null）
       throttle = 1; ab = true;
     } else if (s.role === 'drone') {
       /* 无人僚机永远待在编队里，不追出去。
@@ -619,6 +623,7 @@
         desired = M3.norm(M3.sub(aim, a.pos));
       }
       ab = $.abPolicy(a, s, res, dT, world);
+      if (s.fakeBoostT > 0) ab = true;            // 假撤退回头：短时加力，缩短回转时间窗
       desired = $.yoyo(a, s, desired, dT);
     } else {
       // 无目标：巡逻
@@ -632,7 +637,7 @@
     /* 所有分支都汇到这里，所以升限钳制放在这一处就够了 ——
        无论是追击、规避还是编队，都不会为了追人钻到没有机动能力的高度。 */
     desired = clampCeiling(a, desired);
-    if (s.mode !== 'retreat') desired = arenaSteer(a, desired, world);   // 撤离就是要出去，不被软转向拉回来
+    if (s.mode !== 'retreat' || s.fake) desired = arenaSteer(a, desired, world);   // 撤离就是要出去，不被软转向拉回来
 
     $.steerTo(a, desired, ctrl, a);
 

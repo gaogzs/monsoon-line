@@ -7,6 +7,8 @@
    C. 出界口：没有整备点的一方（enemy）撤出战区边界 → 从战场移除（retreated / leftBy='retreat' / escaped，不计击杀）
    D. 整备往返：我方 ally 撤到整备区 → 走 NPC 整备周期 → 补满血回来，retreating 清除
    E. 僚机随长机：长机开始撤，ai.leader 指向它的僚机也撤
+   F. 假撤退（批次 5d）：elite / ace、血量尚可时（retreat 'off' 的关卡里也有）沿远离对手的方向飞一阵，然后回头迎击；不移除单位
+   G. 撤向防空伞（批次 5d）：被追击、且己方防空比追击者更近时，撤离方向朝向防空而不是出界口
    用法：node tools/test/probes/probe-retreat.js
    ============================================================ */
 'use strict';
@@ -116,6 +118,49 @@ function world(seed) {
   L.ai.retreating = true;
   W.step(5);
   chk('长机撤离，ai.leader 指向它的僚机跟着撤', a.ai.retreating && b.ai.retreating);
+}
+
+/* ---------- F. 假撤退 ---------- */
+{
+  const W = world(7);
+  const $ = W.AI.$;
+  $.FAKE.P = 1;                                           // 概率拉满，只测机制
+  const foe = W.mk(1, 0, 0, { rank: 'ace', skill: 0.9 });
+  const ally = W.mk(0, -6000, 0);       // 在机尾方向：假撤退就是继续往前飞、拉开距离
+  ally.hp = ally.maxHp = 1e9; ally.ai.cmd = 'hold';
+  W.step(30);
+  foe.hp -= 3;                                            // 事件：掉一点血，满血线以上
+  let started = false, maxD = 0, ended = false, d0 = 0;
+  for (let f = 0; f < 60 * 40; f++) {
+    W.step(1);
+    if (foe.ai.fake && !started) { started = true; d0 = W.M3.dist(foe.pos, ally.pos); }
+    if (started && foe.ai.fake) { const dv = W.M3.norm(W.M3.sub(foe.pos, ally.pos)); maxD = Math.max(maxD, W.M3.dot(foe.fwd, dv)); }
+    if (started && !foe.ai.fake) { ended = true; break; }
+  }
+  chk('F 假撤退：retreat off 的关卡里也会开始，期间机头转到背着对手飞', started && maxD > 0.7, 'away=' + maxD.toFixed(2));
+  chk('F 假撤退结束后回头：单位还在、不是撤离，missT 已预置（先机）', ended && foe.alive && !foe.retreated && foe.ai.mode !== 'retreat' && foe.ai.fakeBoostT > 0, 'ended=' + ended);
+  const pawn = world(8); pawn.AI.$.FAKE.P = 1;
+  const pf = pawn.mk(1, 0, 0, { rank: 'pawn', skill: 0.55 }), pa = pawn.mk(0, 6000, 0); pa.hp = pa.maxHp = 1e9; pa.ai.cmd = 'hold';
+  pawn.step(30); pf.hp -= 3; pawn.step(20);
+  chk('F pawn 位格不会假撤退', !pf.ai.fake);
+}
+
+/* ---------- G. 撤向防空伞 ---------- */
+{
+  const W = world(9);
+  W.w.retreatOn = true;
+  const e = W.mk(1, 0, 0), chaser = W.mk(0, -3000, 0);
+  chaser.hp = chaser.maxHp = 1e9;
+  const sam = W.Ent.makeTarget({ x: W.ar.cx + 12000, y: 0, z: W.ar.cz, hp: 9999, radius: 20, ground: true, team: 1 });
+  sam.tags = { sam: true }; sam.weapon = 'ss6'; W.w.targets.push(sam);
+  e.ai.target = chaser; e.ai.retreating = true;
+  const d = W.AI.$.retreatDir(e, e.ai, W.w);
+  const toS = W.M3.norm(W.M3.V(sam.pos.x - e.pos.x, 0, sam.pos.z - e.pos.z));
+  chk('G 被追击且己方防空更近：撤离方向朝向防空', d && W.M3.dot(W.M3.norm(W.M3.V(d.x, 0, d.z)), toS) > 0.95, d ? 'cos=' + W.M3.dot(W.M3.norm(W.M3.V(d.x, 0, d.z)), toS).toFixed(2) : 'null');
+  chaser.pos.x = sam.pos.x - 1000; chaser.pos.z = sam.pos.z;        // 追击者比我更靠近防空：去了是送人头
+  const d2 = W.AI.$.retreatDir(e, e.ai, W.w);
+  const um2 = W.AI.$.umbrellaPoint(e, e.ai, W.w);
+  chk('G 追击者比我更靠近防空：不选它', um2 === null);
 }
 
 process.exit(ok ? 0 : 1);

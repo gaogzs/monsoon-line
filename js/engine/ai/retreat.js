@@ -39,31 +39,100 @@
     return Math.max(0, Math.min(0.9, p * rk));
   };
 
-  /* 决策层调用（每帧）：检测事件、到点评估、长机带僚机。 */
+  /* ---- 假撤退 / 撤向防空伞（批次 5d）---- */
+  $.FAKE = { P: 0.08, MIN: 8, SPAN: 7, TURN_DIST: 3500 };
+
+  function hdist(a, b) { var dx = a.x - b.x, dz = a.z - b.z; return Math.sqrt(dx * dx + dz * dz); }
+
+  /* 己方防空伞：我方带对空火力的 world.targets（sam 标签 / 近防 / 对空武器），半径取对空弹有效射程（近防无武器时 5 km）。
+     只在"被追击"（有敌机目标在 7 km 内，或被照射）且这个位置比追击者更靠近我时才算数。 */
+  $.umbrellaPoint = function (a, s, world) {
+    var ch = s.target && s.target.alive && s.target.kind !== 'target' ? s.target : null;
+    if (!ch || M3.dist(a.pos, ch.pos) > 7000) { if (!(a.rwrT > 0)) return null; }
+    var best = null, bd = 1e18;
+    for (var i = 0; i < world.targets.length; i++) {
+      var t = world.targets[i];
+      if (!t.alive || t.team !== a.team) continue;
+      var wp = t.weapon && WEAPONS[t.weapon];
+      var aa = (t.tags && t.tags.sam) || t.hasAA || (wp && wp.target === 'air');
+      if (!aa) continue;
+      var r = wp ? Ent.aiReach(wp, 3000) : 5000;
+      var d = hdist(a.pos, t.pos);
+      if (d >= bd || d > 40000) continue;
+      if (ch && hdist(ch.pos, t.pos) <= d) continue;            // 追击者比我更靠近它：去了也是送人头
+      bd = d; best = { x: t.pos.x, z: t.pos.z, r: r, d: d };
+    }
+    return best;
+  };
+
+  function startFake(a, s, world) {
+    s.fake = { t: 0, dur: $.FAKE.MIN + $.FAKE.SPAN * $.rnd01(s), from: s.target };
+    Chatter.emit(world, 'rtb', a);                  // 真 / 假撤退在玩家眼里不可区分（这是卖点）
+  }
+
+  function fakeOK(a, s) {
+    if (s.rank !== 'elite' && s.rank !== 'ace') return false;
+    if (a.hp < a.maxHp * 0.6 || s.leader) return false;
+    var t = s.target;
+    return !!(t && t.alive && t.kind !== 'target');
+  }
+
+  /* 决策层调用（每帧）：检测事件、到点评估（真撤离 / 假撤退）、长机带僚机、推进假撤退。
+     真撤离只在 world.retreatOn 时才有；假撤退不移除单位，retreat 'off' 的关卡里也生效。 */
   $.retreatWatch = function (a, s, world, dt) {
-    if (!world.retreatOn || !canRetreat(a, s)) return;
+    if (!canRetreat(a, s)) return;
+    var real = !!world.retreatOn;
     if (s.retreatCd > 0) s.retreatCd -= dt;
     if (s.hpSeen === undefined) { s.hpSeen = a.hp; s.ammoSeen = missileAmmo(a); }
     var am = missileAmmo(a);
     var event = a.hp < s.hpSeen - 0.5 || am < s.ammoSeen;
     s.hpSeen = a.hp; s.ammoSeen = am;
+
+    if (s.fake) {                                    // 假撤退进行中：到时间 / 对手追近了 → 急转回头
+      var f = s.fake, ch = f.from;
+      f.t += dt;
+      var near = ch && ch.alive && M3.dist(a.pos, ch.pos) < $.FAKE.TURN_DIST && f.t > 3;
+      if (f.t >= f.dur || !ch || !ch.alive || near) {
+        s.fake = null; s.fakeBoostT = 3; s.standCool = 15; s.retargetT = 0; s.target = ch && ch.alive ? ch : null;
+        s.missT = $.SKILL.reactT(s);                 // 回头第一枪不再等反应延迟（先机发射）
+      }
+      return;
+    }
     if (!s.retreating) {
       if (event && !(s.evalT > 0) && !(s.retreatCd > 0)) s.evalT = $.RETREAT.EVAL_DELAY;
       if (s.evalT > 0) {
         s.evalT -= dt;
         if (s.evalT <= 0) {
-          if ($.rnd01(s) < $.retreatProb(a, s)) { s.retreating = true; Chatter.emit(world, 'rtb', a); }
+          if (real && $.rnd01(s) < $.retreatProb(a, s)) { s.retreating = true; s.umbT = 0; Chatter.emit(world, 'rtb', a); }
+          else if (fakeOK(a, s) && $.rnd01(s) < $.FAKE.P * (s.rank === 'ace' ? 1 : 0.7)) startFake(a, s, world);
           else s.retreatCd = $.RETREAT.COOLDOWN;
         }
       }
       var L = s.leader;
-      if (L && L.alive && L.ai && L.ai.retreating) s.retreating = true;      // 僚机跟长机
+      if (real && L && L.alive && L.ai && L.ai.retreating) s.retreating = true;      // 僚机跟长机
     }
-    if (s.retreating && !Resupply.pointFor(world, a)) s.retreating = false;   // 无处可去（没有整备点也没有战区）
+    if (s.retreating) {
+      var um = $.umbrellaPoint(a, s, world);
+      if (um && um.d < um.r * 0.7) { s.umbT = (s.umbT || 0) + dt; if (s.umbT > 6) { s.retreating = false; s.retreatCd = $.RETREAT.COOLDOWN; } }
+      else if (!um && !Resupply.pointFor(world, a)) s.retreating = false;           // 无处可去（没有整备点也没有战区）
+    }
+  };
+
+  /* 假撤退的期望方向：背着追击者水平飞 */
+  $.fakeDir = function (a, s) {
+    var from = s.fake && s.fake.from;
+    if (!from) return a.fwd;
+    var dx = a.pos.x - from.pos.x, dz = a.pos.z - from.pos.z, l = Math.sqrt(dx * dx + dz * dz) || 1;
+    return M3.norm(M3.V(dx / l, 0.02, dz / l));
   };
 
   /* 机动层调用：返回期望方向；飞出战区边界的就地移除并返回 null。 */
   $.retreatDir = function (a, s, world) {
+    var um = $.umbrellaPoint(a, s, world);
+    if (um) {                                         // 被追击且有更近的己方防空伞：把对手引进火力网
+      var ux = um.x - a.pos.x, uz = um.z - a.pos.z, ul = Math.sqrt(ux * ux + uz * uz) || 1;
+      return M3.norm(M3.V(ux / ul, 0.0, uz / ul));
+    }
     var pt = Resupply.pointFor(world, a);
     if (!pt) return null;
     if (pt.exit && Arena.state(world.arenaDef, a.pos).zone === 'out') {
