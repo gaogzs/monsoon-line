@@ -638,6 +638,11 @@
         var aim = M3.add(tg.pos, M3.add(M3.mul(tg.right, 2500 * (s.flankSide || 1)), M3.mul(tg.fwd, -1500)));
         desired = M3.norm(M3.sub(aim, a.pos));
       }
+      /* 半主动照射中的高技能（ace）：保持目标在锥内的同时往一侧偏出一个角度（偏置转向），拉开距离、不迎着对手冲 */
+      if (s.skill >= 0.85 && $.illumHolds(s)) {
+        var bc = Math.cos(0.28 * (s.flankSide || 1)), bs = Math.sin(0.28 * (s.flankSide || 1));
+        desired = M3.norm(M3.V(desired.x * bc + desired.z * bs, desired.y, -desired.x * bs + desired.z * bc));
+      }
       ab = $.abPolicy(a, s, res, dT, world);
       if (s.fakeBoostT > 0) ab = true;            // 假撤退回头：短时加力，缩短回转时间窗
       desired = $.yoyo(a, s, desired, dT);

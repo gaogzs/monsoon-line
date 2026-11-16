@@ -46,6 +46,18 @@
     return ai.kind === 'counter' ? to : M3.norm(M3.V(-to.x, Math.max(-0.2, Math.min(0.2, -to.y)), -to.z));
   };
 
+  /* 假撤退回头：对手在机尾方向时，ace 用 PSM 甩头迎击（补上它原本缺的急转手段）；门限不过就保持常规转弯 */
+  $.psmTurnBack = function (a, s, world, tgt) {
+    if (!tgt || !tgt.alive || !eligible(a, s) || a.psm || s.psmCd > 0) return false;
+    var to = M3.norm(M3.sub(tgt.pos, a.pos));
+    if (M3.dot(a.fwd, to) > -0.3) return false;
+    s.psmAI = { kind: 'counter', src: tgt, t: 0 };
+    if (!Ent.psmGate(a, world, to).ok) { s.psmAI = null; return false; }
+    Ent.psmStart(a);
+    s.psmCd = $.PSM_AI.CD;
+    return true;
+  };
+
   $.psmActive = function (a, s) { return !!(a.psm && s.psmAI); };
 
   /* 决策层调用（每帧） */
@@ -54,7 +66,9 @@
     if (a.psm && s.psmAI) {                                  // 进行中：对准 / 超时 / 目标没了 → 自己结束
       var ai = s.psmAI, aim = $.psmAim(a, s);
       ai.t += dt;
-      if (!aim || ai.t > $.PSM_AI.MAX_T || M3.angleBetween(a.fwd, aim) < $.PSM_AI.ALIGN) {
+      var shaken = ai.kind === 'break' && ((ai.src.sarhLost === true) || (ai.src.kind !== 'missile' && !(a.rwrT > 0)));   // 摆脱成功：半主动弹丢了照射 / 不再被照射
+      if (!aim || shaken || ai.t > $.PSM_AI.MAX_T || M3.angleBetween(a.fwd, aim) < $.PSM_AI.ALIGN) {
+        s.psmShaken = (s.psmShaken || 0) + (shaken ? 1 : 0);
         Ent.psmAbort(a, world, 'ai');
         s.psmAI = null;
       }

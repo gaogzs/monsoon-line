@@ -95,6 +95,7 @@
       if (f.t >= f.dur || !ch || !ch.alive || near) {
         s.fake = null; s.fakeBoostT = 3; s.standCool = 15; s.retargetT = 0; s.target = ch && ch.alive ? ch : null;
         s.missT = $.SKILL.reactT(s);                 // 回头第一枪不再等反应延迟（先机发射）
+        if (s.target) $.psmTurnBack(a, s, world, s.target);   // ace：对手在机尾时用 PSM 甩头迎击
       }
       return;
     }

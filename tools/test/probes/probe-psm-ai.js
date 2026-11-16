@@ -62,6 +62,7 @@ function scene(seed, o) {
       // 冷却：第二次起手与第一次间隔应 ≥ CD
       if (A.ai.psmAI && A.psm && A.ai.psmAI.t < 0.05 && f > 0) { const t = f / 60; if (starts.length && t - starts[starts.length - 1] > 0.1) starts.push(t); }
     }
+    if (process.env.DBGP) console.log('seed', seed, starts.map(x => x.toFixed(1)).join(' '));
     if (starts.length > 1) { for (let i = 1; i < starts.length; i++) if (starts[i] - starts[i - 1] < W.AI.$.PSM_AI.CD - 0.5) againEarly++; }
     if (W.A.psm && W.A.psm.t > 12) unfinished++;
   }
