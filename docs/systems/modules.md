@@ -24,6 +24,10 @@
 
 `util`（索敌与工具）、`steer`（把期望方向翻译成三轴杆量）、`brain`（attach / update 主决策）、`tactics`（追击 / 规避 / 对地）。
 
+### `Ambient` —— 战场环境事件（批次 5f，独立全局）
+
+文件：`engine/ambient.js`。`Ambient.update(world, mission, dt)`（`engine/game/update.js` 在 `mission.tick` 之后调）；只读 `mission.ambient`，缺省什么都不做；私有 LCG；类型 `distress / reinforce / straggler / distant`。探针：`probe-ambient`。
+
 ### `FovWatch` —— 视场 / 锥的进出调度（批次 5c，独立全局）
 
 文件：`engine/fovwatch.js`。`FovWatch.watch({obs, tgt, cone, hyst, onEnter, onExit}) → h`（`h.inside`）、`unwatch`、`step(now)`（`engine/game/update.js` 每帧调）、`subscribe(fn) / lock / unlock`（锁定状态翻转广播口）、`clear()`（`mission-start.js` 开局清空）、`stats`。保守调度：下次检查时间 = 现在 + 离边界余量 / 最大角速度上界（`(|v_观察者|+|v_目标|)/距离 + turnMax`），所以不漏事件；迟滞：进 0.85 倍锥、出 1.0 倍锥。目前只接入 AI 照射（`ai/illum.js`）；玩家 `updateLock` 的锥计算、导弹导引头不走它。探针：`probe-fovwatch`。

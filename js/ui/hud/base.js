@@ -105,6 +105,7 @@
     $.drawThreatRing(ctx, W, H, p, world);
     $.drawLaserStatus(ctx, W, H, p, world);
     $.drawPsmHints(ctx, W, H, p, world);
+    $.drawAiDebug(ctx, W, H, p, world);        // 仅 ?debug=ai 时才画（hud/debug.js）
     $.drawLeadReticle(ctx, W, H, cam, p);   // 画在目标框之上，免得被挡住
     $.drawCcip(ctx, W, H, cam, p);          // 无制导炸弹 / 火箭的预计落点（CCIP）
     $.drawFootprint(ctx, W, H, cam, p);     // 精确制导炸弹的动态瞄准圈（泪滴形）

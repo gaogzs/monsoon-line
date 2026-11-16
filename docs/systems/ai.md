@@ -625,3 +625,18 @@ M3 播撒机 0.25、护航 0.58–0.72、
 - **触发**：事件（新出现的威胁）→ `EVAL_DELAY` 0.8 s 后评估一次（掷骰 `p = clamp(0.25 + 0.6×(skill−0.75)/0.25, 0.25, 0.85)`，`break` 还要 TTI > 2.5 s，再过 `psmGate` 的能量 / 高度 / 动压门限）→ 结果为否则要等威胁消失再出现才再评估；起手后冷却 `CD` 15 s。随机数用私有 LCG（`s.rs`）。
 - **HUD**：AI 进入 PSM 时在它身上标"高攻角机动"（`hud/targeting.js drawPsmHints`，与玩家自己的 PSM 提示同一类信息）。
 - **未做**：假撤退回头迎击"优先用 PSM"（回头仍是 3 s 加力 + 先机发射）；`break` 的成败没有接 `FovWatch.onLockLost` 判定（只靠 `psmAbort` 的对准 / 超时结束）。
+
+
+### 批次 5f：个体模型、态势记忆、编队协同、环境事件与调试（未发版）
+
+补齐 5.7 里 5d 没做的组，以及 5.6 / 5.8 顺延的几项。
+
+- **照射偏置转向**（`brain.js`）：skill ≥ 0.85 的 AI 在半主动照射中，把期望方向水平偏出 0.28 rad（按 `flankSide` 左右），保持目标在锥内的同时拉开。
+- **假撤退回头用 PSM**（`psm.js psmTurnBack`）：ace、对手在机尾（`dot(fwd, 视线) < −0.3`）、PSM 冷却已过、过得了 `psmGate` 时，回头那一刻起一次 counter PSM；**摆脱成功判定**：`break` 型 PSM 在来袭的半主动弹丢照射（`m.sarhLost`）或不再被雷达照射（`a.rwrT = 0`）时提前结束，`s.psmShaken` 计数。
+- **性格 `temperament`**（`skill.js TEMPER`，`spawnEnemy({ temperament })`，缺省 null = 中性，不偏移）：`aggressive`（开火意愿 +0.10、脱离阈值 ×0.7、撤离概率 ×0.7、不玩外围游走）/ `cautious`（skill ≥ 0.55 就玩外围游走、撤离概率 ×1.3、开火 −0.05）/ `sniper`（skill ≥ 0.5 就玩外围游走、环半径 ×1.2、开火 +0.05）/ `loyal`（不离开 `ai.leader` / `ai.ward` 超过 6 km）。**偏差**：设计里"缺省按 skill 与机型随机抽"没做——缺省中性，免得所有关卡的数值整体漂移；`呼号台词按性格选变体` 也没做。
+- **人为失误**（`skill.js SKILL.misjudgeT / lostExtra`，仅 skill < 0.7）：新来的来袭弹登记一次"晚发现"延迟 `(0.7−skill)×2×rnd`；丢目标后重选多等 `(0.7−skill)×3×rnd`。**超调**没做。
+- **过载与体能**（`brain.js gTrack`，有人机，无人机 `tags.unmanned` 无此限制）：由速度方向的转动速率估算持续 G，> 0.85 × `gLimit`（机型 `ac.gLimit`，缺省 9）累计满 `G_SUSTAIN` 6 s → 视野变窄 `G_BLACKOUT` 1.5 s（机动放缓，不转向）。机型数据里没有 `gLimit` 字段，用缺省 9；HUD 对玩家自己的灰视 / 红视暗角没做。
+- **态势记忆**（`memory.js`，skill ≥ 0.6）：能感知目标 = 近距目视（< 6 km）、雷达前半球（< 16 km、离机头 ≤ 120°）、己方预警机在线（`aewc`、未被压制）或同队别的 AI 离目标 < 8 km（数据链）；目标 `emcon` 或带 `lockResist` 时雷达 / 数据链距离缩小。感知不到 → `s.searching`：向 `lastKnown`（位置 + 速度外推，随时间衰减）飞，搜索中不开火，`T_SEARCH` 6 s 后放弃目标。低技能保持全知；面目标不适用。
+- **编队协同**（`coord.js`）：**护航**（`ai.ward`；`spawnEnemy({ ward })`）——无威胁时绕被护卫者转（R 4 km，leash 8 km），敌机进入被护卫者 8 km 内且反应延迟（`reactT`）过后转去拦截，被护卫者没了回到普通追击；**巡航队形**（`ai.fm = { mode: wedge|echelon|column, lead, idx }`；`spawnEnemy({ fm })`）——未交战跟队长槽位，目标进入 12 km / 被锁 / 来袭弹 / 掉血后整队解散；**脱离干扰区**——被压制 > 0.45 持续 2 s → `extend` 5 s、朝远离干扰源；**友军呼救**——我方 AI 被咬尾 / 血量 < 40% 喊一次 `help`（Chatter，冷却 20 s），Director 把"正在打求援者的敌机"评分 ×0.6。**未做**：干扰机 AI 主动靠近己方编队（目前的干扰机都是航线单位）。
+- **环境事件**（`engine/ambient.js`，`mission.ambient = [{ type, p, cooldown, max, … }]`，缺省没有）：`distress`（Chatter help）、`reinforce`（边缘生成 n 架，我方 `spawnAlly` / 敌方 `spawnEnemy`，播一句无线电，`max` 缺省 1 次）、`straggler`（hp 25% 的飞机直接撤离）、`distant`（一句 fx 无线电）；每 5 s 掷一次骰，私有 LCG。13 关都没声明，批次 8 逐关选用。
+- **调试可视化**（`hud/debug.js`）：地址栏 `?debug=ai` 时（`HUD.debugAI`）在每架屏幕内的 AI 头上叠 mode / 目标 / 位格·技能·性格 / 角色·撤离·PSM·搜索·GLOC·锁定·照射标记。**未做**：Director 扇区环的世界空间绘制。

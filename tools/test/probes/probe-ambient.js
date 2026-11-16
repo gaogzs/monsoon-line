@@ -64,4 +64,14 @@ function scene(ambient) {
   chk('C 概率 0：不触发', Z.R.log().filter(e => e.cls === 'fx').length === 0);
 }
 
+/* ---------- F：?debug=ai 叠加层渲染不抛错（只读状态） ---------- */
+{
+  const W = scene(null);
+  W.step(60 * 3);
+  W.S.sandbox.HUD.debugAI = true;
+  let err = null;
+  try { W.S.render(); } catch (e) { err = e; }
+  chk('F AI 调试叠加层（?debug=ai）整帧渲染不抛错', !err, err ? String(err.stack).split('\n')[0] : '');
+}
+
 process.exit(ok ? 0 : 1);

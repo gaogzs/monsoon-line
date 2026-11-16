@@ -768,6 +768,24 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 
 > **批次 5 分片进度**：**5a 已完成（未发版，版本号由你定）**：5.0 分层、5.1 位格 / `AI.SKILL`、5.2 外围游走 / 回头 + Director、5.3 `ally`、5.4 撤离（含去整备点）、以及 5.7 里的「反应延迟与机炮偏移」。**顺延到后续批次**：5.5 Radio 2.0 与 `Chatter`、5.6 半主动雷达弹 / `FovWatch`、5.7 其余项、5.8 AI 过失速机动。
 
+### 5f 实施记录（5.7 余项 + 5.6 / 5.8 顺延项，已完成，未发版）
+
+代码：`ai/{memory,coord}.js`、`skill.js`（`TEMPER`、`misjudgeT / lostExtra`）、`brain.js`（`gTrack`、队形 / 护航分支、搜索）、`psm.js`（`psmTurnBack`）、`engine/ambient.js`、`hud/debug.js`、`chatter.js`（`help`）；探针 `probe-individual / memory / coord / ambient`。详见 [ai.md](systems/ai.md) 的"批次 5f"。出入：
+
+| 设计 | 实际 |
+|---|---|
+| 性格缺省"按 skill 与机型随机抽" | 缺省 null（中性），由 `spawnEnemy({ temperament })` 指定，不让所有关卡数值整体漂移；"呼号台词按性格选变体"没做 |
+| 过载：每个机型有 `gLimit`；HUD 灰视 / 红视暗角 | 用 `ac.gLimit`，缺省 9（机型数据没写这个字段）；玩家侧暗角没做 |
+| 人为失误：超调、丢目标、误判来袭弹 | 做了"晚发现来袭弹"与"丢目标后多等"，超调没做 |
+| 态势记忆"由 FovWatch 的进出事件驱动" | 直接按距离 / 前半球 / 预警机 / 数据链判（0.5 s 内的变化足够慢，没必要走调度）；预警机在线 = 始终感知，不是"记忆时间翻倍" |
+| 干扰机 AI 靠近己方编队 | 没做（现有干扰机都是航线单位）；被压制脱离干扰区做了 |
+| 友军呼救带方位、Director 重分配无任务友军 | 台词不带方位；Director 只是把打求援者的敌机评分 ×0.6 |
+| Director 扇区环的世界空间绘制 | 没做（`?debug=ai` 只有头顶标签） |
+| 5.6 偏置转向 / 5.8 回头用 PSM / 摆脱判定 | 做了；`tether` 的机型 / 关卡预设仍没配 |
+| golden | 低技能的失误延迟（私有 LCG 抽取）与态势记忆改变了回放，**有意**重存（单独提交） |
+
+**批次 5 至此除了以下项目外全部完成**：`tether` 的 NPC 预设、HUD 灰视暗角、超调失误、性格呼号台词、干扰机靠近编队、扇区环绘制。
+
 ### 5e 实施记录（AI 过失速机动，已完成，未发版）
 
 代码：`ai/psm.js`、`brain.js`（`mode: 'psm'`、覆盖链跳过）、`hud/targeting.js drawPsmHints`；探针 `probe-psm-ai`。**批次 5 到此全部完成**（5a–5e；仍顺延的见下）。出入：
