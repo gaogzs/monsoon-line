@@ -244,7 +244,6 @@
     // 航线型单位完全不走下面那套
     if (a.route) return updateRoute(a, dt, world);
     var s = a.ai;
-    var ctrl = a.ctrl;
 
     if (s.retargetT > 0) s.retargetT -= dt;
     if (s.modeT > 0) s.modeT -= dt;
@@ -254,6 +253,16 @@
     if (s.burstT > 0) s.burstT -= dt;
     if (s.flareT > 0) s.flareT -= dt;
 
+    /* 三层（docs/POST2-0IMPL.md 5.0）：感知 → 决策 → 机动 → 开火。
+       mode 取值：pursue / evade / extend（standoff / closeIn / retreat 由后续步骤接入决策层）。 */
+    perceive(a, s, world, dt);
+    decide(a, s, world, dt);
+    maneuver(a, s, world, dt);
+    fire(a, s, world);
+  }
+
+  /* 感知层：把"谁在照我、我被压制多久"这类状态算进 a / s，不做任何决策。 */
+  function perceive(a, s, world, dt) {
     /* ---- 雷达告警（RWR）：谁在用主动雷达锁定我 ----
 
        AI 的"被照射感知"，决定它会不会专门回头咬那个正在照它的人。
@@ -302,7 +311,10 @@
     } else if (s.ewResist > 0) {
       s.ewResist = Math.max(0, s.ewResist - dt * 0.08);
     }
+  }
 
+  /* 决策层：威胁规避 → 脱离 → 选目标 → 诱饵连放。只改 s.mode / s.target / s.*T，不碰操纵量。 */
+  function decide(a, s, world, dt) {
     /* ---------- 1. 威胁规避优先级最高 ---------- */
     var inc = $.findIncoming(a, world);
     if (inc) {
@@ -411,7 +423,11 @@
         }
       }
     }
+  }
 
+  /* 机动层：按模式 / 角色出期望方向与油门，过覆盖链（升限、战区边界、垂直改出、近地保护），写 a.throttle / a.ab / a.target。 */
+  function maneuver(a, s, world, dt) {
+    var ctrl = a.ctrl;
     /* ---------- 4. 分派行为 ---------- */
     var desired;
     var throttle = 0.85, ab = false;
@@ -560,7 +576,10 @@
        少了这一行，那些地方全都静默失效 —— 它们不报错，
        只是永远看不到东西。 */
     a.target = s.target;
+  }
 
+  /* 开火层：机炮与导弹。读 s.target / s.mode，写 a.firingGun，经 world.fireMissile 发射。 */
+  function fire(a, s, world) {
     /* ---------- 5. 开火 ---------- */
     if (s.mode === 'evade' || s.mode === 'extend') {
       a.firingGun = false;
