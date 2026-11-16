@@ -25,7 +25,7 @@
    NPC（team 0 的 AI 飞机，**不含玩家的僚机**）：进入范围、**并且**处于需要补给的状态（弹药不足一半 /
      机炮不足三成 / 血量低于六成）时触发；不用驻留。过 npcDelay 秒后**从 world.actors 摘出**（alive 仍为 true，
      所以不触发"僚机损失"），再过 npcAway 秒补满、套用 reset、放回 world.actors。开局就在范围里的 NPC 要先离开一次才会触发。
-   **僚机—长机关系**（不限于玩家）：有长机的飞机是僚机（a.ai.leader；没写 leader 的 role wingman / drone 默认
+   **僚机—长机关系**（不限于玩家）：有长机的飞机是僚机（a.ai.leader；没写 leader 的 role drone 默认
    跟玩家）。僚机**不会自主触发**整备——它们不会自己进入补给状态；而是在**长机**整备完成时一起补满
    （Resupply.squadRearm），不管它们离得多远。长机可以是玩家，也可以是 NPC（NPC 长机在重新出现的那一刻
    触发它的僚机），以后 NPC 有了自己的僚机，同一套机制直接适用：
@@ -106,11 +106,11 @@ var Resupply = (function () {
     return a.rs;
   }
 
-  /* 僚机—长机关系：显式的 ai.leader 优先；没写的 role wingman / drone 是老式的玩家僚机，默认跟玩家。 */
+  /* 僚机—长机关系：显式的 ai.leader 优先；没写的 role drone 是老式的玩家僚机，默认跟玩家。 */
   function leaderOf(world, a) {
     if (!a.ai) return null;
     if (a.ai.leader) return a.ai.leader;
-    if (a.ai.role === 'wingman' || a.ai.role === 'drone') return world.player || null;
+    if (a.ai.role === 'drone') return world.player || null;
     return null;
   }
 

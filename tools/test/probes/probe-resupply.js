@@ -411,8 +411,8 @@ wingCase('僚机·平台（m9，reset 缺省 keep）', 'm9', {
     a.name = a.label = name; w.actors.push(a); return a;
   };
   const L = mk('escort', null, null, 'LEADER-1');
-  const W1 = mk('wingman', L, { dx: 120, dy: 30, dz: -180 }, 'WING-A');
-  const W2 = mk('wingman', L, { dx: -120, dy: 30, dz: -180 }, 'WING-B');
+  const W1 = mk('ally', L, { dx: 120, dy: 30, dz: -180 }, 'WING-A');
+  const W2 = mk('ally', L, { dx: -120, dy: 30, dz: -180 }, 'WING-B');
   const R = S.sandbox.Resupply;
   chk('leaderOf：显式 ai.leader 优先；没写的老式僚机默认跟玩家；普通 AI 没有长机',
     R.leaderOf(w, W1) === L && R.leaderOf(w, L) === null && R.leaderOf(w, w.wings[2]) === p);

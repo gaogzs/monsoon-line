@@ -113,6 +113,18 @@ function spawnEnemy(w, o) {
   return a;
 }
 
+/* 友军战斗机（role 'ally'）：玩家一方的自主 AI 战斗机，走与敌机同一套空战 AI（含 Director 的扇区分派、
+   不抢人头、外围游走），team 0。o 与 spawnEnemy 相同（ac / loadout / rank / skill / x,y,z / fwd …），
+   另可写 leader（僚机—长机关系，整备时跟着长机走）。目前没有关卡使用，仅提供接口。 */
+function spawnAlly(w, o) {
+  var a = spawnEnemy(w, Object.assign({}, o, { team: 0 }));
+  a.ai.role = 'ally';
+  a.ai.cmd = 'focus';       // 复用字段，不参与 ally 的判断
+  a.behavior = 'ally';
+  if (o.leader) a.ai.leader = o.leader;
+  return a;
+}
+
 /* ============================================================
    轰炸机抵达投弹点
 

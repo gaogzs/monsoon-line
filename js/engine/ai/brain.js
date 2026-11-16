@@ -20,6 +20,13 @@
       missT: 0,            // 导弹反应计时（持续式）
       flareReact: 0,       // 干扰弹首发的反应计时（登记式）
       lostT: null,         // 目标丢失后的换目标反应计时（null = 没在等）
+      furT: 0,             // 与目标缠斗（< 1800 m）累计时间；缠斗太久就脱离重来（Director，$.DIR.T_FURBALL）
+      standT: 0,           // 在外围游走（standoff）里待了多久
+      closeT: 0,           // 回头近战（closeIn）里待了多久
+      standCool: 0,        // 冷却：closeIn 之后这么久不再进 standoff
+      orbit: 1,            // standoff 绕圈方向（±1）
+      ringR: 0,            // standoff 的环半径
+      wclass: null,        // 武器分类：longRange / shortRange / gunOnly
       mode: 'pursue',
       modeT: 0,
       evadeT: 0,
@@ -34,7 +41,7 @@
       formation: opt.formation || null,   // {lead, dx, dy, dz}
       /* 长机（僚机—长机关系，docs/POST2-0IMPL.md 批次 4.2）：有长机的飞机是僚机。
          目前只用来决定"谁跟着谁整备"（Resupply.leaderOf / wingmenOf）；僚机的跟随行为仍读 world.player，
-         批次 5 做"长机泛化"时再改成读这里。没写 leader 的 role wingman / drone 默认跟玩家。 */
+         批次 5 做"长机泛化"时再改成读这里。没写 leader 的 role drone 默认跟玩家。 */
       leader: opt.leader || null,
       wander: M3.rnd(0, 6.28),
       /* 默认指令是 focus（只打长机授权的目标），不是 spread。
@@ -212,7 +219,7 @@
   var ARENA_PULL_K = 1.8;
   function arenaSteer(a, dir, world) {
     var s = a.ai;
-    if (!dir || !world.arenaDef || s.role === 'wingman' || s.role === 'drone') return dir;
+    if (!dir || !world.arenaDef || s.role === 'drone') return dir;
     var st = Arena.state(world.arenaDef, a.pos);
     if (st.zone === 'in') { s.arenaSide = 0; return dir; }
     var w = st.zone === 'out' ? 1 : Math.min(1, st.depth * ARENA_PULL_K);
@@ -256,13 +263,14 @@
     if (s.retargetT > 0) s.retargetT -= dt;
     if (s.modeT > 0) s.modeT -= dt;
     if (s.evadeT > 0) s.evadeT -= dt;
+    if (s.standCool > 0) s.standCool -= dt;
     if (s.shootT > 0) s.shootT -= dt;
     s.envClock = (s.envClock || 0) + dt;      // 发射包线缓存的时钟（见 aiEnvelope）
     if (s.burstT > 0) s.burstT -= dt;
     if (s.flareT > 0) s.flareT -= dt;
 
     /* 三层（docs/POST2-0IMPL.md 5.0）：感知 → 决策 → 机动 → 开火。
-       mode 取值：pursue / evade / extend（standoff / closeIn / retreat 由后续步骤接入决策层）。 */
+       mode 取值：pursue / evade / extend / standoff（外围游走）/ closeIn（回头近战）；retreat 由后续步骤接入。 */
     perceive(a, s, world, dt);
     decide(a, s, world, dt);
     maneuver(a, s, world, dt);
@@ -382,30 +390,25 @@
       }
     } else if ((s.retargetT <= 0 || !s.target || !s.target.alive) && !lostWait(s, dt)) {
       s.lostT = null;
-      s.retargetT = $.SKILL.retarget(s);
-      if (s.role === 'wingman' && s.cmd === 'focus' && world.player && world.player.target) {
-        s.target = world.player.target;
-      } else if (s.role === 'wingman' && s.cmd === 'cover') {
-        // 掩护：优先打正在锁定长机的敌机
-        s.target = $.leadThreat(a, world) || $.nearestEnemy(a, world, 9000);
+      s.retargetT = s.role === 'ally' ? 8 + 7 * $.rnd01(s) : $.SKILL.retarget(s);   // ally 的重评估间隔 8–15 s（Director）
+      /* 被主动雷达照射时优先咬照射者 —— "谁在照我，我先打谁"。
+
+         被动测距（silentLock）的对手不会走到这里，所以带一件
+         GUS-6 / GUS-9 就能安静地锁定别人，而不把仇恨引到自己身上。 */
+      if (a.rwrSrc && M3.dist2(a.rwrSrc.pos, a.pos) < 12000 * 12000) {
+        s.target = a.rwrSrc;
       } else {
-        /* 被主动雷达照射时优先咬照射者 —— "谁在照我，我先打谁"。
+        s.target = $.director.pick(a, world, 15000);
+        /* 空中没目标、手上却带着对面弹 → 去挑海面上的打。
 
-           被动测距（silentLock）的对手不会走到这里，所以带一件
-           GUS-6 / GUS-9 就能安静地锁定别人，而不把仇恨引到自己身上。 */
-        if (a.rwrSrc && M3.dist2(a.rwrSrc.pos, a.pos) < 12000 * 12000) {
-          s.target = a.rwrSrc;
-        } else {
-          s.target = $.nearestEnemy(a, world, s.role === 'wingman' ? 11000 : 15000);
-          /* 空中没目标、手上却带着对面弹 → 去挑海面上的打。
-
-             以前 AI 完全看不见 world.targets（nearestEnemy 只扫 actors），
-             于是"敌机炸你的前进基地"这件事在代码里根本不存在 ——
-             下游的随队攻击机只能是摆设。 */
-          if (!s.target) s.target = $.surfaceTargetFor(a, world);
-        }
+           以前 AI 完全看不见 world.targets（nearestEnemy 只扫 actors），
+           于是"敌机炸你的前进基地"这件事在代码里根本不存在 ——
+           下游的随队攻击机只能是摆设。 */
+        if (!s.target) s.target = $.surfaceTargetFor(a, world);
       }
     }
+
+    decideRange(a, s, world, dt);
 
     // 诱饵连放：一串放完（或放光）之后才开始 1.8 s 的决策冷却
     if (s.flareBurst > 0) {
@@ -439,6 +442,39 @@
           break;
         }
       }
+    }
+  }
+
+  /* 距离层（Director，docs/POST2-0IMPL.md 5.2）：外围游走（standoff）/ 回头近战（closeIn）/ 缠斗太久脱离。
+     只对 SKILL.standoff 为真（elite 以上）的、带远距对空弹的飞机生效；其余照旧一路 pursue。
+       pursue  → standoff：目标是空中单位、进到环内（d < 1.1 R_s）、不在冷却、没缠斗太久
+       standoff → closeIn：远距弹打光 / 离目标 < 1500 m（已经贴上了）/ 游走超过 T_STANDOFF
+       closeIn → pursue ：20 s 后（"回头"：重新按 pursue 打，之后可以再次进环）
+       缠斗（< 1800 m）累计 T_FURBALL 以上：脱离（extend）4–7 s 再重来 */
+  function decideRange(a, s, world, dt) {
+    var D = $.DIR, t = s.target;
+    var air = t && t.alive && t.kind !== 'target';
+    if (!air || s.mode === 'evade' || s.mode === 'extend' || !$.SKILL.standoff(s)) {
+      if (s.mode === 'standoff' || s.mode === 'closeIn') s.mode = 'pursue';
+      if (!air) { s.furT = 0; s.standT = 0; s.closeT = 0; }
+      return;
+    }
+    var d = M3.dist(a.pos, t.pos);
+    if (d < 1800) s.furT += dt; else s.furT = Math.max(0, s.furT - dt * 0.5);
+    var wc = $.weaponClass(a);
+    s.wclass = wc.cls;
+    s.ringR = M3.clamp(wc.reach * D.RING_K, 2500, 9000);
+    if (s.mode === 'standoff') {
+      s.standT += dt;
+      if (wc.cls !== 'longRange' || s.standT > D.T_STANDOFF || d < 1500) { s.mode = 'closeIn'; s.closeT = 0; s.standCool = 20; }
+    } else if (s.mode === 'closeIn') {
+      s.closeT += dt;
+      if (s.closeT > 20) s.mode = 'pursue';
+    } else if (s.standCool <= 0 && wc.cls === 'longRange' && d < s.ringR * 1.1 && s.furT < D.T_FURBALL) {
+      s.mode = 'standoff'; s.standT = 0; s.orbit = $.rnd01(s) < 0.5 ? -1 : 1;
+    }
+    if (s.furT > D.T_FURBALL && wc.cls === 'longRange') {
+      s.mode = 'extend'; s.modeT = 4 + 3 * $.rnd01(s); s.furT = 0; s.standCool = 15;
     }
   }
 
@@ -520,20 +556,17 @@
         desired = M3.norm(M3.V(tan.x, climb, tan.z));
         throttle = 0.6;
       }
-    } else if (s.role === 'wingman' && (!s.target || s.cmd === 'spread')) {
-      // 编队 / 巡航
-      var lead = world.player;
-      if (lead && lead.alive) {
-        var slot = s.formation || { dx: 120, dy: 30, dz: -180 };
-        var wp = M3.add(lead.pos,
-          M3.add(M3.mul(lead.right, slot.dx),
-            M3.add(M3.mul(lead.fwd, slot.dz), M3.V(0, slot.dy, 0))));
-        desired = M3.norm(M3.sub(wp, a.pos));
-        if (M3.dist(wp, a.pos) > 900) { throttle = 1; ab = true; }
-        else throttle = 0.7;
-        // 有空战机会时仍要接战
-        if (s.target) { desired = $.leadTo(a, s.target); throttle = 0.95; ab = true; }
-      } else desired = a.fwd;
+    } else if (s.mode === 'standoff' && s.target && s.target.alive) {
+      /* 外围游走：沿环（半径 ringR）绕目标飞，机头离视线一个偏角 θ —— 在环上很小（导弹锁得住），
+         进到环内就加大（边绕边向外让），环外则收小（边绕边靠近）。 */
+      var rs0 = $.pursue(a, s.target, world);
+      var toS = M3.sub(s.target.pos, a.pos), dS = M3.len(toS);
+      var losS = M3.mul(toS, 1 / Math.max(1, dS));
+      var sideS = M3.norm(M3.V(-losS.z * s.orbit, 0, losS.x * s.orbit));
+      var th = M3.clamp(0.35 + (s.ringR - dS) / Math.max(1, s.ringR) * 1.6, 0.2, 1.2);
+      var dv = M3.add(M3.mul(losS, Math.cos(th)), M3.mul(sideS, Math.sin(th)));
+      desired = M3.norm(M3.V(dv.x, losS.y * 0.6, dv.z));
+      throttle = rs0.throttle; ab = rs0.ab;
     } else if (s.target && s.target.kind === 'target') {
       /* 对面目标：**保持高度**，只把机头转过去。
 

@@ -68,7 +68,7 @@ function extendRun(steerOn) {
   const G = S.sandbox.Game, A = S.sandbox.Arena, M3 = S.sandbox.M3;
   S.start(0);
   const w = G.__world(), p = G.__player(); p.hp = p.maxHp = 1e9;
-  const e = w.actors.filter(a => a.team === 1 && a.alive && a.ai && !a.route && a.ai.role !== 'wingman' && a.ai.role !== 'drone')[0];
+  const e = w.actors.filter(a => a.team === 1 && a.alive && a.ai && !a.route && a.ai.role !== 'drone')[0];
   const ar = w.arenaDef;
   if (!steerOn) w.arenaDef = null;               // 对照组：关掉软转向（玩家侧渐黑也一起关）
   e.pos.x = ar.cx + ar.half - 2000; e.pos.z = ar.cz; e.pos.y = 7000;
