@@ -578,6 +578,7 @@
       var losS = M3.mul(toS, 1 / Math.max(1, dS));
       var sideS = M3.norm(M3.V(-losS.z * s.orbit, 0, losS.x * s.orbit));
       var th = M3.clamp(0.35 + (s.ringR - dS) / Math.max(1, s.ringR) * 1.6, 0.2, 1.2);
+      if (s.shootT <= 0 && a.spAmmo > 0) th = Math.min(th, 0.1);      // 弹已就绪：机头对正目标等锁定 / 发射，齐射后才继续绕
       var dv = M3.add(M3.mul(losS, Math.cos(th)), M3.mul(sideS, Math.sin(th)));
       desired = M3.norm(M3.V(dv.x, losS.y * 0.6, dv.z));
       throttle = rs0.throttle; ab = rs0.ab;
