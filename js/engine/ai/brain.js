@@ -1,7 +1,7 @@
 (function (AI) {
   'use strict';
   var $ = AI.$;
-  $.attach = attach; $.update = update;
+  $.attach = attach; $.update = update; $.gTrack = gTrack;
 
   /* ============================================================
      创建 AI 状态
@@ -9,6 +9,7 @@
   function attach(a, opt) {
     opt = opt || {};
     a.ai = {
+      temperament: opt.temperament || null,   // aggressive / cautious / sniper / loyal（skill.js TEMPER）；缺省中性
       role: opt.role || 'enemy',
       skill: opt.skill === undefined ? (opt.rank && RANKS[opt.rank] ? RANKS[opt.rank].skill : 0.6) : opt.skill,
       rank: opt.rank || null,
@@ -29,6 +30,9 @@
       wclass: null,        // 武器分类：longRange / shortRange / gunOnly
       illum: null,         // 半主动弹的照射状态 {missile, target, w, abandoned}（updateIllum）
       lowStrike: false,    // 低空突防中（跳过近地保护，$.skimDir 自己守 80 m 下限）
+      blackT: 0, gT: 0, pDir: null,   // 过载 / 视野变窄（gTrack）
+      incId: null, incWait: 0, incDelay: 0, lostX: 0, lostXSet: false,   // 人为失误（skill.js misjudgeT / lostExtra）
+      ward: opt.ward || null,        // 护航：被护卫者（loyal 性格的 leash 参照）
       subrole: null,       // 'bait' / 'flank'（Director 给成对的 skill>=0.6 敌机分配）
       flankSide: 1,
       psmAI: null,         // AI 过失速机动 {kind: counter|break, src, t}（ai/psm.js）
@@ -284,6 +288,7 @@
 
     /* 三层（docs/POST2-0IMPL.md 5.0）：感知 → 决策 → 机动 → 开火。
        mode 取值：pursue / evade / extend / standoff（外围游走）/ closeIn（回头近战）/ retreat（撤离，retreat.js）。 */
+    gTrack(a, s, dt);
     perceive(a, s, world, dt);
     decide(a, s, world, dt);
     maneuver(a, s, world, dt);
@@ -291,12 +296,34 @@
     fire(a, s, world, dt);
   }
 
+  /* 过载与体能（有人机）：由速度方向的转动速率估算持续 G；持续高 G 超过 G_SUSTAIN 秒 → 视野变窄 G_BLACKOUT 秒，
+     期间机动放缓（maneuver 里不转向）。无人机（tags.unmanned）没有这个限制。gLimit 取机型 ac.gLimit，缺省 9。 */
+  function gTrack(a, s, dt) {
+    if (a.tags && a.tags.unmanned) { s.blackT = 0; return; }
+    if (s.blackT > 0) s.blackT -= dt;
+    var v = a.vel || null;
+    if (!v || dt <= 0) return;
+    var sp = M3.len(v);
+    if (sp < 50) return;
+    var dir = M3.mul(v, 1 / sp);
+    if (s.pDir) {
+      var om = M3.angleBetween(s.pDir, dir) / dt;
+      var g = 1 + sp * om / 9.81, lim = (a.ac && a.ac.gLimit) || 9;
+      if (g > lim * 0.85) s.gT = (s.gT || 0) + dt; else s.gT = Math.max(0, (s.gT || 0) - dt * 0.5);
+      if (s.gT > $.G_SUSTAIN) { s.gT = 0; s.blackT = $.G_BLACKOUT; }
+    }
+    s.pDir = dir;
+  }
+
   /* 目标丢了 / 死了之后要等一个反应延迟才重选（登记一次，持续式）；返回 true = 还在等。 */
   function lostWait(s, dt) {
     if (s.target && !s.target.alive) { s.target = null; s.lostT = 0; }
     if (s.lostT === null) return false;
+    if (s.lostT === 0 && !s.lostXSet) { s.lostXSet = true; s.lostX = $.SKILL.lostExtra(s); }     // 低技能：被晃出视线后多花一阵才重新找到
     s.lostT += dt;
-    return s.lostT < $.SKILL.reactT(s);
+    if (s.lostT < $.SKILL.reactT(s) + s.lostX) return true;
+    s.lostXSet = false; s.lostX = 0;
+    return false;
   }
 
   /* 感知层：把"谁在照我、我被压制多久"这类状态算进 a / s，不做任何决策。 */
@@ -356,6 +383,12 @@
     $.updateIllum(a, s, world, dt);
     /* ---------- 1. 威胁规避优先级最高 ---------- */
     var inc = $.findIncoming(a, world);
+    /* 人为失误：低技能晚发现来袭弹（新来的一枚登记一次延迟，延迟内当没看见） */
+    if (inc) {
+      if (s.incId !== inc) { s.incId = inc; s.incWait = 0; s.incDelay = $.SKILL.misjudgeT(s); }
+      s.incWait += dt;
+      if (s.incWait < s.incDelay) inc = null;
+    } else s.incId = null;
     /* 半主动照射中：来袭弹还远（> 2.5 km）就不转身规避，免得把自己的弹甩丢；进了 2.5 km 一次性判断放不放弃（按技能） */
     if (inc && $.illumHolds(s)) {
       if (M3.dist(inc.pos, a.pos) > 2500) inc = null;
@@ -373,7 +406,7 @@
     }
 
     /* ---------- 2. 血量过低脱离 ---------- */
-    if (s.mode !== 'evade' && a.hp < a.maxHp * 0.25 && Math.random() < 0.004) {
+    if (s.mode !== 'evade' && a.hp < a.maxHp * 0.25 * ($.temper(s).extend || 1) && Math.random() < 0.004) {
       s.mode = 'extend';
       s.modeT = M3.rnd(4, 9);
     }
@@ -497,7 +530,7 @@
     if (d < 1800) s.furT += dt; else s.furT = Math.max(0, s.furT - dt * 0.5);
     var wc = $.weaponClass(a);
     s.wclass = wc.cls;
-    s.ringR = M3.clamp(wc.reach * D.RING_K, 2500, 9000);
+    s.ringR = M3.clamp(wc.reach * D.RING_K * ($.temper(s).ring || 1), 2500, 9000);
     if (s.mode === 'standoff') {
       s.standT += dt;
       if (wc.cls !== 'longRange' || s.standT > D.T_STANDOFF || d < 1500) { s.mode = 'closeIn'; s.closeT = 0; s.standCool = 20; }
@@ -524,7 +557,9 @@
     var throttle = 0.85, ab = false;
     s.lowStrike = false;
 
-    if (s.mode === 'psm') {
+    if (s.blackT > 0 && s.mode !== 'psm') {
+      desired = a.fwd; throttle = 0.8; ab = false;       // 视野变窄：机动被迫放缓（不转向）
+    } else if (s.mode === 'psm') {
       /* 过失速机动：机头去对准 psmAim（甩向攻击者 / 远离来袭弹），推力全开；stepAircraft 看 a.psm 转 stepPSM，消费这里 steerTo 写的 ctrl */
       desired = $.psmAim(a, s) || a.fwd;
       throttle = 1; ab = false;
@@ -625,6 +660,9 @@
     } else if (s.target) {
       var res = $.pursue(a, s.target, world);
       desired = res.dir;
+      /* loyal 性格：不离开长机 / 被护卫者超过 leash（缺省长机 = ai.leader，护航 = ai.ward）*/
+      var lead0 = s.leader || s.ward, lash = $.temper(s).leash;
+      if (lash && lead0 && lead0.alive && M3.dist(a.pos, lead0.pos) > lash) desired = M3.norm(M3.sub(lead0.pos, a.pos));
       /* 机炮瞄准偏移：机头去对准"提前量点 + aim"，子弹跟着机头打偏。只在近距、对空、有炮时叠加。 */
       if (WEAPONS[a.gun] && M3.dist(a.pos, s.target.pos) < $.SKILL.AIM_RANGE) {
         desired = M3.norm(M3.add(desired, M3.add(M3.mul(a.right, s.aim.x), M3.mul(a.up, s.aim.y))));

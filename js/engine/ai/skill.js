@@ -15,7 +15,7 @@
     // 机炮锥（弧度）；开火门限是它的 3.2 倍
     gunCone: function (s) { return 0.028 + (1 - s.skill) * 0.02; },
     // 导弹射击意愿（每次满足条件时掷骰的概率）
-    fireWill: function (s) { return 0.35 + s.skill * 0.45; },
+    fireWill: function (s) { return 0.35 + s.skill * 0.45 + ($.temper(s).fire || 0); },
     // 射击间隔系数（乘在 rnd(2.6, 5.2) 上）
     shootGap: function (s) { return 1.6 - s.skill * 0.6; },
     // 高技能要求进 nez（目标掉头逃也能打中），低技能进 rmax
@@ -23,7 +23,7 @@
     // 对敌方电子战的适应速度（每秒）
     ewRate: function (s) { return 0.18 + s.skill * 0.30; },
     // 外围游走（standoff）只给 elite 以上；低位格直接冲上去
-    standoff: function (s) { return s.skill >= 0.7 && s.role !== 'drone'; },
+    standoff: function (s) { var t = $.temper(s); return !t.noStandoff && s.skill >= (t.standoffMin || 0.7) && s.role !== 'drone'; },
     // 提前量折扣（目前与技能无关）
     leadK: function () { return 0.85; },
 
@@ -37,6 +37,26 @@
     AIM_RANGE: 2500,       // 偏移只在这个距离以内加到瞄准点上（远距接近不受影响）
     STRAFE_EXIT: 1.3       // 扫射滞回：e > r × 1.3 退出
   };
+
+  /* 飞行员性格（docs/POST2-0IMPL.md 5.7「个体模型」）：与 skill 正交，给参数表一组偏移。缺省 null = 中性（不偏移）。
+       aggressive  开火意愿高、脱离阈值低、撤离概率 ×0.7、不玩外围游走（贴近狗斗）
+       cautious    skill ≥ 0.55 就玩外围游走、撤离概率 ×1.3、开火意愿略低
+       sniper      skill ≥ 0.5 就玩外围游走、环半径 ×1.2、偏爱远程弹（开火意愿略高）
+       loyal       僚机 / 护航：不离开长机 / 被护卫者超过 leash 米 */
+  $.TEMPER = {
+    aggressive: { fire: 0.10, extend: 0.7, retreat: 0.7, noStandoff: true },
+    cautious: { fire: -0.05, retreat: 1.3, standoffMin: 0.55 },
+    sniper: { fire: 0.05, ring: 1.2, standoffMin: 0.5 },
+    loyal: { leash: 6000 }
+  };
+  var NEUTRAL = {};
+  $.temper = function (s) { return (s.temperament && $.TEMPER[s.temperament]) || NEUTRAL; };
+
+  /* 人为失误（低技能，skill < 0.7）：晚发现来袭弹 / 被晃出视线后多花一阵才重新找目标。
+     触发走"登记一次 + 延迟"，不逐帧掷骰；延迟随技能单调递减，高技能为 0。 */
+  $.SKILL.misjudgeT = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 2.0 * $.rnd01(s) : 0; };
+  $.SKILL.lostExtra = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 3.0 * $.rnd01(s) : 0; };
+  $.G_SUSTAIN = 6; $.G_BLACKOUT = 1.5;
 
   /* 私有随机流（线性同余 + Box–Muller）：新特性不碰 Math.random，
      不改变原有决策抽签的顺序。每架 AI 一份状态 s.rs（attach 时播种，确定性）。 */

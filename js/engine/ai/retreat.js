@@ -36,7 +36,7 @@
     var gunLow = !(base > 0) || a.gunAmmo < base * 0.3;
     if (noMsl) p += gunLow ? 0.4 : 0.15;
     var rk = s.rank === 'ace' ? 0.5 : s.rank === 'elite' ? 0.75 : s.rank === 'rookie' ? 1.3 : 1;
-    return Math.max(0, Math.min(0.9, p * rk));
+    return Math.max(0, Math.min(0.9, p * rk * ($.temper(s).retreat || 1)));
   };
 
   /* ---- 假撤退 / 撤向防空伞（批次 5d）---- */
