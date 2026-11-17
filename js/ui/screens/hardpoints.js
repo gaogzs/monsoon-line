@@ -128,7 +128,9 @@
     var btn = document.createElement('button');
     btn.textContent = text;
     btn.onclick = function () {
-      host.scrollTop = sec.offsetTop - host.offsetTop;
+      /* host 是 position:relative，sec.offsetTop 已经是相对 host 的位置；
+         再减 host 自己的 offsetTop 会让每个分类都滚短一截。 */
+      host.scrollTop = sec.offsetTop;
       SFX.click();
     };
     return btn;
