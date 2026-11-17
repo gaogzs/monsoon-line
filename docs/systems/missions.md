@@ -680,5 +680,5 @@ spawn()
 
 - **`mission.retreat`**：`'off'`（缺省）/ `'on'`。`on` 时 AI 会按位格概率撤离：本队有整备点就去整备并回来，否则飞出战区边界后被移除（`retreated / leftBy='retreat' / escaped`，不计击杀）。`win()` 数 `team===1 && alive` 的关卡开启前要留意撤离的敌机会让胜利条件提前满足。13 关目前都没开。
 - **`mission.ambient`**（批次 5f）：`[{ type: 'distress' | 'reinforce' | 'straggler' | 'distant', p, cooldown, max, team, n, ac, rank, side }]`，战场环境事件，缺省没有；见 [ai.md](ai.md) 与 `js/engine/ambient.js`。
-- **`spawnEnemy` 新选项**：`temperament`（aggressive / cautious / sniper / loyal）、`ward`（被护卫者，护航）、`fm`（`{ mode, lead, idx }` 巡航队形）。
+- **`spawnEnemy` 新选项**：`temperament`（aggressive / cautious / sniper / loyal；前三种有无线电性格台词）、`ward`（被护卫者，护航）、`fm`（`{ mode, lead, idx }` 巡航队形）、`jam`（v3.6.2，`{ wid?, skill?, trigK?, dur?, fadeTo?, rekey?, msg? }`，自由飞行的干扰机：要同时写 `ward` 与 `special` 吊舱，`behavior` 缺省 `recon`；目前没有关卡使用）。
 - **`spawnAlly(w, o)`**（`_lib.js`）：`o` 同 `spawnEnemy`，team 固定 0、`role: 'ally'`，可写 `leader`；目前没有关卡使用。

@@ -44,14 +44,14 @@ tools/
 | AI 反应延迟 / 机炮瞄准偏移 | `probe-aim.js` |
 | AI 目标分配（反扎堆）/ 外围游走 | `probe-spacing.js` |
 | AI 撤离（开关 / 触发 / 出界 / 整备往返） | `probe-retreat.js` |
-| 无线电队列（优先级 / TTL / 日志）与 Chatter | `probe-radio.js` |
+| 无线电队列（优先级 / TTL / 日志）、Chatter 与性格台词 | `probe-radio.js` |
 | 半主动雷达弹（照射保持 / 丢锁宽限 / AI 照射 / HUD） | `probe-sarh.js` |
 | AI 战术（按导弹类型防御 / 加力 / 诱饵侧击） | `probe-tactics.js` |
 | 低空突防 | `probe-strike.js` |
-| 个体模型（性格 / 失误 / 过载） | `probe-individual.js` |
+| 个体模型（性格 / 失误 / 过载）、射程外远射、超调 | `probe-individual.js` |
 | 态势记忆 | `probe-memory.js` |
-| 编队协同（护航 / 队形 / 脱离干扰区 / 呼救） | `probe-coord.js` |
-| 战场环境事件与 `?debug=ai` 叠加层 | `probe-ambient.js` |
+| 编队协同（护航 / 队形 / 脱离干扰区 / 呼救）与自由飞行的干扰机 | `probe-coord.js` |
+| 战场环境事件与 `?debug=ai` 叠加层（含扇区环） | `probe-ambient.js` |
 | 受损玻璃裂痕（随机 / 严重度 / 再次受伤生长 / 消退 / 封顶） | `probe-hudfx.js` |
 | AI 过失速机动（ace 触发 / 非 ace 与 noPSM / 无人机不触发 / TTI 门限 / 冷却） | `probe-psm-ai.js`（玩家侧的 PSM 在 `probe-psm.js`） |
 | FovWatch（保守调度与暴力检查逐事件一致、迟滞） | `probe-fovwatch.js` |
