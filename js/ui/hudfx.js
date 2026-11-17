@@ -19,6 +19,13 @@
      静息时一笔都不画（没有裂痕就不进 on）。
      告警栏的"受损警告"由 alertOn() 提供，退得比裂痕早。
 
+   过载视觉（v3.6.2；只是显示，没有任何实际惩罚，不改控制、不碰玩家状态）
+     读 p.gNow（带符号的体感 G）与机型 gLimit（缺省 9）。
+     持续高正 G（> gLimit × 0.8 且持续 gSustain 秒才拉满）：边缘向内收缩的暗灰渐变（灰视 / 黑视，上限很轻）；
+     负 G（< -2）：沿边缘的淡红渐变（红视）。
+     告警栏另有 OVERLOAD / NEG-G：gAlert() 给出 0 / 1（琥珀）/ 2（红色快闪）。
+     1 G 附近一笔都不画（golden-render 不变）。
+
    画在**单独一层全屏画布**上（z-index 300）：盖住游戏画布上的 HUD，
    也盖住无线电记录、系统提示这些 HTML 面板（200 / 210）——
    干扰时整个界面都该"花"。暂停菜单（800）在它上面，不受影响。
@@ -45,6 +52,17 @@ var HudFx = (function () {
     crackMax: 900,         // 线段总数封顶
     crackAlpha: 0.6,       // 冷白主线的最大不透明度
     crackFogA: 0.05,       // 严重时那层极淡白雾的最大不透明度（不是红色）
+    gLimDefault: 9,        // 机型没写 gLimit 时的过载上限（与 AI 的 gTrack 一致）
+    gGreyFrom: 0.8,        // 持续正 G 超过 gLimit × 这个数开始灰视
+    gGreySpan: 0.25,       // 再多 gLimit × 这个数达到满强度
+    gSustain: 4,           // 持续多久才拉满（s）
+    gGreyMax: 0.35,        // 灰视边缘最大不透明度（轻微）
+    gRedFrom: -2,          // 低于它开始红视
+    gRedSpan: 3,           // 再低多少达到满强度
+    gRedMax: 0.30,         // 红视边缘最大不透明度
+    gWarnFrac: 0.85,       // 告警：gNow ≥ gLimit × 这个数（琥珀）
+    gNegWarn: -2.5,        // 告警：gNow ≤ 这个数（琥珀）
+    gNegCrit: -4,          // 告警：gNow ≤ 这个数（红色）
     alertHold: 1.4,        // "受损警告"在最后一次掉血后保留多久（s）
     jamBlur: 1.2,          // 干扰最强时整层界面的模糊半径（px）
     layerZ: 300            // 叠加层的 z-index：无线电面板之上、暂停菜单之下
@@ -84,6 +102,7 @@ var HudFx = (function () {
   var vis = 0;             // 裂痕整体可见度 0..1
   var holdT = 0, fadeDur = 4;
   var cracks = [], segCount = 0;
+  var gT = 0, gGrey = 0, gRed = 0, gLevel = 0, gNeg = false;   // 过载视觉状态
   var cumDmg = 0, lastSev = 0, seedCtr = 0, lastAsp = 16 / 9, lastNow = 0;
   var arenaK = 0;          // 越界渐黑进度 0..1（Game 的 arenaTick 推进，经 setArenaFade 推进来）
   var alertT = 0;          // 告警剩余时间
@@ -116,13 +135,40 @@ var HudFx = (function () {
     var dt = lastT ? Math.min(0.1, (now - lastT) / 1000) : 0;
     lastT = now;
     lastNow = now;
-    if (p !== lastP) { lastP = p; lastHp = p.hp; clearCracks(); cumDmg = 0; lastSev = 0; alertT = 0; return dt; }
+    if (p !== lastP) { lastP = p; lastHp = p.hp; clearCracks(); gT = 0; cumDmg = 0; lastSev = 0; alertT = 0; return dt; }
     if (p.alive && lastHp !== null && p.hp < lastHp - 1e-6) noteDamage(lastHp - p.hp, p.maxHp || 100);
     lastHp = p.hp;
+    stepG(p, dt);
     if (cracks.length && holdT > 0) holdT -= dt;
     else if (cracks.length) { vis -= dt / fadeDur; if (vis <= 0) clearCracks(); }
     alertT = Math.max(0, alertT - dt);
     return dt;
+  }
+
+  /* ---------- 过载视觉 ---------- */
+  function stepG(p, dt) {
+    var g = typeof p.gNow === 'number' && isFinite(p.gNow) ? p.gNow : 1;
+    var lim = (p.ac && p.ac.gLimit) || FX.gLimDefault;
+    var hi = lim * FX.gGreyFrom;
+    if (g > hi) gT = Math.min(FX.gSustain, gT + dt); else gT = Math.max(0, gT - dt * 2);
+    var posK = M3.clamp((g - hi) / Math.max(0.1, lim * FX.gGreySpan), 0, 1);
+    gGrey = p.alive === false ? 0 : posK * M3.clamp(gT / FX.gSustain, 0, 1) * FX.gGreyMax;
+    gRed = p.alive === false ? 0 : M3.clamp((FX.gRedFrom - g) / FX.gRedSpan, 0, 1) * FX.gRedMax;
+    gNeg = g < 0;
+    gLevel = p.alive === false ? 0 : (g >= lim || g <= FX.gNegCrit) ? 2 : (g >= lim * FX.gWarnFrac || g <= FX.gNegWarn) ? 1 : 0;
+  }
+
+  /* 边缘渐变：中心近乎透明（不挡读数），k 是边缘不透明度；shrink 0..1 让透明区随强度收缩（隧道视野） */
+  function drawEdge(ctx, W, H, rgb, k, shrink) {
+    if (!ctx.createRadialGradient) return;
+    var r0 = Math.min(W, H) * (0.58 - 0.26 * shrink), r1 = Math.hypot(W, H) * 0.55;
+    var g = ctx.createRadialGradient(W / 2, H / 2, r0, W / 2, H / 2, r1);
+    g.addColorStop(0, 'rgba(' + rgb + ',0)');
+    g.addColorStop(1, 'rgba(' + rgb + ',' + k.toFixed(3) + ')');
+    ctx.save();
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
   }
 
   /* ---------- 玻璃裂痕 ---------- */
@@ -340,7 +386,7 @@ var HudFx = (function () {
     var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     step(p, now);
     var j = jamLevel(p);
-    var on = j > FX.jamMin || cracks.length > 0 || arenaK > 0.01;
+    var on = j > FX.jamMin || cracks.length > 0 || gGrey > 0.005 || gRed > 0.005 || arenaK > 0.01;
     var g = on ? getLayer() : null;
     if (g) {
       var dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 2);
@@ -353,6 +399,8 @@ var HudFx = (function () {
       g = ctx;
     }
     if (j > FX.jamMin) drawJam(g, W, H, Math.min(1, j), now);
+    if (gGrey > 0.005) drawEdge(g, W, H, '16,18,22', gGrey, gGrey / FX.gGreyMax);
+    if (gRed > 0.005) drawEdge(g, W, H, '170,20,20', gRed, gRed / FX.gRedMax);
     if (cracks.length) drawCracks(g, W, H, now);
     if (arenaK > 0.01) drawFade(g, W, H, arenaK);
     if (g !== ctx) setBlur(j > FX.jamMin ? FX.jamBlur * Math.min(1, j) : 0);
@@ -361,6 +409,10 @@ var HudFx = (function () {
   return {
     FX: FX, draw: draw, step: step, noteDamage: noteDamage, jamLevel: jamLevel, beginFrame: beginFrame,
     hurtLevel: function () { return cracks.length ? vis : 0; },
+    gAlert: function () { return gLevel; },
+    gNegative: function () { return gNeg; },
+    gGreyLevel: function () { return gGrey; },
+    gRedLevel: function () { return gRed; },
     crackSeverity: function () { return lastSev; },
     crackSegments: function () { return segCount; },
     crackClusters: function () { return cracks.length; },
@@ -375,6 +427,6 @@ var HudFx = (function () {
     alertOn: function () { return alertT > 0; },
     setArenaFade: function (k) { arenaK = k < 0 ? 0 : k > 1 ? 1 : k; },
     arenaLevel: function () { return arenaK; },
-    reset: function () { clearCracks(); cumDmg = 0; lastSev = 0; arenaK = 0; alertT = 0; lastHp = null; lastP = null; lastT = 0; }
+    reset: function () { clearCracks(); gT = 0; gGrey = 0; gRed = 0; gLevel = 0; gNeg = false; cumDmg = 0; lastSev = 0; arenaK = 0; alertT = 0; lastHp = null; lastP = null; lastT = 0; }
   };
 })();

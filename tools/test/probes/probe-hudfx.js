@@ -8,6 +8,7 @@
    D. 消退：满可见保持 crackHold 秒后才开始消退，最终清空且不再占用画布。
    E. 封顶：连续大量小伤害，线段总数不超过 crackMax 加一簇的量。
    F. 窗口比例变化、死亡、换玩家：不抛错 / 清零。
+   G. 过载视觉：1 G 静息为 0；持续高正 G 才拉满灰视且有上限；负 G 红视；告警等级；只读（不改玩家任何字段）。
    用法：node tools/test/probes/probe-hudfx.js
    ============================================================ */
 'use strict';
@@ -121,6 +122,50 @@ function fresh() {
   const b = fresh();
   b.hit(20); b.F.reset();
   chk('reset 清零', b.F.crackSegments() === 0 && b.F.hurtLevel() === 0 && b.F.crackSeverity() === 0);
+}
+
+/* ---- G. 过载视觉 ---- */
+{
+  const a = fresh();
+  a.p.gNow = 1;
+  for (let i = 0; i < 30; i++) a.tick(100);
+  chk('1 G：没有灰视 / 红视 / 告警', a.F.gGreyLevel() === 0 && a.F.gRedLevel() === 0 && a.F.gAlert() === 0);
+  a.p.gNow = 11;
+  a.tick(100);
+  const early = a.F.gGreyLevel();
+  for (let i = 0; i < 60; i++) a.tick(100);
+  const late = a.F.gGreyLevel();
+  chk('持续高正 G：灰视随持续时间渐强', late > early && early < a.F.FX.gGreyMax * 0.5, early.toFixed(3) + ' → ' + late.toFixed(3));
+  chk('灰视有上限（轻微）', late <= a.F.FX.gGreyMax + 1e-9 && a.F.FX.gGreyMax <= 0.4, 'max=' + late.toFixed(3));
+  chk('高正 G：告警等级 2（≥ gLimit）且不是负过载', a.F.gAlert() === 2 && !a.F.gNegative());
+  a.p.gNow = 1;
+  for (let i = 0; i < 80; i++) a.tick(100);
+  chk('回到 1 G：灰视退干净、告警消失', a.F.gGreyLevel() < 1e-6 && a.F.gAlert() === 0);
+  a.p.gNow = 8;
+  a.tick(100);
+  chk('gLimit×0.85 ≤ G < gLimit：告警等级 1', a.F.gAlert() === 1, 'level=' + a.F.gAlert());
+  a.p.gNow = 5;
+  a.tick(100);
+  chk('中等 G（5）：没有视觉也没有告警', a.F.gAlert() === 0 && a.F.gGreyLevel() === 0);
+  a.p.gNow = -3;
+  a.tick(100);
+  chk('负 G：红视 > 0、告警 1、是负过载', a.F.gRedLevel() > 0 && a.F.gAlert() === 1 && a.F.gNegative());
+  a.p.gNow = -9;
+  a.tick(100);
+  chk('深负 G：红视有上限、告警 2', a.F.gRedLevel() <= a.F.FX.gRedMax + 1e-9 && a.F.gAlert() === 2, 'red=' + a.F.gRedLevel().toFixed(3));
+  const snap = JSON.stringify(a.p);
+  a.p.gNow = 12; a.tick(100);
+  chk('只读：不改玩家任何字段（除了我们设的 gNow）', JSON.stringify(a.p) === snap.replace('"gNow":-9', '"gNow":12'));
+  const b = fresh();
+  b.p.ac = { gLimit: 6 }; b.p.gNow = 5.5; b.tick(100);
+  chk('机型 gLimit 生效：gLimit 6 时 5.5 G 就告警', b.F.gAlert() === 1, 'level=' + b.F.gAlert());
+  const c = fresh();
+  c.p.gNow = undefined; c.tick(100);
+  chk('没有 gNow 时按 1 G 处理', c.F.gAlert() === 0 && c.F.gGreyLevel() === 0);
+  const d = fresh();
+  d.p.gNow = 14; for (let i = 0; i < 60; i++) d.tick(100);
+  d.p.alive = false; d.tick(100);
+  chk('玩家死亡：过载视觉与告警清掉', d.F.gGreyLevel() === 0 && d.F.gAlert() === 0);
 }
 
 process.exit(ok ? 0 : 1);

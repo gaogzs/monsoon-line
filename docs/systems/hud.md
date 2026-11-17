@@ -528,13 +528,14 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 | 3 | `detected` | `world.detected`（被对空雷达截获） | `▲ DETECTED  被对空雷达截获`（红） |
 | 4 | `terrain` | `p.pos.y < 200 && p.fwd.y < 0` | `TERRAIN 低高度告警`（红） |
 | 5 | `stall` | `p.stall` | `STALL 失速`（红） |
+| 5b | `gload` | `HudFx.gAlert()`：`gNow ≥ gLimit×0.85` 或 `≤ -2.5` 为 1，`≥ gLimit` 或 `≤ -4` 为 2 | `OVERLOAD 高过载` / `NEG-G 负过载`（1 级琥珀常亮，2 级红色快闪；**纯提示，没有惩罚**） |
 | 6 | `lowq` | `p.pos.y > 18000 && p.q < 12` | `LOW Q 动压不足`（琥珀） |
 | 7 | `psm` | `p.psm`（进行中） | `过失速机动`（琥珀，闪） |
 | 8 | `jammed` | `suppressed > 0.05 \|\| ewPower > 0` | `JAMMED 电磁干扰`（琥珀） |
 | 9 | `winchester` | `gunAmmo <= 0 && spAmmo <= 0` | `WINCHESTER 弹药耗尽`（琥珀） |
 | 10 | `emcon` | `p.emcon` | `EMCON-Δ 电磁静默`（青，**不闪** —— 它是状态不是告警） |
 
-`ALERT_ORDER` 现为 `missile / lit / arena / resupply / damage / terrain / stall / lowq / psm / jammed / winchester / emcon`。
+`ALERT_ORDER` 现为 `guided / missile / lit / arena / resupply / damage / terrain / stall / gload / lowq / psm / jammed / winchester / emcon`。
 `arena`：警告区琥珀慢闪「LEAVING AREA 即将离开战区」（是警告，不是命令——所以写进行时态），越界红色快闪「OUT OF AREA 已越出战区」并显示渐黑剩余秒数；
 `resupply`：靠近时青色距离、驻留中「REARMING n/hold s」（界外整备区写「REARM ZONE」）、规避中拒绝（琥珀闪）、补给耗尽。状态都由 `Game` / `Resupply` 写在 `world.arena / world.arenaFade / world.resupply.status`，HUD 只读，不跨命名空间读 `Game.$`。
 
@@ -754,11 +755,13 @@ ctx.strokeText(t, x, y);
 
 **独立图层（v2.0 后）**：HudFx 画在自己的全屏 canvas 上，`z-index 300` —— 压在 `#radio`（200）与 `#sysnote`（210）之上、`.overlay` 暂停层（800）之下（旧：画进 HUD 的 ctx，盖不住无线电）。受扰时再加 CSS `backdrop-filter: blur`，最大 `FX.jamBlur` 1.2 px × 受扰强度。`Renderer.begin` 每帧调 `HudFx.beginFrame` 清屏，所以离开战斗就消失。没有图层（tools）时退回画到传入的 ctx。
 **越界渐黑**（v3.5.0）：`HudFx.setArenaFade(k)`（0..1）由 `Game` 的 `arenaTick` 每帧推进，`draw` 的"on"判定把 `arenaK > 0.01` 算进去，画一层纯黑盖在受扰 / 受损之上；`reset()` 清零，`arenaLevel()` 读当前值。失败停留画面（`#failing`，z-index 800）在它之上，所以失败提示直接显示在黑屏上。
+**过载视觉**（v3.6.2，纯显示、无惩罚）：`HudFx` 读 `p.gNow` 与 `p.ac.gLimit`（缺省 9）。持续正 G > `gLimit×0.8` 才逐渐拉满（`gSustain` 4 s）灰视，边缘向内收缩的暗灰渐变，上限 0.35；负 G < -2 沿边缘淡红渐变（红视），上限 0.30；1 G 附近一笔不画（golden-render 不变）。不读写 `p` 的任何字段，不改控制。读数 `gGreyLevel() / gRedLevel() / gAlert() / gNegative()`。
 参数全在 `HudFx.FX`。裂痕随机用私有 PRNG（`performance.now()` 取整 ^ 递增计数 × 黄金比例常数播种，每次受击都不同），**不碰 `Math.random`**，所以不扰动游戏的随机流；探针 `probe-hudfx.js`。
 
 | 效果 | 触发 | 强度 | 上限（保证 UI 可读） |
 |---|---|---|---|
 | 干扰滤镜：下行扫描线带 + 细扫描线 + 静电噪点（预渲染 128² 图随机平移铺满）+ 偶发撕裂线 | `max(suppressed, ewPower × 0.8)` > 0.04 | 线性跟随强度 | 扫描线带 0.10、噪点 0.13、撕裂线 0.22（只有一两条 1–3 px 的线） |
+| 过载灰视 / 红视：边缘径向渐变，中心近乎透明 | `p.gNow` 持续 > gLimit×0.8 / 负 G < -2 | 随超出量与持续时间增长 | 灰视 0.35、红视 0.30 |
 | 受损玻璃裂痕（v3.6.2 起取代红屏）：放射主裂纹 + 随机游走折线 + 分叉 +（较重时）蛛网环 + 撞击核碎屑；深色底 + 冷白主线 + 偏 1 px 淡青高光；严重时叠极淡白雾 | 每帧比较玩家 hp，掉血即触发（不改 `Ent.damage`） | 严重度 `0.12 + 0.55 × 本次冲击 + 0.45 × 累计受伤 / maxHp`（本次冲击 = 单次伤害 / maxHp × 3.2，夹到 1）；线段数随严重度增加；再次受伤时全部裂痕回满，按新伤害在已有簇上长新分支 / 延长末梢，单次 > 25% 满血必定另起一簇 | 主线 0.6、白雾 0.05；满可见保持 1.2 s，之后线性消退 `3 + 5 × 严重度` 秒；线段封顶 900；静息一笔不画 |
 
 告警栏：
