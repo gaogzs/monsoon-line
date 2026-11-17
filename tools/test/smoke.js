@@ -5752,7 +5752,7 @@ try {
 });
 
 /* ============================================================
-   HUD 全屏滤镜（HudFx）：受伤闪红随单次伤害变重、很快退掉；
+   HUD 全屏滤镜（HudFx）：受损玻璃裂痕随单次 / 累计伤害变重、满可见保持后慢慢消退；
    受损告警跟着亮；干扰强度取 max(suppressed, ewPower × 0.8)；
    最强也不超过"看得清 UI"的不透明度上限。
    ============================================================ */
@@ -5767,20 +5767,23 @@ try {
   F.step(p, 1000);
   p.hp = 95; F.step(p, 1016);
   const small = F.hurtLevel();
-  if (!(small > 0)) bad.push('掉血之后没有红色滤镜');
+  const sevSmall = F.crackSeverity();
+  if (!(small > 0)) bad.push('掉血之后没有玻璃裂痕');
   if (!F.alertOn()) bad.push('掉血之后没有受损告警');
   F.reset(); F.step(p, 2000);
   p.hp = 55; F.step(p, 2016);
-  const big = F.hurtLevel();
-  if (!(big > small)) bad.push('单次伤害更大，红色反而没更重（' + small.toFixed(2) + ' / ' + big.toFixed(2) + '）');
+  const big = F.crackSeverity();
+  if (!(big > sevSmall)) bad.push('单次伤害更大，裂痕严重度反而没更高（' + sevSmall.toFixed(2) + ' / ' + big.toFixed(2) + '）');
   let t = 2016;
   for (let i = 0; i < 60; i++) { t += 16; F.step(p, t); }
-  if (F.hurtLevel() > 0.01) bad.push('红色滤镜 1 秒内没有退掉');
+  if (!(F.hurtLevel() > 0.9)) bad.push('裂痕满可见保持期内就开始消退了');
   for (let i = 0; i < 60; i++) { t += 16; F.step(p, t); }
   if (F.alertOn()) bad.push('受损告警 2 秒后还在');
+  for (let i = 0; i < 120; i++) { t += 100; F.step(p, t); }
+  if (F.hurtLevel() > 0 || F.crackSegments() > 0) bad.push('裂痕 12 秒后还没有消失');
   // 不透明度上限：最强时也只是蒙一层
   const X = F.FX;
-  if (X.hurtEdgeA > 0.5 || X.hurtCenterA > 0.1) bad.push('受伤滤镜最大不透明度过高，会挡住 UI');
+  if (X.crackAlpha > 0.7 || X.crackFogA > 0.08) bad.push('裂痕滤镜最大不透明度过高，会挡住 UI');
   if (X.jamScanA + X.jamNoiseA > 0.3) bad.push('干扰滤镜最大不透明度过高，会挡住 UI');
   p.suppressed = 0.3; p.ewPower = 0.5;
   if (Math.abs(F.jamLevel(p) - 0.4) > 1e-9) bad.push('干扰强度没有取 max(suppressed, ewPower × 0.8)');
@@ -5793,7 +5796,7 @@ try {
   F.setArenaFade(0.5); F.draw(sandbox.Renderer.ctx || {}, 800, 600, p);
   F.reset(); if (F.arenaLevel() !== 0) bad.push('reset 没有清掉渐黑');
   if (bad.length) bad.forEach(fail);
-  else ok('HUD 滤镜：受伤闪红随单次伤害加重、约半秒退掉；受损告警；干扰强度与不透明度上限');
+  else ok('HUD 滤镜：玻璃裂痕随伤害加重、保持后消退；受损告警；干扰强度与不透明度上限');
 } catch (e) {
   fail('HUD 滤镜测试抛出异常 —— ' + e.message + '\n' + e.stack);
 }
