@@ -5,6 +5,7 @@
    A. 护航：无威胁时留在被护卫者周围（R 内外徘徊）；敌机接近被护卫者时转去拦截（等反应延迟）；被护卫者没了 → 不再护航
    B. 巡航队形：未交战时跟队长保持槽位；交战判据成立后解散（s.fm = null）
    C. 电子战协同：被压制持续 > JAM.T 秒 → 主动脱离干扰区（extend，目标 = 干扰源）
+   E. 自由飞行的干扰机（v3.6.2，spawnEnemy 的 jam 选项）：从远处靠近己方编队并绕着它转、敌人进干扰范围才开吊舱、不接战、不追击
    D. 友军呼救：被咬尾 / 血量低 → helpT 置位并播 Chatter help；Director 把"正在打求援者"的敌机评分 ×0.6
    用法：node tools/test/probes/probe-coord.js
    ============================================================ */
@@ -89,6 +90,40 @@ function base(seed) {
   chk('D 播出求援无线电（help 事件）', W.S.sandbox.Radio.log().some(e => e.who === 'ALPHA-1'));
   const aid = W.AI.$.director.pick(helper, W.w, 20000);
   chk('D Director：正在打求援者的敌机被优先选中', aid === chaser);
+}
+
+/* E 自由飞行的干扰机 */
+{
+  const mkJam = (seed, foeZ) => {
+    const W = base(seed);
+    const leader = W.mk(1, 0, 8000, 0, 1); leader.ai.cmd = 'hold';
+    const jam = W.S.sandbox.spawnEnemy(W.w, { ac: 'lodestone', team: 1, x: 12000, y: 8000, z: -9000, fwd: W.M3.V(0, 0, 1), speed: 250, special: 'vsc', skill: 0.5, ward: leader, jam: {}, callsign: 'JAM-1' });
+    const foe = W.mk(0, 0, 8000, foeZ, -1); foe.ai.cmd = 'hold'; foe.hp = foe.maxHp = 1e9;
+    const pin = (u, z) => { u.pos.x = 0; u.pos.z = z; u.speed = 0; };          // 钉住编队长机与敌人（'hold' 也会往前飞）
+    const stepPinned = () => { W.step(1); pin(leader, 0); pin(foe, foeZ); };
+    return { W, leader, jam, foe, stepPinned };
+  };
+  const vsc = mkJam(1, 60000).W.S.sandbox.WEAPONS.vsc;
+  const AIs = mkJam(1, 60000).W.AI.$;
+  chk('E ESCORT.R < 干扰半径（绕编队盘旋时敌人进得了压制范围）', AIs.ESCORT.R < vsc.jamRadius, AIs.ESCORT.R + ' < ' + vsc.jamRadius);
+  const A = mkJam(1, 60000);       // 敌人（玩家一方）在 60 km 外：不该开机
+  chk('E spawnEnemy jam：写进 ai.jam，行为默认 recon（不接战）', !!A.jam.ai.jam && A.jam.behavior === 'recon' && A.jam.ai.ward === A.leader);
+  let dMin = 1e9, dEnd = 0, opened = false, fired = false;
+  for (let f = 0; f < 60 * 70; f++) {
+    A.stepPinned();
+    dEnd = A.W.M3.dist(A.jam.pos, A.leader.pos); dMin = Math.min(dMin, dEnd);
+    if (A.jam.spActive > 0 || A.jam.ewPower > 0) opened = true;
+    if (A.jam.firingGun) fired = true;
+  }
+  chk('E 从远处靠近己方编队并留在它周围', dMin < A.W.AI.$.ESCORT.R * 1.5 && dEnd < 9000, 'min=' + dMin.toFixed(0) + ' end=' + dEnd.toFixed(0));
+  chk('E 敌人在范围外：吊舱不开', !opened);
+  chk('E 不开火（recon 构型）', !fired);
+  const B = mkJam(1, 7000);        // 敌人在编队前方 7 km：进了干扰半径
+  let openAt = -1, sup = 0;
+  for (let f = 0; f < 60 * 60; f++) { B.stepPinned(); sup = Math.max(sup, B.foe.suppressed || 0); if (openAt < 0 && (B.jam.spActive > 0 || B.jam.ewPower > 0)) openAt = f / 60; }
+  chk('E 敌人进入干扰半径：自动开吊舱', openAt >= 0, 'at ' + openAt.toFixed(1) + ' s');
+  chk('E 干扰机没有去追击敌人（目标不是敌机 / 仍在编队旁）', B.W.M3.dist(B.jam.pos, B.leader.pos) < 9000);
+  chk('E 敌人被压制（suppressed > 0）', sup > 0, 'sup=' + sup.toFixed(2));
 }
 
 process.exit(ok ? 0 : 1);

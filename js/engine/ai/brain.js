@@ -35,6 +35,7 @@
       fm: opt.fm || null,            // 巡航队形 {mode, lead, idx}（coord.js）
       jamAway: null, jammer: null, helpT: 0, escortT: null, escortOK: null,
       ward: opt.ward || null,        // 护航：被护卫者（loyal 性格的 leash 参照）
+      jam: opt.jam || null,          // 自由飞行的干扰机（v3.6.2）：{ wid, skill, trigK, dur, fadeTo, rekey, msg }；跟着 ward 走，进范围自动开吊舱，不主动接战
       lastKnown: null, lostSightT: 0, searching: false,   // 态势记忆（memory.js）
       subrole: null,       // 'bait' / 'flank'（Director 给成对的 skill>=0.6 敌机分配）
       flankSide: 1,
@@ -291,6 +292,7 @@
     if (s.longT > 0) s.longT -= dt;
     if (s.overT > 0) s.overT -= dt;
     if (s.overCd > 0) s.overCd -= dt;
+    if (s.jam) jamAuto(a, s.jam, world, dt);        // 自由飞行的干扰机：与航线型干扰机同一套自动开机
     s.envClock = (s.envClock || 0) + dt;      // 发射包线缓存的时钟（见 aiEnvelope）
     if (s.burstT > 0) s.burstT -= dt;
     if (s.flareT > 0) s.flareT -= dt;
@@ -673,6 +675,10 @@
       /* 巡航队形（未交战）：跟着队长走槽位；交战判据成立后 coord.js 会解散（s.fm = null），回到各自的战术角色 */
       var fd = $.fmDir(a, s, world);
       desired = fd.dir; throttle = fd.throttle; ab = fd.ab;
+    } else if (s.jam && s.ward && s.ward.alive) {
+      /* 干扰机：留在己方编队旁（离远了飞回去、近了绕着转），靠吊舱压制进入范围的敌人，不去追击 */
+      desired = $.escortDir(a, s);
+      throttle = 0.8; ab = false;
     } else if (s.target) {
       var res = $.pursue(a, (s.searching && $.searchGhost(s)) || s.target, world);
       desired = res.dir;
