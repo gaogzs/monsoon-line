@@ -63,6 +63,7 @@
     if (idx < 0 || n < 2) return null;
     return [(idx + 0.5) / n * 6.283185307179586, 3.141592653589793 / n];
   }
+  $.sectorOf = sectorOf;       // 调试叠加层（hud/debug.js，经 AI.sectorOf）要画它
 
   /* 选目标：在 maxR 内的敌机里取"评分距离"最小的。评分 = 距离 ×（已被盯惩罚）×（扇区惩罚）×（抢人头惩罚）。
      没有任何同队攻击者、不是 ally 时，与 nearestEnemy 完全等价。 */

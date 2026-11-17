@@ -14,8 +14,8 @@ function chk(name, cond, detail) {
   console.log((cond ? 'PASS ' : 'FAIL ') + name + (detail ? '  ' + detail : ''));
   if (!cond) ok = false;
 }
-function scene(ambient) {
-  const S = Sim.load({ seed: 3 });
+function scene(ambient, trace) {
+  const S = Sim.load({ seed: 3, trace: !!trace });
   const { M3, Ent, AI, MISSIONS } = S.sandbox;
   const idx = MISSIONS.findIndex(m => m.id === 'm1');
   if (ambient) MISSIONS[idx].ambient = ambient;
@@ -72,6 +72,29 @@ function scene(ambient) {
   let err = null;
   try { W.S.render(); } catch (e) { err = e; }
   chk('F AI 调试叠加层（?debug=ai）整帧渲染不抛错', !err, err ? String(err.stack).split('\n')[0] : '');
+}
+
+/* ---------- F2：Director 扇区环（≥ 2 架友机）---------- */
+{
+  const W = scene(null, true);
+  const { M3, Ent, AI } = W.S.sandbox;
+  const ally2 = Ent.makeAircraft({ type: 'albatross', team: 0, x: W.p.pos.x - 800, y: 4000, z: W.p.pos.z + 700, fwd: M3.V(0, 0, 1), speed: 250, special: null });
+  ally2.label = 'ALPHA-2'; ally2.hp = ally2.maxHp = 1e9; AI.attach(ally2, { role: 'ally', skill: 0.5 }); W.w.actors.push(ally2);
+  const foe = Ent.makeAircraft({ type: 'albatross', team: 1, x: W.p.pos.x, y: 4000, z: W.p.pos.z + 6000, fwd: M3.V(0, 0, -1), speed: 250, special: null });
+  foe.hp = foe.maxHp = 1e9; AI.attach(foe, { role: 'enemy', skill: 0.5 }); W.w.actors.push(foe);
+  W.step(60 * 3);
+  const d = W.w.aiDir;
+  chk('F2 两架友机：aiDir 有 2 个友机，且 AI.sectorOf 返回 [中心角, 半宽]', d && d.allies.length >= 2 && Array.isArray(AI.sectorOf(d, d.allies[0])) && Math.abs(AI.sectorOf(d, d.allies[0])[1] - Math.PI / d.allies.length) < 1e-9);
+  const lines = () => W.S.trace.filter(t => t.startsWith('lineTo(')).length;
+  W.S.trace.length = 0; W.S.sandbox.HUD.debugAI = false; W.S.render();
+  const off = lines();
+  W.S.trace.length = 0; W.S.sandbox.HUD.debugAI = true;
+  let err = null;
+  try { W.S.render(); } catch (e) { err = e; }
+  const on = lines();
+  chk('F2 扇区环整帧渲染不抛错', !err, err ? String(err.stack).split('\n')[0] : '');
+  chk('F2 开 ?debug=ai 后确实多画了扇区环的线（关掉时不画）', on > off, 'lineTo ' + off + ' → ' + on);
+  W.S.sandbox.HUD.debugAI = false;
 }
 
 process.exit(ok ? 0 : 1);
