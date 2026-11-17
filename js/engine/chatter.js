@@ -16,6 +16,8 @@
      Chatter.rearmed(world, unit)    Resupply.reappear 里调：整备完成，并重置该单位的轮询标记
    限频：同一（事件，说话人）有冷却；全场时间窗内总量有上限；说话人 = 单位呼号（label），没有就不播。
    台词：locales/zh-CN/text/radio.json，键 radio.<事件>.<ally|foe>.variants（数组，T.pick 随机挑）。
+   性格台词：radio.<事件>.<ally|foe>.<性格>.variants（aggressive / cautious / sniper × fox / splash / defensive / rtb），
+   单位的 ai.temperament 有对应键就用，没有回退通用。目前没有关卡设置 temperament，游戏里要等关卡用上才听得到。
    声线集按队伍选：team 0 = ally，其余 = foe（设计里的"上游 / 下游"按机型 faction 选，faction 是本地化文本、不能当键）。
    ============================================================ */
 var Chatter = (function () {
@@ -53,7 +55,11 @@ var Chatter = (function () {
     w.push(t);
     st.cd[key] = t + def;
     var friendly = unit.team === 0;
-    var tx = T.pick('radio.' + type + '.' + (friendly ? 'ally' : 'foe') + '.variants', function () { return rnd01(st); }, ctx);
+    /* 性格台词（v3.6.2）：unit.ai.temperament 有对应变体就用它，没有回退通用；查键不消耗抽签，老序列不变 */
+    var side = friendly ? 'ally' : 'foe', tp = unit.ai && unit.ai.temperament, rng = function () { return rnd01(st); };
+    var useTp = !!tp && T.has('radio.' + type + '.' + side + '.' + tp + '.variants');
+    var tx = useTp ? T.pick('radio.' + type + '.' + side + '.' + tp + '.variants', rng, ctx)
+                   : T.pick('radio.' + type + '.' + side + '.variants', rng, ctx);
     Radio.raw({
       who: unit.label, cls: friendly ? 'ally' : 'enemy', tx: tx,
       pri: friendly && !ATMOS[type] ? 'ally' : 'chatter', key: key, gap: 0.4

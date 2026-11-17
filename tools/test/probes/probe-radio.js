@@ -221,4 +221,49 @@ const shown = () => Radio.log().filter(e => !e.dropped);
   chk('整备完成：rearmed 钩子播出', lg.some(e => reTx.indexOf(e.tx) >= 0), lg.map(e => e.tx).join(' | '));
 }
 
+/* ---------- H. 性格台词（v3.6.2） ---------- */
+{
+  const S4 = Sim.load({ seed: 1 });
+  const { M3, Ent, AI, Chatter, Radio: R4, MISSIONS, T: T4 } = S4.sandbox;
+  S4.start(MISSIONS.findIndex(m => m.id === 'm1'));
+  const G = S4.sandbox.Game, w = G.__world(), p = G.__player();
+  p.hp = p.maxHp = 1e9;
+  const mk = (team, label, temperament, x) => {
+    const a = Ent.makeAircraft({ type: 'albatross', team, x: p.pos.x + x, y: 4000, z: p.pos.z + 500, fwd: M3.V(1, 0, 0), speed: 250, special: 'dl6' });
+    AI.attach(a, { role: team === 0 ? 'ally' : 'enemy', skill: 0.55, rank: 'pawn', temperament });
+    a.label = label; a.hp = a.maxHp = 100; w.actors.push(a);
+    return a;
+  };
+  const say = (type, unit) => {
+    R4.clear(); w.chat = null; w.time = 100;
+    Chatter.emit(w, type, unit);
+    for (let i = 0; i < 300; i++) R4.update(1 / 60);
+    const lg = R4.log().filter(e => e.who === unit.label);
+    return lg.length ? lg[lg.length - 1].tx : null;
+  };
+  const TYPES = ['fox', 'splash', 'defensive', 'rtb'];
+  let allOk = true, miss = [];
+  for (const tp of ['aggressive', 'cautious', 'sniper']) {
+    for (const ty of TYPES) {
+      const a = mk(0, 'TP-' + tp + '-' + ty, tp, 600), f = mk(1, 'TF-' + tp + '-' + ty, tp, 900);
+      const lineA = say(ty, a), lineF = say(ty, f);
+      if (!T4.all('radio.' + ty + '.ally.' + tp + '.variants').includes(lineA)) { allOk = false; miss.push('ally ' + tp + ' ' + ty + ': ' + lineA); }
+      if (!T4.all('radio.' + ty + '.foe.' + tp + '.variants').includes(lineF)) { allOk = false; miss.push('foe ' + tp + ' ' + ty + ': ' + lineF); }
+    }
+  }
+  chk('H aggressive / cautious / sniper：4 个事件 × ally / foe 都取性格台词', allOk, miss.join(' | '));
+  const neutral = mk(0, 'TN-1', null, 700), loyal = mk(0, 'TL-1', 'loyal', 750);
+  const lN = say('fox', neutral), lL = say('fox', loyal);
+  const gen = T4.all('radio.fox.ally.variants');
+  chk('H 中性 / loyal（没有性格台词）回退通用', gen.includes(lN) && gen.includes(lL), lN + ' | ' + lL);
+  const evTypes = ['bingoAmmo', 'winchester', 'rearmed', 'damaged', 'help'];
+  const ag = mk(0, 'TA-9', 'aggressive', 800);
+  const lb = evTypes.map(ty => say(ty, ag)), okB = evTypes.every((ty, i) => T4.all('radio.' + ty + '.ally.variants').includes(lb[i]));
+  chk('H 没有性格台词的事件对有性格的单位也回退通用', okB, lb.join(' | '));
+  const x = mk(0, 'TX-1', 'aggressive', 600), y = mk(0, 'TX-2', null, 650);
+  R4.clear(); w.chat = null; w.time = 100; Chatter.emit(w, 'fox', x); const rsA = w.chat.rs;
+  R4.clear(); w.chat = null; w.time = 100; Chatter.emit(w, 'fox', y); const rsB = w.chat.rs;
+  chk('H 性格查键不额外消耗 Chatter 抽签（两种单位各抽一次，结果同一个 LCG 状态）', rsA === rsB, rsA + ' vs ' + rsB);
+}
+
 process.exit(ok ? 0 : 1);
