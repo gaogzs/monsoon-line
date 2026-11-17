@@ -6,6 +6,7 @@
    B. 人为失误：晚发现来袭弹 / 丢目标后多花一阵——低技能有延迟、随技能单调不增、skill ≥ 0.7 为 0
    C. 过载：有人机持续高 G 超过 G_SUSTAIN → 视野变窄（blackT > 0）；无人机无此限制；低 G 不触发
    D. loyal 性格：离被护卫者超过 leash 时被拉回
+   F. 超调失误（v3.6.2）：低技能进近时登记超调（继续直飞一阵），≥ 0.7 不触发，有冷却，随技能单调不增
    E. 射程外远射（v3.6.2）：低技能 AI 有小概率在包线外就放弹；≥ LONGSHOT.SKILL 绝不；有冷却；只用私有 LCG
    用法：node tools/test/probes/probe-individual.js
    ============================================================ */
@@ -121,6 +122,40 @@ const mk = (o) => {
   chk('E 两次发射之间有间隔（shootT / 冷却）', gap >= 2.0, 'minGap=' + (gap === Infinity ? 'n/a' : gap.toFixed(1)));
   const r1 = run(0.35, 3, 20), r2 = run(0.35, 3, 20);
   chk('E 同种子可复现（私有 LCG）', JSON.stringify(r1.shots) === JSON.stringify(r2.shots));
+}
+
+/* F */
+{
+  const run = (skill, seed, secs) => {
+    const S2 = Sim.load({ seed: 1 });
+    const { M3: M, Ent: En, AI: A } = S2.sandbox;
+    S2.start(0);
+    const G = S2.sandbox.Game, w = G.__world(), p = G.__player();
+    for (const a of w.actors) if (a !== p) a.alive = false;
+    w.actors = w.actors.filter(a => a === p);
+    w.targets.length = 0; w.arenaDef = null;
+    p.pos.x += 90000;
+    const sh = En.makeAircraft({ type: 'albatross', team: 1, x: 0, y: 3000, z: 0, fwd: M.V(0, 0, 1), speed: 250, special: null });
+    A.attach(sh, { role: 'enemy', skill, rank: skill < 0.5 ? 'rookie' : skill < 0.7 ? 'pawn' : 'elite' });
+    sh.ai.rs = (seed * 2654435761) >>> 0;
+    const tg = En.makeAircraft({ type: 'albatross', team: 0, x: 900, y: 3000, z: 4200, fwd: M.V(0, 0, -1), speed: 250, special: null });
+    tg.hp = tg.maxHp = 1e9;
+    w.actors.push(tg, sh);
+    for (let f = 0; f < 60 * secs; f++) { tg.throttle = 0.8; S2.step(1 / 60); p.alive = true; p.hp = p.maxHp; }
+    return sh.ai.overshoots || 0;
+  };
+  const tot = (sk, secs) => { let n = 0; for (let seed = 1; seed <= 6; seed++) n += run(sk, seed, secs || 25); return n; };
+  const lo = tot(0.35), mid = tot(0.55), hi = tot(0.7), ace = tot(0.9);
+  chk('F rookie / pawn 进近时会登记超调', lo > 0 && mid > 0, 'rookie=' + lo + ' pawn=' + mid);
+  chk('F skill ≥ 0.7：不触发超调', hi === 0 && ace === 0, 'elite=' + hi + ' ace=' + ace);
+  chk('F $.SKILL.overshoot：随技能单调不增、0.7 起为 0', $.SKILL.overshoot({ skill: 0.35 }) > $.SKILL.overshoot({ skill: 0.55 }) && $.SKILL.overshoot({ skill: 0.55 }) > 0 && $.SKILL.overshoot({ skill: 0.7 }) === 0);
+  let per = 0; for (let seed = 1; seed <= 6; seed++) per = Math.max(per, run(0.35, seed, 25));
+  chk('F 冷却：25 s 内每架最多登记 ceil(25/CD)+1 次', per <= Math.ceil(25 / $.OVERSHOOT.CD) + 1, 'max=' + per);
+  const a = mk({ skill: 0.35 }); a.ai.target = mk(); a.ai.target.pos = M3.V(0, 6000, 1000); a.ai.target.vel = M3.V(0, 0, -250); a.vel = M3.V(0, 0, 250);
+  const d0 = M3.norm(M3.V(0.8, 0, 0.6)), d1 = $.overshoot(a, a.ai, d0, 1000);
+  chk('F 超调期间期望方向偏向机头（继续直飞）', a.ai.overT > 0 && M3.dot(d1, a.fwd) > M3.dot(d0, a.fwd), M3.dot(d0, a.fwd).toFixed(2) + ' → ' + M3.dot(d1, a.fwd).toFixed(2));
+  const b = mk({ skill: 0.9 }); b.ai.target = a.ai.target; b.vel = a.vel;
+  chk('F ace：期望方向原样返回', $.overshoot(b, b.ai, d0, 1000) === d0);
 }
 
 process.exit(ok ? 0 : 1);

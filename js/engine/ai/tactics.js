@@ -99,6 +99,30 @@
   }
 
   /* ============================================================
+     超调失误（低技能，v3.6.2）
+
+     进到近距（MIN..MAX）又在接近时，**登记一次**：之后 HOLD 秒内期望方向向"继续直飞"混入 BLEND，
+     转弯收得不干净，自然飞过头再回头。目标本来就在机头正前时混入没有差别，所以迎头的正常接近不受影响。
+     登记之后 CD 秒内不再登记；时长随技能递减（SKILL.overshoot），≥ 0.7 的不触发。
+     随机只用私有 LCG，且只在登记那一刻抽一次。
+     ============================================================ */
+  $.OVERSHOOT = { MIN: 500, MAX: 1800, HOLD0: 0.6, HOLD_SPAN: 1.2, CD: 10, BLEND: 0.6 };
+  $.overshoot = function (a, s, desired, dT) {
+    var O = $.OVERSHOOT, k = $.SKILL.overshoot(s);
+    if (k <= 0) return desired;
+    if (!(s.overT > 0) && !(s.overCd > 0) && dT > O.MIN && dT < O.MAX && s.target && s.target.kind !== 'target' && !s.searching) {
+      var tv = s.target.vel || M3.V(0, 0, 0);
+      if (M3.dot(M3.sub(a.vel, tv), M3.sub(s.target.pos, a.pos)) > 0) {         // 正在接近
+        s.overT = (O.HOLD0 + O.HOLD_SPAN * $.rnd01(s)) * k;
+        s.overCd = O.CD;
+        s.overshoots = (s.overshoots || 0) + 1;
+      }
+    }
+    if (s.overT > 0) return M3.norm(M3.add(M3.mul(desired, 1 - O.BLEND), M3.mul(a.fwd, O.BLEND)));
+    return desired;
+  };
+
+  /* ============================================================
      对地攻击（M2 里敌方地面设施不需要，但玩家僚机需要打平台）
      ============================================================ */
   function strafeTarget(a, t, world) {

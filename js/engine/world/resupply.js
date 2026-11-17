@@ -247,7 +247,7 @@ var Resupply = (function () {
     if (a.ai) {
       var s = a.ai;
       s.target = null; s.mode = 'pursue'; s.evadeT = 0; s.modeT = 0; s.retargetT = 0; s.flareBurst = 0;
-      s.retreating = false; s.evalT = 0; s.retreatCd = 0; s.psmAI = null; s.psmCd = 0; s.psmEval = null; s.psmSeen = false; s.fake = null; s.fakeBoostT = 0; s.umbT = 0; s.subrole = null;
+      s.retreating = false; s.evalT = 0; s.retreatCd = 0; s.psmAI = null; s.psmCd = 0; s.psmEval = null; s.psmSeen = false; s.fake = null; s.fakeBoostT = 0; s.overT = 0; s.overCd = 0; s.longT = 0; s.umbT = 0; s.subrole = null;
       s.aim.x = 0; s.aim.y = 0; s.aimFor = null; s.gunT = 0; s.missT = 0; s.strafe = false; s.flareReact = 0; s.lostT = null;
       s.furT = 0; s.standT = 0; s.closeT = 0; s.standCool = 0; s.msl = null; s.hpSeen = a.hp;
     }

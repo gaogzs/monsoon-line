@@ -54,6 +54,8 @@
       flareBurst: 0,      // 这一串诱饵还剩几组没放
       shootT: 0,
       longT: 0,
+      overT: 0,
+      overCd: 0,
       burstT: 0,
       ewResist: 0,        // 对敌方电子战的适应度（设定 7.3"对手也在学"）
       target: null,
@@ -287,6 +289,8 @@
     if (s.fakeBoostT > 0) s.fakeBoostT -= dt;
     if (s.shootT > 0) s.shootT -= dt;
     if (s.longT > 0) s.longT -= dt;
+    if (s.overT > 0) s.overT -= dt;
+    if (s.overCd > 0) s.overCd -= dt;
     s.envClock = (s.envClock || 0) + dt;      // 发射包线缓存的时钟（见 aiEnvelope）
     if (s.burstT > 0) s.burstT -= dt;
     if (s.flareT > 0) s.flareT -= dt;
@@ -697,6 +701,7 @@
       ab = $.abPolicy(a, s, res, dT, world);
       if (s.fakeBoostT > 0) ab = true;            // 假撤退回头：短时加力，缩短回转时间窗
       desired = $.yoyo(a, s, desired, dT);
+      desired = $.overshoot(a, s, desired, dT);   // 低技能：进近时收不住转弯，飞过头
     } else {
       // 无目标：护航机绕着被护卫者转，其余巡逻
       var wd = s.ward && s.ward.alive ? $.escortDir(a, s) : null;

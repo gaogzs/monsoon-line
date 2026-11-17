@@ -59,6 +59,8 @@
      只在包线外、锁定带 BAND 倍以内的区间，且至少留一枚（弹药 > 1）。 */
   $.LONGSHOT = { SKILL: 0.65, K: 0.9, ROLL: 1.5, COOL: 6, BAND: 1.4 };
   $.SKILL.longShot = function (s) { return s.skill < $.LONGSHOT.SKILL ? ($.LONGSHOT.SKILL - s.skill) * $.LONGSHOT.K : 0; };
+  /* 超调失误（v3.6.2）：低技能的飞行员进近时收不住转弯，沿原航向多飞一阵再回头（见 tactics.js $.overshoot）。0..1，≥ 0.7 为 0 */
+  $.SKILL.overshoot = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) / 0.35 : 0; };
   $.SKILL.misjudgeT = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 2.0 * $.rnd01(s) : 0; };
   $.SKILL.lostExtra = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 3.0 * $.rnd01(s) : 0; };
   $.G_SUSTAIN = 6; $.G_BLACKOUT = 1.5;
