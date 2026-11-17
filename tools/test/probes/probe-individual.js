@@ -6,6 +6,7 @@
    B. 人为失误：晚发现来袭弹 / 丢目标后多花一阵——低技能有延迟、随技能单调不增、skill ≥ 0.7 为 0
    C. 过载：有人机持续高 G 超过 G_SUSTAIN → 视野变窄（blackT > 0）；无人机无此限制；低 G 不触发
    D. loyal 性格：离被护卫者超过 leash 时被拉回
+   E. 射程外远射（v3.6.2）：低技能 AI 有小概率在包线外就放弹；≥ LONGSHOT.SKILL 绝不；有冷却；只用私有 LCG
    用法：node tools/test/probes/probe-individual.js
    ============================================================ */
 'use strict';
@@ -84,6 +85,42 @@ const mk = (o) => {
   };
   const loyal = run('loyal'), free = run(null);
   chk('D loyal：比不带性格的护航机离被护卫者近得多（leash 起作用）', loyal < free - 2500, 'loyal=' + loyal.toFixed(0) + ' free=' + free.toFixed(0));
+}
+
+/* E */
+{
+  const run = (skill, seed, secs, extra) => {
+    const S2 = Sim.load({ seed: 1 });
+    const { M3: M, Ent: En, AI: A } = S2.sandbox;
+    S2.start(0);
+    const G = S2.sandbox.Game, w = G.__world(), p = G.__player();
+    for (const a of w.actors) if (a !== p) a.alive = false;
+    w.actors = w.actors.filter(a => a === p);
+    w.targets.length = 0; w.arenaDef = null;
+    p.pos.x += 90000;
+    const sh = En.makeAircraft({ type: 'sandstone', team: 1, x: 0, y: 3000, z: 0, fwd: M.V(0, 0, 1), speed: 250, special: 'vbn' });
+    A.attach(sh, Object.assign({ role: 'enemy', skill, rank: skill < 0.5 ? 'rookie' : 'pawn' }, extra || {}));
+    sh.ai.rs = (seed * 2654435761) >>> 0;
+    const tg = En.makeAircraft({ type: 'albatross', team: 0, x: 0, y: 3000, z: 4700, fwd: M.V(0, 0, 1), speed: 250, special: null });
+    tg.hp = tg.maxHp = 1e9;
+    w.actors.push(tg, sh);
+    const shots = [];
+    const orig = w.fireMissile;
+    w.fireMissile = function (actor, target) { if (actor === sh) shots.push({ t: w.time, d: M.dist(sh.pos, tg.pos) }); return orig.apply(this, arguments); };
+    for (let f = 0; f < 60 * secs; f++) { tg.throttle = 0.8; sh.throttle = 0.8; S2.step(1 / 60); p.alive = true; p.hp = p.maxHp; }
+    return { shots, longShots: sh.ai.longShots || 0, rs: sh.ai.rs };
+  };
+  const tot = (sk) => { let n = 0, ls = 0; for (let seed = 1; seed <= 8; seed++) { const r = run(sk, seed, 20); n += r.shots.length; ls += r.longShots; } return { n, ls }; };
+  const lo = tot(0.35), mid = tot(0.55), hi = tot(0.7), ace = tot(0.9);
+  chk('E rookie（0.35）会射程外远射', lo.ls > 0, 'longShots=' + lo.ls + ' shots=' + lo.n);
+  chk('E 射程外远射随技能递减：rookie ≥ pawn(0.55)', lo.ls >= mid.ls, lo.ls + ' ≥ ' + mid.ls);
+  chk('E skill ≥ 0.65：绝不射程外远射', hi.ls === 0 && ace.ls === 0, 'hi=' + hi.ls + ' ace=' + ace.ls);
+  chk('E $.SKILL.longShot：单调不增、0.65 起为 0', $.SKILL.longShot({ skill: 0.35 }) > $.SKILL.longShot({ skill: 0.55 }) && $.SKILL.longShot({ skill: 0.55 }) > 0 && $.SKILL.longShot({ skill: 0.65 }) === 0 && $.SKILL.longShot({ skill: 0.9 }) === 0);
+  let gap = Infinity;
+  for (let seed = 1; seed <= 8; seed++) { const r = run(0.35, seed, 40); for (let i = 1; i < r.shots.length; i++) gap = Math.min(gap, r.shots[i].t - r.shots[i - 1].t); }
+  chk('E 两次发射之间有间隔（shootT / 冷却）', gap >= 2.0, 'minGap=' + (gap === Infinity ? 'n/a' : gap.toFixed(1)));
+  const r1 = run(0.35, 3, 20), r2 = run(0.35, 3, 20);
+  chk('E 同种子可复现（私有 LCG）', JSON.stringify(r1.shots) === JSON.stringify(r2.shots));
 }
 
 process.exit(ok ? 0 : 1);

@@ -54,6 +54,11 @@
 
   /* 人为失误（低技能，skill < 0.7）：晚发现来袭弹 / 被晃出视线后多花一阵才重新找目标。
      触发走"登记一次 + 延迟"，不逐帧掷骰；延迟随技能单调递减，高技能为 0。 */
+  /* 射程外"浪费的远射"（v3.6.2）：低技能的飞行员沉不住气，目标还在包线外就把弹放出去。
+     概率随技能递减，≥ SKILL 为 0（高技能绝不乱放）。每 ROLL 秒最多掷一次（私有 LCG），放了之后 COOL 秒不再掷；
+     只在包线外、锁定带 BAND 倍以内的区间，且至少留一枚（弹药 > 1）。 */
+  $.LONGSHOT = { SKILL: 0.65, K: 0.9, ROLL: 1.5, COOL: 6, BAND: 1.4 };
+  $.SKILL.longShot = function (s) { return s.skill < $.LONGSHOT.SKILL ? ($.LONGSHOT.SKILL - s.skill) * $.LONGSHOT.K : 0; };
   $.SKILL.misjudgeT = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 2.0 * $.rnd01(s) : 0; };
   $.SKILL.lostExtra = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 3.0 * $.rnd01(s) : 0; };
   $.G_SUSTAIN = 6; $.G_BLACKOUT = 1.5;

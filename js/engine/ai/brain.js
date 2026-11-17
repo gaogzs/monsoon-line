@@ -53,6 +53,7 @@
       flareT: 0,
       flareBurst: 0,      // 这一串诱饵还剩几组没放
       shootT: 0,
+      longT: 0,
       burstT: 0,
       ewResist: 0,        // 对敌方电子战的适应度（设定 7.3"对手也在学"）
       target: null,
@@ -285,6 +286,7 @@
     if (s.standCool > 0) s.standCool -= dt;
     if (s.fakeBoostT > 0) s.fakeBoostT -= dt;
     if (s.shootT > 0) s.shootT -= dt;
+    if (s.longT > 0) s.longT -= dt;
     s.envClock = (s.envClock || 0) + dt;      // 发射包线缓存的时钟（见 aiEnvelope）
     if (s.burstT > 0) s.burstT -= dt;
     if (s.flareT > 0) s.flareT -= dt;
@@ -875,6 +877,17 @@
         if (lockOK && s.missT >= $.SKILL.reactT(s) && Math.random() < $.SKILL.fireWill(s) * jamK) {
           if (world.fireMissile) world.fireMissile(a, t);
           s.shootT = M3.rnd(2.6, 5.2) * $.SKILL.shootGap(s);
+        } else if (!lockOK && s.longT <= 0 && $.SKILL.longShot(s) > 0 && a.spAmmo > 1 && okAng && dist > minR && t.kind !== 'target' &&
+                   spW.seeker && spW.seeker !== 'none' && !spW.tags.unguided && !spW.tags.passive && !spW.tags.sarh &&
+                   Ent.jamLockOK(a, t) && dist < Math.max(spW.lockDist || 0, Ent.aiReach(spW, reachAlt)) * $.LONGSHOT.BAND) {
+          /* 低技能的射程外远射：只在这个分支里才抽私有 LCG，不扰动上面 Math.random 的抽签顺序 */
+          s.longT = $.LONGSHOT.ROLL;
+          if ($.rnd01(s) < $.SKILL.longShot(s)) {
+            if (world.fireMissile) world.fireMissile(a, t);
+            s.shootT = M3.rnd(2.6, 5.2) * $.SKILL.shootGap(s);
+            s.longT = $.LONGSHOT.COOL;
+            s.longShots = (s.longShots || 0) + 1;
+          }
         }
       }
     }
