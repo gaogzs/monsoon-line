@@ -160,7 +160,8 @@
   /* 候选策略与权重（距离 d 取三段）；返回策略名 */
   function pickTailPlan(a, s, world, d, k) {
     var c = [], tot = 0, i, vMil = (a.phys && a.phys.vMil) || 400;
-    function add(name, w) { c.push([name, w]); tot += w; }
+    var tw = $.temper(s).tailW || {};
+    function add(name, w) { w *= (tw[name] === undefined ? 1 : tw[name]); c.push([name, w]); tot += w; }
     var near = d < 900, mid = d >= 900 && d < 1800;
     if (near) add('break', 3); else if (mid) add('break', 3); else add('break', 1);
     if (!near || k > 0.2) add('jink', near ? 0.5 : (mid ? 1 : 3));
@@ -185,7 +186,7 @@
     }
     if (!chaser) { s.tailT = Math.max(0, (s.tailT || 0) - dt * 2); if (s.tailT <= 0) { s.tailSide = 0; s.tailPlan = null; } return null; }
     s.tailT = (s.tailT || 0) + dt;
-    if (k <= 0 || s.tailT < $.SKILL.reactT(s)) return null;
+    if (k <= 0 || s.tailT < $.SKILL.reactT(s) * ($.temper(s).react || 1)) return null;
     if (!s.tailPlan || !(s.planT > 0)) {
       s.tailPlan = pickTailPlan(a, s, world, bd, k);
       s.planT = T.PLAN_T0 + T.PLAN_SPAN * $.rnd01(s);
@@ -235,7 +236,7 @@
     var closing = M3.dot(M3.sub(a.vel || M3.mul(a.fwd, a.speed || 0), tv), los);
     var tl = Math.max(0.2, Math.min(1.5, dT / Math.max(200, a.speed || 300)));
     var lead = M3.add(t.pos, M3.mul(tv, tl)), plan = 'lead', slow = 0;
-    if (dT < 500 && closing > 40 && k >= 0.4) {
+    if (dT < ($.temper(s).lagDist || 500) && closing > 40 && k >= 0.4) {
       plan = 'lag'; lead = M3.sub(t.pos, M3.mul(tv, 0.5)); slow = 60;
     } else if (k >= 0.55 && t.right && Math.abs(t.right.y) > 0.45) {
       plan = 'cut';

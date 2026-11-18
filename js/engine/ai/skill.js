@@ -44,10 +44,18 @@
        sniper      skill ≥ 0.5 就玩外围游走、环半径 ×1.2、偏爱远程弹（开火意愿略高）
        loyal       僚机 / 护航：不离开长机 / 被护卫者超过 leash 米 */
   $.TEMPER = {
-    aggressive: { fire: 0.10, extend: 0.7, retreat: 0.7, noStandoff: true },
-    cautious: { fire: -0.05, retreat: 1.3, standoffMin: 0.55 },
-    sniper: { fire: 0.05, ring: 1.2, standoffMin: 0.5 },
-    loyal: { leash: 6000 },
+    /* v3.6.3 新增字段（缺省 = 中性）：
+         tailW   反咬尾各策略的权重乘子（tactics.js pickTailPlan）   react  被咬后的反应延迟系数
+         lagDist 保持咬尾时"太近、改瞄身后"的触发距离（缺省 500 m）
+         longK   射程外远射概率乘子   longCap  远射技能上限增量（缺省 0.65 → +longCap）   overK  超调时长乘子
+         fakeK   假撤退概率乘子 */
+    aggressive: { fire: 0.10, extend: 0.7, retreat: 0.7, noStandoff: true,
+      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3 },
+    cautious: { fire: -0.05, retreat: 1.3, standoffMin: 0.55,
+      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6 },
+    sniper: { fire: 0.05, ring: 1.2, standoffMin: 0.5,
+      tailW: { zoom: 1.8, brake: 1.6, drag: 1.2, scissors: 0.6 }, lagDist: 500, longK: 0.3, overK: 0.5 },
+    loyal: { leash: 6000, tailW: { drag: 1.5 } },
     steady: {}                                  // 显式中性：关卡 / 探针传它即可关掉生成时的随机性格
   };
 
@@ -87,9 +95,9 @@
      概率随技能递减，≥ SKILL 为 0（高技能绝不乱放）。每 ROLL 秒最多掷一次（私有 LCG），放了之后 COOL 秒不再掷；
      只在包线外、锁定带 BAND 倍以内的区间，且至少留一枚（弹药 > 1）。 */
   $.LONGSHOT = { SKILL: 0.65, K: 0.9, ROLL: 1.5, COOL: 6, BAND: 1.4 };
-  $.SKILL.longShot = function (s) { return s.skill < $.LONGSHOT.SKILL ? ($.LONGSHOT.SKILL - s.skill) * $.LONGSHOT.K : 0; };
+  $.SKILL.longShot = function (s) { var t = $.temper(s), cap = $.LONGSHOT.SKILL + (t.longCap || 0); return s.skill < cap ? (cap - s.skill) * $.LONGSHOT.K * (t.longK === undefined ? 1 : t.longK) : 0; };
   /* 超调失误（v3.6.2）：低技能的飞行员进近时收不住转弯，沿原航向多飞一阵再回头（见 tactics.js $.overshoot）。0..1，≥ 0.7 为 0 */
-  $.SKILL.overshoot = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) / 0.35 : 0; };
+  $.SKILL.overshoot = function (s) { return s.skill < 0.7 ? Math.min(1, (0.7 - s.skill) / 0.35 * ($.temper(s).overK || 1)) : 0; };
   /* 咬尾攻防（v3.6.3）：技术值里新增两项能力，0..1，随 skill 单调递增。
        shakeTail  摆脱咬尾：被敌机咬住（攻击者在机尾锥内、近距）持续超过反应延迟后，横向急转 + 俯冲甩开；skill ≤ 0.3 为 0，≥ 0.9 为 1
        holdTail   保持咬尾：自己咬着对手时用提前量追击并按对手速度调油门（不冲过头）；skill ≤ 0.35 为 0，≥ 0.9 为 1 */

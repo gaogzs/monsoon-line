@@ -105,7 +105,7 @@
         s.evalT -= dt;
         if (s.evalT <= 0) {
           if (real && $.rnd01(s) < $.retreatProb(a, s)) { s.retreating = true; s.umbT = 0; Chatter.emit(world, 'rtb', a); }
-          else if (fakeOK(a, s) && $.rnd01(s) < $.FAKE.P * (s.rank === 'ace' ? 1 : 0.7)) startFake(a, s, world);
+          else if (fakeOK(a, s) && $.rnd01(s) < $.FAKE.P * (s.rank === 'ace' ? 1 : 0.7) * ($.temper(s).fakeK === undefined ? 1 : $.temper(s).fakeK)) startFake(a, s, world);
           else s.retreatCd = $.RETREAT.COOLDOWN;
         }
       }
