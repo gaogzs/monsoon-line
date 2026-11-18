@@ -56,7 +56,7 @@
       shootT: 0,
       longT: 0,
       overT: 0,
-      tailT: 0, tailSide: 0, tailFlip: 0,     // 被咬尾计时 / 摆脱转向侧（tactics.js $.shakeTail）
+      tailT: 0, tailSide: 0, tailFlip: 0, tailPlan: null, planT: 0, holdPlan: null,     // 被咬尾计时 / 摆脱转向侧（tactics.js $.shakeTail）
       overCd: 0,
       burstT: 0,
       ewResist: 0,        // 对敌方电子战的适应度（设定 7.3"对手也在学"）
@@ -724,7 +724,7 @@
       var hold = $.holdTail(a, s, desired, dT, res);              // 保持咬尾：提前量 + 按对手速度调油门
       if (hold) { desired = hold.dir; throttle = hold.throttle; ab = hold.ab && !$.illumHolds(s); s.holdingTail = true; } else s.holdingTail = false;
       var shake = $.shakeTail(a, s, world, dt, desired);          // 摆脱咬尾：被咬住超过反应延迟后横向急转
-      if (shake) { desired = shake.dir; throttle = 1; ab = ab || shake.ab; }
+      if (shake) { desired = shake.dir; throttle = shake.throttle; ab = shake.ab || (ab && shake.throttle >= 1); }
     } else {
       // 无目标：护航机绕着被护卫者转，其余巡逻
       var wd = s.ward && s.ward.alive ? $.escortDir(a, s) : null;

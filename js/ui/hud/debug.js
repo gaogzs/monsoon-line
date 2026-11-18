@@ -75,6 +75,8 @@
       if (a.psm) flags.push('PSM');
       if (ai.searching) flags.push('SEARCH');
       if (ai.blackT > 0) flags.push('GLOC');
+      if (ai.tailT > 0 && ai.tailPlan) flags.push('SHAKE:' + ai.tailPlan);
+      if (ai.holdPlan) flags.push('HOLD:' + ai.holdPlan);
       if (a.lockHeldOn) flags.push('LOCK>' + nameOf(a.lockHeldOn));
       if (ai.illum) flags.push('illum' + (ai.illum.abandoned ? '(x)' : ''));
       var l1 = ai.mode + ' > ' + nameOf(ai.target) + (ai.evalT > 0 ? '  eval ' + ai.evalT.toFixed(1) : '');

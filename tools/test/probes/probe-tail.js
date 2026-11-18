@@ -115,4 +115,44 @@ function base(seed) {
   chk('D 冷却期内再被压制：不立刻再次脱离', !again);
 }
 
+/* E 多策略：反咬尾按距离 / 技能选不同招；咬尾按态势选 lead / lag / cut / high */
+{
+  const plansAt = (skill, dist, seeds) => {
+    const seen = {};
+    for (const seed of seeds) {
+      const W = base(seed);
+      const me = W.mk(0, 0, 9000, 0, 1, { skill, rank: skill > 0.8 ? 'elite' : 'pawn' }); me.ai.cmd = 'hold'; me.speed = 330;
+      const friend = W.mk(0, 6000, 9000, 6000, 1, { skill: 0.6 }); friend.ai.cmd = 'hold';
+      const foe = W.mk(1, 0, 9000, -dist, 1, { skill: 0.5 }); foe.ai.cmd = 'hold';
+      for (let f = 0; f < 60 * 20; f++) {
+        W.step(1);
+        foe.ai.target = me; foe.ai.retargetT = 99;
+        foe.pos = W.M3.sub(me.pos, W.M3.mul(me.fwd, dist)); foe.fwd = W.M3.clone(me.fwd); foe.speed = me.speed;       // 钉在机尾 dist 处
+      }
+      for (const k in (me.ai.tailPlans || {})) seen[k] = (seen[k] || 0) + me.ai.tailPlans[k];
+    }
+    return seen;
+  };
+  const seeds = [1, 2, 3, 4, 5, 6];
+  const lo = plansAt(0.45, 1500, seeds), hi = plansAt(0.95, 600, seeds), far = plansAt(0.95, 2400, seeds);
+  const names = o => Object.keys(o).sort().join('/');
+  chk('E 低技能（0.45）只会 break / jink / dive', Object.keys(lo).length > 0 && Object.keys(lo).every(k => ['break', 'jink', 'dive'].includes(k)), names(lo));
+  chk('E 高技能近距：会用 3 种以上策略', Object.keys(hi).length >= 3, names(hi));
+  chk('E 高技能近距：用得上剪刀 / 刹车 / 爬升之一', ['scissors', 'brake', 'zoom'].some(k => hi[k]), names(hi));
+  chk('E 远距（2.4 km）：不会剪刀 / 刹车', !far.scissors && !far.brake && Object.keys(far).length > 0, names(far));
+  const W = base(9), M3 = W.M3;
+  const tgt = W.mk(0, 0, 6000, 1500, 1, { skill: 0.5 }); tgt.speed = 250;
+  const me = W.mk(1, 0, 6000, 0, 1, { skill: 0.95, rank: 'elite' }); me.speed = 320; me.ai.target = tgt;
+  const res = { dir: M3.V(0, 0, 1), throttle: 1, ab: true }, desired = M3.norm(M3.V(0.3, 0, 1));
+  const hLead = W.AI.$.holdTail(me, me.ai, desired, 1500, res);
+  chk('E 咬尾：平飞目标 → lead', me.ai.holdPlan === 'lead', me.ai.holdPlan);
+  tgt.right = M3.norm(M3.V(1, 0.7, 0));                                    // 右翼抬起 = 压左坡度转弯
+  const hc = W.AI.$.holdTail(me, me.ai, desired, 1500, res);
+  chk('E 咬尾：目标压坡度转弯 → cut，且瞄点偏向转弯圈内侧（左）', me.ai.holdPlan === 'cut' && hc.dir.x < hLead.dir.x, me.ai.holdPlan);
+  tgt.right = M3.V(1, 0, 0);
+  tgt.pos.z = 400; me.vel = M3.V(0, 0, 330); tgt.vel = M3.V(0, 0, 250);
+  const hl = W.AI.$.holdTail(me, me.ai, desired, 400, res);
+  chk('E 咬尾：太近且在接近（< 500 m）→ lag，油门比 lead 更收', me.ai.holdPlan === 'lag' && hl.throttle < 0.9, me.ai.holdPlan + ' thr=' + (hl && hl.throttle.toFixed(2)));
+}
+
 process.exit(ok ? 0 : 1);
