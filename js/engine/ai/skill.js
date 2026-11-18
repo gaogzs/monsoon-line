@@ -47,7 +47,36 @@
     aggressive: { fire: 0.10, extend: 0.7, retreat: 0.7, noStandoff: true },
     cautious: { fire: -0.05, retreat: 1.3, standoffMin: 0.55 },
     sniper: { fire: 0.05, ring: 1.2, standoffMin: 0.5 },
-    loyal: { leash: 6000 }
+    loyal: { leash: 6000 },
+    steady: {}                                  // 显式中性：关卡 / 探针传它即可关掉生成时的随机性格
+  };
+
+  /* 生成时的随机性格（保底）：关卡没写 temperament 时由 missions/_lib.js 的 spawnEnemy 调（AI.rollTemperament）。
+     AI.attach 本身不抽，所以直接 attach 的探针行为不变。
+     选择用 a.ai.rs（attach 时确定性播种）的一次哈希，**不推进 rs**，所以不会让该机后续任何私有抽签错位。
+     池：aggressive 0.30 / cautious 0.25 / sniper 0.20（仅机上有远距对空弹）/ loyal 0.25（仅有 leader 或 ward）；
+     无人僚机、航线型、support 不抽。 */
+  $.TEMPER_POOL = { aggressive: 0.30, cautious: 0.25, sniper: 0.20, loyal: 0.25 };
+  function hash01(x) {
+    x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x ^= x >>> 16;
+    return ((x >>> 0) + 0.5) / 4294967296;
+  }
+  $.rollTemperament = function (a, hint) {
+    var s = a && a.ai;
+    if (!s || s.temperament) return s ? s.temperament : null;
+    if (s.role === 'drone' || s.role === 'support' || a.route) return null;
+    hint = hint || {};
+    var w = [], tot = 0, k, v;
+    for (k in $.TEMPER_POOL) {
+      if (!Object.prototype.hasOwnProperty.call($.TEMPER_POOL, k)) continue;
+      if (k === 'loyal' && !(s.leader || s.ward || hint.leader || hint.ward)) continue;
+      if (k === 'sniper' && $.weaponClass(a).cls !== 'longRange') continue;
+      v = $.TEMPER_POOL[k]; w.push([k, v]); tot += v;
+    }
+    var r = hash01(s.rs ^ 0x7f4a7c15) * tot, i;
+    s.temperament = w[w.length - 1][0];
+    for (i = 0; i < w.length; i++) { r -= w[i][1]; if (r <= 0) { s.temperament = w[i][0]; break; } }
+    return s.temperament;
   };
   var NEUTRAL = {};
   $.temper = function (s) { return (s.temperament && $.TEMPER[s.temperament]) || NEUTRAL; };

@@ -102,7 +102,8 @@ function spawnEnemy(w, o) {
   var skill = o.skill !== undefined ? o.skill : (rank ? RANKS[rank].skill : 0.55);
   if (!rank) rank = rankFromSkill(skill);
   var jam = o.jam ? Object.assign({ wid: a.special || 'vsc', skill: 0.5, trigK: 1, dur: 30, fadeTo: 0.6, rekey: 3, msg: null }, o.jam) : null;
-  AI.attach(a, { role: 'enemy', skill: skill, rank: rank, temperament: o.temperament || null, ward: o.ward || null, fm: o.fm || null, jam: jam });
+  AI.attach(a, { role: 'enemy', skill: skill, rank: rank, temperament: o.temperament || (o.behavior === 'recon' ? 'steady' : null), ward: o.ward || null, fm: o.fm || null, jam: jam });
+  if (!a.ai.temperament) AI.rollTemperament(a, { leader: o.leader, ward: o.ward });   // 保底：关卡没指定性格就随机一个（侦察 / 干扰机构型视为 steady）
   a.rank = rank;
   a.ai.cmd = o.behavior || 'pursue';
   // 护航机不算任务目标：任务简报说的是"测绘编队 5 架"，
