@@ -321,6 +321,7 @@ a.firingGun = (dist < gunRange * 0.9 && off < gunCone * 3.2 && a.gunAmmo > 0);
 `update` 里期望方向算完、`clampCeiling` 之后、交给 `AI.steerTo` 之前调一次 `arenaSteer(a, desired, world)`（`engine/ai/brain.js`）。
 只改期望方向的**水平**分量（俯仰照旧），朝战区中心拉：
 
+- **缓冲带（v3.6.3）**：警告区外再宽一圈（`ARENA_BUFFER_K = 2.2` × warn），朝外飞的 NPC 提前被拉回（权重 `ARENA_BUFFER_W = 0.5 × (深入度)²`，朝里飞的不管；真撤离不受影响），警告区内权重不低于 `ARENA_BUFFER_W`（与缓冲带衔接）。原因：NPC 没有特别理由就不该把缠斗中的玩家一路带出界。
 - 权重 `w = min(1, depth × ARENA_PULL_K)`（`ARENA_PULL_K = 1.8`，深度到约 55% 就取满），越界取满。起拉要早：高空低动压时转弯半径大，等权重涨起来再掉头就来不及。
 - 规避中（`mode === 'evade'`）在**警告区内**权重减半 —— 躲导弹优先；越过真边界就不再让步。
 - 无人机（`'drone'`）跟着长机，不单独处理；航线型单位走 `updateRoute`，根本不经过这里（沿航线飞出去的轰炸机不受影响）。
@@ -634,6 +635,8 @@ M3 播撒机 0.25、护航 0.58–0.72、
 - **照射偏置转向**（`brain.js`）：skill ≥ 0.85 的 AI 在半主动照射中，把期望方向水平偏出 0.28 rad（按 `flankSide` 左右），保持目标在锥内的同时拉开。
 - **假撤退回头用 PSM**（`psm.js psmTurnBack`）：ace、对手在机尾（`dot(fwd, 视线) < −0.3`）、PSM 冷却已过、过得了 `psmGate` 时，回头那一刻起一次 counter PSM；**摆脱成功判定**：`break` 型 PSM 在来袭的半主动弹丢照射（`m.sarhLost`）或不再被雷达照射（`a.rwrT = 0`）时提前结束，`s.psmShaken` 计数。
 - **性格 `temperament`**（`skill.js TEMPER`，`spawnEnemy({ temperament })`，缺省 null = 中性，不偏移）：`aggressive`（开火意愿 +0.10、脱离阈值 ×0.7、撤离概率 ×0.7、不玩外围游走）/ `cautious`（skill ≥ 0.55 就玩外围游走、撤离概率 ×1.3、开火 −0.05）/ `sniper`（skill ≥ 0.5 就玩外围游走、环半径 ×1.2、开火 +0.05）/ `loyal`（不离开 `ai.leader` / `ai.ward` 超过 6 km）。**偏差**：设计里"缺省按 skill 与机型随机抽"没做——缺省中性，免得所有关卡的数值整体漂移。**性格台词**（v3.6.2）：`chatter.js emit` 先试 `radio.<事件>.<ally|foe>.<性格>.variants`（`T.has` 守卫），没有就回退通用；`aggressive / cautious / sniper` × `fox / splash / defensive / rtb` 有台词，`loyal` 与其余事件回退；查键不消耗 Chatter 抽签。目前没有关卡设置 temperament，游戏里要等关卡用上才听得到。
+- **咬尾攻防**（v3.6.3，`tactics.js $.shakeTail / $.holdTail`，技能值 `SKILL.shakeTail = clamp((skill−0.3)/0.6)`、`SKILL.holdTail = clamp((skill−0.35)/0.55)`，随 skill 单调增）：**摆脱咬尾**——有敌机以我为目标、落在机尾锥（cos < −0.5）内且 < 2.6 km 持续超过反应延迟后，期望方向向「垂直于攻击者视线的横向 + 略俯冲」混入 `k×0.85`，skill ≥ 0.75 每 2.4 s 换一侧（剪刀），k > 0.5 给加力；转向侧只在开始时抽一次私有 LCG。**保持咬尾**——目标在机头前方锥（cos ≥ 0.8）内、同向、< 2.6 km 时，期望方向向提前量点混入 `k×0.8`，油门按「目标速度 + (距离−700)×0.25」调（不冲过头），`ai.holdingTail` 供调试。两者只在追击分支生效（规避 / PSM / 撤离 / 脱离优先），无人僚机不受影响。
+- **脱离干扰区**（`coord.js`）：只为出干扰区，压制降到阈值一半以下就立刻结束 extend，之后 `JAM.CD = 8 s` 内不再触发，不会一路飞远。
 - **人为失误**（`skill.js SKILL.misjudgeT / lostExtra`，仅 skill < 0.7）：新来的来袭弹登记一次"晚发现"延迟 `(0.7−skill)×2×rnd`；丢目标后重选多等 `(0.7−skill)×3×rnd`。**超调**（v3.6.2，`tactics.js $.overshoot`，仅 skill < 0.7，`SKILL.overshoot = (0.7−skill)/0.35`）：进近（500–1800 m 且在接近）时登记一次，随后 `(0.6 + 1.2·rnd) × overshoot` 秒内期望方向向"继续直飞"混入 60%，转弯收不干净、飞过头再回头；登记后 10 s 内不再登记；目标本来就在机头正前时混入无差别。**射程外远射**（v3.6.2，`SKILL.longShot = (0.65−skill)×0.9`，skill ≥ 0.65 为 0）：包线 / 有效射程外、锁定带 1.4 倍以内、目标是飞机、有弹且弹药 > 1、非半主动 / 无制导时，每 1.5 s 掷一次私有 LCG，中了就放（之后 6 s 不再掷），弹走正常 `fireMissile`——多半飞不到，是气氛与"低技术"，不显著提高难度；现有开火判定的 `Math.random` 抽签顺序不动。
 - **过载与体能**（`brain.js gTrack`，有人机，无人机 `tags.unmanned` 无此限制）：由速度方向的转动速率估算持续 G，> 0.85 × `gLimit`（机型 `ac.gLimit`，缺省 9）累计满 `G_SUSTAIN` 6 s → 视野变窄 `G_BLACKOUT` 1.5 s（机动放缓，不转向）。机型数据里没有 `gLimit` 字段，用缺省 9；玩家自己的灰视 / 红视在 `HudFx`（v3.6.2，纯显示、无惩罚，见 [hud.md](hud.md)）。
 - **态势记忆**（`memory.js`，skill ≥ 0.6）：能感知目标 = 近距目视（< 6 km）、雷达前半球（< 16 km、离机头 ≤ 120°）、己方预警机在线（`aewc`、未被压制）或同队别的 AI 离目标 < 8 km（数据链）；目标 `emcon` 或带 `lockResist` 时雷达 / 数据链距离缩小。感知不到 → `s.searching`：向 `lastKnown`（位置 + 速度外推，随时间衰减）飞，搜索中不开火，`T_SEARCH` 6 s 后放弃目标。低技能保持全知；面目标不适用。

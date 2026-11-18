@@ -61,6 +61,11 @@
   $.SKILL.longShot = function (s) { return s.skill < $.LONGSHOT.SKILL ? ($.LONGSHOT.SKILL - s.skill) * $.LONGSHOT.K : 0; };
   /* 超调失误（v3.6.2）：低技能的飞行员进近时收不住转弯，沿原航向多飞一阵再回头（见 tactics.js $.overshoot）。0..1，≥ 0.7 为 0 */
   $.SKILL.overshoot = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) / 0.35 : 0; };
+  /* 咬尾攻防（v3.6.3）：技术值里新增两项能力，0..1，随 skill 单调递增。
+       shakeTail  摆脱咬尾：被敌机咬住（攻击者在机尾锥内、近距）持续超过反应延迟后，横向急转 + 俯冲甩开；skill ≤ 0.3 为 0，≥ 0.9 为 1
+       holdTail   保持咬尾：自己咬着对手时用提前量追击并按对手速度调油门（不冲过头）；skill ≤ 0.35 为 0，≥ 0.9 为 1 */
+  $.SKILL.shakeTail = function (s) { return Math.max(0, Math.min(1, (s.skill - 0.3) / 0.6)); };
+  $.SKILL.holdTail = function (s) { return Math.max(0, Math.min(1, (s.skill - 0.35) / 0.55)); };
   $.SKILL.misjudgeT = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 2.0 * $.rnd01(s) : 0; };
   $.SKILL.lostExtra = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 3.0 * $.rnd01(s) : 0; };
   $.G_SUSTAIN = 6; $.G_BLACKOUT = 1.5;

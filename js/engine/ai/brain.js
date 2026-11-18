@@ -56,6 +56,7 @@
       shootT: 0,
       longT: 0,
       overT: 0,
+      tailT: 0, tailSide: 0, tailFlip: 0,     // 被咬尾计时 / 摆脱转向侧（tactics.js $.shakeTail）
       overCd: 0,
       burstT: 0,
       ewResist: 0,        // 对敌方电子战的适应度（设定 7.3"对手也在学"）
@@ -240,12 +241,24 @@
      航线型单位走 updateRoute，根本不经过这里（沿航线飞出去的轰炸机不受影响）。 */
   /* 起拉要早：高空低动压时转弯半径大，等权重涨起来再掉头就来不及了 */
   var ARENA_PULL_K = 1.8;
+  var ARENA_BUFFER_K = 2.2;       // 缓冲带宽度 = 警告区宽度 × 它（外沿；内沿 = 警告区外沿）
+  var ARENA_BUFFER_W = 0.5;       // 缓冲带内最大拉回权重（到警告区外沿时）
   function arenaSteer(a, dir, world) {
     var s = a.ai;
     if (!dir || !world.arenaDef || s.role === 'drone') return dir;
     var st = Arena.state(world.arenaDef, a.pos);
-    if (st.zone === 'in') { s.arenaSide = 0; return dir; }
-    var w = st.zone === 'out' ? 1 : Math.min(1, st.depth * ARENA_PULL_K);
+    var w;
+    if (st.zone === 'in') {
+      /* 缓冲带（v3.6.3）：警告区外再宽一圈（BUFFER_K × warn），朝外飞的 NPC 提前被往里拉，权重随深入平方增长。
+         NPC 没有特别理由（真撤离出界）就不该把正在缠斗的玩家一路带出界；朝里飞的不管。 */
+      var edgeD = st.edgeDist, B = world.arenaDef.warn * ARENA_BUFFER_K;
+      if (edgeD >= B || (s.mode === 'retreat' && !s.fake) || s.role === 'support') { s.arenaSide = 0; return dir; }
+      var ccx = world.arenaDef.cx - a.pos.x, ccz = world.arenaDef.cz - a.pos.z, ccl = Math.sqrt(ccx * ccx + ccz * ccz) || 1;
+      var dl = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
+      if (dl < 1e-6 || (dir.x * ccx + dir.z * ccz) / (dl * ccl) >= 0) { s.arenaSide = 0; return dir; }     // 本来就朝里
+      var dpt = 1 - (edgeD - world.arenaDef.warn) / (B - world.arenaDef.warn);
+      w = ARENA_BUFFER_W * dpt * dpt;
+    } else w = st.zone === 'out' ? 1 : Math.max(ARENA_BUFFER_W, Math.min(1, st.depth * ARENA_PULL_K));   // 与缓冲带在警告区外沿衔接（不跳变）
     if (s.mode === 'evade' && st.zone === 'warn') w *= 0.5;     // 越过真边界就不再让步
     var cx = world.arenaDef.cx - a.pos.x, cz = world.arenaDef.cz - a.pos.z;
     var cl = Math.sqrt(cx * cx + cz * cz);
@@ -708,6 +721,10 @@
       if (s.fakeBoostT > 0) ab = true;            // 假撤退回头：短时加力，缩短回转时间窗
       desired = $.yoyo(a, s, desired, dT);
       desired = $.overshoot(a, s, desired, dT);   // 低技能：进近时收不住转弯，飞过头
+      var hold = $.holdTail(a, s, desired, dT, res);              // 保持咬尾：提前量 + 按对手速度调油门
+      if (hold) { desired = hold.dir; throttle = hold.throttle; ab = hold.ab && !$.illumHolds(s); s.holdingTail = true; } else s.holdingTail = false;
+      var shake = $.shakeTail(a, s, world, dt, desired);          // 摆脱咬尾：被咬住超过反应延迟后横向急转
+      if (shake) { desired = shake.dir; throttle = 1; ab = ab || shake.ab; }
     } else {
       // 无目标：护航机绕着被护卫者转，其余巡逻
       var wd = s.ward && s.ward.alive ? $.escortDir(a, s) : null;
