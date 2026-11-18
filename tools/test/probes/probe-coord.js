@@ -138,4 +138,21 @@ function base(seed) {
   chk('F 无人僚机被压制 / 低血量：不进 extend、不飞离', !extended);
 }
 
+/* G 敌机选目标：偏好玩家本人；玩家一方预警机几乎不被选 */
+{
+  const W = base(6);
+  const p = W.p, foe = W.mk(1, p.pos.x, 6000, p.pos.z + 9000, -1);
+  const wing = W.mk(0, p.pos.x + 400, 6000, p.pos.z + 2000, 1, { role: 'drone' });     // 比玩家离敌人更近
+  W.w.player = p; p.pos.y = 6000;
+  const pick = () => W.AI.$.director.pick(foe, W.w, 20000);
+  chk('G 玩家与更近的僚机同在范围内：敌机选玩家', pick() === p);
+  const stack = [1, 2, 3].map(i => W.mk(1, p.pos.x + i * 300, 6000, p.pos.z + 9000, -1)); for (const e of stack) e.ai.target = p;
+  chk('G 已有三架敌机在打玩家：仍选玩家（不吃被盯惩罚）', pick() === p);
+  p.alive = false;
+  const aew = W.mk(0, p.pos.x, 6000, p.pos.z + 3000, 1); aew.aewc = true;
+  chk('G 预警机比僚机近得多：仍选僚机', pick() === wing);
+  wing.alive = false;
+  chk('G 只剩预警机：才会选它', pick() === aew);
+}
+
 process.exit(ok ? 0 : 1);

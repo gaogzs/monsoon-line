@@ -587,7 +587,7 @@ M3 播撒机 0.25、护航 0.58–0.72、
 
 ### Director 与距离层
 
-`director.js`：`$.director.pick(a, world, maxR)` 与 `$.weaponClass(a)`；快照每 0.5 s 刷新（`world.aiDir`）。参数在 `$.DIR`：`PILE 1.0`、`STICKY 0.7`、`R_LONG 7000`、`T_FURBALL 25`、`T_STANDOFF 45`、`RING_K 0.6`。规则与门槛见 [POST2-0IMPL.md 的 5a 实施记录](../POST2-0IMPL.md)。`probe-spacing`：8v8 扎堆指数降 ≥ 50%、交战不坍塌、环半径与分类。
+`director.js`：`$.director.pick(a, world, maxR)` 与 `$.weaponClass(a)`；快照每 0.5 s 刷新（`world.aiDir`）。参数在 `$.DIR`：`PILE 1.0`、`STICKY 0.7`、`R_LONG 7000`、`T_FURBALL 25`、`T_STANDOFF 45`、`RING_K 0.6`。敌机看玩家本人：评分 ×0.55（`PLAYER_BIAS`）且不吃「已被盯」惩罚，所以更倾向打玩家而不是僚机；敌机看**玩家一方预警机**：评分 ×8（`AEW_PENALTY`），身边还有别的目标就几乎不选。无人僚机（`role: 'drone'`）永远不进 `extend`（被压制脱离 / 低血量脱离都不适用），只留在编队槽位。规则与门槛见 [POST2-0IMPL.md 的 5a 实施记录](../POST2-0IMPL.md)。`probe-spacing`：8v8 扎堆指数降 ≥ 50%、交战不坍塌、环半径与分类。
 
 ### `ally`
 

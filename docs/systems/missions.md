@@ -54,7 +54,7 @@
 | `spawnPlatform` | `spawnPlatform(w, o) → t` | **固定式海上平台**（`o.platform` = `PLATFORMS` 的 id：`shoal` / `breakwater` / `sluice` / `reed` / `cairn` / `beacon`）：和 `spawnShip` 同一条路（`Ent.makeTarget` + 炮位 / 发射器），不走航线、不发水花；被击毁后不移除，改画 `<model>_wreck` 并下沉一截（m9 用它） |
 | `spawnCellField` | `spawnCellField(w, {xs, zs}) → [{x,y,z}]` | **调节单元阵列**：`xs × zs` 每个点一个 3×3 编组，推进 `w.targets` 与 `w.cells`，返回各组中心。见下文「调节单元阵列」 |
 | `spawnShip` | `spawnShip(w, o) → t` | **水面舰船**：按 `o.model` 查 `SHIPS` 表取 `hp/radius/value/label`（查不到回退 `SHIPS[0]`），直接调 `Ent.makeTarget` 并推入 `w.targets`；`team` 缺省 1、`fireCd` 缺省 `rnd(3,8)`；`o` 可覆盖 `hp/radius/value/label/team/drift/route/weapon/fireCd` |
-| `spawnAewc` | `spawnAewc(w, o) → a` | **空中预警机**：`spawnEnemy` + `a.aewc = true` + `route: {loiter:true, wp, exit}`。行为在 `js/engine/game/lock.js` 的 `updateAewc()` 里 |
+| `spawnAewc` | `spawnAewc(w, o) → a` | **空中预警机**：`spawnEnemy` + `a.aewc = true` + `route: {loiter:true, wp, exit}`。行为在 `js/engine/game/lock.js` 的 `updateAewc()` 里。己方预警机应摆在战区后沿（m1 / sk1 的 z 贴近边界），`spawnEnemy` 会把出生点落在它 25 km 内的敌方单位推到圈外 |
 | `bombTheBase` | `bombTheBase(bomber, w)` | 轰炸机抵达投弹点的动作：48 个爆炸粒子 + 对 `w.baseTarget` 造成 340 伤害 |
 
 > **水面舰船一律走 `spawnShip`。** `js/data/ships/` 里注册的 `SHIPS` 表（16 艘，见
