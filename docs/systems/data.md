@@ -83,7 +83,7 @@ var CALLSIGN = {
 
 ## AIRCRAFT 表
 
-数组，17 条。6 条可驾驶（`frigatebird sailfish booby petrel skua albatross`），11 条 NPC（带 `npcOnly: true`：`folded_wing schist basalt sandstone boulder tideline spray datum pelican quartz lodestone`）。
+数组，18 条。6 条可驾驶（`frigatebird sailfish booby petrel skua albatross`），12 条 NPC（带 `npcOnly: true`：`folded_wing gravel schist basalt sandstone boulder tideline spray datum pelican quartz lodestone`）。
 
 **`model` 不必等于 `id`**：NPC 机型借用现成几何——`tideline` 用 `sailfish`，`datum` / `pelican` 用 `sower`，`quartz` / `lodestone` 用 `boulder`。
 
@@ -102,7 +102,7 @@ var CALLSIGN = {
 | `ctrlFull` | number | — | `Ent` `ctrlFactor` 回退成 `22000`（只有 `petrel` 写 16500） |
 | `ctrlFloor` | number | — | 回退成 `0.13`（只有 `sailfish` 写 0.34） |
 | `variableSweep` | bool | — | 只有 `frigatebird` 有；`Ent` 据此做变后掠翼插值 |
-| `tags` | string[] | — | 机制标签，注册时展开成 `{名: true}`，实体创建时带到 `a.tags`；目前只有 `folded_wing` 写了 `['unmanned']`（无人僚机，原来的 `isDrone`） |
+| `tags` | string[] | — | 机制标签，注册时展开成 `{名: true}`，实体创建时带到 `a.tags`；`folded_wing`（上游 KA-7）与 `gravel`（下游 ROK-6「砾石」廉价无人机，默认挂一对 BIN-6）写了 `['unmanned']`（无人机，原来的 `isDrone`） |
 | `muzzle` | `[x, y, z]` | — | 炮管口的机体坐标（x 取绝对值，左右各一），写了就按它出膛（`Ent.gunMuzzle`，原来的 `GUN_MUZZLE` 表）；目前只有 `booby` 写了 |
 | `hitR` | number | — | 命中半径（米），缺省 7.5（`Combat.HIT_R_AIR`）；机炮弹丸判定（`scanShot`）、近炸弹 / 引信、爆炸衰减（`Combat.radiusOf`）都读 `a.hitR`。目前只有 `boulder`（ROK-40）写了 11.5：机体 58 × 54 m 再用 7.5 会显得"贴着机翼打不中"，hp 不动，靠更大的靶面自然变脆 |
 | `gunResist` | number | — | 机炮抗性（小口径航炮伤害减免比例，`Ent.gunResistK`）；`boulder` 0.15、`pelican` / `lodestone` / `quartz` 0.05，其余缺省 = 0 |

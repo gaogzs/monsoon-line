@@ -8,7 +8,7 @@
 
 | 文件 | 内容 |
 |---|---|
-| `js/missions/_lib.js` | 共享生成器（全局函数）：`spawnEnemy` / `spawnWingman` / `spawnAewc` / `spawnWinterport` / `spawnTarget` / `spawnCellField` / `spawnShip` / `spawnPlatform` / `bombTheBase` / `jammerRoute`，以及 `batchCallsigns`（sk1 批次呼号）、`SK_FITS`（sk1 机型→弹种）、`M11_FLAG_MARKS`（m11 旗舰受损播报档位）、`CELL_SPACING` |
+| `js/missions/_lib.js` | 共享生成器（全局函数）：`spawnEnemy` / `spawnWingman` / `spawnDrone` / `spawnAewc` / `spawnWinterport` / `spawnTarget` / `spawnCellField` / `spawnShip` / `spawnPlatform` / `bombTheBase` / `jammerRoute`，以及 `batchCallsigns`（sk1 批次呼号）、`SK_FITS`（sk1 机型→弹种）、`M11_FLAG_MARKS`（m11 旗舰受损播报档位）、`CELL_SPACING` |
 | `js/missions/<id>.js` | **每关一个文件**：`Registry.mission({ order, id, no, name, … spawn / tick / win / lose })`。现有 13 个：`m1 m2 m3 m4 m5 m6 m7 m8 m10 m12 sk1 m9 m11`（按这个 `order` 先后） |
 | `js/missions/campaigns.js` | `Registry.campaign({ order, id, …, missions: ['m1', …] })`，战役**按关卡 id 引用** |
 | `js/missions/zz-seal.js` | `Registry.sealMissions()`（生成全局 `MISSIONS` / `CAMPAIGNS`，把战役里的 id 换成 `MISSIONS` 的全局下标）+ `getMission(idx)` |
@@ -50,6 +50,7 @@
 |---|---|---|
 | `spawnEnemy` | `spawnEnemy(w, o) → a` | 造一架敌机并推入 `w.actors`。`o` 字段见下表 |
 | `spawnWingman` | `spawnWingman(w, idx, slotX, slotY, slotZ) → a` | 造僚机（机型写死 `folded_wing`，队形相对长机），登记 `w.wings[idx]` |
+| `spawnDrone` | `spawnDrone(w, leader, o) → a \| null` | 以任意长机（飞机或舰船）为 `ai.leader` 的无人机，team 跟长机，**不**写 `w.wings`；`o.type` 机型（如下游 `gravel`）、`dx/dy/dz` 槽位、`cmd`、`skill`、`loadout`；同队存活 ≥ `MAX_DRONES`（24）返回 null |
 | `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets` |
 | `spawnPlatform` | `spawnPlatform(w, o) → t` | **固定式海上平台**（`o.platform` = `PLATFORMS` 的 id：`shoal` / `breakwater` / `sluice` / `reed` / `cairn` / `beacon`）：和 `spawnShip` 同一条路（`Ent.makeTarget` + 炮位 / 发射器），不走航线、不发水花；被击毁后不移除，改画 `<model>_wreck` 并下沉一截（m9 用它） |
 | `spawnCellField` | `spawnCellField(w, {xs, zs}) → [{x,y,z}]` | **调节单元阵列**：`xs × zs` 每个点一个 3×3 编组，推进 `w.targets` 与 `w.cells`，返回各组中心。见下文「调节单元阵列」 |

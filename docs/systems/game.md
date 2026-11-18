@@ -188,7 +188,7 @@ for 每架 AI：AI.update → Ent.stepAircraft → updateDEW
 watchdog(dt)                                            ← 所有飞机步进之后
 导弹 / 子弹 step → resolveBullets(dt) → updateTargets(dt) → Ent.stepParticles
 最近一架 NPC 的引擎声 / 导弹告警 / 引擎音 / 地形与失速音
-mission.tick(world, dt);  compact()                     ← 三数组去死 + 粒子上限
+mission.tick(world, dt);  compact()                     ← 三数组去死 + 粒子上限 + 延迟压缩 actors（死 / 离场超过 10 s 移除；击落记功 / 友军损失先入账 `world.gone`，见 `compactActors`）
 击杀统计 → 玩家受击台词 → 失败 / 胜负：failing 中则计时、到点 endFail()；否则 时限到 / mission.lose → beginFail()，mission.win → finish(true)（只有胜利 return）
 僚机损失台词（flags.allyDown 一次性触发器）
 updateCamera(dt)                                        ← 相机放在实体全部就位之后

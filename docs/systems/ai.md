@@ -453,7 +453,8 @@ if (pos.y < 500 && fwd.y < 0) steerTo(a, norm(V(fwd.x, 0.4, fwd.z)), a.ctrl, a);
 ## 无人僚机（`role: 'drone'`）
 
 与 `role: 'ally'`（自主友军战斗机）的差别不是参数，而是**有没有判断力**。
-当前所有僚机都由 `spawnWingman()` 生成为 drone。它有三条铁律，
+**长机泛化**（批次 6.1）：无人机跟谁由 `ai.leader` 决定，没写就是玩家（`$.leaderOf(s, world)`）。长机可以是飞机，也可以是舰船（`world.targets` 里的 target）——舰船的 `right` 不维护、`speed` 恒为 0、没有 `.target`，所以编队 / 取目标一律走 `util.js` 的访问器 `$.leadRight`（舰船现算 `fwd × up`）、`$.leadSpeed`（舰船取 `|vel|`）、`$.leadTarget`（缺失当 null，回退到 `nearestEnemy`）。**退化规则不变**：只有无人机自己 `suppressed > 0.35` 才退化为只规避不开火，长机被压制不连带；长机死了走"盘旋"分支。无人机由 `spawnDrone(w, leader, o)`（`js/missions/_lib.js`）生成：team 跟长机、不写 `world.wings` / `wingIdx`（玩家 1/2/3 命令只对 `spawnWingman` 的僚机有效）、同队同时存活上限 `MAX_DRONES = 24`（满了返回 null）。探针 `probe-drones`。
+当前玩家的僚机由 `spawnWingman()` 生成为 drone（敌方 / 友方有人机的无人僚机用 `spawnDrone`）。它有三条铁律，
 外加一套由长机指令（`cmd`）决定的授权规则 —— 见上文"目标选择"：
 
 **1. 目标只能来自长机授权**
