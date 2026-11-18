@@ -2,9 +2,9 @@
    由 tools/build/release.js 从 git 记录写出，每次提交前重新生成。
    标题页右上角显示它的时间与版本号，用来确认当前部署的是哪一版。 */
 var BUILD_STAMP = {
-  version: "v3.6.2",
-  time: '2026-11-17 17:05',
-  iso: '2026-11-17T17:05:40+09:00',
-  hash: 'd3935ea',
-  subject: "docs: 批次 5 收尾补全（射程外远射、超调、性格台词、自由干扰机、扇区环、玻璃裂痕、过载视觉）"
+  version: "v3.6.3",
+  time: '2026-11-18 15:17',
+  iso: '2026-11-18T15:17:59+09:00',
+  hash: 'd1a5df0',
+  subject: "docs: 性格随机保底与各机制接入（ai / missions / tools）"
 };
