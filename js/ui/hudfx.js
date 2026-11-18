@@ -20,8 +20,8 @@
      告警栏的"受损警告"由 alertOn() 提供，退得比裂痕早。
 
    过载视觉（v3.6.2；只是显示，没有任何实际惩罚，不改控制、不碰玩家状态）
-     读 p.gNow（带符号的体感 G）与机型 gLimit（缺省 9）。
-     持续高正 G（> gLimit × 0.8 且持续 gSustain 秒才拉满）：边缘向内收缩的暗灰渐变（灰视 / 黑视，上限很轻）；
+     读 p.gNow（带符号的体感 G）；阈值与 G 力条变色一致（+9 / −2 G 琥珀，+12 / −5 G 红）。
+     持续高正 G（> 9 G 且持续 gSustain 秒才拉满）：边缘向内收缩的暗灰渐变（灰视 / 黑视）；
      负 G（< -2）：沿边缘的淡红渐变（红视）。
      告警栏另有 OVERLOAD / NEG-G：gAlert() 给出 0 / 1（琥珀）/ 2（红色快闪）。
      1 G 附近一笔都不画（golden-render 不变）。
@@ -52,17 +52,17 @@ var HudFx = (function () {
     crackMax: 900,         // 线段总数封顶
     crackAlpha: 0.6,       // 冷白主线的最大不透明度
     crackFogA: 0.05,       // 严重时那层极淡白雾的最大不透明度（不是红色）
-    gLimDefault: 9,        // 机型没写 gLimit 时的过载上限（与 AI 的 gTrack 一致）
-    gGreyFrom: 0.8,        // 持续正 G 超过 gLimit × 这个数开始灰视
-    gGreySpan: 0.25,       // 再多 gLimit × 这个数达到满强度
-    gSustain: 4,           // 持续多久才拉满（s）
-    gGreyMax: 0.35,        // 灰视边缘最大不透明度（轻微）
+    gGreyFrom: 9,          // 持续正 G 超过它开始灰视（= G 力条变琥珀的 +9 G）
+    gGreySpan: 3,          // 再多 G 达到满强度（= G 力条撑满变红的 +12 G）
+    gSustain: 2.5,         // 持续多久才拉满（s）
+    gGreyMax: 0.6,         // 灰视边缘最大不透明度
     gRedFrom: -2,          // 低于它开始红视
     gRedSpan: 3,           // 再低多少达到满强度
     gRedMax: 0.30,         // 红视边缘最大不透明度
-    gWarnFrac: 0.85,       // 告警：gNow ≥ gLimit × 这个数（琥珀）
-    gNegWarn: -2.5,        // 告警：gNow ≤ 这个数（琥珀）
-    gNegCrit: -4,          // 告警：gNow ≤ 这个数（红色）
+    gWarnPos: 9,           // 告警：gNow > 这个数（琥珀）—— 与 G 力条（hud/instruments.js）变色阈值一致
+    gCritPos: 12,          // 告警：gNow ≥ 这个数（红色）
+    gNegWarn: -2,          // 告警：gNow < 这个数（琥珀）
+    gNegCrit: -5,          // 告警：gNow ≤ 这个数（红色）
     alertHold: 1.4,        // "受损警告"在最后一次掉血后保留多久（s）
     jamBlur: 1.2,          // 干扰最强时整层界面的模糊半径（px）
     layerZ: 300            // 叠加层的 z-index：无线电面板之上、暂停菜单之下
@@ -148,14 +148,13 @@ var HudFx = (function () {
   /* ---------- 过载视觉 ---------- */
   function stepG(p, dt) {
     var g = typeof p.gNow === 'number' && isFinite(p.gNow) ? p.gNow : 1;
-    var lim = (p.ac && p.ac.gLimit) || FX.gLimDefault;
-    var hi = lim * FX.gGreyFrom;
+    var hi = FX.gGreyFrom;
     if (g > hi) gT = Math.min(FX.gSustain, gT + dt); else gT = Math.max(0, gT - dt * 2);
-    var posK = M3.clamp((g - hi) / Math.max(0.1, lim * FX.gGreySpan), 0, 1);
+    var posK = M3.clamp((g - hi) / Math.max(0.1, FX.gGreySpan), 0, 1);
     gGrey = p.alive === false ? 0 : posK * M3.clamp(gT / FX.gSustain, 0, 1) * FX.gGreyMax;
     gRed = p.alive === false ? 0 : M3.clamp((FX.gRedFrom - g) / FX.gRedSpan, 0, 1) * FX.gRedMax;
     gNeg = g < 0;
-    gLevel = p.alive === false ? 0 : (g >= lim || g <= FX.gNegCrit) ? 2 : (g >= lim * FX.gWarnFrac || g <= FX.gNegWarn) ? 1 : 0;
+    gLevel = p.alive === false ? 0 : (g >= FX.gCritPos || g <= FX.gNegCrit) ? 2 : (g > FX.gWarnPos || g < FX.gNegWarn) ? 1 : 0;
   }
 
   /* 边缘渐变：中心近乎透明（不挡读数），k 是边缘不透明度；shrink 0..1 让透明区随强度收缩（隧道视野） */
