@@ -126,4 +126,16 @@ function base(seed) {
   chk('E 敌人被压制（suppressed > 0）', sup > 0, 'sup=' + sup.toFixed(2));
 }
 
+/* F 无人僚机不得自己脱离编队（被压制 / 低血量都只留在槽位） */
+{
+  const W = base(5);
+  const forceSup = (u, v) => Object.defineProperty(u, 'suppressed', { get: () => v, set() {}, configurable: true });
+  const d = W.mk(0, 0, 6000, 0, 1, { role: 'drone', formation: { dx: 200, dy: 0, dz: -200 } });
+  forceSup(d, 0.8); d.hp = d.maxHp * 0.1;
+  const jam = W.mk(1, 0, 6000, 5000, -1); jam.ai.cmd = 'hold'; Object.defineProperty(jam, 'ewPower', { get: () => 1, set() {}, configurable: true });
+  let extended = false;
+  for (let f = 0; f < 60 * 40; f++) { W.step(1); d.hp = d.maxHp * 0.1; if (d.ai.mode === 'extend') extended = true; }
+  chk('F 无人僚机被压制 / 低血量：不进 extend、不飞离', !extended);
+}
+
 process.exit(ok ? 0 : 1);

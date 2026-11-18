@@ -418,7 +418,7 @@
     }
 
     /* ---------- 2. 血量过低脱离 ---------- */
-    if (s.mode !== 'evade' && a.hp < a.maxHp * 0.25 * ($.temper(s).extend || 1) && Math.random() < 0.004) {
+    if (s.role !== 'drone' && s.mode !== 'evade' && a.hp < a.maxHp * 0.25 * ($.temper(s).extend || 1) && Math.random() < 0.004) {
       s.mode = 'extend';
       s.modeT = M3.rnd(4, 9);
     }

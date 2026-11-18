@@ -83,7 +83,7 @@
       if (engaged) s.fm = null;
     }
     // 3. 脱离干扰区
-    if (a.suppressed > $.JAM.THRESH && s.jammer && s.jammer.alive) {
+    if (a.suppressed > $.JAM.THRESH && s.jammer && s.jammer.alive && s.role !== 'drone') {   // 无人僚机不得自己脱离编队
       s.jamT = (s.jamT || 0) + dt;
       if (s.jamT > $.JAM.T && s.mode !== 'evade' && s.mode !== 'retreat' && s.mode !== 'psm') {
         s.mode = 'extend'; s.modeT = $.JAM.ESCAPE_S; s.jamAway = s.jammer; s.jamT = 0;
