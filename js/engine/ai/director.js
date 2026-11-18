@@ -13,6 +13,8 @@
      ============================================================ */
   var TICK = 0.5;
   var STEAL_PENALTY = 1.5;      // ally 对"玩家正盯着的敌机"的评分系数
+  var AEW_PENALTY = 8;          // 敌机对玩家一方预警机的评分系数：近乎不选（除非身边真没别的目标）
+  var PLAYER_BIAS = 0.55;       // 敌机对玩家本人的评分系数：更倾向攻击玩家，而不是僚机
   var STEAL_HP_FRAC = 0.35;     // 那架敌机血量低于此比例就不再回避（可以补刀）
   var R_LONG = 7000;            // 有效射程 ≥ 此值的对空弹 = 远距武器
   $.DIR = { STICKY: 0.7, PILE: 1.0 /* 每多一个同队攻击者，评分距离 ×(1 + PILE) */, TICK: TICK, R_LONG: R_LONG, T_FURBALL: 25, T_STANDOFF: 45, RING_K: 0.6 };
@@ -79,7 +81,10 @@
         var d2 = M3.dist2(e.pos, a.pos);
         if (d2 >= R2) continue;
         var sc = Math.sqrt(d2);
-        var n = attackers(d, a, e);
+        var isPlayer = pl && e === pl && a.team !== pl.team;      // 敌机看玩家：不吃"已被盯"惩罚，另有偏好系数
+        var n = isPlayer ? 0 : attackers(d, a, e);
+        if (isPlayer) sc *= PLAYER_BIAS;
+        if (e.aewc && pl && e.team === pl.team) sc *= AEW_PENALTY;
         if (n > 0) sc *= 1 + $.DIR.PILE * n;
         if (d.help.length && a.ai.role !== 'drone' && e.target && d.help.indexOf(e.target) >= 0 && e.target !== a && e.target.team === a.team) sc *= 0.6;   // 正在打求援者的敌机：优先过去
         if (e === a.ai.target) sc *= $.DIR.STICKY;       // 黏性：当前目标打折，免得在相近的候选之间来回切（接近会变慢）

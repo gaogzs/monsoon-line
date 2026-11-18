@@ -3,7 +3,23 @@
 /* ============================================================
    生成器
    ============================================================ */
+/* 己方预警机的安全区：敌方单位不得生成在它 AEW_SAFE_R 以内（硬推到圈外），免得开场就被顺手打掉。
+   只看出生点；之后的行为由 Director 的预警机目标权重压住（ai/director.js）。 */
+var AEW_SAFE_R = 25000;
+function awayFromFriendlyAewc(w, o) {
+  if ((o.team === undefined ? 1 : o.team) !== 1 || !w.actors) return;
+  for (var i = 0; i < w.actors.length; i++) {
+    var e = w.actors[i];
+    if (!e.aewc || !e.alive || e.team !== 0) continue;
+    var dx = o.x - e.pos.x, dz = o.z - e.pos.z, d = Math.sqrt(dx * dx + dz * dz);
+    if (d >= AEW_SAFE_R) continue;
+    if (d < 1) { dx = 0; dz = 1; d = 1; }
+    o.x = e.pos.x + dx / d * AEW_SAFE_R; o.z = e.pos.z + dz / d * AEW_SAFE_R;
+  }
+}
+
 function spawnEnemy(w, o) {
+  awayFromFriendlyAewc(w, o);
   /* 用 o.ac 指定机型（AIRCRAFT 表的 id），性能、外形、名称全部取自
      该条目。早先这里把 RO-27 的数值硬编码在函数里，于是换机型
      只是换个名字，飞起来还是同一架。 */
