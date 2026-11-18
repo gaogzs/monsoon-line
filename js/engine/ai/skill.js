@@ -15,9 +15,9 @@
     // 机炮锥（弧度）；开火门限是它的 3.2 倍
     gunCone: function (s) { return 0.028 + (1 - s.skill) * 0.02; },
     // 导弹射击意愿（每次满足条件时掷骰的概率）
-    fireWill: function (s) { return 0.35 + s.skill * 0.45 + ($.temper(s).fire || 0); },
+    fireWill: function (s) { return 0.35 + s.skill * 0.45 + ($.temper(s).fire || 0) + ($.temper(s).rage || 0) * (1 - (s.hpFrac === undefined ? 1 : s.hpFrac)); },
     // 射击间隔系数（乘在 rnd(2.6, 5.2) 上）
-    shootGap: function (s) { return 1.6 - s.skill * 0.6; },
+    shootGap: function (s) { return (1.6 - s.skill * 0.6) * (1 - ($.temper(s).rage || 0) * (1 - (s.hpFrac === undefined ? 1 : s.hpFrac))); },
     // 高技能要求进 nez（目标掉头逃也能打中），低技能进 rmax
     useNez: function (s) { return s.skill >= 0.6; },
     // 对敌方电子战的适应速度（每秒）
@@ -50,11 +50,13 @@
          longK   射程外远射概率乘子   longCap  远射技能上限增量（缺省 0.65 → +longCap）   overK  超调时长乘子
          fakeK   假撤退概率乘子
          playerK 选目标时对玩家本人的评分乘子（< 1 更专注玩家）  closeK  对近距目标的评分加罚（< 2 km 加 closeK×1500 m（狙击 1.0 = 1.5 km） 的等效距离，到 3 km 渐退为 0）：不爱贴脸缠斗
-         isoK    对"周围 4 km 有其友机"的目标加罚（1 + isoK·min(4, n)）  helpK  对"正在打求援友军的敌机"的评分乘子（缺省 0.6） */
+         isoK    对"周围 4 km 有其友机"的目标加罚（1 + isoK·min(4, n)）  helpK  对"正在打求援友军的敌机"的评分乘子（缺省 0.6）
+         abK     能量加力门限乘子（角点速度 × abK；> 1 更爱开加力，仅 skill ≥ ELITE_SKILL）
+         rage    受伤后的开火意愿 / 射击间隔变化：fireWill += rage×(1−血量比)，shootGap ×= 1 − rage×(1−血量比)（< 0 = 越伤越保守） */
     aggressive: { fire: 0.10, extend: 0.7, retreat: 0.7, noStandoff: true,
-      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3, playerK: 0.8, helpK: 0.5 },
+      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3, playerK: 0.8, helpK: 0.5, abK: 1.15, rage: 0.15 },
     cautious: { fire: -0.05, retreat: 1.3, standoffMin: 0.55,
-      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6, isoK: 0.15, helpK: 0.8 },
+      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6, isoK: 0.15, helpK: 0.8, abK: 0.85, rage: -0.1 },
     sniper: { fire: 0.05, ring: 1.2, standoffMin: 0.5,
       tailW: { zoom: 1.8, brake: 1.6, drag: 1.2, scissors: 0.6 }, lagDist: 500, longK: 0.3, overK: 0.5, closeK: 1.0 },
     loyal: { leash: 6000, tailW: { drag: 1.5 }, helpK: 0.4 },

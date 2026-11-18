@@ -296,6 +296,7 @@
     if (a.route) return updateRoute(a, dt, world);
     var s = a.ai;
 
+    s.hpFrac = a.maxHp > 0 ? Math.max(0, Math.min(1, a.hp / a.maxHp)) : 1;      // 性格 rage 用（skill.js fireWill / shootGap）
     if (s.retargetT > 0) s.retargetT -= dt;
     if (s.modeT > 0) s.modeT -= dt;
     if (s.evadeT > 0) s.evadeT -= dt;

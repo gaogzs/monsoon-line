@@ -32,7 +32,8 @@
     if (s.skill < $.ELITE_SKILL) return res.ab;
     if ($.irThreat(a, world)) return false;
     var corner = $.cornerSpeed(a);
-    return dist > 2600 ? a.speed < corner * 1.15 : a.speed < corner * 0.9;
+    var k = $.temper(s).abK || 1;                  // 性格：激进更爱开加力、谨慎更省
+    return dist > 2600 ? a.speed < corner * 1.15 * k : a.speed < corner * 0.9 * k;
   };
 
   // yo-yo：缠斗中速度太低，压机头换速度

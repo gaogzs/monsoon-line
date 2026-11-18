@@ -7,6 +7,7 @@
       'steady' 可关、AI.attach 直接调不抽
    B. 咬尾 / 远射 / 超调 / 假撤退 × 性格：各量按性格的单调关系；steady 与无性格逐位一致
    C. 选目标 × 性格（director.pick）：激进更专注玩家、狙击不爱贴脸、谨慎不爱打有友机掩护的、求援响应系数
+   D. 能量加力门限 / 受伤后开火意愿 × 性格
    用法：node tools/test/probes/probe-temper.js
    ============================================================ */
 'use strict';
@@ -136,6 +137,21 @@ function world(seed) {
     const h = k => (AIs[k].helpK === undefined ? 0.6 : AIs[k].helpK);
     chk('C 求援响应系数：忠诚 < 激进 < 默认 < 谨慎', h('loyal') < h('aggressive') && h('aggressive') < 0.6 && 0.6 < h('cautious'), [h('loyal'), h('aggressive'), 0.6, h('cautious')].join(' < '));
   }
+}
+
+/* D 能量 / 受伤 × 性格 */
+{
+  const W = world(4), AIs = W.AI.$, M3 = W.M3;
+  const me = t => W.spawn({ skill: 0.9, rank: 'elite', temperament: t, x: 0, y: 6000, z: 0, fwd: M3.V(0, 0, 1), speed: 250 });
+  const ab = (t, speedK) => { const a = me(t); a.speed = AIs.cornerSpeed(a) * speedK; return AIs.abPolicy(a, a.ai, { ab: false }, 4000, W.w); };
+  chk('D 收敛段加力门限：速度 = 角点 × 1.2 时，激进开加力、无性格不开、谨慎不开', ab('aggressive', 1.2) === true && ab('steady', 1.2) === false && ab('cautious', 1.2) === false);
+  chk('D 速度 = 角点 × 1.0：谨慎也不开、无性格开；速度 = 角点 × 0.8：谨慎开', ab('steady', 1.0) === true && ab('cautious', 1.0) === false && ab('cautious', 0.8) === true);
+  const fw = (t, hp) => AIs.SKILL.fireWill({ skill: 0.6, temperament: t, hpFrac: hp }), sg = (t, hp) => AIs.SKILL.shootGap({ skill: 0.6, temperament: t, hpFrac: hp });
+  chk('D 满血时 rage 无影响（激进 / 谨慎只剩 fire 偏移）', Math.abs(fw('aggressive', 1) - fw('steady', 1) - AIs.TEMPER.aggressive.fire) < 1e-9 && sg('aggressive', 1) === sg('steady', 1));
+  chk('D 血量 40%：激进开火意愿更高、射击间隔更短；谨慎相反', fw('aggressive', 0.4) > fw('aggressive', 1) && sg('aggressive', 0.4) < sg('aggressive', 1) && fw('cautious', 0.4) < fw('cautious', 1) && sg('cautious', 0.4) > sg('cautious', 1), fw('aggressive', 0.4).toFixed(3) + ' / ' + fw('cautious', 0.4).toFixed(3));
+  chk('D hpFrac 缺省按 1（旧调用方 / 探针不变）', AIs.SKILL.fireWill({ skill: 0.6 }) === 0.35 + 0.6 * 0.45 && AIs.SKILL.shootGap({ skill: 0.6 }) === 1.6 - 0.6 * 0.6);
+  const a = me('aggressive'); a.hp = a.maxHp * 0.5; W.S.step(1 / 60);
+  chk('D update 维护 s.hpFrac', Math.abs(a.ai.hpFrac - 0.5) < 0.02, String(a.ai.hpFrac));
 }
 
 process.exit(ok ? 0 : 1);
