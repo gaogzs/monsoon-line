@@ -8,6 +8,7 @@
    D. 压制规则：只有无人机自己被压制（> 0.35）才退化为不开火；长机被压制不连带
    E. 不写 world.wings / wingIdx；玩家僚机（leader = 玩家）行为不变
    F. 同队存活无人机上限 24
+   H. 下游无人机 ROK-6「砾石」（gravel）
    G. 延迟压缩 world.actors：死机宽限 10 s 后移除，击落记功 / 友军损失先入账
    用法：node tools/test/probes/probe-drones.js
    ============================================================ */
@@ -121,6 +122,17 @@ function base(seed) {
   chk('G 玩家击落数不因压缩而减少', k1 >= 1 && W.w.killed === k1, k1 + ' -> ' + W.w.killed);
   chk('G 友军损失入账（world.gone.lost）', W.w.gone.lost === 1);
   chk('G 玩家本体不被压缩', W.w.actors.includes(W.p));
+}
+
+/* H 下游无人机 ROK-6「砾石」 */
+{
+  const W = base(7);
+  const L = W.lead(1, 0, 6000, 0);
+  const d = W.spawnDrone(W.w, L, { type: 'gravel' });
+  const ac = W.S.sandbox.AIRCRAFT.find(x => x.id === 'gravel');
+  chk('H 砾石：npcOnly、unmanned、模型存在', ac.npcOnly === true && ac.tags.unmanned === true && !!W.S.sandbox.MODELS.gravel);
+  chk('H 砾石 spawnDrone：team 1、drone、默认挂 BIN-6、挂载无问题', d.team === 1 && d.ai.role === 'drone' && d.mountWids.join() === 'dl6' && W.Ent.mountIssues.length === 0, d.mountWids.join());
+  chk('H 砾石 killCredit 友方击落带 unmanned 标签（战报按无人机记）', d.tags && d.tags.unmanned === true);
 }
 
 console.log(ok ? '\nALL PASS' : '\nSOME FAILED');
