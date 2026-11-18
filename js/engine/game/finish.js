@@ -55,6 +55,7 @@
       var a = $.world.actors[i];
       if (a.team === 0 && !a.isPlayer && !a.alive && !a.escaped) other++;
     }
+    other += $.world.gone.lost;       // 已被压缩移除的友军损失（update.js compactActors）
     var dmgP = Math.round(Math.min(1, dmg) * 2500);
     var txt = prot.length
       ? T('engine.game.finish.friendlyLosses.txt.s1') + lost + T('engine.game.finish.friendlyLosses.txt.s2') + Math.round(dmg / Math.max(1, prot.length - lost || 1) * 100) + '%' + T('engine.game.finish.friendlyLosses.txt.s3') + other

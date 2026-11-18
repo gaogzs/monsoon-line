@@ -217,7 +217,7 @@
     compact();
 
     // 统计：按击杀者分开记功（Ent.kill 写的 killedBy）
-    var k = 0, kw = 0, ks = 0;
+    var k = $.world.gone.kill, kw = $.world.gone.wing, ks = $.world.gone.ship;      // 已被压缩移除的死机先入账（compactActors）
     for (i = 0; i < $.world.actors.length; i++) {
       var deadA = $.world.actors[i];
       if (deadA.team !== 1 || deadA.alive) continue;
@@ -303,5 +303,35 @@
     for (i = 0; i < arr.length; i++) if (arr[i].alive) out.push(arr[i]);
     if (out.length > 900) out.splice(0, out.length - 900);
     $.world.particles = out;
+    compactActors();
+  }
+
+  /* 延迟压缩 world.actors（批次 6.1）：死亡 / 离场超过 ACTOR_GRACE_S 的飞机从数组里移除（玩家不动）。
+     无人机成群时 actors 会越攒越多，而每帧的 nearestEnemy / leadThreat / scanShot 都是 O(actors)。
+     **统计要先入账再移除**：战报的击落记功（update 里按 killCredit 逐帧数）和友军损失（finish.friendlyLosses）
+     原来都是遍历 actors 里的死机现算的，移除后会丢，所以这里先把它们记进 world.gone。
+     宽限 10 s 给残骸 / 无线电（chatter 读 killedBy）/ 击杀提示留足时间。 */
+  var ACTOR_GRACE_S = 10;
+  function compactActors() {
+    var w = $.world, arr = w.actors, out = null, i;
+    for (i = 0; i < arr.length; i++) {
+      var a = arr[i];
+      if (a.alive || a.isPlayer) continue;
+      if (a.goneAt === undefined) a.goneAt = w.time;
+      if (w.time - a.goneAt < ACTOR_GRACE_S) continue;
+      if (!out) out = arr.slice(0, i);
+      var g = w.gone;
+      if (a.team === 1) {
+        var credit = $.killCredit(a);
+        if (credit === 'player') g.kill++; else if (credit === 'wing') g.wing++; else if (credit === 'ship') g.ship++;
+      } else if (a.team === 0 && !a.escaped) g.lost++;
+    }
+    if (!out) return;
+    var keep = [];
+    for (i = 0; i < arr.length; i++) {
+      var b = arr[i];
+      if (b.alive || b.isPlayer || b.goneAt === undefined || w.time - b.goneAt < ACTOR_GRACE_S) keep.push(b);
+    }
+    w.actors = keep;
   }
 })(Game);

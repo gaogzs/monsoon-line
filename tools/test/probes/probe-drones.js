@@ -7,6 +7,8 @@
    C. 长机死亡：无人机盘旋，不去接管战局
    D. 压制规则：只有无人机自己被压制（> 0.35）才退化为不开火；长机被压制不连带
    E. 不写 world.wings / wingIdx；玩家僚机（leader = 玩家）行为不变
+   F. 同队存活无人机上限 24
+   G. 延迟压缩 world.actors：死机宽限 10 s 后移除，击落记功 / 友军损失先入账
    用法：node tools/test/probes/probe-drones.js
    ============================================================ */
 'use strict';
@@ -90,6 +92,35 @@ function base(seed) {
   chk('E 玩家僚机：leader = 玩家、写 wingIdx / world.wings', wg.ai.leader === W.p && wg.wingIdx === 2 && W.w.wings[2] === wg);
   const { AI } = W;
   chk('E leaderOf：有 leader 取 leader，没有回退玩家', AI.$.leaderOf(wg.ai, W.w) === W.p && AI.$.leaderOf({ leader: null }, W.w) === W.p);
+}
+
+/* F 同时存活上限 */
+{
+  const W = base(5);
+  const L = W.lead(1, 0, 6000, 0);
+  let made = 0, nullAt = -1;
+  for (let i = 0; i < 30; i++) { const d = W.spawnDrone(W.w, L, { type: 'folded_wing' }); if (d) made++; else if (nullAt < 0) nullAt = i; }
+  chk('F 同队存活无人机上限 24：第 25 架起返回 null', made === 24 && nullAt === 24, 'made=' + made);
+}
+
+/* G 延迟压缩：死机宽限 10 s 后移除，但击落记功 / 友军损失先入账 */
+{
+  const W = base(6);
+  W.p.pos.x -= 80000;
+  const foe = W.lead(1, 5000, 6000, 5000);
+  const ally = W.lead(0, -5000, 6000, 5000);
+  W.lead(1, 90000, 6000, 90000);                   // 哨兵：留一架活敌机，免得关卡判胜利后停更
+  const n0 = W.w.actors.length;
+  W.Ent.kill(foe, W.w, false, W.p);               // 玩家击落一架敌机
+  W.Ent.kill(ally, W.w, false, foe);              // 敌机击落一架友机
+  W.step(60 * 3);
+  chk('G 宽限内死机仍在 actors 里', W.w.actors.includes(foe) && W.w.actors.includes(ally));
+  const k1 = W.w.killed;
+  W.step(60 * 9);
+  chk('G 宽限（10 s）后死机从 actors 移除', !W.w.actors.includes(foe) && !W.w.actors.includes(ally) && W.w.actors.length === n0 - 2, 'n=' + W.w.actors.length + '/' + n0);
+  chk('G 玩家击落数不因压缩而减少', k1 >= 1 && W.w.killed === k1, k1 + ' -> ' + W.w.killed);
+  chk('G 友军损失入账（world.gone.lost）', W.w.gone.lost === 1);
+  chk('G 玩家本体不被压缩', W.w.actors.includes(W.p));
 }
 
 console.log(ok ? '\nALL PASS' : '\nSOME FAILED');

@@ -211,9 +211,17 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
 /* 无人机（批次 6.1）：以任意长机（飞机或舰船）为 leader 的无人僚机，team 跟长机。
    与 spawnWingman 的区别：不写 world.wings / wingIdx（那是玩家 1/2/3 命令的接口，敌方无人机收不到玩家命令）；
    机型、挂载、位格可选。leader 死后走编队段的"长机已死：盘旋"分支。
+   返回 null = 同队存活无人机已达 MAX_DRONES。
    o：type（机型 id，必填）/ loadout / dx dy dz（相对长机的槽位，缺省取机体系 140, 25, -190）/ skill / cmd / callsign。 */
+var MAX_DRONES = 24;      // 同队同时存活的无人机上限（O(n²) 的感知 / 弹道扫描要有预算）
 function spawnDrone(w, leader, o) {
   o = o || {};
+  var live = 0;
+  for (var di = 0; di < w.actors.length; di++) {
+    var de = w.actors[di];
+    if (de.alive && de.team === leader.team && de.ai && de.ai.role === 'drone') live++;
+  }
+  if (live >= MAX_DRONES) return null;
   var sl = { dx: o.dx !== undefined ? o.dx : 140, dy: o.dy !== undefined ? o.dy : 25, dz: o.dz !== undefined ? o.dz : -190 };
   var fwd = leader.fwd ? M3.clone(leader.fwd) : M3.V(0, 0, 1);
   var right = M3.norm(M3.V(-fwd.z, 0, fwd.x));      // fwd × up

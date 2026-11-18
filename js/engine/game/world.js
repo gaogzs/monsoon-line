@@ -11,6 +11,7 @@
       time: 0,
       actors: [], missiles: [], shotQueue: [], bullets: [], particles: [], targets: [],
       wings: {},
+      gone: { kill: 0, wing: 0, ship: 0, lost: 0 },   // 已从 actors 压缩移除的死机的入账（update.js compactActors）
       player: null,
       flags: {},
       mapOpen: false,              // 战场地图（按住 M）是否显示：input.js 写、HUD 读
