@@ -600,7 +600,7 @@ drawCompass → drawPitchLadder → drawBoresight → drawTapes
 保留它是为了让将来给某件弹填上 `'laser'` 时，HUD 反馈能立刻跟上：
 
 - 投放前：目标框下方写照射进度
-- 投放后：`H * 0.87` 常驻状态条（`◎ 照射保持中` / `✕ 照射中断`）
+- 投放后：`H * 0.82 - U(84)`（`$.statusLineY`，方位尺上方，避开挂载列表）常驻状态条（`◎ 照射保持中` / `✕ 照射中断`）
 
 ---
 

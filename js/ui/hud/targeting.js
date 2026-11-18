@@ -159,7 +159,7 @@
     }
     if (!flying) { drawIllumStatus(ctx, W, H, p, world); return; }
 
-    var y = H * 0.87;
+    var y = $.statusLineY(H);
     if (flying.laserLost) {
       $.text(ctx, T('ui.hud.targeting.drawLaserStatus.s3'), W / 2, y, $.RED, $.FB, 'center');
       $.text(ctx, T('ui.hud.targeting.drawLaserStatus.s4'), W / 2, y + 16,
@@ -168,6 +168,11 @@
       $.text(ctx, T('ui.hud.targeting.drawLaserStatus.s5'), W / 2, y, $.AMBER, $.FB, 'center');
     }
   }
+
+  /* 弹道引导状态行（激光 / 半主动照射）的 y：放在武器面板与方位尺的**上方**。
+     以前是 H*0.87，正好压在挂载列表上（列表从 H−74 往上长、行数越多越高）。方位尺在 H*0.82，
+     它的目标标记 + LOCK 框向上伸出约 60 px，所以再往上留够，两行（第二行 +16）互不相压。 */
+  $.statusLineY = function (H) { return H * 0.82 - $.U(84); };
 
   /* 自己的半主动弹（标签 sarh）在飞：屏幕下缘一条状态 —— 照射保持 / ✕ 照射中断（x.x s 内重锁可恢复） */
   function ownSarhMissile(p, world) {
@@ -195,7 +200,7 @@
   function drawIllumStatus(ctx, W, H, p, world) {
     var m = ownSarhMissile(p, world);
     if (!m) return;
-    var y = H * 0.87;
+    var y = $.statusLineY(H);
     if (m.sarhLost) {
       var left = Math.max(0, Ent.SARH_GRACE - (m.illumT || 0));
       $.text(ctx, T('ui.hud.targeting.drawIllumStatus.lost', { s: left.toFixed(1) }), W / 2, y, $.RED, $.FB, 'center');
