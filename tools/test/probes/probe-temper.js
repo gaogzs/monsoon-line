@@ -6,6 +6,7 @@
       loyal 只给有 leader / ward 的、sniper 只给带远距对空弹的、drone / support / 侦察构型不抽、
       'steady' 可关、AI.attach 直接调不抽
    B. 咬尾 / 远射 / 超调 / 假撤退 × 性格：各量按性格的单调关系；steady 与无性格逐位一致
+   C. 选目标 × 性格（director.pick）：激进更专注玩家、狙击不爱贴脸、谨慎不爱打有友机掩护的、求援响应系数
    用法：node tools/test/probes/probe-temper.js
    ============================================================ */
 'use strict';
@@ -102,6 +103,39 @@ function world(seed) {
     return me.ai.holdPlan;
   };
   chk('B 保持咬尾：450 m 时谨慎（lag 650）收手、激进（350）继续贴', hold('cautious') === 'lag' && hold('aggressive') === 'lead', hold('cautious') + ' / ' + hold('aggressive'));
+}
+
+/* C 选目标 × 性格 */
+{
+  const mkW = (seed, temper) => {
+    const B = world(seed), M3 = B.M3;
+    B.p.pos.x = 100000; B.p.pos.z = 100000; B.p.alive = false;                      // 玩家远离、不参与
+    const me = B.spawn({ team: 1, temperament: temper, skill: 0.6, x: 0, y: 6000, z: 0, fwd: M3.V(0, 0, 1), speed: 250 }); me.ai.cmd = 'hold';
+    const at = (x, z, o) => { const u = B.spawn(Object.assign({ team: 0, temperament: 'steady', skill: 0.6, x, y: 6000, z, fwd: M3.V(0, 0, 1), speed: 250 }, o || {})); u.ai.cmd = 'hold'; return u; };
+    return { B, me, at, M3, pick: () => B.AI.$.director.pick(me, B.w, 20000) };
+  };
+  {
+    const run = temper => {
+      const W = mkW(1, temper);
+      W.B.p.alive = true; W.B.p.pos.x = 0; W.B.p.pos.z = 9000; W.B.p.pos.y = 6000; W.B.w.player = W.B.p;
+      const wing = W.at(0, 4500);
+      return W.pick() === W.B.p ? 'player' : (W.pick() === wing ? 'wing' : '?');
+    };
+    chk('C 玩家 9 km、僚机 4.5 km：无性格选僚机，激进选玩家', run('steady') === 'wing' && run('aggressive') === 'player', run('steady') + ' / ' + run('aggressive'));
+  }
+  {
+    const run = temper => { const W = mkW(2, temper); const near = W.at(0, 2000), far = W.at(0, 2500); return W.pick() === near ? 'near' : 'far'; };
+    chk('C 近 2.0 km / 远 2.5 km：无性格选近的，狙击选远的（不爱贴脸）', run('steady') === 'near' && run('sniper') === 'far', run('steady') + ' / ' + run('sniper'));
+  }
+  {
+    const run = temper => { const W = mkW(3, temper); const guarded = W.at(0, 5000), escort = W.at(900, 5200), loner = W.at(5200, 0); return W.pick() === guarded ? 'guarded' : (W.pick() === loner ? 'loner' : '?'); };
+    chk('C 5.0 km 有友机掩护 / 5.2 km 落单：无性格选近的有掩护的，谨慎选落单的', run('steady') === 'guarded' && run('cautious') === 'loner', run('steady') + ' / ' + run('cautious'));
+  }
+  {
+    const AIs = world(1).AI.$.TEMPER;
+    const h = k => (AIs[k].helpK === undefined ? 0.6 : AIs[k].helpK);
+    chk('C 求援响应系数：忠诚 < 激进 < 默认 < 谨慎', h('loyal') < h('aggressive') && h('aggressive') < 0.6 && 0.6 < h('cautious'), [h('loyal'), h('aggressive'), 0.6, h('cautious')].join(' < '));
+  }
 }
 
 process.exit(ok ? 0 : 1);

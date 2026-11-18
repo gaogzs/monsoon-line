@@ -74,7 +74,7 @@
       var d = snapshot(world);
       var best = null, bs = Infinity, R2 = maxR * maxR;
       var sec = a.ai.role === 'ally' ? sectorOf(d, a) : null;
-      var pl = world.player;
+      var pl = world.player, tp = $.temper(a.ai);
       for (var i = 0; i < world.actors.length; i++) {
         var e = world.actors[i];
         if (!e.alive || !Ent.hostile(e, a)) continue;
@@ -83,10 +83,19 @@
         var sc = Math.sqrt(d2);
         var isPlayer = pl && e === pl && a.team !== pl.team;      // 敌机看玩家：不吃"已被盯"惩罚，另有偏好系数
         var n = isPlayer ? 0 : attackers(d, a, e);
-        if (isPlayer) sc *= PLAYER_BIAS;
+        if (isPlayer) sc *= PLAYER_BIAS * (tp.playerK || 1);
+        if (tp.closeK && d2 < 3000 * 3000) sc += tp.closeK * 1500 * Math.min(1, (3000 - Math.sqrt(d2)) / 1000);   // 狙击：不爱贴脸——< 2 km 的目标评分 +closeK×1500 m 等效，到 3 km 渐退为 0
+        if (tp.isoK) {                                                                // 谨慎：不爱打有友机掩护的目标
+          var cover = 0;
+          for (var j = 0; j < world.actors.length && cover < 4; j++) {
+            var f = world.actors[j];
+            if (f !== e && f.alive && f.team === e.team && f.ai && !f.route && M3.dist2(f.pos, e.pos) < 4000 * 4000) cover++;
+          }
+          sc *= 1 + tp.isoK * cover;
+        }
         if (e.aewc && pl && e.team === pl.team) sc *= AEW_PENALTY;
         if (n > 0) sc *= 1 + $.DIR.PILE * n;
-        if (d.help.length && a.ai.role !== 'drone' && e.target && d.help.indexOf(e.target) >= 0 && e.target !== a && e.target.team === a.team) sc *= 0.6;   // 正在打求援者的敌机：优先过去
+        if (d.help.length && a.ai.role !== 'drone' && e.target && d.help.indexOf(e.target) >= 0 && e.target !== a && e.target.team === a.team) sc *= (tp.helpK || 0.6);   // 正在打求援者的敌机：优先过去
         if (e === a.ai.target) sc *= $.DIR.STICKY;       // 黏性：当前目标打折，免得在相近的候选之间来回切（接近会变慢）
         if (sec) {
           // 敌机方位（相对 ally 队质心）与本机扇区中心比较

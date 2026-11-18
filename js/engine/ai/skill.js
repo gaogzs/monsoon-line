@@ -48,14 +48,16 @@
          tailW   反咬尾各策略的权重乘子（tactics.js pickTailPlan）   react  被咬后的反应延迟系数
          lagDist 保持咬尾时"太近、改瞄身后"的触发距离（缺省 500 m）
          longK   射程外远射概率乘子   longCap  远射技能上限增量（缺省 0.65 → +longCap）   overK  超调时长乘子
-         fakeK   假撤退概率乘子 */
+         fakeK   假撤退概率乘子
+         playerK 选目标时对玩家本人的评分乘子（< 1 更专注玩家）  closeK  对近距目标的评分加罚（< 2 km 加 closeK×1500 m（狙击 1.0 = 1.5 km） 的等效距离，到 3 km 渐退为 0）：不爱贴脸缠斗
+         isoK    对"周围 4 km 有其友机"的目标加罚（1 + isoK·min(4, n)）  helpK  对"正在打求援友军的敌机"的评分乘子（缺省 0.6） */
     aggressive: { fire: 0.10, extend: 0.7, retreat: 0.7, noStandoff: true,
-      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3 },
+      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3, playerK: 0.8, helpK: 0.5 },
     cautious: { fire: -0.05, retreat: 1.3, standoffMin: 0.55,
-      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6 },
+      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6, isoK: 0.15, helpK: 0.8 },
     sniper: { fire: 0.05, ring: 1.2, standoffMin: 0.5,
-      tailW: { zoom: 1.8, brake: 1.6, drag: 1.2, scissors: 0.6 }, lagDist: 500, longK: 0.3, overK: 0.5 },
-    loyal: { leash: 6000, tailW: { drag: 1.5 } },
+      tailW: { zoom: 1.8, brake: 1.6, drag: 1.2, scissors: 0.6 }, lagDist: 500, longK: 0.3, overK: 0.5, closeK: 1.0 },
+    loyal: { leash: 6000, tailW: { drag: 1.5 }, helpK: 0.4 },
     steady: {}                                  // 显式中性：关卡 / 探针传它即可关掉生成时的随机性格
   };
 
