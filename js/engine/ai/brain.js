@@ -64,8 +64,8 @@
       retargetT: M3.rnd(0, 1.2),
       formation: opt.formation || null,   // {lead, dx, dy, dz}
       /* 长机（僚机—长机关系，docs/POST2-0IMPL.md 批次 4.2）：有长机的飞机是僚机。
-         目前只用来决定"谁跟着谁整备"（Resupply.leaderOf / wingmenOf）；僚机的跟随行为仍读 world.player，
-         批次 5 做"长机泛化"时再改成读这里。没写 leader 的 role drone 默认跟玩家。 */
+         决定"谁跟着谁整备"（Resupply.leaderOf / wingmenOf），也是无人机跟随 / 掩护 / 取目标的长机（$.leaderOf，
+         批次 6.1 长机泛化）；长机可以是飞机或舰船。没写 leader 的 role drone 默认跟玩家。 */
       leader: opt.leader || null,
       wander: M3.rnd(0, 6.28),
       /* 默认指令是 focus（只打长机授权的目标），不是 spread。
@@ -464,8 +464,8 @@
          设定集与资料库都写了 —— 强对抗环境下数据链会被切断，
          此时无人机只能规避和自卫，不能主动攻击。
          压制来自干扰机辐射场打在它身上的 suppressed（见 entities.js）。 */
-      var dLead = world.player;
-      var leadOk = dLead && dLead.alive && dLead.target && dLead.target.alive;
+      var dLead = $.leaderOf(s, world);
+      var leadOk = dLead && dLead.alive && $.leadTarget(dLead);
       /* 只看僚机自己是否被压制。长机电磁静默或被压制只是下不了令，
          已有的授权照旧，僚机仍会按当前指令攻击。 */
       if (a.suppressed > 0.35) {
@@ -475,10 +475,10 @@
       } else if (s.cmd === 'cover') {
         s.target = $.leadThreat(a, world) ||
           (dLead && dLead.alive ? $.nearestEnemyTo(dLead.pos, a, world, $.WING_FREE_R) : null) ||
-          (leadOk ? dLead.target : null);
+          (leadOk ? $.leadTarget(dLead) : null);
       } else {
         // 长机阵亡时不自主接战（设定：无人机没有接管战局的能力，只会盘旋）
-        s.target = leadOk ? dLead.target : (dLead && dLead.alive ? $.nearestEnemy(a, world, $.WING_FREE_R) : null);
+        s.target = leadOk ? $.leadTarget(dLead) : (dLead && dLead.alive ? $.nearestEnemy(a, world, $.WING_FREE_R) : null);
       }
     } else if ((s.retargetT <= 0 || !s.target || !s.target.alive) && !lostWait(s, dt) && !$.illumHolds(s)) {
       s.lostT = null;
@@ -520,8 +520,8 @@
        每架僚机对每枚来袭弹只掷一次骰（概率 0.6）；中了就固定连放 3 轮，不管骗没骗中。
        替长机挡的是**锁定长机的弹**，不是自己的。 */
     if (s.role === 'drone' && s.cmd === 'cover' && !s.flareBurst && a.flares > 0 &&
-        a.flareCd <= 0 && world.player && world.player.alive) {
-      var lead = world.player, rk = a.name || 'drone';
+        a.flareCd <= 0 && $.leaderOf(s, world) && $.leaderOf(s, world).alive) {
+      var lead = $.leaderOf(s, world), rk = a.name || 'drone';
       for (var mi = 0; mi < world.missiles.length; mi++) {
         var lm = world.missiles[mi];
         if (!lm.alive || lm.target !== lead || lm.team === a.team) continue;
@@ -623,7 +623,7 @@
          它的价值在于替长机挡导弹、探路、把导弹挂架打空 ——
          一旦追出去，这三件事就都做不成了。
          所以它的机动**只跟编队位置有关**，目标只用于决定何时开火。 */
-      var dLead2 = world.player;
+      var dLead2 = $.leaderOf(s, world);
       if (dLead2 && dLead2.alive) {
         var sl = s.formation || { dx: 140, dy: 25, dz: -190 };
         /* 指令同时改变站位 —— 这是 codex 里"分开"与"靠拢"的落点：
@@ -636,7 +636,7 @@
            （替长机挡弹、探路、把挂架打空）全建立在"不脱离"上。 */
         var ek = s.cmd === 'cover' ? 0.55 : (s.cmd === 'spread' ? 1.6 : 1);
         var wpD = M3.add(dLead2.pos,
-          M3.add(M3.mul(dLead2.right, sl.dx * ek),
+          M3.add(M3.mul($.leadRight(dLead2), sl.dx * ek),
             M3.add(M3.mul(dLead2.fwd, sl.dz * ek), M3.V(0, sl.dy, 0))));
         desired = M3.norm(M3.sub(wpD, a.pos));
         /* 油门：按长机当前速度 + 前后偏差连续调（速度匹配），而不是"700 m 外开加力、以内固定 0.75"。
@@ -647,7 +647,7 @@
            只看沿航向的分量的话，偏在侧面 / 高度上时目标速度就等于长机速度，永远收不回来 */
         var gap = M3.dist(wpD, a.pos);
         var err = ahead > -100 ? gap : -gap;
-        var vWant = (dLead2.speed || 0) + M3.clamp(err * 0.25, -120, 260);
+        var vWant = $.leadSpeed(dLead2) + M3.clamp(err * 0.25, -120, 260);
         var vMil = (a.phys && a.phys.vMil) * loadoutPenalty(Ent.curLoadFactor(a)).vMil || 400;
         ab = vWant > vMil * 0.98;
         throttle = M3.clamp(vWant / vMil, 0.25, 1);

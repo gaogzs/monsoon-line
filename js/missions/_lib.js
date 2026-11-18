@@ -208,6 +208,35 @@ function spawnWingman(w, idx, slotX, slotY, slotZ) {
   return a;
 }
 
+/* 无人机（批次 6.1）：以任意长机（飞机或舰船）为 leader 的无人僚机，team 跟长机。
+   与 spawnWingman 的区别：不写 world.wings / wingIdx（那是玩家 1/2/3 命令的接口，敌方无人机收不到玩家命令）；
+   机型、挂载、位格可选。leader 死后走编队段的"长机已死：盘旋"分支。
+   o：type（机型 id，必填）/ loadout / dx dy dz（相对长机的槽位，缺省取机体系 140, 25, -190）/ skill / cmd / callsign。 */
+function spawnDrone(w, leader, o) {
+  o = o || {};
+  var sl = { dx: o.dx !== undefined ? o.dx : 140, dy: o.dy !== undefined ? o.dy : 25, dz: o.dz !== undefined ? o.dz : -190 };
+  var fwd = leader.fwd ? M3.clone(leader.fwd) : M3.V(0, 0, 1);
+  var right = M3.norm(M3.V(-fwd.z, 0, fwd.x));      // fwd × up
+  var a = Ent.makeAircraft({
+    type: o.type,
+    team: leader.team,
+    x: leader.pos.x + right.x * sl.dx + fwd.x * sl.dz,
+    y: leader.pos.y + sl.dy,
+    z: leader.pos.z + right.z * sl.dx + fwd.z * sl.dz,
+    fwd: fwd,
+    speed: leader.speed || (leader.vel ? M3.len(leader.vel) : 0) || 250,
+    loadout: o.loadout || null
+  });
+  if (o.callsign) { a.name = o.callsign; a.label = o.callsign; }
+  AI.attach(a, {
+    role: 'drone', skill: o.skill !== undefined ? o.skill : 0.62,
+    leader: leader, cmd: o.cmd || 'focus',
+    formation: { dx: sl.dx, dy: sl.dy, dz: sl.dz }
+  });
+  w.actors.push(a);
+  return a;
+}
+
 /* 空中预警机。
 
    它不是战斗机 —— 用 route 型航线，完全绕开空战 AI（见 ai.js 的

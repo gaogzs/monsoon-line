@@ -101,6 +101,16 @@
     return M3.norm(M3.V(dir.x, d > 6000 ? -0.06 : -0.02, dir.z));
   }
 
+  /* 长机泛化（批次 6.1）：无人机跟谁 = ai.leader，没写就是玩家。长机可以是飞机，也可以是舰船（target）——
+     舰船的 right 恒为 (1,0,0) 且不更新、speed 恒为 0、没有 .target，所以编队 / 目标逻辑一律走下面三个访问器，不直接读这些字段。 */
+  $.leaderOf = function (s, world) { return (s && s.leader) || world.player; };
+  $.leadRight = function (lead) {
+    if (lead.kind !== 'target') return lead.right;
+    return M3.norm(M3.V(-lead.fwd.z, 0, lead.fwd.x));            // 与飞机 right 同向：fwd × up 的水平投影
+  };
+  $.leadSpeed = function (lead) { return lead.kind === 'target' ? M3.len(lead.vel || M3.V(0, 0, 0)) : (lead.speed || 0); };
+  $.leadTarget = function (lead) { return (lead.target && lead.target.alive) ? lead.target : null; };
+
   /* 正在锁定长机的敌机 —— "掩护"这条指令的核心。
      drone 的 cover 分支用它。
      它以前写在 wingman 的 cover 分支里（那条分支因为僚机都是 drone 而从来没跑到过，
@@ -110,7 +120,7 @@
      （update() 末尾那一行）—— 在补上那行之前，这里永远找不到人，
      掩护会静默退化成"随便打一个最近的"。 */
   function leadThreat(a, world) {
-    var lead = world.player;
+    var lead = $.leaderOf(a.ai, world);
     if (!lead || !lead.alive) return null;
     for (var i = 0; i < world.actors.length; i++) {
       var e = world.actors[i];
