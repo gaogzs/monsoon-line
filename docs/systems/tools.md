@@ -54,6 +54,7 @@ tools/
 | 战场环境事件与 `?debug=ai` 叠加层（含扇区环） | `probe-ambient.js` |
 | 受损玻璃裂痕（随机 / 严重度 / 再次受伤生长 / 消退 / 封顶） | `probe-hudfx.js` |
 | 咬尾攻防（摆脱 / 保持）、边界缓冲、脱离干扰区提前结束 | `probe-tail.js` |
+| 性格：随机保底、各机制 × 性格（咬尾 / 远射 / 超调 / 假撤退 / 选目标 / 加力 / 受伤） | `probe-temper.js`（约 40 s） |
 | AI 过失速机动（ace 触发 / 非 ace 与 noPSM / 无人机不触发 / TTI 门限 / 冷却） | `probe-psm-ai.js`（玩家侧的 PSM 在 `probe-psm.js`） |
 | FovWatch（保守调度与暴力检查逐事件一致、迟滞） | `probe-fovwatch.js` |
 | `render-gl.js` / `render.js` / `shading.js` | `probe-render.js`（要 Chrome） |
