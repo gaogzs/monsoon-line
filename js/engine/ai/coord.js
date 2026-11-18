@@ -16,7 +16,7 @@
      ============================================================ */
   $.ESCORT = { R: 4000, LEASH: 8000, THREAT_R: 8000 };
   $.FORM = { R_ENGAGE: 12000, DX: 260, DZ: 200 };
-  $.JAM = { T: 2.0, THRESH: 0.45, ESCAPE_S: 5 };
+  $.JAM = { T: 2.0, THRESH: 0.45, ESCAPE_S: 5, CD: 8 };
   $.HELP = { T: 8, CALL_CD: 20, HP: 0.4, REAR_R: 3000 };
 
   // 队形槽位偏移（右 dx、前 dz，负 = 身后）；idx 从 1 起
@@ -83,12 +83,15 @@
       if (engaged) s.fm = null;
     }
     // 3. 脱离干扰区
+    if (s.jamCd > 0) s.jamCd -= dt;
     if (a.suppressed > $.JAM.THRESH && s.jammer && s.jammer.alive && s.role !== 'drone') {   // 无人僚机不得自己脱离编队
       s.jamT = (s.jamT || 0) + dt;
-      if (s.jamT > $.JAM.T && s.mode !== 'evade' && s.mode !== 'retreat' && s.mode !== 'psm') {
+      if (s.jamT > $.JAM.T && !(s.jamCd > 0) && s.mode !== 'evade' && s.mode !== 'retreat' && s.mode !== 'psm') {
         s.mode = 'extend'; s.modeT = $.JAM.ESCAPE_S; s.jamAway = s.jammer; s.jamT = 0;
       }
     } else { s.jamT = 0; if (s.mode !== 'extend') s.jamAway = null; }
+    /* 脱离只为出干扰区：压制一松（< THRESH 一半）就结束，不必飞满时间；结束后 JAM.CD 秒内不再触发，免得反复一路飞远 */
+    if (s.mode === 'extend' && s.jamAway && s.modeT > 0 && a.suppressed < $.JAM.THRESH * 0.5) { s.modeT = 0; s.jamCd = $.JAM.CD; }
     // 4. 友军呼救（只有我方 AI）
     if (a.team === 0 && !a.isPlayer && s.role !== 'drone') {
       var bitten = false;
