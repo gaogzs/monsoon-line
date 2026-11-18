@@ -10,7 +10,7 @@
        收敛（> 2600 m）：速度低于角点 × 1.15 才开加力（够快就省着，进狗斗时能量更足）
        狗斗（≤ 2600 m）：速度低于角点 × 0.9 才开加力（保住转弯能量）
        红外威胁（有红外弹以我为目标，< 6000 m）：不开加力（irSignature 的 ab 项 ×3）
-     yo-yo：近距缠斗、速度掉到角点 × 0.8 以下时，压机头俯冲换速度。
+     yo-yo：近距缠斗、速度掉到角点 × 0.8 以下时，压机头俯冲换速度；速度 > 角点 × 1.25 且转不进去时上升 yo-yo（抬高期望方向爬升掉速，防飞过头）。
      ============================================================ */
   $.ELITE_SKILL = 0.72;
 
@@ -38,7 +38,14 @@
 
   // yo-yo：缠斗中速度太低，压机头换速度
   $.yoyo = function (a, s, dir, dist) {
-    if (s.skill < $.ELITE_SKILL || dist > 1800 || a.speed >= $.cornerSpeed(a) * 0.8) return dir;
-    return M3.norm(M3.V(dir.x, Math.min(dir.y, -0.2), dir.z));
+    if (s.skill < $.ELITE_SKILL || dist > 1800) return dir;
+    var corner = $.cornerSpeed(a);
+    if (a.speed < corner * 0.8) return M3.norm(M3.V(dir.x, Math.min(dir.y, -0.2), dir.z));       // 低速：压机头换速度
+    /* 上升 yo-yo：太快且这一圈转不进去（目标在机头 > 32° 之外）→ 把期望方向抬高，用爬升吃掉多余速度，
+       避免飞过头；爬升掉速到 1.25 倍角点以下自然结束。过低（< 1200 m）不抬，免得和近地保护打架。 */
+    if (a.speed > corner * 1.25 && dist > 300 && a.pos.y > 1200 && M3.dot(a.fwd, dir) < 0.85) {
+      return M3.norm(M3.V(dir.x, Math.max(dir.y, 0.5), dir.z));
+    }
+    return dir;
   };
 })(AI);

@@ -60,6 +60,17 @@ const msl = (wid, z, owner) => ({ pos: M3.V(0, 4000, z), w: WEAPONS[wid], owner:
   const eY = mkAc(0.85); eY.speed = $.cornerSpeed(eY) * 0.6;
   const dY = $.yoyo(eY, eY.ai, M3.norm(M3.V(0, 0.3, 1)), 1200);
   chk('B yo-yo：缠斗中速度太低，压机头', dY.y < -0.1, 'y=' + dY.y.toFixed(2));
+  // 上升 yo-yo：太快且转不进去 → 抬高期望方向；够慢 / 对得准 / 太低 / 低技能则不抬
+  const eU = mkAc(0.85); eU.speed = $.cornerSpeed(eU) * 1.4; eU.pos.y = 3000;
+  const sideDir = M3.norm(M3.V(1, 0, 0.3));
+  chk('B 上升 yo-yo：太快且转不进去，抬高方向', $.yoyo(eU, eU.ai, sideDir, 900).y > 0.4);
+  chk('B 上升 yo-yo：目标在机头附近不抬', $.yoyo(eU, eU.ai, eU.fwd, 900).y < 0.2);
+  eU.speed = $.cornerSpeed(eU) * 1.1;
+  chk('B 上升 yo-yo：速度不高不抬', $.yoyo(eU, eU.ai, sideDir, 900).y < 0.2);
+  eU.speed = $.cornerSpeed(eU) * 1.4; eU.pos.y = 600;
+  chk('B 上升 yo-yo：太低不抬', $.yoyo(eU, eU.ai, sideDir, 900).y < 0.2);
+  const lo = mkAc(0.4); lo.speed = $.cornerSpeed(lo) * 1.4; lo.pos.y = 3000;
+  chk('B 上升 yo-yo：低技能不抬', $.yoyo(lo, lo.ai, sideDir, 900).y < 0.2);
 }
 
 /* ---------- C ---------- */
