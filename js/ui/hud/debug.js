@@ -76,6 +76,7 @@
       if (ai.searching) flags.push('SEARCH');
       if (ai.blackT > 0) flags.push('GLOC');
       if (ai.tailT > 0 && ai.tailPlan) flags.push('SHAKE:' + ai.tailPlan);
+      if (ai.mode === 'evade' && ai.evadePlanShown) flags.push('EVADE:' + ai.evadePlanShown);
       if (ai.holdPlan) flags.push('HOLD:' + ai.holdPlan);
       if (a.lockHeldOn) flags.push('LOCK>' + nameOf(a.lockHeldOn));
       if (ai.illum) flags.push('illum' + (ai.illum.abandoned ? '(x)' : ''));

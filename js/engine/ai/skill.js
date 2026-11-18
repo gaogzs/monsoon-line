@@ -45,6 +45,7 @@
        loyal       僚机 / 护航：不离开长机 / 被护卫者超过 leash 米 */
   $.TEMPER = {
     /* v3.6.3 新增字段（缺省 = 中性）：
+         evW     甩脱来袭导弹各策略的权重乘子（evade.js）
          tailW   反咬尾各策略的权重乘子（tactics.js pickTailPlan）   react  被咬后的反应延迟系数
          lagDist 保持咬尾时"太近、改瞄身后"的触发距离（缺省 500 m）
          longK   射程外远射概率乘子   longCap  远射技能上限增量（缺省 0.65 → +longCap）   overK  超调时长乘子
@@ -54,11 +55,14 @@
          abK     能量加力门限乘子（角点速度 × abK；> 1 更爱开加力，仅 skill ≥ ELITE_SKILL）
          rage    受伤后的开火意愿 / 射击间隔变化：fireWill += rage×(1−血量比)，shootGap ×= 1 − rage×(1−血量比)（< 0 = 越伤越保守） */
     aggressive: { fire: 0.10, extend: 0.7, retreat: 0.7, noStandoff: true,
-      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3, playerK: 0.8, helpK: 0.5, abK: 1.15, rage: 0.15 },
+      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3, playerK: 0.8, helpK: 0.5, abK: 1.15, rage: 0.15,
+      evW: { breakIn: 1.6, corkscrew: 1.3, run: 0.4, climb: 0.8 } },
     cautious: { fire: -0.05, retreat: 1.3, standoffMin: 0.55,
-      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6, isoK: 0.15, helpK: 0.8, abK: 0.85, rage: -0.1 },
+      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6, isoK: 0.15, helpK: 0.8, abK: 0.85, rage: -0.1,
+      evW: { run: 1.7, climb: 1.3, dive: 1.2, breakIn: 0.7 } },
     sniper: { fire: 0.05, ring: 1.2, standoffMin: 0.5,
-      tailW: { zoom: 1.8, brake: 1.6, drag: 1.2, scissors: 0.6 }, lagDist: 500, longK: 0.3, overK: 0.5, closeK: 1.0 },
+      tailW: { zoom: 1.8, brake: 1.6, drag: 1.2, scissors: 0.6 }, lagDist: 500, longK: 0.3, overK: 0.5, closeK: 1.0,
+      evW: { run: 1.3, climb: 1.3, jink: 0.8 } },
     loyal: { leash: 6000, tailW: { drag: 1.5 }, helpK: 0.4 },
     steady: {}                                  // 显式中性：关卡 / 探针传它即可关掉生成时的随机性格
   };
@@ -106,6 +110,7 @@
        shakeTail  摆脱咬尾：被敌机咬住（攻击者在机尾锥内、近距）持续超过反应延迟后，横向急转 + 俯冲甩开；skill ≤ 0.3 为 0，≥ 0.9 为 1
        holdTail   保持咬尾：自己咬着对手时用提前量追击并按对手速度调油门（不冲过头）；skill ≤ 0.35 为 0，≥ 0.9 为 1 */
   $.SKILL.shakeTail = function (s) { return Math.max(0, Math.min(1, (s.skill - 0.3) / 0.6)); };
+  $.SKILL.evade = function (s) { return Math.max(0, Math.min(1, (s.skill - 0.35) / 0.55)); };     // 甩脱来袭导弹的策略深度（evade.js）；skill ≤ 0.35 为 0
   $.SKILL.holdTail = function (s) { return Math.max(0, Math.min(1, (s.skill - 0.35) / 0.55)); };
   $.SKILL.misjudgeT = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 2.0 * $.rnd01(s) : 0; };
   $.SKILL.lostExtra = function (s) { return s.skill < 0.7 ? (0.7 - s.skill) * 3.0 * $.rnd01(s) : 0; };

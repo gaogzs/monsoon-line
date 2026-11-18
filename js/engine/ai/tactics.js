@@ -55,7 +55,9 @@
   /* ============================================================
      规避：把来袭导弹放在 3/9 线，同时保能量
      ============================================================ */
-  function evade(a, m, world) {
+  function evade(a, m, world, dt) {
+    // v3.6.4：skill ≥ 0.4 走多策略（evade.js）；低技能保持下面的基线
+    if (a.ai) { var rs = $.evadeStrat(a, a.ai, m, world, dt); if (rs) return rs; }
     var toM = M3.norm(M3.sub(m.pos, a.pos));
     var dist = M3.dist(m.pos, a.pos);
 

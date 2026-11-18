@@ -50,6 +50,7 @@
       mode: 'pursue',
       modeT: 0,
       evadeT: 0,
+      evPlan: null, evT: 0, evFor: null, evTerm: false, evSide: 1, evFlip: 0, evPhase: 0, evadePlanShown: null,     // 甩脱来袭弹的策略状态（evade.js）
       msl: null,
       flareT: 0,
       flareBurst: 0,      // 这一串诱饵还剩几组没放
@@ -576,7 +577,7 @@
   /* 机动层：按模式 / 角色出期望方向与油门，过覆盖链（升限、战区边界、垂直改出、近地保护），写 a.throttle / a.ab / a.target。 */
   function maneuver(a, s, world, dt) {
     var ctrl = a.ctrl;
-    if (s.mode !== 'evade') s.flareReact = 0;      // 干扰弹首发的反应计时：威胁没了就清零
+    if (s.mode !== 'evade') { s.flareReact = 0; s.evPlan = null; s.evFor = null; s.evadePlanShown = null; }      // 干扰弹首发的反应计时 / 规避策略：威胁没了就清零
     // 机炮准星偏移：换目标时重抽；之后 OU 漂移；没有（空中）目标时衰减
     if (s.aimFor !== s.target) { s.aimFor = s.target; if (s.target) $.aimReset(s); }
     $.aimStep(s, dt, !!(s.target && s.target.alive && s.target.kind !== 'target'));
@@ -592,7 +593,8 @@
       desired = $.psmAim(a, s) || a.fwd;
       throttle = 1; ab = false;
     } else if (s.mode === 'evade' && s.msl) {
-      var r = $.evade(a, s.msl, world);
+      var r = $.evade(a, s.msl, world, dt);
+      s.evadePlanShown = r.plan || null;
       desired = r.dir;
       throttle = r.throttle;
       ab = r.ab;
@@ -602,7 +604,7 @@
          但一组都没骗到就等于没放。连放的后续几组在下面统一处理，
          这样中途切出 evade 也会把这一串放完。 */
       s.flareReact += dt;
-      if (s.flareReact >= $.SKILL.reactT(s) && s.flareT <= 0 && !s.flareBurst && a.flares > 0 && a.flareCd <= 0) {
+      if (s.flareReact >= $.SKILL.reactT(s) && s.flareT <= 0 && !s.flareBurst && a.flares > 0 && a.flareCd <= 0 && !$.flareUseless(s, s.msl)) {
         s.flareBurst = 2 + Math.floor(Math.random() * 4);
       }
     } else if (s.mode === 'extend') {
