@@ -21,7 +21,7 @@ Registry.aircraft({
   hardpointGroups: [
     { id: 'A', label: T('aircraft.gannet.hardpointGroups.i0.label'), kind: 'heavy', pts: [{ x: 3.2, y: -1.6 }, { x: -3.2, y: -1.6 }] },
     { id: 'B', label: T('aircraft.gannet.hardpointGroups.i1.label'), kind: 'light', pts: [{ x: 5.2, y: -3.0 }, { x: -5.2, y: -3.0 }] },
-    { id: 'C', label: T('aircraft.gannet.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 7.0, y: -4.0 }, { x: -7.0, y: -4.0 }] },
+    { id: 'C', label: T('aircraft.gannet.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 6.8, y: -5.6 }, { x: -6.8, y: -5.6 }] },
     { id: 'D', label: T('aircraft.gannet.hardpointGroups.i3.label'), kind: 'heavy', playerOnly: true, pts: [{ x: 2.1, y: -3.0 }, { x: -2.1, y: -3.0 }] },
     { id: 'E', label: T('aircraft.gannet.hardpointGroups.i4.label'), kind: 'belly', playerOnly: true, pts: [{ x: 0.9, y: -2.6 }, { x: -0.9, y: -2.6 }] }
   ],

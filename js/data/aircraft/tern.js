@@ -20,10 +20,10 @@ Registry.aircraft({
   gun: 'cel3',
   maxLoad: 6000,
   hardpointGroups: [
-    { id: 'A', label: T('aircraft.tern.hardpointGroups.i0.label'), kind: 'belly', pts: [{ x: 1.0, y: -2.0 }, { x: -1.0, y: -2.0 }] },
-    { id: 'B', label: T('aircraft.tern.hardpointGroups.i1.label'), kind: 'belly', pts: [{ x: 2.2, y: -2.4 }, { x: -2.2, y: -2.4 }] },
-    { id: 'C', label: T('aircraft.tern.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 4.0, y: -2.2 }, { x: -4.0, y: -2.2 }] },
-    { id: 'D', label: T('aircraft.tern.hardpointGroups.i3.label'), kind: 'light', pts: [{ x: 5.6, y: -3.0 }, { x: -5.6, y: -3.0 }] }
+    { id: 'A', label: T('aircraft.tern.hardpointGroups.i0.label'), kind: 'belly', pts: [{ x: 1.0, y: 0.0 }, { x: -1.0, y: 0.0 }] },
+    { id: 'B', label: T('aircraft.tern.hardpointGroups.i1.label'), kind: 'belly', pts: [{ x: 1.0, y: -5.5 }, { x: -1.0, y: -5.5 }] },
+    { id: 'C', label: T('aircraft.tern.hardpointGroups.i2.label'), kind: 'light', pts: [{ x: 5.4, y: -4.8 }, { x: -5.4, y: -4.8 }] },
+    { id: 'D', label: T('aircraft.tern.hardpointGroups.i3.label'), kind: 'light', pts: [{ x: 7.0, y: -7.3 }, { x: -7.0, y: -7.3 }] }
   ],
   defaultLoadout: { A: 'pgb', B: 'clb', C: 'mrm', D: 'trm' }
 });
