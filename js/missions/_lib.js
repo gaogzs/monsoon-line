@@ -351,6 +351,29 @@ function spawnAewc(w, o) {
   return a;
 }
 
+/* 空中整备机（批次 6.5）：在 o.a ↔ o.b 两点之间慢速来回盘旋，永不退场；本身就是一个移动的整备点。
+   与 spawnAewc 的区别：不设 aewc（那是预警机的通报 / 调度逻辑）；登记 w.refs[o.ref || 'puffin']，
+   关卡用 mission.resupply: [{ ref: 'puffin', r: 2200, hold: 5, swap: true }] 引用它。
+   盘旋范围取小一点（o.a、o.b 相距 3 ~ 6 km，arrive 同步缩小），玩家才好跟上、好停留。
+   o: { ac（缺省 'puffin'）, x, y, z, a, b（两个 M3.V 航点）, label, team（缺省 0）, ref } */
+function spawnTanker(w, o) {
+  var a = spawnEnemy(w, {
+    ac: o.ac || 'puffin',
+    team: o.team === undefined ? 0 : o.team,
+    x: o.x, y: o.y, z: o.z,
+    fwd: M3.V(0, 0, 1), speed: 220,
+    special: null,
+    callsign: o.label || null,
+    behavior: 'recon'
+  });
+  a.tanker = true;
+  a.bigTarget = true;
+  if (a.ai) a.ai.role = 'support';
+  a.route = { loiter: true, wp: o.a, exit: o.b, alt: o.y, arrive: 1500 };
+  (w.refs || (w.refs = {}))[o.ref || 'puffin'] = a;
+  return a;
+}
+
 /* 冬港。第 3 关与第 10 关是同一个人、同一架飞机 —— 所以只在这里写一次。
 
    GAL-31「玄武岩」：下游飞得最高的一型（升限 19 000 m），也是那批

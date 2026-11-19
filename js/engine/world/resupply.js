@@ -450,7 +450,7 @@ var Resupply = (function () {
       if (r.uses !== undefined && !(r.uses >= 1)) bad.push(mission.id + ' entry uses must be >= 1 (omit it for unlimited)');
       if (r.ref) {
         t = world.refs[r.ref];
-        var tg = t && ((t.ship || t.platform || {}).tags || {});
+        var tg = t && ((t.ship || t.platform || t).tags || {});      // 舰船读 ship.tags，平台读 platform.tags，飞机（空中整备机）读自己的 tags
         if (!t) bad.push(mission.id + ' ref "' + r.ref + '" has no unit');
         else if (t.team !== 0) bad.push(mission.id + ' ref ' + r.ref + ' is not team 0');
         else if (!tg.resupply) bad.push(mission.id + ' ref ' + r.ref + ' lacks the resupply tag');
