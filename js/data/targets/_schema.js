@@ -9,4 +9,7 @@
                 机炮射速太高，命中就是一片 —— 对大块头、厚结构或"打个孔也无所谓"的东西，
                 这一片不该等于一枚对地弹。飞机写在 AIRCRAFT[].gunResist，舰船写在
                 SHIPS[].gunResist；spawnTarget 传了 gunResist 就以传入为准。
+     sam / mounts / launchers   自卫火力（可选，写法同 PLATFORMS）：spawnTarget 按模型名取来
+                Turret.attach，sam 落到 t.weapon（旋转架舰空弹由 updateTargets 驱动）。
+                中立单位（team 2）不开火，所以别给调节单元写；关卡传 armed:false 可关掉。
    ============================================================ */

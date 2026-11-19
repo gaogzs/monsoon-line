@@ -313,8 +313,16 @@ function spawnWinterport(w, o) {
   return ace;
 }
 
+/* o.armed === false：这一单位不挂自卫火力（给不想变难的关卡留的开关）。
+   TARGETS[model] 带 mounts / launchers 才会挂炮塔；中立单位（team 2）挂了也不开火
+   （updateTargets 只让 team !== 2 的目标跑炮塔），所以调节单元不会被武装。 */
 function spawnTarget(w, o) {
   var t = Ent.makeTarget(o);
+  var d = (typeof TARGETS !== 'undefined' && TARGETS[o.model]) || null;
+  if (d && (d.mounts || d.launchers) && o.armed !== false && typeof Turret !== 'undefined') {
+    Turret.attach(t, d.mounts, d.launchers);
+    if (d.sam && !t.weapon) { t.weapon = d.sam; t.fireCd = M3.rnd(3, 8); }
+  }
   w.targets.push(t);
   return t;
 }
