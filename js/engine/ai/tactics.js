@@ -137,6 +137,12 @@
        zoom      高速时拉起近垂直爬升（速度 ≥ 0.7 vMil；k ≥ 0.6）：攻击者冲不上去、冲过头
        scissors  剪刀：压油门、每 SCISSOR_FLIP 秒换侧，逼攻击者冲过头（< 1.2 km；k ≥ 0.75）
        brake     收油门 + 横向急转，让攻击者飞过去（< 0.8 km；k ≥ 0.8）
+       ---- 转守为攻（反转型，v3.6.4）：brake 与下面三个。共同点是**减速 + 横向让出**，让更快的攻击者冲过头；
+            攻击者一旦跑出机尾锥（跑到我前半球）且 < COUNTER_R，立刻转入反击（$.counterStep）：强制盯住它 COUNTER_T 秒、
+            开火意愿 +COUNTER_FIRE、首发免反应延迟，之后由 pursue + holdTail 接手咬尾。
+       barrel    进攻桶滚（k ≥ 0.7、< 1.1 km、速度 ≥ 0.6 vMil）：先朝侧上方让出 + 怠速（BARREL_T 内），再机头翻向攻击者往下压
+       rolling   滚动剪刀（k ≥ 0.85、< 700 m）：垂直面里上 / 下交替 + 怠速，每 ROLL_FLIP 秒换向
+       feint     假动作反转（k ≥ 0.75、0.5–1.4 km）：先满油门朝一侧硬转 FEINT_T0..T1 秒，逼攻击者下提前量，再突然反向 + 怠速
      ---- 保持咬尾（咬人）：目标在机头前方锥内（HOLD_COS）、同向、< HOLD_R；k = holdTail
        lead      提前量追击（基线，k > 0）
        lag       太近且仍在接近（< 500 m）时瞄目标身后，不冲过头；油门也收一点（k ≥ 0.4）
@@ -149,9 +155,9 @@
              HOLD_R: 2600, HOLD_COS: 0.8, HOLD_MIX: 0.8,
              // 转守为攻：反击窗口时长 / 开火意愿加成 / 触发距离；各反转策略的阶段时长
              COUNTER_T: 4, COUNTER_FIRE: 0.25, COUNTER_R: 1800,
-             BARREL_T: 2.2, HAMMER_T: 1.6, ROLL_FLIP: 1.0, FEINT_T0: 0.5, FEINT_T1: 0.2 };
+             BARREL_T: 2.2, ROLL_FLIP: 1.0, FEINT_T0: 0.5, FEINT_T1: 0.2 };
   /* 反转（转守为攻）型策略：攻击者被甩到机尾锥之外时转入反击（$.counterStep） */
-  $.REVERSAL = { barrel: true, hammer: true, rolling: true, feint: true };
+  $.REVERSAL = { barrel: true, rolling: true, feint: true, brake: true };
 
   /* 转入反击：强制盯住攻击者 COUNTER_T 秒（brain.js decide）、开火更果断（SKILL.fireWill）、第一枪不等反应延迟 */
   $.counterStep = function (a, s, chaser) {
@@ -187,7 +193,6 @@
     // 转守为攻（反转型，高技能）：让攻击者冲过头，再翻转成自己咬住对方（见 $.counterStep）
     var fastE = (a.speed || 0) >= 0.6 * vMil;
     if (k >= 0.7 && d < 1100 && fastE) add('barrel', 2.5);
-    if (k >= 0.8 && d < 900 && (a.speed || 0) >= 0.75 * vMil && Ent.agl(a) > 3000) add('hammer', 2);
     if (k >= 0.85 && d < 700) add('rolling', 2);
     if (k >= 0.75 && d > 500 && d < 1400) add('feint', 2.5);
     var r = $.rnd01(s) * tot;
@@ -231,7 +236,7 @@
     }
     var los = M3.norm(M3.sub(a.pos, chaser.pos));                         // 攻击者 → 我
     var los2 = M3.norm(M3.V(los.x, 0, los.z));
-    var toC = M3.norm(M3.sub(chaser.pos, a.pos));                         // 我 → 攻击者（反转型策略用）
+    var dC = M3.dist(chaser.pos, a.pos), toC = M3.norm(M3.sub(chaser.pos, a.pos));                         // 我 → 攻击者（反转型策略用）
     var perp = M3.norm(M3.cross(M3.V(0, 1, 0), los));
     var m = Math.min(1, k * T.SHAKE_MIX + 0.1), dir, thr = 1, ab = k > 0.5;
     if (plan === 'break') {
@@ -251,22 +256,17 @@
       thr = 0.6; ab = false;
     } else if (plan === 'barrel') {
       /* 进攻桶滚：先拉起 + 侧向（收油门让攻击者冲到前下方），再越过顶端、机头翻回攻击者所在处往下压 */
-      if (s.planClock < T.BARREL_T * 0.45) { dir = M3.norm(M3.add(M3.V(0, 0.85, 0), M3.mul(perp, 0.55 * s.tailSide))); thr = 0.5; ab = false; }
+      if (s.planClock < T.BARREL_T) { dir = M3.norm(M3.add(M3.V(0, 0.45, 0), M3.mul(perp, 1.0 * s.tailSide))); thr = 0.15; ab = false; }
       else { dir = M3.norm(M3.add(M3.mul(toC, 0.8), M3.V(0, -0.5, 0))); thr = 0.85; ab = false; }
-      m = Math.min(1, k + 0.1);
-    } else if (plan === 'hammer') {
-      /* 锤头：近垂直爬升到速度掉下来（或 HAMMER_T），再机头翻向攻击者往下压 */
-      if (s.planClock < T.HAMMER_T && a.speed > 0.45 * ((a.phys && a.phys.vMil) || 400)) { dir = M3.norm(M3.add(M3.mul(los2, 0.1), M3.V(0, 1, 0))); thr = 1; ab = true; }
-      else { dir = M3.norm(M3.add(M3.mul(toC, 0.8), M3.V(0, -0.5, 0))); thr = 0.9; ab = false; }
       m = Math.min(1, k + 0.1);
     } else if (plan === 'rolling') {
       /* 滚动剪刀：垂直面里上 / 下交替 + 小油门，把相对几何翻过来 */
-      dir = M3.norm(M3.add(M3.mul(perp, 0.5 * s.tailSide), M3.V(0, s.tailSide > 0 ? 0.8 : -0.5, 0)));
-      thr = 0.35; ab = false; m = Math.min(1, k + 0.1);
+      dir = M3.norm(M3.add(M3.mul(perp, 0.9 * s.tailSide), M3.V(0, s.tailSide > 0 ? 0.6 : -0.4, 0)));
+      thr = 0.15; ab = false; m = Math.min(1, k + 0.1);
     } else if (plan === 'feint') {
       /* 假动作反转：先朝一侧硬转逼攻击者下提前量 / 压坡度，随后突然反向 + 朝攻击者拉 */
       if (s.planClock < s.tailFlip) { dir = M3.norm(M3.add(M3.mul(perp, s.tailSide), M3.V(0, 0.05, 0))); thr = 1; }
-      else { dir = M3.norm(M3.add(M3.mul(perp, -0.9 * s.tailSide), M3.add(M3.mul(toC, 0.4), M3.V(0, 0.1, 0)))); thr = 0.7; ab = false; }
+      else { dir = M3.norm(M3.add(M3.mul(perp, -0.9 * s.tailSide), M3.add(M3.mul(toC, 0.4), M3.V(0, 0.1, 0)))); thr = 0.15; ab = false; }
       m = Math.min(1, k + 0.1);
     } else {                                                               // brake
       dir = M3.norm(M3.add(M3.mul(perp, s.tailSide), M3.V(0, 0.1, 0)));
