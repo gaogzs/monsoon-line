@@ -184,6 +184,12 @@
     if (k >= 0.6 && (a.speed || 0) >= 0.7 * vMil && a.pos.y < 9000) add('zoom', near ? 2 : 1.5);
     if (k >= 0.75 && d < 1200) add('scissors', 3);
     if (k >= 0.8 && d < 800) add('brake', 2);
+    // 转守为攻（反转型，高技能）：让攻击者冲过头，再翻转成自己咬住对方（见 $.counterStep）
+    var fastE = (a.speed || 0) >= 0.6 * vMil;
+    if (k >= 0.7 && d < 1100 && fastE) add('barrel', 2.5);
+    if (k >= 0.8 && d < 900 && (a.speed || 0) >= 0.75 * vMil && Ent.agl(a) > 3000) add('hammer', 2);
+    if (k >= 0.85 && d < 700) add('rolling', 2);
+    if (k >= 0.75 && d > 500 && d < 1400) add('feint', 2.5);
     var r = $.rnd01(s) * tot;
     for (i = 0; i < c.length; i++) { r -= c[i][1]; if (r <= 0) return c[i][0]; }
     return c[c.length - 1][0];
@@ -212,18 +218,20 @@
       s.tailPlan = pickTailPlan(a, s, world, bd, k);
       s.planT = T.PLAN_T0 + T.PLAN_SPAN * $.rnd01(s);
       s.tailSide = $.rnd01(s) < 0.5 ? -1 : 1;
-      s.tailFlip = s.tailPlan === 'scissors' ? T.SCISSOR_FLIP : T.JINK_MIN + T.JINK_SPAN * $.rnd01(s);
+      s.tailFlip = s.tailPlan === 'scissors' ? T.SCISSOR_FLIP : (s.tailPlan === 'feint' ? T.FEINT_T0 + T.FEINT_T1 * $.rnd01(s) : T.JINK_MIN + T.JINK_SPAN * $.rnd01(s));
+      s.planClock = 0;
       s.tailBreaks = (s.tailBreaks || 0) + 1;
       s.tailPlans = s.tailPlans || {}; s.tailPlans[s.tailPlan] = (s.tailPlans[s.tailPlan] || 0) + 1;
     }
-    s.planT -= dt;
+    s.planT -= dt; s.planClock = (s.planClock || 0) + dt;
     var plan = s.tailPlan;
-    if (plan === 'scissors' || plan === 'jink') {
+    if (plan === 'scissors' || plan === 'jink' || plan === 'rolling') {
       s.tailFlip -= dt;
-      if (s.tailFlip <= 0) { s.tailSide = -s.tailSide; s.tailFlip = plan === 'scissors' ? T.SCISSOR_FLIP : T.JINK_MIN + T.JINK_SPAN * $.rnd01(s); }
+      if (s.tailFlip <= 0) { s.tailSide = -s.tailSide; s.tailFlip = plan === 'scissors' ? T.SCISSOR_FLIP : (plan === 'rolling' ? T.ROLL_FLIP : T.JINK_MIN + T.JINK_SPAN * $.rnd01(s)); }
     }
     var los = M3.norm(M3.sub(a.pos, chaser.pos));                         // 攻击者 → 我
     var los2 = M3.norm(M3.V(los.x, 0, los.z));
+    var toC = M3.norm(M3.sub(chaser.pos, a.pos));                         // 我 → 攻击者（反转型策略用）
     var perp = M3.norm(M3.cross(M3.V(0, 1, 0), los));
     var m = Math.min(1, k * T.SHAKE_MIX + 0.1), dir, thr = 1, ab = k > 0.5;
     if (plan === 'break') {
@@ -241,6 +249,25 @@
     } else if (plan === 'scissors') {
       dir = M3.norm(M3.add(M3.mul(perp, s.tailSide), M3.mul(a.fwd, 0.25)));
       thr = 0.6; ab = false;
+    } else if (plan === 'barrel') {
+      /* 进攻桶滚：先拉起 + 侧向（收油门让攻击者冲到前下方），再越过顶端、机头翻回攻击者所在处往下压 */
+      if (s.planClock < T.BARREL_T * 0.45) { dir = M3.norm(M3.add(M3.V(0, 0.85, 0), M3.mul(perp, 0.55 * s.tailSide))); thr = 0.5; ab = false; }
+      else { dir = M3.norm(M3.add(M3.mul(toC, 0.8), M3.V(0, -0.5, 0))); thr = 0.85; ab = false; }
+      m = Math.min(1, k + 0.1);
+    } else if (plan === 'hammer') {
+      /* 锤头：近垂直爬升到速度掉下来（或 HAMMER_T），再机头翻向攻击者往下压 */
+      if (s.planClock < T.HAMMER_T && a.speed > 0.45 * ((a.phys && a.phys.vMil) || 400)) { dir = M3.norm(M3.add(M3.mul(los2, 0.1), M3.V(0, 1, 0))); thr = 1; ab = true; }
+      else { dir = M3.norm(M3.add(M3.mul(toC, 0.8), M3.V(0, -0.5, 0))); thr = 0.9; ab = false; }
+      m = Math.min(1, k + 0.1);
+    } else if (plan === 'rolling') {
+      /* 滚动剪刀：垂直面里上 / 下交替 + 小油门，把相对几何翻过来 */
+      dir = M3.norm(M3.add(M3.mul(perp, 0.5 * s.tailSide), M3.V(0, s.tailSide > 0 ? 0.8 : -0.5, 0)));
+      thr = 0.35; ab = false; m = Math.min(1, k + 0.1);
+    } else if (plan === 'feint') {
+      /* 假动作反转：先朝一侧硬转逼攻击者下提前量 / 压坡度，随后突然反向 + 朝攻击者拉 */
+      if (s.planClock < s.tailFlip) { dir = M3.norm(M3.add(M3.mul(perp, s.tailSide), M3.V(0, 0.05, 0))); thr = 1; }
+      else { dir = M3.norm(M3.add(M3.mul(perp, -0.9 * s.tailSide), M3.add(M3.mul(toC, 0.4), M3.V(0, 0.1, 0)))); thr = 0.7; ab = false; }
+      m = Math.min(1, k + 0.1);
     } else {                                                               // brake
       dir = M3.norm(M3.add(M3.mul(perp, s.tailSide), M3.V(0, 0.1, 0)));
       thr = 0.15; ab = false;

@@ -55,13 +55,13 @@
          abK     能量加力门限乘子（角点速度 × abK；> 1 更爱开加力，仅 skill ≥ ELITE_SKILL）
          rage    受伤后的开火意愿 / 射击间隔变化：fireWill += rage×(1−血量比)，shootGap ×= 1 − rage×(1−血量比)（< 0 = 越伤越保守） */
     aggressive: { fire: 0.10, extend: 0.7, retreat: 0.7, noStandoff: true,
-      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3, playerK: 0.8, helpK: 0.5, abK: 1.15, rage: 0.15,
+      tailW: { scissors: 1.6, brake: 0.7, dive: 0.5, drag: 0.4, jink: 0.8, barrel: 1.5, rolling: 1.5, hammer: 1.2, feint: 1.2 }, react: 1, lagDist: 350, longK: 1.6, longCap: 0.1, overK: 1.3, fakeK: 0.3, playerK: 0.8, helpK: 0.5, abK: 1.15, rage: 0.15,
       evW: { breakIn: 1.6, corkscrew: 1.3, run: 0.4, climb: 0.8 } },
     cautious: { fire: -0.05, retreat: 1.3, standoffMin: 0.55,
-      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6, isoK: 0.15, helpK: 0.8, abK: 0.85, rage: -0.1,
+      tailW: { dive: 1.6, drag: 1.8, jink: 1.4, scissors: 0.7, barrel: 0.6, rolling: 0.5, feint: 0.7 }, react: 0.8, lagDist: 650, longK: 0.5, overK: 0.6, fakeK: 1.6, isoK: 0.15, helpK: 0.8, abK: 0.85, rage: -0.1,
       evW: { run: 1.7, climb: 1.3, dive: 1.2, breakIn: 0.7 } },
     sniper: { fire: 0.05, ring: 1.2, standoffMin: 0.5,
-      tailW: { zoom: 1.8, brake: 1.6, drag: 1.2, scissors: 0.6 }, lagDist: 500, longK: 0.3, overK: 0.5, closeK: 1.0,
+      tailW: { zoom: 1.8, brake: 1.6, drag: 1.2, scissors: 0.6, hammer: 1.3, barrel: 0.7, rolling: 0.7, feint: 0.7 }, lagDist: 500, longK: 0.3, overK: 0.5, closeK: 1.0,
       evW: { run: 1.3, climb: 1.3, jink: 0.8 } },
     loyal: { leash: 6000, tailW: { drag: 1.5 }, helpK: 0.4 },
     steady: {}                                  // 显式中性：关卡 / 探针传它即可关掉生成时的随机性格
