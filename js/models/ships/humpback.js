@@ -60,18 +60,24 @@ Registry.model({
       }
     }
     // 飞行甲板（A 艉段 / B 腰段 / C 艏段）
-    slab([[-46, -165], [32, -165], [32, -60], [-31, -60]], DECK_TOP, DECK_BOT, C.deck, C.hull2, C.hull2);
-    slab([[-31, -60], [32, -60], [32, 60], [-31, 60]], DECK_TOP, DECK_BOT, C.deck, C.hull2, C.hull2);
-    slab([[-31, 60], [32, 60], [27, 115], [18, 148], [5, 164], [-7, 164], [-20, 148], [-29, 115]], DECK_TOP, DECK_BOT, C.deck, C.hull2, C.hull2);
+    // 斜角舷台：左舷外沿从舰尾 (-14.4) 按 9° 一直向外斜到 z = +34 处最宽（x ≈ −46）（SPON_X），再斜着收回前甲板边沿（-31）
+    var SPON_Z = 34, SPON_X = -14.4 - KANG * (SPON_Z + 165);
+    slab([[-14.4, -165], [32, -165], [32, SPON_Z], [SPON_X, SPON_Z]], DECK_TOP, DECK_BOT, C.deck, C.hull2, C.hull2);
+    slab([[SPON_X, SPON_Z], [32, SPON_Z], [32, 60], [-31, 60]], DECK_TOP, DECK_BOT, C.deck, C.hull2, C.hull2);
+    /* 艏段：两舷各两段近乎笔直的边向舰首收拢（腰部 ±31 → z = 120 处 ±27 → 舰首 −9 … +7 一段窄平头），
+       现代大型航母的飞行甲板前部就是这种楔形，不是圆弧鼓出来的 */
+    slab([[-31, 60], [32, 60], [27, 120], [7, 165], [-9, 165], [-27, 120]], DECK_TOP, DECK_BOT, C.deck, C.hull2, C.hull2);
 
     // 甲板外飘的下面：船体往外一圈外倾的舷侧（右舷整段、左舷腰段、左舷斜角段）
     b.wing(V(20.5, 10, -165), V(32, 17, -165), V(32, 17, 60), V(20.5, 10, 60), C.hull2);
-    b.wing(V(-20.5, 10, -60), V(-31, 17, -60), V(-31, 17, 60), V(-20.5, 10, 60), C.hull2);
-    b.wing(V(-19, 9, -165), V(-46, 17, -165), V(-31, 17, -60), V(-20.5, 10, -60), C.hull2);
-    // 斜角甲板外沿的几根支撑
-    var zs = [-150, -120, -90];
+    b.face([b.pt(-19.5, 10, -133), b.pt(SPON_X, 17, SPON_Z), b.pt(-20.5, 10, SPON_Z)], C.hull2);
+    b.face([b.pt(-20.5, 10, SPON_Z), b.pt(SPON_X, 17, SPON_Z), b.pt(-19.5, 10, -133)], C.hull2);
+    b.face([b.pt(-20.5, 10, SPON_Z), b.pt(SPON_X, 17, SPON_Z), b.pt(-31, 17, 60), b.pt(-20.5, 10, 60)], C.hull2);
+    b.face([b.pt(-20.5, 10, 60), b.pt(-31, 17, 60), b.pt(SPON_X, 17, SPON_Z), b.pt(-20.5, 10, SPON_Z)], C.hull2);
+        // 斜角甲板外沿的几根支撑
+    var zs = [-120, -90, -60, -30, 0];
     for (var si = 0; si < zs.length; si++) {
-      var xe = -46 + (zs[si] + 165) * (15 / 105);
+      var xe = -14.4 - (zs[si] + 165) * KANG;
       b.box(xe + 3, 12.5, zs[si], 1.4, 9, 1.4, C.hull2);
     }
 
@@ -81,23 +87,55 @@ Registry.model({
       var nx = dz / l * w / 2, nz = -dx / l * w / 2, yy = y || (DECK_TOP + 0.06);
       b.wing(V(x0 + nx, yy, z0 + nz), V(x1 + nx, yy, z1 + nz), V(x1 - nx, yy, z1 - nz), V(x0 - nx, yy, z0 - nz), col);
     }
-    // 斜角着舰区：轴线 x(z) = -2 + KANG·(z - 60)，宽 16 m，从艉部延伸到 z = 40
-    function axisX(z) { return -2 + KANG * (z - 60); }
+    /* 斜角着舰区：轴线 x(z) = 2 − KANG·(z + 160)，越往前越偏向左舷（与舰体中线夹 9°）。
+       飞机顺着轴线往前滑，复飞时从左舷飞出去，不会撞上右舷的舰岛 —— 这也是左舷舷台
+       越往前越宽的原因。宽 16 m，从舰尾延伸到 z = +8（占全长一半多；舷台在 z = +34 才收回）。 */
+    function axisX(z) { return 2 - KANG * (z + 160); }
     var HW = 8, cs = Math.cos(9 * Math.PI / 180), sn = Math.sin(9 * Math.PI / 180);
-    stripe(axisX(-160), -160, axisX(30), 30, 0.7, C.white);                       // 着舰中线
-    stripe(axisX(-160) - HW * cs, -160 + HW * sn, axisX(40) - HW * cs, 40 + HW * sn, 0.55, C.yellow);   // 左边线
-    stripe(axisX(-160) + HW * cs, -160 - HW * sn, axisX(40) + HW * cs, 40 - HW * sn, 0.55, C.yellow);   // 右边线
+    stripe(axisX(-160), -160, axisX(8), 8, 0.7, C.white);                       // 着舰中线
+    stripe(axisX(-160) - HW * cs, -160 - HW * sn, axisX(8) - HW * cs, 8 - HW * sn, 0.55, C.yellow);   // 左边线
+    stripe(axisX(-160) + HW * cs, -160 + HW * sn, axisX(8) + HW * cs, 8 + HW * sn, 0.55, C.yellow);   // 右边线
     var wires = [-132, -120, -108, -96];                                          // 四道拦阻索
     for (var wi = 0; wi < wires.length; wi++) {
       var cx0 = axisX(wires[wi]);
-      stripe(cx0 - (HW - 0.6) * cs, wires[wi] + (HW - 0.6) * sn, cx0 + (HW - 0.6) * cs, wires[wi] - (HW - 0.6) * sn, 0.35, C.metal, DECK_TOP + 0.08);
+      stripe(cx0 - (HW - 0.6) * cs, wires[wi] - (HW - 0.6) * sn, cx0 + (HW - 0.6) * cs, wires[wi] + (HW - 0.6) * sn, 0.35, C.metal, DECK_TOP + 0.08);
     }
     // 甲板边缘警示带：右舷整段、左舷腰段 / 艏段（斜角段的外沿已经被着舰区边线占了）
     stripe(31, -165, 31, 58, 0.9, C.yellow);
-    stripe(-30, -58, -30, 58, 0.9, C.yellow);
-    // 艏段的中线（白色，断开的）
-    stripe(0, 64, 0, 100, 0.6, C.white);
-    stripe(0, 112, 0, 152, 0.6, C.white);
+    stripe(-14.4 + 0.4, -165, SPON_X + 0.5, SPON_Z, 0.9, C.yellow);
+    stripe(SPON_X + 0.5, SPON_Z, -30.5, 58, 0.9, C.yellow);
+    /* 艏部涂装（按真实航母的画法）：
+         ① 边缘黄线沿艏部轮廓一直描到舰首（两舷各一条，舰首尖端一道横线）
+         ② 每条弹射轨道有两侧白色虚线车道线（车道宽 5.6 m）、起点一道黄色横线（越线禁区）、
+            终点一道白色横标（弹射终点）
+         ③ 两条艏部轨道之间不画中线 —— 那一带是停机 / 滑行区，真实甲板上也是空的 */
+    function dashed(x0, z0, x1, z1, w, col, on, off) {
+      var L = Math.sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0)) || 1, ux = (x1 - x0) / L, uz = (z1 - z0) / L;
+      for (var t = 0; t < L; t += on + off) {
+        var e = Math.min(L, t + on);
+        stripe(x0 + ux * t, z0 + uz * t, x0 + ux * e, z0 + uz * e, w, col);
+      }
+    }
+    // 艏部边缘黄线（左舷 / 右舷各 2 段，沿艏部多边形内缩 0.5 m；舰首窄平头一道横线）
+    stripe(-30.5, 58, -26.6, 120, 0.9, C.yellow);
+    stripe(-26.6, 120, -8.6, 164.2, 0.9, C.yellow);
+    stripe(31, 58, 26.6, 120, 0.9, C.yellow);
+    stripe(26.6, 120, 6.6, 164.2, 0.9, C.yellow);
+    stripe(-8.6, 164.2, 6.6, 164.2, 0.9, C.yellow);
+    // 艏部两条弹射轨道的车道：(x, 起点 z, 终点 z) 与下面的轨道 box 对上
+    var lanes = [[-9, 70, 156], [6, 62, 150]];
+    for (var li = 0; li < lanes.length; li++) {
+      var lx = lanes[li][0], lz0 = lanes[li][1], lz1 = lanes[li][2];
+      dashed(lx - 2.8, lz0, lx - 2.8, lz1, 0.35, C.white, 14, 8);
+      dashed(lx + 2.8, lz0, lx + 2.8, lz1, 0.35, C.white, 14, 8);
+      stripe(lx - 3.0, lz0 - 1.0, lx + 3.0, lz0 - 1.0, 0.55, C.yellow);      // 起点：越线禁区
+      stripe(lx - 3.0, lz1, lx + 3.0, lz1, 0.45, C.white);                   // 终点：弹射终点
+    }
+    // 腰部（右舷）弹射轨道的车道：x = 17，z −22 … 64；车道边线收到 ±2.6 m，免得压到舰岛根部与前升降机
+    dashed(17 - 2.6, -22, 17 - 2.6, 44, 0.35, C.white, 14, 8);
+    dashed(17 + 2.6, -22, 17 + 2.6, 44, 0.35, C.white, 14, 8);
+    stripe(17 - 2.8, -23, 17 + 2.8, -23, 0.55, C.yellow);
+    stripe(17 - 2.8, 44, 17 + 2.8, 44, 0.45, C.white);
 
     /* 弹射器轨道：艏部两具 + 右舷腰部一具。跑道数据（runways）的起飞端就是它们的前端。 */
     b.box(-9, DECK_TOP + 0.12, 113, 1.1, 0.16, 86, C.metal);      // 艏 1（左），z 70 … 156

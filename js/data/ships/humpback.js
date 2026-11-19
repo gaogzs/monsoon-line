@@ -31,7 +31,7 @@ Registry.ship({
   mounts: [
   _m('ciwsFL', 'ciws20', [-24, 20.0, 112], -Math.PI / 4, ARC_CIWS, null, 'ciws'),
   _m('ciwsFR', 'ciws20', [24, 20.0, 112], Math.PI / 4, ARC_CIWS, null, 'ciws'),
-  _m('ciwsAL', 'ciws20', [-38, 20.0, -140], -3 * Math.PI / 4, ARC_CIWS, null, 'ciws'),
+  _m('ciwsAL', 'ciws20', [-22, 20.0, -90], -3 * Math.PI / 4, ARC_CIWS, null, 'ciws'),
   _m('ciwsAR', 'ciws20', [28, 20.0, -140], 3 * Math.PI / 4, ARC_CIWS, null, 'ciws'),
   _m('n50L', 'n50', [-28, 19.2, 6], -Math.PI / 2, ARC_SIDE, 'tur50', 'dual'),
   _m('n50R', 'n50', [30, 19.2, 6], Math.PI / 2, ARC_SIDE, 'tur50', 'dual')

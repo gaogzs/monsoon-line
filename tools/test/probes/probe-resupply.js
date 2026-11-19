@@ -264,9 +264,10 @@ function runwayEnds(carrier) {
     if (t === null || t > 25 || Math.abs(t - pos[1]) > 1.0) bad2.push(q.id + ' 表面 ' + t);
   }
   chk('炮位 / 发射架都落在飞行甲板上（不悬空、不埋进舰岛）', !bad2.length, bad2.join('；'));
-  // 斜角甲板：艉部左舷伸出去，腰部以前没有这块（与直甲板的区别）
-  const aft = topY(-44, -150), mid = topY(-44, 30);
-  chk('斜角甲板：艉部左舷（x -44, z -150）有甲板，腰部同一 x 处没有', aft !== null && Math.abs(aft - 19.2) < 0.3 && (mid === null || mid < 15), 'aft=' + aft + ' mid=' + mid);
+  /* 斜角甲板：左舷外沿从舰尾按 9° 越往前越向左舷外探，到腰部（z ≈ +34）最宽，再斜着收回前甲板；
+     所以同一个 x（−40）在舰尾（z −150）没有甲板，在腰部（z +10）才有 —— 不是"舰尾最宽、向前收窄"（那是反的） */
+  const aft = topY(-40, -150), mid = topY(-40, 10);
+  chk('斜角甲板：越往前越向左舷外探 —— 腰部（x -40, z +10）有甲板，舰尾同一 x（z -150）没有', mid !== null && Math.abs(mid - 19.2) < 0.3 && aft === null, 'aft=' + aft + ' mid=' + mid);
   chk('舰岛在右舷靠后、是全船最高处', topY(26, -30) > 35 && topY(-20, 0) < 20);
 }
 
