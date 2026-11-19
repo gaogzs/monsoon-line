@@ -47,6 +47,7 @@
    "gannet": "a26d2cc96bb9",
    "skua": "928bb9f45813",
    "puffin": "dc7a1980d399",
+   "manta": "9c82b26bda80",
    "albatross": "565a18acfb2e",
    "folded_wing": "c06b35306ce3",
    "schist": "418f34ba2b9f",
@@ -61,7 +62,7 @@
    "quartz": "12d1f13d5d26",
    "lodestone": "603bc7c5310c",
    "gravel": "3d8d55fbaa3c",
-   "$order": "eaebc3b9777e"
+   "$order": "20d91449b8e6"
   },
   "SHIPS": {
    "orca": "36151043a7a5",
@@ -339,6 +340,7 @@
   "lnch_gun": "9b16bcf6d1b6",
   "lnchr_base": "0c0f1cb0d55b",
   "lnchr_gun": "63e08d08e33d",
+  "manta": "eb3f2723c55b",
   "missile": "c0b1511f72d8",
   "narwhal": "c14bbc63760a",
   "obsidian": "50f7985e5460",
@@ -381,7 +383,7 @@
   "tur75_gun": "44ac3980a90e",
   "tur75r_base": "2090ad6ed049",
   "tur75r_gun": "b975d447543a",
-  "$order": "1288a37dfb16",
+  "$order": "4ddf622e3ac0",
   "$hidden": "613739b120dd",
   "$turretSpec": "8cdc31b662e3",
   "shoal_wreck": "b5a6b97ab0ce",
