@@ -50,6 +50,7 @@
    "folded_wing": "c06b35306ce3",
    "schist": "418f34ba2b9f",
    "basalt": "2ffa8c59ab8e",
+   "obsidian": "23fda399d7c4",
    "sandstone": "6094df1b1852",
    "boulder": "bfb7770929ed",
    "tideline": "9e3a74ff8c37",
@@ -59,7 +60,7 @@
    "quartz": "12d1f13d5d26",
    "lodestone": "603bc7c5310c",
    "gravel": "3d8d55fbaa3c",
-   "$order": "e6bd4ab5916c"
+   "$order": "a1275642aafa"
   },
   "SHIPS": {
    "orca": "36151043a7a5",
@@ -129,6 +130,7 @@
    "ssm": "712113d68078",
    "swm": "566626c4b30e",
    "tca11": "34b2766431a9",
+   "tephra": "ffb1894ecc50",
    "tether": "5796c246d687",
    "trm": "8f6a95a8f204",
    "v11": "44f47fcfb275",
@@ -144,7 +146,7 @@
    "vsr": "b982cece78ea",
    "vzu": "3a56d8afd988",
    "wasp": "5fb403e211f0",
-   "$order": "1b2995eac508"
+   "$order": "50e34d95b9bf"
   },
   "TURRET_GUNS": {
    "aa30": "aeb52d74e586",
@@ -338,6 +340,7 @@
   "lnchr_gun": "63e08d08e33d",
   "missile": "c0b1511f72d8",
   "narwhal": "c14bbc63760a",
+  "obsidian": "50f7985e5460",
   "orca": "d59b876589d4",
   "petrel": "95d3015d6074",
   "pod": "819b36d18d68",
@@ -376,7 +379,7 @@
   "tur75_gun": "44ac3980a90e",
   "tur75r_base": "2090ad6ed049",
   "tur75r_gun": "b975d447543a",
-  "$order": "259e61ef9a3f",
+  "$order": "48d9e1a2977d",
   "$hidden": "613739b120dd",
   "$turretSpec": "8cdc31b662e3",
   "shoal_wreck": "b5a6b97ab0ce",
