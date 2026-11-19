@@ -42,6 +42,7 @@
    "frigatebird": "4fd1053f894c",
    "sailfish": "076d0281d9ce",
    "booby": "8a6b9316693d",
+   "tern": "b8219e23db3b",
    "petrel": "bca3c14e9e9e",
    "gannet": "a26d2cc96bb9",
    "skua": "928bb9f45813",
@@ -58,7 +59,7 @@
    "quartz": "12d1f13d5d26",
    "lodestone": "603bc7c5310c",
    "gravel": "3d8d55fbaa3c",
-   "$order": "7022a4c2391b"
+   "$order": "e6bd4ab5916c"
   },
   "SHIPS": {
    "orca": "36151043a7a5",
@@ -357,6 +358,7 @@
   "spermwhale": "7a86815bcd00",
   "spray": "f5d1a4953ef4",
   "station": "d3a69b55980d",
+  "tern": "9b5d49344eb7",
   "trilobite": "516ef4c19717",
   "tur120_base": "36f15ba6e045",
   "tur120_gun": "5704c6d6118b",
@@ -370,7 +372,7 @@
   "tur75_gun": "44ac3980a90e",
   "tur75r_base": "2090ad6ed049",
   "tur75r_gun": "b975d447543a",
-  "$order": "5f6d2dd48a1f",
+  "$order": "156236892017",
   "$hidden": "613739b120dd",
   "$turretSpec": "8cdc31b662e3",
   "shoal_wreck": "b5a6b97ab0ce",
