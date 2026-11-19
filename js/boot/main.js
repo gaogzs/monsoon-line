@@ -110,7 +110,7 @@
       'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb', 'pod',
       /* 水面舰船（SHIPS 表）—— 接入关卡之前它们也要先被自检覆盖，
          否则模型名写错要到任务里才暴露。顺序按阵营：上游 → 下游 → 其余 */
-      'orca', 'bluewhale', 'humpback', 'spermwhale', 'dolphin',
+      'orca', 'bluewhale', 'humpback', 'spermwhale', 'dolphin', 'narwhal',
       'trilobite', 'ammonite', 'seascorpion', 'cameroceras', 'dunkleosteus',
       'daplu', 'skori', 'diklo', 'cross', 'icecore', 'atoll'];
     for (i = 0; i < needModels.length; i++) {
