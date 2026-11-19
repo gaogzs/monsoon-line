@@ -65,6 +65,7 @@
    "orca": "36151043a7a5",
    "bluewhale": "736f79d105e9",
    "humpback": "fe0c6e2c95b5",
+   "narwhal": "9e644ada6c7f",
    "spermwhale": "ba763fbe69d2",
    "dolphin": "4d03f203f8bb",
    "trilobite": "62aabb14e58b",
@@ -78,7 +79,7 @@
    "cross": "734a894fa035",
    "icecore": "8e2361e94788",
    "atoll": "23709586c721",
-   "$order": "61f2901c5359"
+   "$order": "71162a4d61dd"
   },
   "PLATFORMS": {
    "shoal": "9908476461b6",
@@ -334,6 +335,7 @@
   "lnchr_base": "0c0f1cb0d55b",
   "lnchr_gun": "63e08d08e33d",
   "missile": "c0b1511f72d8",
+  "narwhal": "31ab0b6fc6c0",
   "orca": "d59b876589d4",
   "petrel": "95d3015d6074",
   "pod": "819b36d18d68",
@@ -372,7 +374,7 @@
   "tur75_gun": "44ac3980a90e",
   "tur75r_base": "2090ad6ed049",
   "tur75r_gun": "b975d447543a",
-  "$order": "156236892017",
+  "$order": "ca5765fe5feb",
   "$hidden": "613739b120dd",
   "$turretSpec": "8cdc31b662e3",
   "shoal_wreck": "b5a6b97ab0ce",
