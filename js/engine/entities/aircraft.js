@@ -203,6 +203,7 @@
   function stepAircraft(a, dt, world) {
     if (a.gunFlashT > 0) a.gunFlashT -= dt;     // 炮口火光的余辉，见 flashRings
     if (!a.alive) return;
+    if (a.deck) return $.stepDeck(a, dt, world);        // 甲板起飞：独立分支，见 deck.js
     if (a.psm) return $.stepPSM(a, dt, world);          // 过失速机动：独立分支，见 psm.js
     var p = effectivePhys(a);
 

@@ -16,6 +16,11 @@
   Ent.stepAircraft = $.stepAircraft;
   /* 过失速机动（psm.js）：Game 的 controlPlayer / 按键走这几个公开函数 */
   Ent.stepPSM = $.stepPSM;
+  Ent.stepDeck = $.stepDeck;
+  Ent.deckSlot = $.deckSlot;
+  Ent.deckPose = $.deckPose;
+  Ent.putOnDeck = $.putOnDeck;
+  Ent.DECK = $.DECK;
   Ent.psmGate = $.psmGate;
   Ent.psmStart = $.psmStart;
   Ent.psmAbort = $.psmAbort;

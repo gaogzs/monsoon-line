@@ -142,7 +142,7 @@
     for (var i = 0; i < $.world.actors.length; i++) {
       var a = $.world.actors[i];
       if (!a.alive || a.isPlayer) continue;
-      if (a.ai) AI.update(a, dt, $.world);
+      if (a.ai && !a.deck) AI.update(a, dt, $.world);    // 还在甲板上起飞的飞机不跑 AI（离舰后才接手）
       Ent.stepAircraft(a, dt, $.world);
       $.updateDEW(dt, a);
     }

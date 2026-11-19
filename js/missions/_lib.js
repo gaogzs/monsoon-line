@@ -20,6 +20,15 @@ function awayFromFriendlyAewc(w, o) {
 
 function spawnEnemy(w, o) {
   awayFromFriendlyAewc(w, o);
+  /* o.deck = 带跑道的宿主（舰船 / 平台）：飞机从它的跑道起点弹射起飞（Ent.putOnDeck，见 entities/deck.js）。
+     o.runway 指定第几条跑道（缺省取空闲的）。没有空闲跑道返回 null，调用者下一帧再试。 */
+  var deckHost = o.deck || null, deckRi = -1;
+  if (deckHost) {
+    deckRi = Ent.deckSlot(deckHost, o.runway, w.time);
+    if (deckRi < 0) return null;
+    var dp = Ent.deckPose(deckHost, deckRi);
+    o = Object.assign({}, o, { x: dp.pos.x, y: dp.pos.y, z: dp.pos.z, fwd: dp.fwd, speed: 1 });
+  }
   /* 用 o.ac 指定机型（AIRCRAFT 表的 id），性能、外形、名称全部取自
      该条目。早先这里把 RO-27 的数值硬编码在函数里，于是换机型
      只是换个名字，飞起来还是同一架。 */
@@ -128,6 +137,7 @@ function spawnEnemy(w, o) {
   }
 
   w.actors.push(a);
+  if (deckHost) Ent.putOnDeck(a, deckHost, deckRi);
   return a;
 }
 
@@ -222,17 +232,24 @@ function spawnDrone(w, leader, o) {
     if (de.alive && de.team === leader.team && de.ai && de.ai.role === 'drone') live++;
   }
   if (live >= MAX_DRONES) return null;
+  /* o.deck / o.runway：同 spawnEnemy —— 无人机从宿主的跑道起点弹射起飞（leader 与宿主可以是同一艘舰） */
+  var deckHost = o.deck || null, deckRi = -1, dpose = null;
+  if (deckHost) {
+    deckRi = Ent.deckSlot(deckHost, o.runway, w.time);
+    if (deckRi < 0) return null;
+    dpose = Ent.deckPose(deckHost, deckRi);
+  }
   var sl = { dx: o.dx !== undefined ? o.dx : 140, dy: o.dy !== undefined ? o.dy : 25, dz: o.dz !== undefined ? o.dz : -190 };
   var fwd = leader.fwd ? M3.clone(leader.fwd) : M3.V(0, 0, 1);
   var right = M3.norm(M3.V(-fwd.z, 0, fwd.x));      // fwd × up
   var a = Ent.makeAircraft({
     type: o.type,
     team: leader.team,
-    x: leader.pos.x + right.x * sl.dx + fwd.x * sl.dz,
-    y: leader.pos.y + sl.dy,
-    z: leader.pos.z + right.z * sl.dx + fwd.z * sl.dz,
-    fwd: fwd,
-    speed: leader.speed || (leader.vel ? M3.len(leader.vel) : 0) || 250,
+    x: dpose ? dpose.pos.x : leader.pos.x + right.x * sl.dx + fwd.x * sl.dz,
+    y: dpose ? dpose.pos.y : leader.pos.y + sl.dy,
+    z: dpose ? dpose.pos.z : leader.pos.z + right.z * sl.dx + fwd.z * sl.dz,
+    fwd: dpose ? dpose.fwd : fwd,
+    speed: dpose ? 1 : (leader.speed || (leader.vel ? M3.len(leader.vel) : 0) || 250),
     loadout: o.loadout || null
   });
   if (o.callsign) { a.name = o.callsign; a.label = o.callsign; }
@@ -242,6 +259,7 @@ function spawnDrone(w, leader, o) {
     formation: { dx: sl.dx, dy: sl.dy, dz: sl.dz }
   });
   w.actors.push(a);
+  if (deckHost) Ent.putOnDeck(a, deckHost, deckRi);
   return a;
 }
 
