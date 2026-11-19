@@ -110,15 +110,17 @@ function spawnEnemy(w, o) {
   var rank = o.rank || ac.rank || null;
   var skill = o.skill !== undefined ? o.skill : (rank ? RANKS[rank].skill : 0.55);
   if (!rank) rank = rankFromSkill(skill);
-  var jam = o.jam ? Object.assign({ wid: a.special || 'vsc', skill: 0.5, trigK: 1, dur: 30, fadeTo: 0.6, rekey: 3, msg: null }, o.jam) : null;
-  AI.attach(a, { role: 'enemy', skill: skill, rank: rank, temperament: o.temperament || (o.behavior === 'recon' ? 'steady' : null), ward: o.ward || null, fm: o.fm || null, jam: jam });
+  /* 干扰场：关卡显式给 o.jam（随队干扰机，构型视为 recon），或机型数据带 ewField（支援机的大范围干扰场，不改接战构型） */
+  var ewf = ac.ewField ? Object.assign({ wid: 'vsc', skill: 0.6, trigK: 1, dur: 30, fadeTo: 0.6, rekey: 3, msg: null, R: ac.ewField.R }, ac.ewField) : null;
+  var jam = o.jam ? Object.assign({ wid: a.special || 'vsc', skill: 0.5, trigK: 1, dur: 30, fadeTo: 0.6, rekey: 3, msg: null }, o.jam) : ewf;
+  AI.attach(a, { role: o.role || 'enemy', skill: skill, rank: rank, temperament: o.temperament || (o.behavior === 'recon' ? 'steady' : null), ward: o.ward || null, fm: o.fm || null, jam: jam });
   if (!a.ai.temperament) AI.rollTemperament(a, { leader: o.leader, ward: o.ward });   // 保底：关卡没指定性格就随机一个（侦察 / 干扰机构型视为 steady）
   a.rank = rank;
   a.ai.cmd = o.behavior || 'pursue';
   // 护航机不算任务目标：任务简报说的是"测绘编队 5 架"，
   // 把它们算进去会让"剩余 N"对不上
   if (o.escort) a.ai.escort = true;
-  a.behavior = o.behavior || (jam ? 'recon' : 'pursue');     // 干扰机：受损前不主动接战
+  a.behavior = o.behavior || (o.jam ? 'recon' : 'pursue');     // 干扰机：受损前不主动接战
   a.wave = o.wave || 0;
 
   /* 被动吊舱（任务脚本指定，例如下游的 SAV-6「迷雾」）。

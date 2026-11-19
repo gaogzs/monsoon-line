@@ -106,7 +106,7 @@
       }
     }
 
-    var needModels = ['frigatebird', 'sailfish', 'booby', 'schist', 'folded_wing', 'gravel', 'sower', 'relay', 'cell',
+    var needModels = ['frigatebird', 'sailfish', 'booby', 'schist', 'folded_wing', 'gravel', 'obsidian', 'sower', 'relay', 'cell',
       'sam', 'radar', 'depot', 'cmdpost', 'station', 'missile', 'bomb', 'pod',
       /* 水面舰船（SHIPS 表）—— 接入关卡之前它们也要先被自检覆盖，
          否则模型名写错要到任务里才暴露。顺序按阵营：上游 → 下游 → 其余 */
@@ -118,7 +118,7 @@
     }
 
     var needWeapons = ['cel1', 'cel3v', 'cel3', 'cel7', 'tca11', 'v11', 'v9', 'v17', 'v22', 'v25', 'v30',
-      'e4', 'l2', 'dl4', 'dl6', 'dl9', 'hwm', 'kkv', 'pgb'];
+      'e4', 'l2', 'dl4', 'dl6', 'dl9', 'tephra', 'hwm', 'kkv', 'pgb'];
     for (i = 0; i < needWeapons.length; i++) {
       if (!WEAPONS[needWeapons[i]]) problems.push(T('boot.main.preflight.s31') + needWeapons[i]);
     }

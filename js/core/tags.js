@@ -34,6 +34,8 @@ Tags.declare('cullFar',  { owner: 'render',   doc: T('core.tags.doc_17') });
 Tags.declare('resupply', { owner: 'game',     doc: T('core.tags.doc_19') });
 // 无人机航母：带机库（SHIPS[].hangar），按波次从跑道放飞无人机、回收耗尽的无人机（js/missions/_lib.js 的 tickHangar）
 Tags.declare('droneCarrier', { owner: 'game', doc: T('core.tags.doc_22') });
+// 大范围电子战场：机型数据的 ewField 由 spawnEnemy 转成 ai.jam（js/engine/ai/brain.js 的 jamAuto），半径取 ewField.R
+Tags.declare('ewfield', { owner: 'ai', doc: T('core.tags.doc_23') });
 // reserved：本批没有机型使用，VTOL（批次 6）带上它；读的地方是 psm.js 的 psmGate
 // 半主动雷达制导（Fox 1）：导弹只在发射机对该目标持有有效锁定时受引导，丢锁沿航向飞、宽限内重锁恢复（entities/missile.js）
 Tags.declare('sarh',      { owner: 'entities', doc: T('core.tags.doc_21') });

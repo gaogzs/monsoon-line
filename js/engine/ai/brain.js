@@ -103,7 +103,7 @@
     if (J.t > 0) return;
     J.t = 0.25;
     var w = WEAPONS[J.wid];
-    var R = (w.jamRadius || 9000) * (J.trigK || 1), R2 = R * R;
+    var R = (J.R || w.jamRadius || 9000) * (J.trigK || 1), R2 = R * R;        // J.R：机型数据 ewField.R 覆盖干扰半径
     var hit = false, i;
     for (i = 0; i < world.actors.length && !hit; i++) {
       var e = world.actors[i];
@@ -115,6 +115,7 @@
     }
     if (!hit) return;
     Ent.openEcm(a, J.wid, J.skill, { wave: { dur: J.dur, to: J.fadeTo } });
+    if (J.R) a.ewFieldR = J.R;
     a.spCd = J.dur + J.rekey;
     if (!J.n && J.msg && world.radio) {
       world.radio.raw({ who: a.label || a.name, cls: 'enemy', tx: J.msg, gap: 0.9 });
@@ -626,6 +627,11 @@
       s.flareReact = 0;
       desired = s.fake ? $.fakeDir(a, s) : $.retreatDir(a, s, world);        // 真撤离飞出战区的会在这里被移除（返回 null）
       throttle = 1; ab = true;
+    } else if (s.role === 'support' && !a.route) {
+      /* 战略制空支援机（批次 6.4）：守在友机后方游走，不追人（支援机动见 ai/support.js）。
+         有 a.route 的（预警机）不进这里：它们走 updateRoute */
+      var sup = $.supportDir(a, s, world, dt);
+      desired = sup.dir; throttle = sup.throttle; ab = sup.ab;
     } else if (s.role === 'drone') {
       /* 无人僚机永远待在编队里，不追出去。
 
@@ -802,6 +808,7 @@
       a.firingGun = false; s.gunT = 0; s.missT = 0; s.strafe = false;
       return;
     }
+    if (s.role === 'support' && !a.route) { $.supportFire(a, s, world, dt); return; }     // 支援机：定时对多个目标齐射，不走通用开火门限（ai/support.js）
     var t = s.target;
     if (!t || !t.alive || s.searching) { a.firingGun = false; s.gunT = 0; s.missT = 0; s.strafe = false; return; }     // 看不见目标就不开火
 

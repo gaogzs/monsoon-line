@@ -23,7 +23,7 @@
     // 对敌方电子战的适应速度（每秒）
     ewRate: function (s) { return 0.18 + s.skill * 0.30; },
     // 外围游走（standoff）只给 elite 以上；低位格直接冲上去
-    standoff: function (s) { var t = $.temper(s); return !t.noStandoff && s.skill >= (t.standoffMin || 0.7) && s.role !== 'drone'; },
+    standoff: function (s) { var t = $.temper(s); return !t.noStandoff && s.skill >= (t.standoffMin || 0.7) && s.role !== 'drone' && s.role !== 'support'; },     // 支援机不进外围游走：它有自己的机动（ai/support.js）
     // 提前量折扣（目前与技能无关）
     leadK: function () { return 0.85; },
 
