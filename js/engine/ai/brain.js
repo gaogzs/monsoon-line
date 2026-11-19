@@ -57,7 +57,8 @@
       shootT: 0,
       longT: 0,
       overT: 0,
-      tailT: 0, tailSide: 0, tailFlip: 0, tailPlan: null, planT: 0, holdPlan: null,     // 被咬尾计时 / 摆脱转向侧（tactics.js $.shakeTail）
+      tailT: 0, tailSide: 0, tailFlip: 0, tailPlan: null, planT: 0, holdPlan: null,
+      counterT: 0, counterFor: null, reversals: 0, planPhase: 0, planClock: 0, tailChaser: null,     // 转守为攻（tactics.js $.counterStep）     // 被咬尾计时 / 摆脱转向侧（tactics.js $.shakeTail）
       overCd: 0,
       burstT: 0,
       ewResist: 0,        // 对敌方电子战的适应度（设定 7.3"对手也在学"）
@@ -301,6 +302,7 @@
     if (s.retargetT > 0) s.retargetT -= dt;
     if (s.modeT > 0) s.modeT -= dt;
     if (s.evadeT > 0) s.evadeT -= dt;
+    if (s.counterT > 0) { s.counterT -= dt; if (s.counterT <= 0 || !(s.counterFor && s.counterFor.alive)) { s.counterT = 0; s.counterFor = null; } }
     if (s.standCool > 0) s.standCool -= dt;
     if (s.fakeBoostT > 0) s.fakeBoostT -= dt;
     if (s.shootT > 0) s.shootT -= dt;
@@ -481,6 +483,9 @@
         // 长机阵亡时不自主接战（设定：无人机没有接管战局的能力，只会盘旋）
         s.target = leadOk ? $.leadTarget(dLead) : (dLead && dLead.alive ? $.nearestEnemy(a, world, $.WING_FREE_R) : null);
       }
+    } else if (s.counterT > 0 && s.counterFor && s.counterFor.alive) {
+      /* 转守为攻（反击窗口）：死死盯住刚被甩过头的攻击者，不被 Director / STICKY 抢走 */
+      s.target = s.counterFor; s.retargetT = Math.max(s.retargetT, 0.8);
     } else if ((s.retargetT <= 0 || !s.target || !s.target.alive) && !lostWait(s, dt) && !$.illumHolds(s)) {
       s.lostT = null;
       s.retargetT = s.role === 'ally' ? 8 + 7 * $.rnd01(s) : $.SKILL.retarget(s);   // ally 的重评估间隔 8–15 s（Director）

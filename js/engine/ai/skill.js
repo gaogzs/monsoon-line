@@ -15,7 +15,7 @@
     // 机炮锥（弧度）；开火门限是它的 3.2 倍
     gunCone: function (s) { return 0.028 + (1 - s.skill) * 0.02; },
     // 导弹射击意愿（每次满足条件时掷骰的概率）
-    fireWill: function (s) { return 0.35 + s.skill * 0.45 + ($.temper(s).fire || 0) + ($.temper(s).rage || 0) * (1 - (s.hpFrac === undefined ? 1 : s.hpFrac)); },
+    fireWill: function (s) { return 0.35 + s.skill * 0.45 + (s.counterT > 0 ? $.TAIL.COUNTER_FIRE : 0) + ($.temper(s).fire || 0) + ($.temper(s).rage || 0) * (1 - (s.hpFrac === undefined ? 1 : s.hpFrac)); },
     // 射击间隔系数（乘在 rnd(2.6, 5.2) 上）
     shootGap: function (s) { return (1.6 - s.skill * 0.6) * (1 - ($.temper(s).rage || 0) * (1 - (s.hpFrac === undefined ? 1 : s.hpFrac))); },
     // 高技能要求进 nez（目标掉头逃也能打中），低技能进 rmax

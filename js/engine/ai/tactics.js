@@ -146,7 +146,19 @@
      随机只用私有 LCG；两者只在追击分支生效（规避 / PSM / 撤离 / 脱离优先），无人僚机不走这里。
      ============================================================ */
   $.TAIL = { SHAKE_R: 2600, REAR_COS: -0.5, SHAKE_MIX: 0.85, PLAN_T0: 2.5, PLAN_SPAN: 1.5, SCISSOR_FLIP: 1.6, JINK_MIN: 0.7, JINK_SPAN: 0.7,
-             HOLD_R: 2600, HOLD_COS: 0.8, HOLD_MIX: 0.8 };
+             HOLD_R: 2600, HOLD_COS: 0.8, HOLD_MIX: 0.8,
+             // 转守为攻：反击窗口时长 / 开火意愿加成 / 触发距离；各反转策略的阶段时长
+             COUNTER_T: 4, COUNTER_FIRE: 0.25, COUNTER_R: 1800,
+             BARREL_T: 2.2, HAMMER_T: 1.6, ROLL_FLIP: 1.0, FEINT_T0: 0.5, FEINT_T1: 0.2 };
+  /* 反转（转守为攻）型策略：攻击者被甩到机尾锥之外时转入反击（$.counterStep） */
+  $.REVERSAL = { barrel: true, hammer: true, rolling: true, feint: true };
+
+  /* 转入反击：强制盯住攻击者 COUNTER_T 秒（brain.js decide）、开火更果断（SKILL.fireWill）、第一枪不等反应延迟 */
+  $.counterStep = function (a, s, chaser) {
+    s.counterFor = chaser; s.counterT = $.TAIL.COUNTER_T;
+    s.reversals = (s.reversals || 0) + 1;
+    s.missT = Math.max(s.missT || 0, $.SKILL.reactT(s));
+  };
 
   function nearestFriend(a, world) {
     var best = null, bd = 15000, i, e;
@@ -186,7 +198,14 @@
       if (d >= bd) continue;
       if (M3.dot(a.fwd, M3.mul(M3.sub(e.pos, a.pos), 1 / Math.max(1, d))) < T.REAR_COS) { bd = d; chaser = e; }
     }
-    if (!chaser) { s.tailT = Math.max(0, (s.tailT || 0) - dt * 2); if (s.tailT <= 0) { s.tailSide = 0; s.tailPlan = null; } return null; }
+    if (!chaser) {
+      var lc = s.tailChaser;
+      if ($.REVERSAL[s.tailPlan] && lc && lc.alive && M3.dist(lc.pos, a.pos) < T.COUNTER_R) { $.counterStep(a, s, lc); s.tailT = 0; s.tailSide = 0; s.tailPlan = null; s.planT = 0; }
+      s.tailChaser = null;
+      s.tailT = Math.max(0, (s.tailT || 0) - dt * 2); if (s.tailT <= 0) { s.tailSide = 0; s.tailPlan = null; } return null;
+    }
+    s.tailChaser = chaser;
+    if (s.counterT > 0) { s.counterT = 0; s.counterFor = null; }        // 又被咬到身后：反击窗口作废
     s.tailT = (s.tailT || 0) + dt;
     if (k <= 0 || s.tailT < $.SKILL.reactT(s) * ($.temper(s).react || 1)) return null;
     if (!s.tailPlan || !(s.planT > 0)) {
