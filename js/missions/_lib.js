@@ -263,6 +263,51 @@ function spawnDrone(w, leader, o) {
   return a;
 }
 
+/* 无人机航母的机库（批次 6.1b）：每帧由 updateTargets 调用（t.hangar 非空才调）。
+   SHIPS[].hangar = { capacity, launchCd, waveSize, stagger, recoverR, recoverAlt, droneType, skill?, cmd?, firstCd? }
+   放飞：每 launchCd 秒一波 waveSize 架，波内每隔 stagger 秒从空闲跑道放一架（Ent.deckSlot）；
+         机库剩余不足一波则放剩下的。跑道都占着（或达到无人机上限）就下一帧再试。
+   回收：弹药池打空或血量 < 35% 的无人机改 recall 命令，飞回舰尾槽位（舰后 240 m），进入 dockR（缺省 400 m）且低于 recoverAlt 后收回：
+         alive = false + escaped = true —— killCredit 与友军损失统计都跳过 escaped，不计击毁、不计损失；
+         机库计数 +1，再放飞是全新生成（满弹药、满血）。
+   舰船被击毁（alive = false）不进这里：在外的无人机按"长机已死：盘旋"处理。
+   hold = true 暂停放飞（关卡脚本用）。 */
+function tickHangar(t, w, dt) {
+  var h = t.hangar, d = t.ship && t.ship.hangar;
+  if (!h || !d || !t.alive || t.team === 2) return;
+  for (var i = 0; i < w.actors.length; i++) {
+    var a = w.actors[i];
+    if (!a.alive || !a.ai || a.ai.leader !== t || a.ai.role !== 'drone' || a.deck) continue;
+    if (a.ai.cmd !== 'recall') {
+      var left = 0;                       // 弹药池总量（spAmmo 要等 AI 第一次选武器才填，不能用它判断）
+      for (var wid in a.ammoPool) left += a.ammoPool[wid] || 0;
+      if (left <= 0 || a.hp < a.maxHp * 0.35) a.ai.cmd = 'recall';
+      continue;
+    }
+    var dx = a.pos.x - (t.pos.x - t.fwd.x * 240), dz = a.pos.z - (t.pos.z - t.fwd.z * 240);
+    var dockR = d.dockR || 400;           // 无人机最低速度远大于舰速，只能绕着舰尾槽位盘旋：半径不能给太小
+    if (dx * dx + dz * dz < dockR * dockR && a.pos.y - (t.pos.y || 0) < d.recoverAlt) {
+      a.alive = false; a.escaped = true;
+      h.count = Math.min(d.capacity, h.count + 1); h.recovered++;
+    }
+  }
+  if (h.cd > 0) h.cd -= dt;
+  if (h.pending <= 0 && h.cd <= 0 && h.count > 0 && !h.hold) {
+    h.pending = Math.min(d.waveSize, h.count); h.sg = 0; h.cd = d.launchCd;
+  }
+  if (h.pending > 0) {
+    h.sg -= dt;
+    if (h.sg <= 0) {
+      var k = h.launched;
+      var dr = spawnDrone(w, t, {
+        type: d.droneType, deck: t, skill: d.skill, cmd: d.cmd,
+        dx: ((k % 5) - 2) * 70, dz: -190 - (k % 3) * 40
+      });
+      if (dr) { h.count--; h.pending--; h.launched++; h.sg = d.stagger; }
+    }
+  }
+}
+
 /* 空中预警机。
 
    它不是战斗机 —— 用 route 型航线，完全绕开空战 AI（见 ai.js 的
@@ -454,6 +499,11 @@ function spawnShip(w, o) {
       if (o.ssmK !== undefined && tu.ammo > 0) tu.ammo = Math.max(1, Math.round(tu.ammo * o.ssmK));
       if (o.ssmStagger) tu.cd = M3.rnd(0, o.ssmStagger);
     }
+  }
+  /* 机库（SHIPS[].hangar）：count = 机库里还有几架；o.hangarCount 改开局数量，o.hangar === false 关掉自动放飞 */
+  if (s.hangar && o.hangar !== false) {
+    t.hangar = { count: o.hangarCount !== undefined ? o.hangarCount : s.hangar.capacity,
+      cd: s.hangar.firstCd !== undefined ? s.hangar.firstCd : 6, pending: 0, sg: 0, launched: 0, recovered: 0, hold: false };
   }
   if (o.ref) (w.refs || (w.refs = {}))[o.ref] = t;     // 关卡按 ref 引用本单位（mission.resupply）
   w.targets.push(t);

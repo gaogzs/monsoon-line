@@ -169,6 +169,7 @@
       Ent.stepTarget(t, dt);
       if (t.turrets && t.team !== 2) Turret.stepAll(t, $.world, dt);
       if (t.ship) Ent.wakeSpray(t, $.world, dt);
+      if (t.hangar && typeof tickHangar === 'function') tickHangar(t, $.world, dt);   // 无人机航母：放飞 / 回收（missions/_lib.js）
 
       if (!t.weapon || t.team === 2) continue;
       if (t.fireCd > 0) { t.fireCd -= dt; continue; }

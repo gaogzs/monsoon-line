@@ -473,6 +473,8 @@
          已有的授权照旧，僚机仍会按当前指令攻击。 */
       if (a.suppressed > 0.35) {
         s.target = null;                       // 自主防御：只规避，不开火
+      } else if (s.cmd === 'recall') {
+        s.target = null;                       // 回收：只飞回舰尾，不接战（机库见 missions/_lib.js 的 tickHangar）
       } else if (s.cmd === 'spread') {
         s.target = $.nearestEnemy(a, world, 9000);
       } else if (s.cmd === 'cover') {
@@ -632,7 +634,7 @@
          所以它的机动**只跟编队位置有关**，目标只用于决定何时开火。 */
       var dLead2 = $.leaderOf(s, world);
       if (dLead2 && dLead2.alive) {
-        var sl = s.formation || { dx: 140, dy: 25, dz: -190 };
+        var sl = s.cmd === 'recall' ? { dx: 0, dy: 25, dz: -240 } : (s.formation || { dx: 140, dy: 25, dz: -190 });
         /* 指令同时改变站位 —— 这是 codex 里"分开"与"靠拢"的落点：
 
              cover   收进到 55%（向你靠拢、贴上去）
