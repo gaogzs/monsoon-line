@@ -65,8 +65,8 @@
    "$order": "20d91449b8e6"
   },
   "SHIPS": {
-   "orca": "36151043a7a5",
-   "bluewhale": "736f79d105e9",
+   "orca": "71d66c8251d1",
+   "bluewhale": "afe5823e4410",
    "humpback": "2806635c9d32",
    "narwhal": "f807fb95490f",
    "spermwhale": "ba763fbe69d2",
@@ -74,13 +74,13 @@
    "trilobite": "62aabb14e58b",
    "ammonite": "109caf1b7b6e",
    "hallucigenia": "753c281c31e1",
-   "seascorpion": "03bb65a46c12",
+   "seascorpion": "c7e78fea98b3",
    "cameroceras": "5f5521553a19",
    "dunkleosteus": "dc0989d9eb60",
    "daplu": "3d46363664c7",
    "skori": "59e0925e887d",
    "diklo": "a1016748cca0",
-   "cross": "734a894fa035",
+   "cross": "08ad10fe1b5a",
    "icecore": "8e2361e94788",
    "atoll": "23709586c721",
    "$order": "e46560e4f7cf"
