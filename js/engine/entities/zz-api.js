@@ -17,6 +17,7 @@
   /* 过失速机动（psm.js）：Game 的 controlPlayer / 按键走这几个公开函数 */
   Ent.stepPSM = $.stepPSM;
   Ent.stepDeck = $.stepDeck;
+  Ent.stepVtol = $.stepVtol;
   Ent.deckSlot = $.deckSlot;
   Ent.deckPose = $.deckPose;
   Ent.putOnDeck = $.putOnDeck;

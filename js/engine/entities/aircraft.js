@@ -205,6 +205,7 @@
     if (!a.alive) return;
     if (a.deck) return $.stepDeck(a, dt, world);        // 甲板起飞：独立分支，见 deck.js
     if (a.psm) return $.stepPSM(a, dt, world);          // 过失速机动：独立分支，见 psm.js
+    if (a.vtolOn) return $.stepVtol(a, dt, world);      // 垂直起降低速区：独立分支，见 vtol.js
     var p = effectivePhys(a);
 
     // ---- 动压 ----
@@ -365,6 +366,7 @@
       return;
     }
 
+    if (a.ac && a.ac.vtol) $.vtolWatch(a);       // 垂直起降机型：速度掉到 transSpeed 以下，下一帧起转入 vtol.js
     stepAircraftTail(a, dt, world);
   }
 

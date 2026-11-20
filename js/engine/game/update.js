@@ -36,7 +36,8 @@
       if (!a.wdPrev) a.wdPrev = { x: 0, y: 0, z: 0 };
       a.wdPrev.x = a.pos.x; a.wdPrev.y = a.pos.y; a.wdPrev.z = a.pos.z;
 
-      if (moved < 0.02) a.wdStill = (a.wdStill || 0) + dt;
+      /* 垂直起降机型悬停时位置本来就几乎不动（a.vtolOn，见 vtol.js）：不算"钉住" */
+      if (moved < 0.02 && !a.vtolOn) a.wdStill = (a.wdStill || 0) + dt;
       else a.wdStill = 0;
 
       if (a.wdStill > WD_LIMIT) {
