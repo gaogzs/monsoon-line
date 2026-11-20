@@ -188,6 +188,8 @@ for 每架 AI：AI.update → Ent.stepAircraft → updateDEW
 watchdog(dt)                                            ← 所有飞机步进之后
 导弹 / 子弹 step → resolveBullets(dt) → updateTargets(dt) → Ent.stepParticles
 最近一架 NPC 的引擎声 / 导弹告警 / 引擎音 / 地形与失速音
+
+> 地形告警音（`SFX.terrain()`）的条件：玩家 `pos.y < 260` 且在下扎——常规机型读 `fwd.y < −0.1`（机头朝下），悬停分支（`player.vtolOn`）里机头方向与航迹无关，改读**竖直速度** `vel.y < −5` m/s（HUD 的 TERRAIN 文字警告也同样按竖直速度，见 [hud.md](hud.md)）。另外 `AI.update` 对 `a.deck` 非空（还在甲板上起飞）的飞机不跑，离舰后才接手（`update.js` 的每架 AI 步进处）。
 mission.tick(world, dt);  compact()                     ← 三数组去死 + 粒子上限 + 延迟压缩 actors（死 / 离场超过 10 s 移除；击落记功 / 友军损失先入账 `world.gone`，见 `compactActors`）
 击杀统计 → 玩家受击台词 → 失败 / 胜负：failing 中则计时、到点 endFail()；否则 时限到 / mission.lose → beginFail()，mission.win → finish(true)（只有胜利 return）
 僚机损失台词（flags.allyDown 一次性触发器）
@@ -351,9 +353,11 @@ banner / hitMark / 鼠标引导的 CMD 瞄准环（“被对空雷达截获”�
 
   （油门键是 Shift / Ctrl：`thrIn` 由它们组成。）
 
+  **垂直起降特例**（批次 6.2）：`player.vtolOn`（D-27 海马的悬停分支，见 [flight-model.md](flight-model.md)）时，油门轴不是"推力"而是**垂直速度指令**：0.5 定高、0.5–0.85 爬升、0.85 以上是前向推力。所以松手回落的中间一档改成：`else if (player.vtolOn && throttle > 0.85) throttle = max(0.85, throttle − dt*1.6)`——回落到 0.85（爬升封顶）而不是 1.0，因为 1.0 以上的"加力区"在这里是推力，不是爬升指令。这一档排在 `> 1.0` 回落之前；`< THR_IDLE` 的回升不变。进入悬停分支时油门被设为 0.5 由 `vtolWatch` 做（`entities/vtol.js`），不在控制层。
+
   加力（`> 1.0`）与减速板（`< THR_IDLE`，0.04）都是**按住才有效的瞬时态**：松手后自动回落到军推区间的边界，回落速率 `dt * 1.6` 比推进的 `0.62` 快、又不是瞬间弹回。这正是 [hud.md](hud.md#引擎出力带thrtape) 警告“别拿它们当稳定读数去测”的原因。`player.ab = throttle > 1.0`、`player.brake = throttle < THR_IDLE`。HUD 读数按慢车 0% / 军推 100% 标度，见 [hud.md](hud.md#引擎出力带thrtape)。
 - **过失速机动（同时按住 `G` 与减速板状态）**：`controlPlayer` 末尾（`player.brake` 算出之后）每帧判 `KeyG && player.brake`：满足且过 `Ent.psmGate` 就 `psmStart`（条件不满足静默忽略，无提示），任一松开走 `psmAbort`；结束时键还按着则 `psmLock` 到松开为止。`controlPlayer` 在 `updateMouseAim` 之后：`player.psm` 活动中时**屏蔽键盘覆盖与高 G**（`psmOn`），飞控照常把机头指向光标，`stepPSM` 消费 `a.ctrl`；键盘直控（没有光标）或 `toggleAimMode` 切走时中止；低空中止后 `player.psmLevel` 期间目标换成水平略带爬升的方向（高于 `PSM_LEVEL_AGL` 且不再下降才解除）。细节见 [flight-model.md](flight-model.md#过失速机动psm玩家侧)。
-- 高 G 机动（`G`）：只有 `demand = |pitch| + |roll| > 0.55` 且 `speed > Ent.vStallAt(player) * 1.30`（当前高度的失速速度）才生效 —— 否则它就成了一个无脑常开的加速器。生效时 `gLoad` 用 `M3.smooth(..., HIG_MAX, 9, dt)` 拉起；速度代价由 `stepAircraft` 的转弯掉速自然产生（角速度放大约 1.9 倍，掉速随之放大）；松手用 `M3.smooth(..., 1, 6, dt)` 落回。
+- 高 G 机动（`G`）：只有 `demand = |pitch| + |roll| > 0.55` 且 `speed > Ent.vStallAt(player) * 1.30`（当前高度的失速速度）才生效 —— 否则它就成了一个无脑常开的加速器。生效时 `gLoad` 用 `M3.smooth(..., HIG_MAX, 9, dt)` 拉起；速度代价由 `stepAircraft` 的转弯掉速自然产生（角速度放大约 1.9 倍，掉速随之放大）；松手用 `M3.smooth(..., 1, 6, dt)` 落回。**悬停分支关掉高 G**：`wantG` 里多一个 `!player.vtolOn` 条件（悬停分支用固定角速率，没有高 G）。
 - 机炮：`wantGun = mouse.left || keys.Space` → `Ent.fireGun`，`SFX.gun(wantGun && player.gunAmmo > 0)`（有按键没弹时不出声）。
 
 ---
@@ -524,6 +528,8 @@ var WD_LIMIT = 1.5;
 ```
 
 `watchdog(dt)`（`engine/game/update.js`）遍历 `world.actors`，把位置变化（三个分量绝对值之和）小于 `0.02` 的帧累加进 `a.wdStill`；超过 1.5 秒就：用 `console.warn` 打一条含 `name / wdStill / speed / fwd / ctrl / pos / hp` 的记录；把姿态重置成 `fwd=(0,0,1) up=(0,1,0) right=(1,0,0)`、速度设为 `min(max(vStallAt * 1.4, 180), vMax * 1.1)`（`vStallAt` 是当前高度的失速速度）、`vel = fwd * speed`、清 `stall`；`wdStill = 0` 让它继续飞。
+
+**垂直起降免检**：悬停时位置本来就几乎不动，所以 `a.vtolOn` 的飞机不累加 `wdStill`（`moved < 0.02 && !a.vtolOn` 才累加），不会被误判成"钉住"。
 
 **兜的是什么**：有飞机在空中“钉住”过（位置完全不动、速度读数却正常），根因至今没定位到，所以这是纯粹的兜底。**为什么值得兜**：玩家分不清“这架飞机卡住了”和“我打不着它”，一架悬停的敌机会让整场战斗都显得坏了。**为什么留 `console.warn`**：万一真被触发，那条记录就是下次定位根因的起点。`mission` 结束后 `update()` 不再运行，所以“结算时的静止”不会被误判成卡死。
 

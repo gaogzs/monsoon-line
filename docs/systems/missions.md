@@ -8,7 +8,7 @@
 
 | 文件 | 内容 |
 |---|---|
-| `js/missions/_lib.js` | 共享生成器（全局函数）：`spawnEnemy` / `spawnWingman` / `spawnDrone` / `spawnAewc` / `spawnWinterport` / `spawnTarget` / `spawnCellField` / `spawnShip` / `spawnPlatform` / `bombTheBase` / `jammerRoute`，以及 `batchCallsigns`（sk1 批次呼号）、`SK_FITS`（sk1 机型→弹种）、`M11_FLAG_MARKS`（m11 旗舰受损播报档位）、`CELL_SPACING` |
+| `js/missions/_lib.js` | 共享生成器（全局函数）：`spawnEnemy` / `spawnWingman` / `spawnDrone` / `spawnTanker` / `spawnAewc` / `spawnWinterport` / `spawnTarget` / `spawnCellField` / `spawnShip` / `spawnPlatform` / `bombTheBase` / `jammerRoute`，以及 `batchCallsigns`（sk1 批次呼号）、`SK_FITS`（sk1 机型→弹种）、`M11_FLAG_MARKS`（m11 旗舰受损播报档位）、`CELL_SPACING` |
 | `js/missions/<id>.js` | **每关一个文件**：`Registry.mission({ order, id, no, name, … spawn / tick / win / lose })`。现有 13 个：`m1 m2 m3 m4 m5 m6 m7 m8 m10 m12 sk1 m9 m11`（按这个 `order` 先后） |
 | `js/missions/campaigns.js` | `Registry.campaign({ order, id, …, missions: ['m1', …] })`，战役**按关卡 id 引用** |
 | `js/missions/zz-seal.js` | `Registry.sealMissions()`（生成全局 `MISSIONS` / `CAMPAIGNS`，把战役里的 id 换成 `MISSIONS` 的全局下标）+ `getMission(idx)` |
@@ -50,11 +50,13 @@
 |---|---|---|
 | `spawnEnemy` | `spawnEnemy(w, o) → a` | 造一架敌机并推入 `w.actors`。`o` 字段见下表 |
 | `spawnWingman` | `spawnWingman(w, idx, slotX, slotY, slotZ) → a` | 造僚机（机型写死 `folded_wing`，队形相对长机），登记 `w.wings[idx]` |
-| `spawnDrone` | `spawnDrone(w, leader, o) → a \| null` | 以任意长机（飞机或舰船）为 `ai.leader` 的无人机，team 跟长机，**不**写 `w.wings`；`o.type` 机型（如下游 `gravel`）、`dx/dy/dz` 槽位、`cmd`、`skill`、`loadout`；同队存活 ≥ `MAX_DRONES`（24）返回 null |
-| `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets` |
+| `spawnDrone` | `spawnDrone(w, leader, o) → a \| null` | 以任意长机（飞机或舰船）为 `ai.leader` 的无人机，team 跟长机，**不**写 `w.wings`；`o.type` 机型（如下游 `gravel`）、`dx/dy/dz` 槽位、`cmd`、`skill`、`loadout`、**`leash`**（AI 长机的无人机自选目标的范围，米，0 = 缺省 `AI.LEASH_R`；玩家长机的僚机不读）、**`deck` / `runway`**（从带 `runways` 的宿主弹射起飞，同 `spawnEnemy`，无空闲跑道返回 null）；同队存活 ≥ `MAX_DRONES`（24）返回 null |
+| `spawnTarget` | `spawnTarget(w, o) → t` | 调 `Ent.makeTarget(o)` 并推入 `w.targets`；`TARGETS[o.model]` 带 `mounts` / `launchers`（目前只有 `relay`）则 `Turret.attach`，`sam` 落到 `t.weapon`（批次 6.6）；**`o.armed === false`** 不挂自卫火力；中立单位（team 2）挂了也不开火 |
 | `spawnPlatform` | `spawnPlatform(w, o) → t` | **固定式海上平台**（`o.platform` = `PLATFORMS` 的 id：`shoal` / `breakwater` / `sluice` / `reed` / `cairn` / `beacon`）：和 `spawnShip` 同一条路（`Ent.makeTarget` + 炮位 / 发射器），不走航线、不发水花；被击毁后不移除，改画 `<model>_wreck` 并下沉一截（m9 用它） |
 | `spawnCellField` | `spawnCellField(w, {xs, zs}) → [{x,y,z}]` | **调节单元阵列**：`xs × zs` 每个点一个 3×3 编组，推进 `w.targets` 与 `w.cells`，返回各组中心。见下文「调节单元阵列」 |
-| `spawnShip` | `spawnShip(w, o) → t` | **水面舰船**：按 `o.model` 查 `SHIPS` 表取 `hp/radius/value/label`（查不到回退 `SHIPS[0]`），直接调 `Ent.makeTarget` 并推入 `w.targets`；`team` 缺省 1、`fireCd` 缺省 `rnd(3,8)`；`o` 可覆盖 `hp/radius/value/label/team/drift/route/weapon/fireCd` |
+| `spawnShip` | `spawnShip(w, o) → t` | **水面舰船**：按 `o.model` 查 `SHIPS` 表取 `hp/radius/value/label`（查不到回退 `SHIPS[0]`），直接调 `Ent.makeTarget` 并推入 `w.targets`；`team` 缺省 1、`fireCd` 缺省 `rnd(3,8)`；`o` 可覆盖 `hp/radius/value/label/team/drift/route/weapon/fireCd`；**机库**（`SHIPS[].hangar`，见 [data.md](data.md)）：`hangarCount`（开局机库数量，缺省 `capacity`）、`hangar: false`（关掉自动放飞）、`hangarLeash`（覆盖舰船数据的 `leash`：小 = 防御母舰，大 = 出击）；放飞与回收由 `tickHangar` 每帧驱动 |
+| `spawnTanker` | `spawnTanker(w, o) → a` | **空中整备机**（批次 6.5，缺省机型 `puffin`）：`spawnEnemy`（`behavior: 'recon'`、`special: null`、team 缺省 0）+ `a.tanker` / `a.bigTarget` + 在 `o.a` ↔ `o.b` 两点间慢速来回盘旋的 `route: {loiter:true, wp, exit, arrive: 1500}`，登记 `w.refs[o.ref \|\| 'puffin']`，关卡用 `mission.resupply: [{ ref: 'puffin', r, hold, swap }]` 引用，它本身就是移动整备点；`o.a`、`o.b` 相距 3 ~ 6 km 为宜 |
+| `tickHangar` | `tickHangar(t, w, dt)` | 无人机航母机库（不由关卡直接调，`updateTargets` 对带 `t.hangar` 的舰船每帧调用）：每 `launchCd` 秒一波 `waveSize` 架、波内每 `stagger` 秒从空闲跑道放一架（`spawnDrone` + `deck`）；弹药池打空或血量 < 35% 的无人机改 `recall` 飞回舰尾槽位（舰后 240 m），进入 `dockR`（缺省 400 m）且低于 `recoverAlt` 后收回（`alive = false` + `escaped = true`，不计击毁 / 友军损失，机库 +1，再放飞是全新生成）；舰船被击毁不进这里；`t.hangar.hold = true` 暂停放飞 |
 | `spawnAewc` | `spawnAewc(w, o) → a` | **空中预警机**：`spawnEnemy` + `a.aewc = true` + `route: {loiter:true, wp, exit}`。行为在 `js/engine/game/lock.js` 的 `updateAewc()` 里。己方预警机应摆在战区后沿（m1 / sk1 的 z 贴近边界），`spawnEnemy` 会把出生点落在它 25 km 内的敌方单位推到圈外 |
 | `bombTheBase` | `bombTheBase(bomber, w)` | 轰炸机抵达投弹点的动作：48 个爆炸粒子 + 对 `w.baseTarget` 造成 340 伤害 |
 
@@ -72,7 +74,7 @@
 > （`spawnShip` 不替你换算，需要按表取值时自己 ×0.514）。现有关卡多用
 > `loop: true` 的两点往返巡航（8–20 m/s），m10 的登陆舰用 `loop: false` 一路往北开。实现见 [entities.md](entities.md#35-目标物-tkind-target)。
 
-`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'schist'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（**只在没写时**缺省 `'dl6'`；显式 `null` = 不带弹，预警机 / 轰炸机 / 运输用的 GAL-31 都这么传）/ **`loadout`**（逐组挂载，见下一节）/ **`rank`**（`rookie / pawn / elite / ace`；缺省取机型 `ac.rank`，再缺省按 `skill` 映射；`skill` 缺省取位格缺省值，没写 rank 也没写 skill 时 0.55）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）。
+`spawnEnemy` 的 `o` 字段：`ac`（AIRCRAFT id，缺省 `'schist'`）/ `x y z` / `fwd`（缺省 −z）/ `speed`（缺省 300）/ `special`（**只在没写时**缺省 `'dl6'`；显式 `null` = 不带弹，预警机 / 轰炸机 / 运输用的 GAL-31 都这么传）/ **`loadout`**（逐组挂载，见下一节）/ **`rank`**（`rookie / pawn / elite / ace`；缺省取机型 `ac.rank`，再缺省按 `skill` 映射；`skill` 缺省取位格缺省值，没写 rank 也没写 skill 时 0.55）/ `skill`（缺省 0.55）/ `behavior`（缺省 `'pursue'`，同时写进 `a.ai.cmd`）/ `callsign` / `escort`（真值则 `a.ai.escort = true`）/ `wave` / **`team`**（缺省 1 / 敌方；**我方支援单位传 0**）/ **`pods`**（被动吊舱 id 数组，走 `Ent.passiveEffects()`，见 [loadout.md](loadout.md)）/ **`deck`**（批次 6.1b：带 `runways` 的宿主舰船 / 平台，飞机从其跑道起点弹射起飞，`Ent.deckSlot` 取空闲跑道、`Ent.deckPose` 取位姿、生成后 `Ent.putOnDeck`；没有空闲跑道返回 `null`，调用者下一帧再试；`o.runway` 指定第几条，机制见 `js/engine/entities/deck.js`）/ **`role`**（写进 `AI.attach` 的 role，缺省 `'enemy'`；支援机传 `'support'`）。机型带 `ewField`（黑曜岩）时 `spawnEnemy` 自动把它当作自由干扰场 `jam`（不改接战构型，`behavior` 仍缺省 `pursue`）；支援机的挂载预设写 `loadout: 'support'` 并配 `special: null`。
 
 `special` 与 `pods` 都**同时管机制和外观**：
 

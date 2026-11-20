@@ -10,7 +10,7 @@
 ```
 tools/
 ├── test/        测试与回归：smoke  snapshot-data  golden  golden-render  probe-perf  text-census  check-locales
-│   ├── probes/    各类探针：probe-balance / blast / ccip / ciws / envelope / footprint / gunlead / missions / range / turret
+│   ├── probes/    各类探针：probe-balance / blast / ccip / ciws / envelope / footprint / gunlead / missions / range / turret 等
 │   └── baseline/  各基线：data.json  golden.json  golden-render.json  perf.json  text-census.json
 ├── build/       生成与发版：gen-index  gen-pages  gen-locales  fmt-locales  extract-text  extract-html（一次性）
 │                            release  stamp-version  rename-aircraft
@@ -58,6 +58,14 @@ tools/
 | 性格：随机保底、各机制 × 性格（咬尾 / 远射 / 超调 / 假撤退 / 选目标 / 加力 / 受伤） | `probe-temper.js`（约 40 s） |
 | AI 过失速机动（ace 触发 / 非 ace 与 noPSM / 无人机不触发 / TTI 门限 / 冷却） | `probe-psm-ai.js`（玩家侧的 PSM 在 `probe-psm.js`） |
 | FovWatch（保守调度与暴力检查逐事件一致、迟滞） | `probe-fovwatch.js` |
+| 武装浮空平台（`spawnTarget` 按 `TARGETS[model]` 挂炮塔 / `armed:false` 关闭 / 高原 relay 对玩家开火 / m2 三座默认武装） | `probe-relay.js` |
+| 通用甲板起飞（跑道起点生成 / 沿跑道离舰 / 宿主在开 / 同跑道占用与间隔 / 有人机与无人机） | `probe-deck.js` |
+| 无人机航母怪诞虫（机库波次放飞 / 库存守恒 / 弹药打空 recall 回收 / 母舰被压制） | `probe-carrier.js` |
+| AI 长机的无人机（巡航守编队、leash 范围内自选目标；母舰出击 / 防御只差 leash 大小；被压制退回规避） | `probe-drone-roles.js` |
+| 战略制空支援机黑曜岩（守在友机后方 / 定时多目标齐射 / 敌机逼近脱离 / 压制 / ewField 干扰场） | `probe-support.js` |
+| 空中整备机海鹦（盘旋航线 / `Resupply.validate` 认飞机的标签 / 移动整备点驻留与出圈清零） | `probe-tanker.js` |
+| 重型运输机蝠鲼（不武装 / 大靶面与血量 / 沿航线飞） | `probe-transport.js` |
+| 垂直起降 `stepVtol`（悬停 / 前倾平移 / 爬升下降率 / 过渡到翼飞时速度连续） | `probe-vtol.js` |
 | `render-gl.js` / `render.js` / `shading.js` | `probe-render.js`（要 Chrome） |
 | 模型、挂载、俯视图、详情页 | 对应的 `render/` 预览器（肉眼看） |
 | 要发一个版本 | `release.js vX.Y.Z`，见[版本戳与发版](#版本戳与发版) |

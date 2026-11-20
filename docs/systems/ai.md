@@ -103,7 +103,7 @@ HUD 中心是准星（CMD），青色标记是机头，二者之间有虚线；T
 
 | 字段 | 初值 | 含义 |
 |---|---|---|
-| `role` | `'enemy'` | `enemy` / `ally`（友军自主战斗机，批次 5a）/ `drone`（`drone` 是 AI 角色，与机型标签 `tags.unmanned` 是两回事；战果归属等处读的是后者）；预警机由 `spawnAewc()` 改成 `support`（它带 `route`，不走状态机） |
+| `role` | `'enemy'` | `enemy` / `ally`（友军自主战斗机，批次 5a）/ `drone`（`drone` 是 AI 角色，与机型标签 `tags.unmanned` 是两回事；战果归属等处读的是后者）；预警机由 `spawnAewc()` 改成 `support`（它带 `route`，不走状态机）；`support` 且**没有** `route` 的是战略制空支援机（批次 6.4，见下文「战略制空支援机」），走 `ai/support.js` |
 | `skill` | 0.6 | 0..1，见「技能等级」 |
 | `rank` | `null` | 位格 `rookie / pawn / elite / ace`（`RANKS`），决定缺省 skill 与撤离概率系数 |
 | `mode` | `'pursue'` | `pursue` / `evade` / `extend` / `standoff` / `closeIn` / `retreat` |
@@ -118,7 +118,8 @@ HUD 中心是准星（CMD），青色标记是机头，二者之间有虚线；T
 | `retargetT` | `rnd(0, 1.2)` | 下一次重选目标的倒计时 |
 | `formation` | null | 实际由 `js/missions/` 传 `{dx, dy, dz}`（`attach` 的 `opt` 也接受它，只是文档化签名里没列） |
 | `wander` | `rnd(0, 6.28)` | 巡逻用的相位 |
-| `cmd` | `'focus'` | 僚机指令 `focus` / `cover` / `spread`。缺省为最保守的 `focus` |
+| `cmd` | `'focus'` | 僚机指令 `focus` / `cover` / `spread`。缺省为最保守的 `focus`；无人机母舰的回收用第四个值 `recall`（只有机库写，玩家按键不产生） |
+| `leash` | 0 | 批次 6：**AI 长机**的无人机自选目标的范围（m）；0 = 缺省 `$.LEASH_R`（8 km）。见「无人僚机」的「长机是 AI 时」 |
 
 ---
 
@@ -171,6 +172,8 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 | 角色 / 指令 | 规则 |
 |---|---|
 | `drone` + 数据链中断 | **降级为完全自主防御**：`s.target = null`，只规避、不开火 |
+| `drone` + `cmd === 'recall'` | `s.target = null`：只飞回舰尾槽位，不接战（排在数据链中断之后、长机类型判断之前） |
+| `drone` 且长机是 AI（`$.aiLed`） | 不分命令：`$.leashTarget`，在长机周围 leash 范围内自选目标，见「无人僚机」 |
 | `drone` + `focus`（默认） | 继承长机的目标；长机没锁定时打离自己 `WING_FREE_R`（6 km）内最近的敌机，仍守在编队槽位上；长机阵亡则不接战 |
 | `drone` + `cover` | 优先打正在锁定长机的敌机（`leadThreat`）；没有时打离**长机** 6 km 内最近的敌机（`nearestEnemyTo`）；再没有退回长机目标 |
 | `drone` + `spread` | 自主接战：`nearestEnemy(a, world, 9000)` |
@@ -213,7 +216,9 @@ if (s.mode === 'extend' && s.modeT <= 0) s.mode = 'pursue';
 |---|---|---|
 | `evade` 且有 `msl` | `evade(a, s.msl, world)` | 1，`ab = dist < 2600` |
 | `extend` | `norm(a.pos - nearestEnemy(a, world, 20000).pos)`，再强制 `y = 0.06` 拉平 | 1，加力 |
-| drone 且长机在 | 长机编队槽位 | 落后 > 700 m 加力，否则 0.75 |
+| drone 且长机在（玩家长机，或 AI 长机但没有目标） | 长机编队槽位（`recall` 时站位改为长机正后 240 m、上 25 m） | 落后 > 700 m 加力，否则 0.75 |
+| drone 且长机是 AI、`cmd !== 'recall'`、手上有活目标 | 不进上一行：放行到下面通用的 `pursue` / 面目标分支去追 | 见 `pursue()` |
+| `support` 且无 `route` | `supportDir`（`ai/support.js`），见「战略制空支援机」 | 由 `supportDir` 给（脱离 1 + 加力 / 到位后 0.7 等） |
 | drone 且长机没了 | 切向盘旋，`y = pos.y < 3200 ? 0.12 : -0.05` | 0.6 |
 | 有目标（`target`） | `approachSurface(a, s.target)`：**保持高度**，只把机头转过去 | 0.9 |
 | 有目标（飞机） | `pursue(a, s.target, world)` | 见 `pursue()` |
@@ -495,6 +500,15 @@ desired = norm(V(tan.x, climb, tan.z));      // 取切向 → 持续转圈
 
 不接管战局、不自主选目标。这不是能力不足，是它压根没有那套东西。
 
+**长机是 AI 时**（批次 6，母舰放出的无人机、AI 长机的僚机）：三条铁律里的"目标只来自授权"与"不追出去"在这里放宽，三档指令（focus / cover / spread）也不存在——那是玩家给僚机下的令。判定是 `util.js` 的 `$.aiLed(s, world)`（长机在、活着、不是玩家）。行为只有两种：
+
+- **巡航**：没有目标时守长机的编队槽位（与玩家长机的槽位机动同一段代码）。
+- **战斗**：`$.leashTarget(a, s, lead, world)` 在长机周围 `s.leash`（缺省 `$.LEASH_R` = 8 km）范围内自己选目标，选到就走通用的 `pursue`（面目标走面目标分支）自由追击。已在追的目标放宽到 **1.4 × R** 才放弃（滞回，免得在圈边来回切换）；没有空中目标时，带得动对面弹的才找面目标（`surfaceTargetFor`），同样要在长机 R 以内。目标丢了 / 跑出圈就回到槽位。
+- 同一型无人机从母舰放出，防御与出击的区别只是 `leash` 大小：机库数据 `hangar.leash` 或关卡的 `hangarLeash` 覆盖（小 = 防御母舰，大 = 出击）；`spawnDrone` 的 `o.leash` 写进 `ai.leash`。
+- 回退不变：自己被压制（`suppressed > 0.35`）只规避不开火；`cmd === 'recall'` 只飞回舰尾不接战；长机阵亡走"盘旋"。优先级是 压制 → 回收 → AI 长机 leash → 玩家三档指令。
+- **玩家长机的僚机**（`spawnWingman`）完全不变：仍是 focus / cover / spread 三档与"不追出去"。
+- 机库（`missions/_lib.js` 的 `tickHangar`）放飞时从甲板弹射（见 [entities.md](entities.md) 的 `deck.js`）；弹药池打空或血量 < 35% 的无人机被设为 `recall`，飞回舰尾槽位（舰后 240 m）收回。
+
 > `tools/test/smoke.js` 里有七项断言：未授权时无目标、授权后继承同一目标、
 > 长机阵亡后不向敌人逼近、长机健在时不脱队，以及三档指令
 > （`spread` 要自主接战、`cover` 要去咬威胁长机的那一架）与
@@ -504,6 +518,19 @@ desired = norm(V(tan.x, climb, tan.z));      // 取切向 → 持续转圈
 > 见 [game.md](game.md) 的 `updateJamming()`（`engine/game/lock.js`）。这是设定 7.5
 > "强对抗环境下数据链会被切断，无人机自动降级为完全自主防御模式"
 > 那句在玩法上的落点。
+
+---
+
+## 战略制空支援机（`role: 'support'`，`ai/support.js`，批次 6.4）
+
+`role === 'support'` 且没有 `a.route` 的飞机（预警机也是 `support`，但带 `route`，走 `updateRoute`，不进这里）。它不是战斗机：不追人、不咬尾、不开机炮，价值在远处。`brain.js` 里 `maneuver` 的该分支调 `$.supportDir`，开火处（`fire`）直接转到 `$.supportFire`，不走通用开火门限。参数集中在 `AI.$.SUPPORT`（`SUP_K`）。
+
+- **机动 `supportDir`**：锚点 = 友方战斗机质心**后方**（远离离质心最近的敌机）`D0…D1` = 12–18 km 的某个距离（每机生成时随机一次）；友机质心只取离自己 `FRIEND_R` 60 km 内的同队 `enemy / ally / 玩家`（不含自己、无人机、其他支援机，附近一架都没有就取最近的一架）。离锚点 > `ARRIVE` 3.5 km 就飞过去（> 20 km 满油门，> 30 km 开加力），到位后绕锚点盘旋；友机全没了就原地盘旋。巡航高度 `ALT` 8 km，低了缓慢爬升。
+- **脱离**：任一敌机逼近到 `THREAT_R` 12 km，就掉头全速（加力）拉开，至少持续 `THREAT_T` 8 s；脱离期间照样齐射。来袭导弹走通用的 `evade`，优先于这里。
+- **齐射 `supportFire`**：首次等待 6–10 s（`FIRST`），之后每 `T0…T1` = 25–40 s 一次；一次 `N0…N1` = 3–4 发，对**不同**的敌机各放一发（候选 = 锁得住 `jamLockOK`、且手上有够得着的空空弹的敌机，按距离从近到远；目标不够就轮着打）。选弹 `pickWeapon`：空空弹、对得上目标、射程（`aiReach × jamLockK`）够、发射槽不在装填，射程最远的优先；半主动弹（`sarh`）只给第一个目标（照射机同一时刻只能照一个）。没有可打目标时 `RETRY` 3 s 后再看。`s.mode === 'evade'` 时不放。
+- **被压制**：齐射间隔按 `1 + JAM_SLOW(1.5) × suppressed` 拉长；锁定距离折半由 `jamLockK / jamLockOK` 管。
+- **干扰场**：不在这里。机型数据的 `ewField`（如黑曜岩 `{ wid: 'vsc', R: 18000 }`）由 `spawnEnemy` 转成 `ai.jam`（带 `R`），走 `brain.js` 的 `jamAuto`，`J.R` 覆盖武器的 `jamRadius`；开机时记 `a.ewFieldR`。机型的接战构型不变。
+- **与技能系统**：`SKILL.standoff` 排除 `support`（和 `drone` 一样不进外围游走，它有自己的机动）；随机性格不给 support 抽。探针 `probe-support`。
 
 ---
 

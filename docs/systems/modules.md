@@ -8,21 +8,21 @@
 
 ### `Ent` —— 实体、飞行模型、导弹、粒子、伤害
 
-文件：`engine/entities/_state.js`、`engine/entities/aircraft.js`、`engine/entities/damage.js`、`engine/entities/ecm.js`、`engine/entities/guns.js`、`engine/entities/missile.js`、`engine/entities/mounts.js`、`engine/entities/particles.js`、`engine/entities/physics.js`、`engine/entities/psm.js`、`engine/entities/radiation.js`、`engine/entities/range.js`、`engine/entities/targets.js`、`engine/entities/warhead.js`、`engine/entities/zz-api.js`
+文件：`engine/entities/_state.js`、`engine/entities/aircraft.js`、`engine/entities/damage.js`、`engine/entities/deck.js`、`engine/entities/ecm.js`、`engine/entities/guns.js`、`engine/entities/missile.js`、`engine/entities/mounts.js`、`engine/entities/particles.js`、`engine/entities/physics.js`、`engine/entities/psm.js`、`engine/entities/radiation.js`、`engine/entities/range.js`、`engine/entities/targets.js`、`engine/entities/vtol.js`、`engine/entities/warhead.js`、`engine/entities/zz-api.js`
 
-公开接口（`Ent.xxx`）：`airDensity`、`airDragK`、`qOf`、`ctrlFactor`、`turnFactor`、`makeAircraft`、`stepAircraft`、`stepPSM`、`psmGate`、`psmStart`、`psmAbort`、`psmEnergy`、`PSM_SAFE_AGL`、`PSM_LEVEL_AGL`、`hostile`、`fitsKind`、`mountPlan`、`storePos`、`storeHy`、`nozzlesOf`、`surfaceBelow`、`STORE_HY`、`forEachStoreSlot`、`storeForSlot`、`chooseWeapon`、`setWeapon`、`targetClass`、`curLoadFactor`、`contactScan`、`weaponMatchesTarget`、`mountIssues`、`clearMountIssues`、`makeMissile`、`stepMissile`、`effectiveLife`、`breakLock`、`breakLockFor`、`openEcm`、`passiveEffects`、`setEcm`、`setStealth`、`ECM_LEAD_K`、`fireGun`、`fireGunFrom`、`shellFuze`、`detonateShell`、`gunMuzzle`、`flashRings`、`stepBullet`、`SLOT_EMPTY`、`spawnParticle`、`stepParticles`、`explode`、`damage`、`kill`、`killGround`、`explode2`、`detonate`、`wakeSpray`、`effRange`、`glideReach`、`maxReach`、`flyTo`、`envelopeRange`、`envelopeCached`、`displayRange`、`naturalPoint`、`gunLead`、`groundY`、`terrainY`、`isLand`、`agl`、`SEA_Y`、`setTerrain`、`finFootprint`、`aiReach`、`AI_RANGE_K`、`lockOff`、`isHard`、`warheadK`、`hitAny`、`isRadiating`、`jamState`、`jamShown`、`jamDuty`、`jamRanges`、`jamPress`、`jamLockOK`、`jamLockK`、`JAM_BURN_R`、`JAM_SURF_K`、`JAM_BURN_SURF`、`gunResistK`、`SMALL_CAL`、`setTargetHitHandler`、`hitSurface`、`makeTarget`、`stepTarget`、`randUnit`
+公开接口（`Ent.xxx`）：`airDensity`、`airDragK`、`qOf`、`ctrlFactor`、`turnFactor`、`makeAircraft`、`stepAircraft`、`stepPSM`、`stepDeck`、`stepVtol`、`deckSlot`、`deckPose`、`putOnDeck`、`DECK`、`psmGate`、`psmStart`、`psmAbort`、`psmEnergy`、`PSM_SAFE_AGL`、`PSM_LEVEL_AGL`、`hostile`、`fitsKind`、`mountPlan`、`storePos`、`storeHy`、`nozzlesOf`、`surfaceBelow`、`STORE_HY`、`forEachStoreSlot`、`storeForSlot`、`chooseWeapon`、`setWeapon`、`targetClass`、`curLoadFactor`、`contactScan`、`weaponMatchesTarget`、`mountIssues`、`clearMountIssues`、`makeMissile`、`stepMissile`、`effectiveLife`、`breakLock`、`breakLockFor`、`openEcm`、`passiveEffects`、`setEcm`、`setStealth`、`ECM_LEAD_K`、`fireGun`、`fireGunFrom`、`shellFuze`、`detonateShell`、`gunMuzzle`、`flashRings`、`stepBullet`、`SLOT_EMPTY`、`spawnParticle`、`stepParticles`、`explode`、`damage`、`kill`、`killGround`、`explode2`、`detonate`、`wakeSpray`、`effRange`、`glideReach`、`maxReach`、`flyTo`、`envelopeRange`、`envelopeCached`、`displayRange`、`naturalPoint`、`gunLead`、`groundY`、`terrainY`、`isLand`、`agl`、`SEA_Y`、`setTerrain`、`finFootprint`、`aiReach`、`AI_RANGE_K`、`lockOff`、`isHard`、`warheadK`、`hitAny`、`isRadiating`、`jamState`、`jamShown`、`jamDuty`、`jamRanges`、`jamPress`、`jamLockOK`、`jamLockK`、`JAM_BURN_R`、`JAM_SURF_K`、`JAM_BURN_SURF`、`gunResistK`、`SMALL_CAL`、`setTargetHitHandler`、`hitSurface`、`makeTarget`、`stepTarget`、`randUnit`
 
-`$` 私有状态在 `js/engine/entities/_state.js`。`physics`（大气 / 控制因子 / 地形钩子）、`psm`（过失速机动，见 [flight-model.md](flight-model.md#过失速机动psm玩家侧)）、`mounts`（挂点适配与 NPC 挂载分配）、`aircraft`、`missile`、`range`（有效射程与发射包线）、`radiation`（反辐射与烧穿干扰）、`warhead`（加固与战斗部）、`guns`、`particles`、`damage`、`ecm`（被动吊舱）、`targets`。
+`$` 私有状态在 `js/engine/entities/_state.js`。`physics`（大气 / 控制因子 / 地形钩子）、`psm`（过失速机动，见 [flight-model.md](flight-model.md#过失速机动psm玩家侧)）、`mounts`（挂点适配与 NPC 挂载分配）、`aircraft`、`missile`、`range`（有效射程与发射包线）、`radiation`（反辐射与烧穿干扰）、`warhead`（加固与战斗部）、`guns`、`particles`、`damage`、`ecm`（被动吊舱）、`targets`、`deck`（批次 6.1b 通用甲板起飞：`stepAircraft` 开头判 `a.deck` 非空就整个交给 `stepDeck`；`deckSlot` 找宿主上空闲的跑道，`deckPose` 算甲板上的位姿，`putOnDeck` 把飞机放上去）、`vtol`（批次 6.2 垂直起降分支：带 `ac.vtol` 的机型速度低于 `transSpeed` 后 `stepAircraft` 末尾的 `vtolWatch` 置 `a.vtolOn`，之后每帧由 `stepVtol` 接管；只有 `stepVtol` 导出，`vtolWatch` / `vtolWingK` 是 `Ent.$` 私有）。
 
 ### `AI` —— AI 控制律与行为
 
-文件：`engine/ai/_state.js`、`engine/ai/brain.js`、`engine/ai/director.js`、`engine/ai/retreat.js`、`engine/ai/skill.js`、`engine/ai/steer.js`、`engine/ai/tactics.js`、`engine/ai/util.js`、`engine/ai/zz-api.js`
+文件：`engine/ai/_state.js`、`engine/ai/brain.js`、`engine/ai/director.js`、`engine/ai/retreat.js`、`engine/ai/skill.js`、`engine/ai/steer.js`、`engine/ai/support.js`、`engine/ai/tactics.js`、`engine/ai/util.js`、`engine/ai/zz-api.js`
 
 公开接口（`AI.xxx`）：`attach`、`update`、`steerTo`、`findIncoming`、`nearestEnemy`、`leadTo`、`strafeTarget`
 
 批次 5a 新增的 `$.SKILL / $.DIR / $.director / $.weaponClass / $.retreatWatch / $.retreatDir / $.retreatProb / $.rnd01 / $.aimStep` 都是私有（`AI.$`），没有导出；探针直接读 `AI.$`。
 
-`util`（索敌与工具）、`steer`（把期望方向翻译成三轴杆量）、`brain`（attach / update 主决策）、`tactics`（追击 / 规避 / 对地）。
+`support`（批次 6.4 战略制空支援机行为：`role === 'support'` 且无 `a.route` 的飞机，`brain.js` 调私有的 `$.supportDir`（守在友机质心后方游走 / 脱离）与 `$.supportFire`（定时对多个目标齐射），没有导出到 `AI.xxx`；参数表 `$.SUPPORT`）、`util`（索敌与工具）、`steer`（把期望方向翻译成三轴杆量）、`brain`（attach / update 主决策）、`tactics`（追击 / 规避 / 对地）。
 
 ### `Ambient` —— 战场环境事件（批次 5f，独立全局）
 
@@ -38,11 +38,11 @@
 
 ### `HUD` —— 平显
 
-文件：`ui/hud/_state.js`、`ui/hud/aids.js`、`ui/hud/base.js`、`ui/hud/instruments.js`、`ui/hud/panels.js`、`ui/hud/radar.js`、`ui/hud/targeting.js`、`ui/hud/text.js`、`ui/hud/zz-api.js`
+文件：`ui/hud/_state.js`、`ui/hud/aids.js`、`ui/hud/base.js`、`ui/hud/hover.js`、`ui/hud/instruments.js`、`ui/hud/panels.js`、`ui/hud/radar.js`、`ui/hud/targeting.js`、`ui/hud/text.js`、`ui/hud/zz-api.js`
 
 公开接口（`HUD.xxx`）：`draw`、`banner`、`hitMark`、`computeNEZ`、`computeEnvelope`、`radarXY`、`offscreenRect`、`drawAlerts`、`ALERT_ORDER`、`thrPercent`、`THR_IDLE`、`THR_MAX`、`GREEN`、`AMBER`、`CY`、`RED`
 
-`base`（配色、布局、主入口 draw）、`instruments`（指南针 / 速度高度带 / 推力 / 舵面）、`radar`（雷达与威胁环）、`targeting`（目标框与锁定框）、`aids`（CCIP / 瞄准圈 / 屏外标记）、`panels`（武器面板 / 告警栈 / 目标方位尺）、`text`。
+`base`（配色、布局、主入口 draw）、`instruments`（指南针 / 速度高度带 / 推力 / 舵面）、`radar`（雷达与威胁环）、`targeting`（目标框与锁定框）、`aids`（CCIP / 瞄准圈 / 屏外标记）、`hover`（批次 6.2 垂直起降悬停 HUD：`base.js` 的主入口里调私有的 `$.drawHover`，只在 `p.vtolOn` 时画速度矢量菱形 / 垂直速度尺 / 模式字，没有导出）、`panels`（武器面板 / 告警栈 / 目标方位尺）、`text`。
 
 ### `Game` —— 状态机、主循环、屏幕、输入、相机
 

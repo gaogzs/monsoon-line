@@ -49,7 +49,7 @@
   morph: { map, spread, swept } }       // 仅 frigatebird 有
 ```
 
-现有 **61** 个键：飞机 13 · 浮空目标 2 · 海上/地面设施 5 · **水面舰船 16** · 固定海上平台 6（`shoal` `breakwater` `sluice` `reed` `cairn` `beacon`，各带一个不可枚举的 `<id>_wreck` 残骸）· 炮塔零件 16（`tur50/75/120[r]_base/_gun`、`lnch[r]_base/_gun`，见 [turret.md](turret.md)）· 弹药 3。
+现有 **69** 个键：飞机 19 · 浮空目标 2 · 海上/地面设施 5 · **水面舰船 18** · 固定海上平台 6（`shoal` `breakwater` `sluice` `reed` `cairn` `beacon`，各带一个不可枚举的 `<id>_wreck` 残骸）· 炮塔零件 16（`tur50/75/120[r]_base/_gun`、`lnch[r]_base/_gun`，见 [turret.md](turret.md)）· 弹药 3。
 另有 6 个不可枚举成员：`TURRET_SPEC` `composeTurrets` `round` `store` `storeDrop` `storeScale`。
 下表列飞机 / 目标 / 舰船 / 平台 / 弹药，`span` / `len` / `radius` 已用 `MODELS` 运行时对象逐项核对过（以各文件里 `done(b, {…})` 的值为准；炮塔零件与 `_wreck` 残骸不带 `span` / `len`）：
 
@@ -69,6 +69,12 @@
 | `sower` | 「灰烬」级播撒机（下游） | 38.0 | 42.5 | — | 四发 |
 | `spray` | 「浪花」海上巡逻机 | 17.2 | 16.4 | — | 双发涡桨 |
 | `boulder` | ROK-40「巨砾」重型轰炸机（下游） | 54 | 58 | — | 四发、不参与空战；2.5 重做（原 48 × 44，机身更细长），石英 / ROK-44 共用 |
+| `gannet` | F-12「塘鹅」国土防卫重型战斗机（批次 6.2b） | 15.6 | 24.0 | — | 鸭翼 + 切角大三角翼，双垂尾外倾分开、无平尾，进气口嵌进机身 |
+| `tern` | G-8「燕鸥」战斗轰炸机（批次 6.2c） | 16.0 | 24.2 | — | 固定大翼套 + 后掠外翼，低位全动平尾、单垂尾，机头下指示吊舱、机尾 ECM 尾刺 |
+| `seahorse` | D-27「海马」轻型舰载垂直起降战斗机（批次 6.2） | 8.6 | 16.0 | — | 单发，喷口向下偏转（physics 见 `entities/vtol.js`） |
+| `obsidian` | GAL-52「黑曜岩」战略制空支援机（下游，批次 6.4） | 19.2 | 47 | — | 协和式细长哥特大三角翼 + 鸭翼 / 下垂翼尖、下垂机头、背部电子战整流罩、机腹三弹舱 |
+| `puffin` | J-4「海鹦」空中整备机（上游，批次 6.5） | 30 | 29.6 | — | 上单翼双发 T 形尾 |
+| `manta` | J-6「蝠鲼」上游重型运输机（批次 6.5） | 47 | 41 | — | 宽扁飞翼 + 头鳍 + 尾刺 + 翼上四发 |
 | `relay` | 「高原」级浮空中继平台 | 27 | 82 | `air` | `radius: 30` |
 | `cell` | DIL-4 型调节单元 | 60 | 118 | `air` | `radius: 34`，三个要害 |
 | `sam` | 中远程 SAM 发射车（4 联装） | 9 | 9 | `ground` `sea` | `radius: 5` |
@@ -77,11 +83,13 @@
 | `cmdpost` | 指挥 / 通信中枢 | 22 | 18 | `ground` `sea` | `radius: 9` |
 | `station` | 第 7 号控制平台 | 88 | 88 | `ground` `sea` | `radius: 56`，地标级 |
 | `humpback` | 座头鲸级航空母舰（上游） | 78.0 | 330 | `ground` `sea` | `radius: 100`；三块凸多边形拼成的斜角飞行甲板（9° 着舰区 + 拦阻索）、三具弹射器、三部升降机、右舷靠后的舰岛 |
+| `narwhal` | 独角鲸级航空巡洋舰（上游，批次 6.3） | 38.4 | 196 | `ground` `sea` | `radius: 62`；前半抬高艏楼，右舷高舰岛，后半斜角飞行甲板与着舰区，`resupply` 整备点 |
 | `bluewhale` | 蓝鲸级快速战斗支援舰（上游） | 26.6 | 210 | `ground` `sea` | `radius: 62`，三座补给门架 |
 | `spermwhale` | 抹香鲸级巡洋舰（上游） | 20.4 | 168 | `ground` `sea` | `radius: 50`，四面大相控阵 |
 | `orca` | 虎鲸级护航驱逐舰（上游） | 18.4 | 148 | `ground` `sea` | `radius: 44` |
 | `dolphin` | 海豚级护卫舰（上游） | 14.4 | 108 | `ground` `sea` | `radius: 33` |
 | `cameroceras` | 房角石级武库舰（下游） | 24.0 | 195 | `ground` `sea` | `radius: 58`，312 个垂发井 |
+| `hallucigenia` | 怪诞虫级无人机航母（下游，批次 6.1b） | 30 | 180 | `ground` `sea` | `radius: 52`；一整块平甲板、三条并排弹射轨道、两舷天线桅，`droneCarrier` |
 | `dunkleosteus` | 邓氏鱼级巡洋舰（下游） | 18.8 | 152 | `ground` `sea` | `radius: 46` |
 | `seascorpion` | 海蝎级登陆舰（下游） | 20.4 | 132 | `ground` `sea` | `radius: 40`，艏门 + 跳板 |
 | `ammonite` | 菊石级巡逻护卫舰（下游） | 15.2 | 118 | `ground` `sea` | `radius: 36` |
@@ -105,13 +113,13 @@
 > `span` / `len` / `air` / `sea` 这些元数据**目前没有任何消费者**；
 > `radius` 与 `ground` 也不会自动传到目标上——设施由 `spawnTarget` 手抄，舰船由 `spawnShip` 从 `SHIPS` 表取（二者都在 `js/missions/_lib.js`）。详见"易踩的坑"。
 >
-> **机型与模型不是一一对应**：`AIRCRAFT` 17 条只用到 13 个飞机模型，
+> **机型与模型不是一一对应**：`AIRCRAFT` 23 条只用到 19 个飞机模型，
 > 5 个 NPC 机型借用现成几何——`tideline` → `sailfish`，`datum` / `pelican` → `sower`，
 > `quartz` / `lodestone` → `boulder`。所以本表没有 `tideline` / `datum` / `pelican` / `quartz` / `lodestone` 这几个键；
 > 要给它们独立外形，得新增 `js/models/aircraft/<id>.js` 并改对应 `js/data/aircraft/<id>.js` 里的 `model`。
 >
 > 舰船的 `span` 是**船宽**、`len` 是**舰长**（沿用同一对字段，没有为船另起名字），
-> `radius` 是受击半径。16 艘船的存在理由见 `js/data/ships/` 注册的 `SHIPS` 表与设定集 8.0.1 节。
+> `radius` 是受击半径。18 艘船的存在理由见 `js/data/ships/` 注册的 `SHIPS` 表与设定集 8.0.1 节。
 
 ### 构造器 `MB`（`js/models/_lib.js`；模型文件里用 `L.MB`，加新模型时要用）
 
@@ -400,8 +408,8 @@ b.hull([
 NPC 读 `npcFits`。见 [loadout.md](loadout.md#npc-的挂载)。
 
 `preflight()` 的必需清单是：
-`frigatebird sailfish booby schist folded_wing sower relay cell sam radar depot cmdpost station missile bomb pod`
-**+ 16 艘舰船** `orca bluewhale humpback spermwhale dolphin trilobite ammonite
+`frigatebird sailfish booby schist folded_wing gravel obsidian puffin manta sower relay cell sam radar depot cmdpost station missile bomb pod`
+**+ 18 艘舰船** `orca bluewhale humpback spermwhale dolphin narwhal hallucigenia trilobite ammonite
 seascorpion cameroceras dunkleosteus daplu skori diklo cross icecore atoll`
 ——新增模型后记得往 `js/boot/main.js` `preflight()` 的 `needModels` 数组里加，否则自检不会覆盖它。
 舰船是先进清单、后进关卡的（v1.4.0 起已由 `spawnShip` 用在各关里）：

@@ -21,7 +21,10 @@
 | Trilobite | 30 mm 遥控炮 ×1 |
 | Seascorpion | 30 mm 遥控炮 ×2 |
 | Daplu | 20 mm 遥控炮 ×1 |
+| Relay（高空中继平台，`js/data/targets/relay.js`，批次 6.6） | 旋转架舰空弹 ×1（`rotSam`，弹 `dl9`）、近防炮 ×2（机头 / 机尾各一座，射界各留约 50° 死角） |
 | ROK-40（飞机，`js/data/aircraft/boulder.js`） | 20 mm 尾炮 ×1（`tail20a`，机载版），管后半球，没有实体 |
+
+**武装浮空平台（批次 6.6）**：设施 `TARGETS[model]`（`js/data/targets/<id>.js`）可以像舰船一样写 `mounts` / `launchers`，再用 `sam` 指定舰空弹 id。`js/missions/_lib.js` 的 `spawnTarget` 在 `Ent.makeTarget` 之后，只要 `TARGETS[o.model]` 带 `mounts` 或 `launchers`，就调 `Turret.attach(t, d.mounts, d.launchers)`，并在 `t.weapon` 为空时把 `t.weapon` 设为 `d.sam`、`t.fireCd` 抽 3–8 s。关卡实例写 `armed: false` 可以关掉（缺省挂）。中立单位（team 2）挂了也不开火（`updateTargets` 只让 `team !== 2` 的目标跑炮塔），所以没写 `mounts` 的调节单元不受影响，高原 relay（team 1）对被发现的玩家才会开火。探针：`probe-relay.js`。因为 relay 开始抽 `fireCd`（`M3.rnd`），m2 的 golden 回放从第 6 秒起有意分歧，基线已重存（只有 `m2@1`）。
 
 炮位数量必须和 `SHIPS[].arms` 的文本一致（`tools/test/smoke.js` 断言）。近防炮、遥控炮、尾炮没有实体，从炮位点直接射出。
 

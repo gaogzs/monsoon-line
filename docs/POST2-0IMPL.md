@@ -30,8 +30,8 @@
 | 2 | **v3.1.x** | 小件包，**每项单独发一个补丁版本**：v3.1.1 失败原因、v3.1.2–v3.1.5 模型修复（假机、挂载翼面、无人机座舱、曳光弹）、v3.1.6 干扰乱码、v3.1.7 假目标、v3.1.8 挂点（**所有战斗机** +1 对）、v3.1.9 重型轰炸机、v3.1.10 存档。全部完成后不再额外发版，批次 3 起升到 v3.2 | 1、W | |
 | 3 | **v3.2 – v3.4** | 光标越极点 + 相机重构；关卡时间与天色；过失速机动（PSM，v3.3）；失速速度随动压（v3.4） | 1 | **已完成** |
 | 4 | **v3.5** | 地图边界；整备点（含暂停整备界面；含界外整备区） | 1、2（失败原因） | **已完成** |
-| 5 | **v3.6** | AI 强化：技能值、外围游走 / 回头、友军独立 AI、撤离；Radio 队列与条件触发无线电；半主动雷达弹（**仅锁定时受引导**） | 3、4 | |
-| 6 | **v3.7** | 新单位：轻型舰载 VTOL（可玩）、国土防卫重型战机（可玩）、战斗轰炸机（可玩）、航空巡洋舰、战略制空支援机、浮空平台武器、敌方无人机、友方有人机的无人僚机 | 5 | |
+| 5 | **v3.6** | AI 强化：技能值、外围游走 / 回头、友军独立 AI、撤离；Radio 队列与条件触发无线电；半主动雷达弹（**仅锁定时受引导**） | 3、4 | **已完成**（v3.6 已发版） |
+| 6 | **v3.7** | 新单位：轻型舰载 VTOL（可玩）、国土防卫重型战机（可玩）、战斗轰炸机（可玩）、航空巡洋舰、战略制空支援机、浮空平台武器、敌方无人机、友方有人机的无人僚机 | 5 | **已完成（待发版，v3.7）**；实施记录见 6.8 |
 | 7 | **v3.8** | 资料库追加背景、世界地图 | W | |
 | 8 | **v3.9** | 关卡重构：友军编成、上游空军呼号、无线电填充、剧情文案 | 4、5、6、W | |
 | 9 | **v3.10** | 地形、城市与场景类型（海洋 / 海岸 / 岛屿 / 内陆）；遮挡锁定与导弹追踪 | 1、2（死因）、3、4、5（FovWatch） | |
@@ -597,7 +597,7 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 - 失速时控制权限乘 0.34（`stepAircraft`），另有低头力矩 `1.2 × st × dt`（只在 `pos.y > 60`）。控制权限由 `ctrlFactor`（`physics.js`，`clamp(q / ctrlFull, ctrlFloor, 1)`）给出，写进 `a.ctrlAuth`，`AI.steerTo`（`js/engine/ai/steer.js`）与 HUD 的 P/R/Y 读它。
 - **没有过载上限**：`gLoad` 只是玩家 G 键的倍率（上限 `HIG_MAX = 1.90`，`vars.js`；`controlPlayer` 里平滑；`stepAircraft` 内夹到 2.3），没有 `maxG` 或转弯率表。
 - 挂载重量惩罚在 `stepAircraft` 开头用"临时 `phys` 副本"替换 `p`（`loadoutPenalty`，`js/data/rules.js`）——这是"对 `p` 整体替换"的先例，也是 PSM 临时缩放舵效的参照。
-- **没有** `stepVtol`、VTOL，`noPSM` 标签也没有（`js/core/tags.js` 里尚未声明，数据里也没人用）。`noPSM` 在本批用 `Tags.declare('noPSM', { owner: 'entities', doc: T('core.tags.doc_N') })` 引入（文案进 `locales/zh-CN/text/core/tags.json`，按 `docs/systems/tags.md`「加一个标签」四步走）；缺省所有机型可用，VTOL（批次 6）加上它。
+- **没有** `stepVtol`、VTOL，`noPSM` 标签也没有（`js/core/tags.js` 里尚未声明，数据里也没人用）。**（批次 6 已落地：`stepVtol` 在 `js/engine/entities/vtol.js`，`vtol` 与 `noPSM` 标签均已声明且由海马 D-27 使用，`noPSM` 不再 `reserved`；见 6.8。）**`noPSM` 在本批用 `Tags.declare('noPSM', { owner: 'entities', doc: T('core.tags.doc_N') })` 引入（文案进 `locales/zh-CN/text/core/tags.json`，按 `docs/systems/tags.md`「加一个标签」四步走）；缺省所有机型可用，VTOL（批次 6）加上它。
 - `docs/systems/flight-model.md` 已按重构后的实现更新，**本项不再需要"校正过时文档"**；本批改飞行代码时只增补 PSM 一节。
 
 **定位**：光标越过极点之后，机体姿态可以指向机头后方，但速度仍沿机头。过失速机动要求**速度矢量与机头解耦**，这是新的物理分支，不能直接在主路径里改。因此做成独立分支 `Ent.stepPSM`——**新建文件 `js/engine/entities/psm.js`**，属于 `Ent` 命名空间：在文件头 `var $ = Ent.$; $.stepPSM = stepPSM;`，在 `js/engine/entities/zz-api.js` 里加 `Ent.stepPSM = $.stepPSM`（及 `Ent.psmGate` 之类要给 `Game` 的门限函数，跨命名空间只走公开函数）。按字母序它在 `physics.js` 之后、`radiation.js` 之前加载，`zz-api.js` 最后——不需要改 `tools/build/gen-index.js`，加载顺序自然成立。PSM 的常量（`PSM_MIN_AGL` 等）放 `engine/entities/_state.js` 或 `psm.js` 头部的 `$.` 上。与批次 6 的 `stepVtol` 同一套隔离做法；`stepAircraft` 主路径不动，不触发 PSM 的场景黄金回放保持逐帧一致。
@@ -658,7 +658,7 @@ P = 90° 时 `up = (−sinY, 0, −cosY)`，模长仍为 1、方向由 Y 决定�
 - 中止路径：速度低于阈值、低空下降、主动中止，各自回到常规飞行且无突跳；
 - 数值稳定：dt = 0.02 / 0.05 两种步长下收敛结果一致（相对误差 ≤ 5%）；
 - 黄金回放：不触发 PSM 的全部场景与现状逐帧相等（`node tools/test/golden.js`）；
-- smoke：`--only 挂载系统`（`noPSM` 已声明且被用到的标签断言；见 3.3 的标签：它要么先被某机型数据使用，要么在 `Tags.declare` 里标 `reserved: true` 直到批次 6）、`--only 干扰与机动`（门限断言）。
+- smoke：`--only 挂载系统`（`noPSM` 已声明且被用到的标签断言；见 3.3 的标签：它要么先被某机型数据使用，要么在 `Tags.declare` 里标 `reserved: true` 直到批次 6；**批次 6 已落地：海马使用它，`reserved` 已去掉**）、`--only 干扰与机动`（门限断言）。
 
 > **3.3 实施偏差（v3.3 已落地，以实际代码与 flight-model.md「过失速机动」一节为准）**：① 速度模型除升力 / 阻力 / 推力 / 重力外**加了一项"速度方向被机头拉着转"**（`PSM_PULL·sin α`）：只靠前四项时 `CLrel` 在 `vStall` 只有 1 g，速度矢量转不动，要么 α 冲到 175°、要么夹在 100° 以内却 12 s 收敛不了；② `stepAircraft` 里抽出了 `effectivePhys` 与 `stepAircraftTail`（早返回不能漏掉装填 / 电子战 / 枪热 / 拖烟 / 尾焰），并在失速 `ctrl *= 0.34` 旁加了 `psmRecover` 一行；③ 控制律不新写，`stepPSM` 消费 `updateMouseAim` 写的 `a.ctrl`；④ 键盘 keydown 块没有 `!paused` 条件，`triggerPsm` 自己判；⑤ SysNote 文案在 `ui/input.json` 而不是 `engine/`；⑥ `noPSM` 标 `reserved`；⑦ dt 0.02 / 0.05 的"收敛时间"放宽到 10%（判据有一步量化），能量损失与结束速度仍 ≤ 5%。
 >
@@ -1397,6 +1397,42 @@ droneCarrier: {
 
 每个单位：`tools/render/render-units.js` 出图、smoke 的挂点与文本核对、`tools/test/probes/probe-balance.js`；新探针 `probe-drones`（无人机自己被压制时退化，长机被压制时不连带）、`probe-vtol`、`probe-carrier`（均放 `tools/test/probes/`）；`probe-missions`；`tools/test/check-locales.js` / `text-census.js`（新增文本无遗漏）；`golden` / `golden-render` 基线按需刷新。文档：`docs/systems/` 里的 `models.md`、`turret.md`、`ai.md`、`data.md`、`entities.md`、`tags.md`（新标签）、世界设定对应章节。发 v3.5。
 
+### 6.8 实施记录与出入（v3.7，已完成）
+
+**落地清单**（按计划条目；代码位置只写模块 + 函数）：
+
+| 项 | 落地 |
+|---|---|
+| 6.1 长机泛化 + `spawnDrone` | `ai.leader` / `spawnDrone` 按计划落地（`js/missions/_lib.js`、`js/engine/ai/`）。无人机统一为"AI 长机行为"，见下表出入 |
+| 6.1b 无人机航母 | 下游「怪诞虫」级 `hallucigenia`（标签 `droneCarrier`）：机库 12 架砾石，每 25 s 一波 3 架、波内每 2.5 s 从三条并排弹射轨道放一架；机库逻辑 `tickHangar`（`js/missions/_lib.js`），弹药池打空或血量 < 35% 的无人机改 `recall` 飞回舰尾槽位，进入 `dockR` 且低于 `recoverAlt` 后收回（`escaped`：不计击毁、不计损失，机库计数 +1） |
+| 6.1b 起飞 | **通用甲板起飞**：`js/engine/entities/deck.js`（`stepDeck / deckSlot / deckPose / putOnDeck`），`spawnEnemy` / `spawnDrone` 的 `o.deck` / `o.runway`；宿主在开则飞机随舰，宿主被击毁当场放开 |
+| 6.2 海马 D-27（VTOL，可玩） | `js/engine/entities/vtol.js` 的 `stepVtol`（辅助悬停 + 翼升力过渡）；HUD `js/ui/hud/hover.js`（悬停指示 / 垂直速度尺 / 模式字）；机型字段 `vtol`；标签 `vtol` + `noPSM`；三组挂点，`maxLoad` 3200 |
+| 6.2b F-12 塘鹅 | 国土防卫重型战斗机，上游可玩，5 组挂点（翼下 3 + 翼根重挂 + 机腹），`maxLoad` 6800；后改鸭翼布局（大鸭翼 + 切角大三角翼 + 双垂尾外倾） |
+| 6.2c G-8 燕鸥 | 战斗轰炸机，上游可玩（机腹 2 组对地 + 翼下 2 组空空，`vMax` 450，`maxLoad` 6000）；后改低空突防外形（固定大翼套、全动平尾、机头下指示吊舱、机尾 ECM 尾刺）；机腹 A 组挂点前后移到进气道之后（原位置挂载悬空，smoke 报错） |
+| 6.3 航空巡洋舰 | 上游「独角鲸」级 `narwhal`（标签 `resupply`）：前半巡洋舰（75 mm 炮、旋转舰空弹架、近防炮），右舷高舰岛，后半斜角飞行甲板；`runways` 取斜角甲板前端；无弹射器、无机库 |
+| 6.4 战略制空支援机 | 下游 GAL-52「黑曜岩」`obsidian`（`npcOnly`、`rank: 'elite'`、`hitR` 13，标签 `ewfield`，字段 `ewField: { wid: 'vsc', R: 18000 }`）+ 下游远程主动弹 DAR-12 `tephra`；AI 新角色 `support`（`js/engine/ai/support.js`：守在友机质心后方游走、敌机逼近则脱离、周期性对多个不同目标齐射）；`spawnEnemy` 透传 `o.role`，并读机型 `ewField` 当作自由干扰场（不改接战构型）；挂载预设 `npcLoadouts.support` |
+| 6.5 空中整备机 | 上游 J-4「海鹦」`puffin`（`npcOnly`、不武装、标签 `resupply`，本身就是移动整备点）；`spawnTanker`（盘旋航线 + 登记 `w.refs`）；`Resupply.validate` 兼容飞机标签 |
+| 6.5 重型运输机 | 上游 J-6「蝠鲼」`manta`（`npcOnly`、不武装、`hp` 700、`hitR` 14，护航关用） |
+| 6.6 武装浮空平台 | `TARGETS.relay` 带 `sam / mounts / launchers`；`spawnTarget` 按模型名取来 `Turret.attach`，`o.armed === false` 可关；中立单位不开火（`updateTargets` 只让 `team !== 2` 跑炮塔），调节单元不会被武装 |
+
+**与上文设计的出入：**
+
+| 项 | 上文 | 实际 |
+|---|---|---|
+| 巡飞攻击无人机（6.5 候选） | 自杀式巡飞弹机型（"Flint"） | **砍掉**，不做；6.5 只落地了整备机与运输机 |
+| 无人机命令 | 沿用 `focus / cover / spread` 三档；中途一度加过 `sortie` / `guard` | **统一为"AI 长机行为"**：长机不是玩家（`AI.aiLed`）时无人机忽略三档命令，只有两种状态——巡航守编队槽位、战斗时在长机周围 `leash` 范围内自选目标（`AI.leashTarget`，缺省 `AI.LEASH_R` 8 km，出圈 ×1.4 放弃）。母舰"防御"与"出击"只是 `leash` 大小不同：机库数据 `hangar.leash`（怪诞虫 25 km），`spawnShip` 的 `o.hangarLeash` 覆盖，`spawnDrone` 的 `o.leash`。玩家僚机三档命令不变。被压制 / 回收中 / 长机阵亡仍走原有分支 |
+| 6.1b 起飞 | 只做垂直弹射 | **通用甲板起飞**：任何飞机都能从带 `runways` 的宿主起飞，无人机航母只是其中一个用法 |
+| 座头鲸 / 独角鲸外形 | 未写 | 两艘斜角甲板外形重画：斜角越往前越向左舷外探，着舰区占全长一半以上；座头鲸艏部改直边楔形窄平头并画弹射轨道车道线；独角鲸甲板铺过舰体中部、舰岛压在右舷（`probe-resupply` 的斜角甲板断言随之改） |
+| 命名由来 | 写进机型 / 舰船 `desc` | **移出资料库描述**，原文收进开发笔记 `docs/world/AIRCRAFT-NAMING.md`（机体与舰船都在内），`desc` 只留外观与定位 |
+| VTOL | 计划见 6.2 | 与计划一致的部分：独立 `stepVtol`、只给玩家用、`noPSM`；出入：① **辅助悬停**——油门 0.5 定高、0.5–0.85 爬升、0.85 以上加前向推力，进悬停时玩家油门放回 0.5，倾斜机头就往那个方向漂；② **不做舰面起降**（没有着舰 / 升降机逻辑）；③ `noPSM` 的 `reserved` **去掉**（海马使用它，smoke 断言同步）；④ 机型名定为 **海马 D-27**；⑤ 速度低于 `vtol.transSpeed` 进悬停分支，回到 ×1.08 且机头对齐后交还主路径；⑥ 看门狗对 `a.vtolOn` 豁免（悬停位置本来就不动） |
+| 机库命令 | 计划写机库 `cmd` | 数据里仍有 `hangar.cmd` 字段并传给 `spawnDrone`，但 AI 长机的无人机不读三档命令，该字段对母舰放出的无人机已无实际作用 |
+
+**回归基线**：`data` 基线随每个新单位重存；`golden`（场景回放）仅 `m2@1` 有意改变——6.6 让高原 `relay` 带武装并在生成时抽 `fireCd`，m2 回放从第 6 秒起分歧，关掉武装后无分歧；其余 12 关与 `golden-render` 不变。
+
+**新增探针**（`tools/test/probes/`）：`probe-relay`（武装浮空平台）、`probe-deck`（通用甲板起飞）、`probe-carrier`（机库放飞 / 回收）、`probe-drone-roles`（AI 长机的无人机 leash 行为）、`probe-support`（支援机 AI 与干扰场）、`probe-tanker`（移动整备点驻留 / 出圈清零 / 被击毁）、`probe-transport`（运输机）、`probe-vtol`（悬停 / 倾斜漂移 / 升降 / 过渡 / 回悬停）；`probe-resupply` 的斜角甲板断言按新外形改。
+
+**没验证的**：本条记录基于提交与代码核对；各新单位的实际手感与外观（尤其 VTOL 操控、舰船新甲板外形）以所有者实机检查为准。
+
 ---
 
 ## 批次 7 · v3.8 资料库背景与世界地图
@@ -1791,7 +1827,7 @@ W.4 原文只有标题；以上验证步骤是按新工具补的，是否沿用"
 
 - **批次 2 的 `failing` 未在当前代码里**：`js/` 下没有 `failing` / `FAIL_HOLD_S`，4.1 对它的引用沿用原文约定（`fail.arena`、"提示直接显示在黑屏上"），落点要等批次 2 的实现确定后回头对一次。
 - **PSM 的 `psm.js` 与 `Ent.$` 的关系**：`psm.js` 放在 `Ent` 命名空间下、经 `$.stepPSM` 与 `zz-api.js` 暴露是按 `docs/systems/modules.md` 的约定推出的；`tools/test/smoke.js`「挂载系统」段里的静态检查（"只许该命名空间自己的文件读写 `NS.$`"）是否对新文件有白名单要求，没有逐条核对。
-- **`noPSM` 在 smoke 里的"声明了必须被用到"断言**：批次 3 时没有机型使用它（VTOL 在批次 6），我写了两种做法（先给某机型数据用 / `reserved: true`）。`docs/systems/tags.md` 说目前没有 `reserved` 的先例，是否直接支持 `reserved: true` 声明参数没核对 `Tags.declare` 的实现。
+- **`noPSM` 在 smoke 里的"声明了必须被用到"断言**：批次 3 时没有机型使用它（VTOL 在批次 6），我写了两种做法（先给某机型数据用 / `reserved: true`）。`docs/systems/tags.md` 说目前没有 `reserved` 的先例，是否直接支持 `reserved: true` 声明参数没核对 `Tags.declare` 的实现。（批次 6 已落地：`noPSM` 已被海马使用，`reserved` 已去掉，此项作废。）
 - **`Shading.AMBIENT` 与 2D `render.js` 内联亮度公式**：核对到 `render.js` 里有一处按 `Shading.AMBIENT + Shading.DIFFUSE * dl` 的内联亮度（`dl` 取 `|n·LIGHT|`），3.2 假定改成可被 `setEnv` 改写；GL 着色器里环境光下限的 uniform 名没有读，要看 `js/render/env/shaders.js` 与 `render-gl.js` 是否真从 `Shading.AMBIENT` 取值。
 - **`Camera.basis` 的位置**：原文称"纯函数 `Camera.basis(Y,P)`"，现在没有 `Camera` 全局，我改成 `js/ui/camera.js` 里经 `Game.$.camBasis` 暴露（并沿用现有同名私有函数名）；若更想要独立全局需要进 `modules.md` 与加载顺序，没有决定。
 - **整备界面脚本归属**：`js/ui/screens/rearm.js` 属 `Game`、经 `Game.$` 开合，是按现有 `screens/*.js` 惯例推的；`Game.openRearm` 要不要进 `zz-api-game.js` 的公开接口表，未与 `modules.md` 的"公开接口"清单对齐。

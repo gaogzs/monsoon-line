@@ -6,7 +6,7 @@
 - 数据里写成数组：`tags: ['hard']`；注册时（`Registry` 的 `aircraft` / `ship` / `platform` / `weapon` / `turretGun` / `target` 六种）展开成 `{ hard: true }`，运行时直接读 `def.tags.hard`（O(1)）；没写 `tags` 的单位得到空对象，所以 `x.tags.名字` 总是安全的。
 - 飞机与设施实体创建时带上单位定义的 `tags`（飞机 `a.tags`、设施 `t.tags`），所以机制代码读的是实体 `a.tags.unmanned`，不查表；武器机制读 `w.tags.名字`（`w` 是武器定义）。
 - 数值参数仍是字段（`gunResist`、`lockResist`、`lead` …），标签只表达"有没有这条机制"。
-- `smoke.js`（「挂载系统」段）断言：数据里用到的每个标签都已声明；声明过的每个标签都至少被一个数据项用到（预留的写 `reserved: true`，目前没有）。
+- `smoke.js`（「挂载系统」段）断言：数据里用到的每个标签都已声明；声明过的每个标签都至少被一个数据项用到（预留的写 `reserved: true`，目前只剩 `noRetreat`）。
 - 单位详情页（飞机 / 舰船 / 平台 / 武器）有一行"机制标签"，直接读这里的 `doc` 字符串，让设计意图对玩家可见。
 - `Tags` 的接口：`declare` `expand` `has(def, 名字)` `declared()`（见 [modules.md](modules.md)）。
 
@@ -40,10 +40,13 @@
 | `relay` | game | 高空中继平台：被击毁时触发中继链断裂的结算与无线电 | 设施 `relay` | `engine/game/combat.js` |
 | `sam` | game | 地对空发射车：被击毁时触发防空网被打开缺口的结算与无线电 | 设施 `sam` | `engine/game/combat.js` |
 | `cullFar` | render | 数量极多的目标：超出绘制 / 雷达显示距离就不画 | 设施 `cell` | `ui/frame.js`、`ui/hud/radar.js` |
-| `resupply` | game | 整备点：关卡 `mission.resupply` 按 `ref` 引用它时，我方玩家驻留在附近可补满弹药、重选挂载 | 舰船 `humpback`、平台 `beacon / breakwater / cairn / reed / shoal / sluice` | `engine/world/resupply.js`（读 `(t.ship || t.platform).tags`，运行时目标的 `t.tags` 来自 `TARGETS`，读不到舰船 / 平台的标签） |
+| `resupply` | game | 整备点：关卡 `mission.resupply` 按 `ref` 引用它时，我方玩家驻留在附近可补满弹药、重选挂载 | 舰船 `humpback`、`narwhal`，平台 `beacon / breakwater / cairn / reed / shoal / sluice`，机型 `puffin`（海鹦，空中整备机） | `engine/world/resupply.js`（`validate` 读 `(t.ship \|\| t.platform \|\| t).tags`：舰船 / 平台读定义上的标签（运行时目标的 `t.tags` 来自 `TARGETS`，读不到），飞机读自己的 `tags`） |
 | `sarh` | entities | 半主动雷达制导（Fox 1）：弹只在发射机对目标持有有效锁定时受引导，丢锁沿航向飞、宽限内重锁恢复 | 武器 `tether` | `entities/missile.js`（`sarh` 分支）、`game/lock.js`（`lockHeldOn`）、`ai/illum.js`、HUD 状态条 / 引导告警、`input.js launchCall`（Fox 1） |
 | `noRetreat` | ai | 带它的 AI 飞机永不撤离（撤离只在关卡声明 `retreat: 'on'` 时才有）。**`reserved`：目前没有机型使用** | （无） | `ai/retreat.js`（`canRetreat`） |
-| `noPSM` | entities | 该机型不能做过失速机动（PSM）。缺省所有机型可用；VTOL 带上它。**`reserved`：目前没有机型使用** | （无，批次 6 的 VTOL） | `entities/psm.js`（`psmGate`） |
+| `noPSM` | entities | 该机型不能做过失速机动（PSM）。缺省所有机型可用；VTOL 带上它 | 机型 `seahorse` | `entities/psm.js`（`psmGate` 返回 `reason: 'noPSM'`）、`ai/psm.js`、`ui/hud/instruments.js`（不画 PSM 指示） |
+| `droneCarrier` | game | 无人机航母：带机库（`SHIPS[].hangar`），按波次从跑道放飞无人机、回收耗尽的无人机 | 舰船 `hallucigenia` | 目前只是文档性标签：机制由 `missions/_lib.js` 的 `tickHangar` 按 `t.hangar`（`spawnTarget` 读 `SHIPS[].hangar` 建立）驱动，不读这个标签 |
+| `ewfield` | ai | 大范围电子战场：机型数据的 `ewField`（`R` 等）由 `spawnEnemy` 转成 `ai.jam`，干扰半径取 `ewField.R`（黑曜岩 18 km） | 机型 `obsidian` | `missions/_lib.js`（`spawnEnemy` 读 `ac.ewField`）、`ai/brain.js`（`jamAuto`，`J.R` 覆盖半径）、`game/lock.js`（读 `a.ewFieldR / ewFieldK`） |
+| `vtol` | entities | 垂直起降：机型数据的 `vtol` 字段（参数）决定悬停分支，速度低于 `transSpeed` 转入 `entities/vtol.js` | 机型 `seahorse` | `entities/aircraft.js`（`stepAircraft` 末尾读 `ac.vtol` 调 `vtolWatch`）、`entities/vtol.js`（`stepVtol`）、`ui/hud/hover.js`；标签本身为文档性，运行时读的是 `ac.vtol` 参数 |
 
 ## 加一个标签
 

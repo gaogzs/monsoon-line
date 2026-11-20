@@ -14,7 +14,9 @@
 | 文件 | 管什么 |
 |---|---|
 | `physics.js` | 大气密度 / 动压 / 控制因子 / 转弯因子 / 阻力系数、地形钩子（`terrainY` `groundY` `agl` `setTerrain`） |
-| `aircraft.js` | `makeAircraft` / `stepAircraft` / `curLoadFactor` / `nozzlesOf` |
+| `aircraft.js` | `makeAircraft` / `stepAircraft` / `curLoadFactor` / `nozzlesOf`；`stepAircraft` 开头按 `a.deck` → `a.psm` → `a.vtolOn` 的顺序把整帧交给独立分支 |
+| `deck.js` | 甲板起飞（批次 6.1b）：`stepDeck` / `deckSlot` / `deckPose` / `putOnDeck`，见 §9 |
+| `vtol.js` | 垂直起降低速区飞行分支（批次 6.2）：`stepVtol` / `vtolWatch` / `vtolWingK`，见 §9 |
 | `mounts.js` | 挂点适配（`fitsKind`）、NPC 挂载分配（`buildNpcMounts`）、选弹（`chooseWeapon` / `setWeapon` / `weaponMatchesTarget`）、挂载物位置（`storePos` 等） |
 | `missile.js` | `makeMissile` / `stepMissile`、红外重捕获、诱饵二次欺骗 |
 | `range.js` | 有效射程、发射包线、`aiReach` / `lockOff` |
@@ -50,7 +52,9 @@
 | `ctrlFactor` | `ctrlFactor(y, speed, ac) → 0..1` | 气动权限系数，端点可被机型覆盖 |
 | `turnFactor` | `turnFactor(y) → 0.34..1` | 导弹转弯率的气动缩放 |
 | `makeAircraft` | `makeAircraft(o) → a` | 造飞机。`o = {type, team, x/y/z, fwd, speed, throttle, special, loadout, pods, isPlayer, flares, radio, group}`（无人机不再靠 `o.isDrone`，而是机型 `tags.unmanned`，造机时 `a.tags = ac.tags`）。非玩家会顺手建 `ammoPool` / `slotCd`（§ 3.1） |
-| `stepAircraft` | `stepAircraft(a, dt, world)` | 飞机每帧：挂载惩罚→动压→失速→姿态→速度→位置→冷却→拖烟 |
+| `stepAircraft` | `stepAircraft(a, dt, world)` | 飞机每帧：挂载惩罚→动压→失速→姿态→速度→位置→冷却→拖烟。`a.deck` 非空整帧交给 `stepDeck`、`a.psm` 交给 `stepPSM`、`a.vtolOn` 交给 `stepVtol`（后两者在尾部回到共用的 `stepAircraftTail`） |
+| `stepDeck` / `deckSlot` / `deckPose` / `putOnDeck` / `DECK` | `stepDeck(a, dt, world)` / `deckSlot(host, want, now) → 跑道下标\|-1` / `deckPose(host, ri) → {pos, fwd}` / `putOnDeck(a, host, ri) → a` / 常量表 | 通用甲板起飞，见 §9。`stepDeck` 一般由 `stepAircraft` 派发，导出是给探针用 |
+| `stepVtol` | `stepVtol(a, dt, world)` | 垂直起降悬停分支，由 `stepAircraft` 在 `a.vtolOn` 时派发，见 §9。`vtolWatch` / `vtolWingK` 只在 `Ent.$` 内部，不导出 |
 | `fitsKind` | `fitsKind(w, kind, playerStyle) → bool` | 这件武器挂得住这种挂点吗。玩家读 `fits`，NPC 读 `npcFits`（缺省退回 `fits`） |
 | `mountPlan` | `mountPlan(a) → [弹种或 null]` | 逐组挂载分配（逐组配置 → 吊舱 → 制式弹），下标对齐 `ac.hardpointGroups` |
 | `storePos` | `storePos(a, g, pt) → 世界坐标` | 一个挂点的挂载物该画在哪。`pt` 只有 (横向, 前后)，高度取 `g.hy` 或按类型给的默认值（`STORE_HY`） |
@@ -149,7 +153,9 @@
 | `wdPrev` / `wdStill` | `Game` `watchdog`（`engine/game/update.js`） | 看门狗状态（见 §5.6） |
 | `aimDir` | `Game` `updateMouseAim`（`engine/game/control.js`） | 鼠标引导的世界瞄准方向，HUD 画准星用 |
 | `planAlpha` / `rollLock` / `prevDesired` / `aimRate` | `AI.steerTo`（`ai/steer.js`） | 飞控跨帧状态 |
-| `ctrlAuth` | `stepAircraft` | 当前舵效（动压 × 失速），steerTo 与 FCS 表读取 |
+| `ctrlAuth` | `stepAircraft` | 当前舵效（动压 × 失速），steerTo 与 FCS 表读取；悬停分支恒写 1 |
+| `deck` | `putOnDeck`（`stepDeck` 每帧更新，离舰 / 宿主被打掉时置 null） | 甲板起飞状态 `{ host, ri, len, s, v, acc, x0, z0, dx, dz, y }`；非空期间位置由 `stepDeck` 写、`AI.update` 不跑（`engine/game/update.js`）。宿主侧另有 `host.deckUse[ri]`（占用的飞机）/ `host.deckFreeAt[ri]`（这条跑道下次可用的世界时刻） |
+| `vtolOn` / `vtolWk` / `vtolVz` | `vtolWatch` / `stepVtol` | 悬停分支开关（仅带 `ac.vtol` 的机型）/ 机翼升力系数 0..1 / 油门对应的指令竖直速度（m/s）。`vtolOn` 被控制层、看门狗、HUD 读，见 [game.md](game.md)、[hud.md](hud.md) |
 
 ### 3.2 导弹 / 炸弹 `m`（`kind: 'missile'`）
 
@@ -429,6 +435,55 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 ## 8. 一句话导航
 
 改数值先看 `js/data/`（一个单位一个文件：武器、机型、目标），改**行为**再看 `js/engine/entities/` 里对应职责的文件；改**发射许可与锁定**看 `engine/game/launch.js` / `lock.js`。飞行模型的理由全部在 [flight-model.md](flight-model.md)，别在本文里重复第二遍。
+
+## 9. 甲板起飞与垂直起降（批次 6.1b / 6.2）
+
+两者都是 `stepAircraft` 开头的**独立分支**：判一个字段就整帧交出去，不碰主路径的姿态 / 速度段，所以不用它们的场景逐帧不变（golden 不变）。数值模型见 [flight-model.md](flight-model.md) 的「垂直起降悬停分支」。
+
+### 9.1 甲板起飞（`deck.js`）
+
+引擎里的飞机一出生就在空中（运动学飞行，没有地面状态）。这里补一个弹射式的放飞：任何机型都能从带跑道的宿主（舰船 / 平台）上起飞，没有滑行阶段。
+
+- **跑道数据**：`SHIPS` / `PLATFORMS` 的 `runways = [{ x, y, z, yaw, len? }]`，宿主局部坐标，`(x, y, z)` 是**起飞端（末端）**，`yaw` 是跑道方向，`len` 缺省 `DECK.LEN`（80 m）。与 `resupply.js` 的 `reset: 'runway'` 共用同一份数据。起点 = 起飞端沿 `yaw` 往后退 `len`（`deckPose` 算）。
+- **放飞入口**：`spawnEnemy` / `spawnDrone`（`js/missions/_lib.js`）的 `o.deck`（宿主）/ `o.runway`（指定第几条，缺省取空闲的）：先 `deckSlot` 找跑道（没有返回 null，调用者下一帧再试），再用 `deckPose` 当出生点，造好飞机后 `putOnDeck`。
+- **状态机**（`a.deck` 非空期间，`stepDeck` 每帧）：
+  1. `putOnDeck`：飞机完整出现在起点、速度 0、机头沿跑道、油门 1 加力；加速度 `acc = vRel² / (2 len)`，其中 `vRel = max(MIN_REL, LIFT_K × vStallAt(a) − 宿主速度在跑道方向的分量)`——**匀加速到起飞端时对空速度 = 1.4 × 失速速度**，所以大飞机加速度小、小飞机大，任何机型都起得来；`MIN_REL`（25 m/s）保证宿主很快时仍有一段看得见的加速。
+  2. 每帧 `s += v·dt + ½·acc·dt²`；位置按**宿主当前位姿**重算（宿主在开、在转，甲板上的飞机跟着走），速度 = 宿主速度 + 沿跑道的 v。
+  3. 跑道走完 `ROT_FROM`（85%）之后逐渐抬头，到末端抬头角 `PITCH`（0.07 rad）。
+  4. `s ≥ len`：`leave` 把 `a.deck` 清掉，按当前速度矢量加抬头角交还主路径，`AI.update` 从下一帧起接手；同时写 `host.deckFreeAt[ri] = now + SPACING`（1.5 s）。
+- **占用与间隔**：同一条跑道同一时刻只放一架（`host.deckUse[ri]` 存活且仍在甲板上就算占用），离舰后还要等 `SPACING` 才放下一架。`deckSlot` 在宿主没了 / 没跑道 / 都占着时返回 -1。
+- **宿主被打掉**：`stepDeck` 每帧检查 `host.alive`，一失效当场 `leave`（不抬头），按当前速度飞出去。
+- 常量表 `Ent.DECK`：`LEN 80`、`GEAR_H 1.5`（机体原点离甲板）、`LIFT_K 1.4`、`MIN_REL 25`、`PITCH 0.07`、`ROT_FROM 0.85`、`SPACING 1.5`。
+- 使用方：无人机航母的机库（`missions/_lib.js` 的 `tickHangar`，见 [ai.md](ai.md)）。探针 `probe-deck`、`probe-carrier`。
+
+### 9.2 垂直起降（`vtol.js`，机型数据带 `ac.vtol`）
+
+主路径是运动学模型（`vel = fwd × speed`，速度钳在 `[0.42 vStall, 1.12 vMax]`，没有侧滑与竖直速度），装不下悬停。带 `ac.vtol` 的机型（目前只有 D-27 海马，标签 `vtol` `noPSM`）在低速区走独立分支：
+
+- **进入**：`stepAircraft` 末尾对带 `ac.vtol` 的机型调 `vtolWatch`，`speed < transSpeed` 就置 `a.vtolOn`，下一帧起整帧交给 `stepVtol`。进入时 `vel = fwd × speed`，天然连续；玩家进入时油门被拉回 0.5（"定高"）。
+- **退出**：`speed > transSpeed × 1.08`（`EXIT_K`，与进入点之间留滞回）**且**速度矢量与机头夹角 ≤ 12°（`EXIT_ANGLE`）时清 `a.vtolOn`，主路径接着飞；角度没对齐就留在本分支里继续对齐。
+- **速度是自由矢量 `a.vel`**（与机头解耦），每帧写回 `a.speed = |vel|`，武器 / 相机 / HUD 读的仍是 `a.speed`、`a.vel`。每帧 `a.stall = false`、`a.sink = 0`、`a.ctrlAuth = 1`。
+- **受力**（加速度）：重力；机翼升力随速度混入，抵消垂直于速度方向的那部分重力（系数 `wk = min(1, (v / wingV)²)`）；升力推力沿机体 `up`，由"辅助悬停"按竖直速度追踪油门指令（增益 `VZ_GAIN` 1.6，竖直加速度上下限 9 / 6 m/s²，上限 `liftG × G`），并按 `1/cosθ` 补偿倾斜——倾斜后推力的水平分量就是横向漂移，不另外加；前向推力沿机头，油门 > 0.85 才开；线性阻力 `−drag × vel`，翼升力起来后减弱；`wk > 0.01` 时速度矢量以时间常数 `align × wk` 被拉向机头。
+- **姿态**：RCS 式固定角速率 `ac.vtol.rcs`，不吃动压与 `ctrlFactor`，按挂载打折（与主路径同一份 `effectivePhys` 比值）；推杆比拉杆弱（`PITCH_DOWN_K` 0.6）。
+- **油门轴语义**（仅玩家，控制层特例见 [game.md](game.md)）：0.50 定高悬停；0.50 → 0.85 爬升（到 `vzUp`）；0.50 → 0.04 下降（到 `vzDown`）；0.85 → 1.25 前向推力渐开（`fwdAccel`）。
+- **其他**：载荷因数 `gNow` 按速度实际变化算；触地（离地 ≤ 2 m）与主路径一样直接坠毁（`kill`，不做着舰）；尾部回到 `stepAircraftTail`（冷却 / 拖烟 / 电子战结算照常）。
+- **只为玩家设计**：`vtolWatch` 本身不分玩家 / AI（带 `ac.vtol` 的机体速度低了都会进分支），但 AI 没有任何悬停逻辑（`ai/` 里不读 `vtolOn`），油门轴语义与进入时的油门回 0.5 都只对玩家生效；海马目前只作为可玩机型。`noPSM` 标签让 PSM 对它不可用。
+- **`ac.vtol` 参数表**（海马取值，注释在 `js/data/aircraft/seahorse.js`）：
+
+| 字段 | 海马 | 含义 |
+|---|---|---|
+| `transSpeed` | 95 | 低于它进悬停分支；回到 ×1.08 且机头对齐后交还主路径 |
+| `wingV` | 80 | 翼升力从 0 到满的速度尺度 |
+| `liftG` | 1.6 | 升力推力 / 重量（要大于 1 + 阻力才能以 `vzUp` 爬升） |
+| `vzUp` / `vzDown` | 28 / 18 | 辅助悬停的最大爬升 / 下降速度（m/s），对应油门 0.85 / 0.04 |
+| `fwdAccel` | 14 | 前向推力加速度（m/s²），油门 0.85 → 1.25 渐开 |
+| `drag` | 0.18 | 悬停时的线性阻力系数（1/s） |
+| `align` | 2.5 | 速度矢量被拉向机头的速率（1/s，× `wk`） |
+| `rcs` | `{ pitch 0.9, roll 1.6, yaw 0.9 }` | 姿态角速率（rad/s） |
+
+探针 `probe-vtol`。
+
+---
 
 ## 碰炸、近炸与干扰弹（`contactScan` / `breakLockFor`）
 

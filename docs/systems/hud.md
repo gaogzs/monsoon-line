@@ -9,6 +9,7 @@
 > | `_state.js` | `var HUD = { $: {} }` |
 > | `base.js` | 调色板（`GREEN / AMBER / CY / RED / DIM / BLUE`）、`HUDK` 缩放、`U()` / `gap()` / `applyScale()`、`hmiLayout()`、`draw()`（唯一入口与每帧顺序） |
 > | `instruments.js` | `drawCompass`、`drawBoresight`、`drawTapes` / `tape`、`thrPercent` / `thrTape`、`drawEnginePanel`、`ctrlGauges`；`THR_IDLE / THR_MAX` 的 HUD 副本 |
+> | `hover.js` | `drawHover`：垂直起降机型悬停分支的 HUD（批次 6.2，速度矢量菱形 / 垂直速度尺 / 模式字），只在 `p.vtolOn` 时画，见「垂直起降悬停 HUD」 |
 > | `radar.js` | `drawRadar`、`farCell`、`radarXY`、`drawBlips`、`drawPitchLadder`、`threatState` / `drawThreatRing`（RWR） |
 > | `targeting.js` | `drawTargets`、`drawLockBox`、`drawConeCue`、`drawLeadReticle`、`drawAllyMark` / `drawPlainMark`、`drawLaserStatus`（兼画半主动的 `drawIllumStatus`：照射保持 / ✕ 照射中断 + 宽限倒计时；`ownSarhMissile` 供 `drawConeCue` 用：半主动弹在飞时圈按照射是否保持画实 / 虚线） |
 > | `aids.js` | `drawCcip`、`drawFootprint`、`computeEnvelope` / `computeNEZ`、`offscreenRect` / `edgePoint` / `drawOffscreen` |
@@ -188,7 +189,7 @@ var s = M3.project(cam, p.pos + dir * 24000);
   `THR_IDLE / THR_MAX` 定义在 `Game`（`js/engine/game/vars.js`），`HUD`（`js/ui/hud/instruments.js`）有同名副本，smoke 断言两边一致。
 - **为什么慢车是 0% 而不是 4%**：飞行模型里没有推力，油门只决定一个目标速度
   （`lerp(0.74·vStall, vMil, throttle)`，见 [flight-model.md](flight-model.md)）。
-  空速带右侧另有一道琥珀短横标出**当前高度**的失速速度（`Ent.vStallAt(p)`，随高度实时移动；低于它变红，超出带宽贴边画成三角）。
+  空速带右侧另有一道琥珀短横标出**当前高度**的失速速度（`Ent.vStallAt(p)`，随高度实时移动；低于它变红，超出带宽贴边画成三角）。**悬停分支（`p.vtolOn`）里不画这道刻度**：该分支没有失速（见 [flight-model.md](flight-model.md)）。
   以前读数直接是"油门杆 × 100"，松手后停在 4%，看起来像还剩 4% 推力 —— 其实那就是慢车。
 - 减速板在物理上是开 / 关两态（油门低于 `THR_IDLE` 就全开），负数段只表示杆位。
 - 刻度 `−25 / 0 / 25 / 50 / 75 / 100 / 125`；`0%` 与 `100%` 各有一道白线
@@ -220,6 +221,8 @@ var s = M3.project(cam, p.pos + dir * 24000);
 - `Q < 12` 转红并闪烁"舵面失效"
 
 **这是玩家在 18 km 以上唯一的生命线**，不要挪走或缩小。
+
+**悬停分支特例**（`p.vtolOn`）：悬停时动压低是常态，所以数字固定用暗色（`$.DIM`）、不转琥珀 / 红，标题也不闪成"舵面失效"（闪烁条件多了 `!p.vtolOn`）。
 
 ### 雷达（左下，镜头朝上）
 
@@ -526,7 +529,7 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 | 1 | `missile` | 有导弹以本机为目标（或 3 km 内的敌弹） | `▲ MISSILE  导弹逼近`（红，快闪，30 px），下一行是最近那枚的距离 |
 | 2 | `lit` | 没有来袭导弹、但有敌机锁着本机 | `▲ SPIKE  雷达照射`（琥珀，30 px） |
 | 3 | `detected` | `world.detected`（被对空雷达截获） | `▲ DETECTED  被对空雷达截获`（红） |
-| 4 | `terrain` | `p.pos.y < 200 && p.fwd.y < 0` | `TERRAIN 低高度告警`（红） |
+| 4 | `terrain` | `Ent.agl(p) < 200` 且下扎：常规机型 `p.fwd.y < 0`；**悬停分支（`p.vtolOn`）改读竖直速度 `p.vel.y < −3`**（悬停时机头方向与航迹无关） | `TERRAIN 低高度告警`（红） |
 | 5 | `stall` | `p.stall` | `STALL 失速`（红） |
 | 5b | `gload` | `HudFx.gAlert()`：与 G 力条变色同阈值：`gNow > 9` 或 `< -2` 为 1，`≥ 12` 或 `≤ -5` 为 2 | `OVERLOAD 高过载` / `NEG-G 负过载`（1 级琥珀常亮，2 级红色快闪；**纯提示，没有惩罚**） |
 | 6 | `lowq` | `p.pos.y > 18000 && p.q < 12` | `LOW Q 动压不足`（琥珀） |
@@ -564,6 +567,18 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 
 ---
 
+## 垂直起降悬停 HUD（`hover.js`，批次 6.2）
+
+`$.drawHover(ctx, W, H, cam, p)`，在 `draw()` 里排在 `drawBoresight` 之后、`drawTapes` 之前；**只在 `p.vtolOn && p.alive` 时画**，其他机型 / 常规飞行一帧不画，也没有设置开关。物理见 [flight-model.md](flight-model.md) 的「垂直起降悬停分支」。画三样东西：
+
+- **速度矢量菱形**（绿，边长约 8 px）：投影点 = `p.pos + norm(p.vel) × 1400`；速度 ≤ 1.5 m/s 时方向没有意义，不画。它与 `drawBoresight` 的机头标记（小圆）之间的偏离就是**横向漂移**。
+- **模式字 + 水平速度**（准星上方）：`HOVER`（`speed < 6` 且 `|vel.y| < 1.5`，几乎不动）/ `VTOL`（喷流托举）/ `TRANS`（过渡：翼升力系数 `p.vtolWk > 0.35`，琥珀色，其余绿色），下一行小字是水平速度（m/s）。文字走 `T('ui.hud.hover.mode_<hover|vtol|trans>')`、`ui.hud.hover.hs`、`ui.hud.hover.vs`。
+- **垂直速度尺**（准星右侧一条竖尺，量程 ±30 m/s、刻度每 10 m/s）：白三角 = 当前竖直速度 `vel.y`，青色短横 = 油门指令的目标竖直速度 `p.vtolVz`（油门 0.5 在零线上，向上爬升、向下下降）；尺顶是标签（`ui.hud.hover.vs`），尺底是带符号的当前值。
+
+悬停分支对其他 HUD 元素的特例：空速带不画失速刻度、动压表不报红不闪、`TERRAIN` 告警按竖直速度——分别见「速度带」「动压表」「告警栈」。
+
+---
+
 ## 公开接口
 
 ```js
@@ -580,7 +595,7 @@ HUD.GREEN / AMBER / CY / RED   // 调色板，供 Game 复用
 `draw()` 的每帧顺序（顺序有语义，不要随意重排）：
 
 ```
-drawCompass → drawPitchLadder → drawBoresight → drawTapes
+drawCompass → drawPitchLadder → drawBoresight → drawHover（仅 vtolOn）→ drawTapes
 → drawRadar → drawThreatRing → drawTargets → drawLaserStatus
 → drawLeadReticle（在目标框之上，免得被挡住）
 → drawIncomingMissiles → drawStores → drawWeaponPanel

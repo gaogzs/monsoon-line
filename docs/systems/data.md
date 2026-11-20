@@ -25,7 +25,7 @@
 
 - **一个单位一个文件**，`order` 决定它在兼容数组 / 对象里的先后（机库列表、图鉴顺序都靠它），注册完就从定义上摘掉，不会出现在运行时对象里。
 - **一件武器的所有信息写在它自己的文件里**：基础字段之外，`attr`（`fits` / `perPoint` / `mass`，封存时平铺到武器上）、`look`（外观）、`role`（一句话定位）、`needs`（能力门槛）、`cd`（每槽装填时间）、`lead`（导引品质）、`flareRD`（箔丝概率）都是这件武器的字段。**不再有"补丁表"**，也没有"拼错键名被静默丢弃"这类坑——读 `WEAPONS[k]` 读到的就是文件里写的东西。
-- 舰船 / 平台的炮位与发射器写在各自文件的 `mounts` / `launchers` 字段里；加固与机炮抗性写在 `data/targets/*.js`（`tags: ['hard']`、`gunResist`），全局 `TARGETS[model]` 按模型名取。
+- 舰船 / 平台的炮位与发射器写在各自文件的 `mounts` / `launchers` 字段里；加固与机炮抗性写在 `data/targets/*.js`（`tags: ['hard']`、`gunResist`），全局 `TARGETS[model]` 按模型名取。**批次 6.6 起设施也能带自卫火力**：`targets/*.js` 可选 `sam`（旋转架舰空弹 id，落到 `t.weapon`）/ `mounts` / `launchers`（写法同舰船，用 `_m()` / `_L()`），`spawnTarget` 取来 `Turret.attach`，关卡传 `armed: false` 关掉；目前只有 `relay`（旋转架 `dl9` + 机头 / 机尾各一座 `ciws20`，各留约 50° 死角）；中立单位（team 2）不开火，所以别给调节单元写。
 - 武器的布尔机制标记（`twinSeeker` `decoyMemory` `reAcquire` `hobs` `penetrator` `antiRadar` `silentLock` `passive` `unguided` `ballistic` `highAltImmune`）写成 `tags` 数组，运行时读 `w.tags.xxx`；机型 / 设施的 `unmanned` `hard` `regulator` `relay` `sam` `cullFar` 同理。标签在 `js/core/tags.js` 声明，见 [tags.md](tags.md)。
 - 玩家可见的文字（`name` / `cn` / `desc` / `role` …）在数据里写成 `T('weapons.srm.desc')` 这样的调用，文本本身在 `locales/zh-CN/text/weapons/srm.json` 等处。desc 里的 `{{字段}}` 模板仍由 `js/data/zz-seal.js` 在封存之后展开。
 - `js/data/zz-seal.js` 调 `Registry.sealData()` 生成消费者读的全局：`AIRCRAFT` / `SHIPS` / `PLATFORMS`（数组，按 `order`）、`WEAPONS` / `TURRET_GUNS`（按 id 为键的对象）、`TARGETS`；之后该层冻结，再注册会抛错。`CALLSIGN` / `CS_DOWNSTREAM`（`callsigns/`）、`VOICES`（`voices.js`）与 `rules.js` 里的函数是普通全局。
@@ -39,10 +39,10 @@
 | 名字 | 类型 | 规模（当前） | 谁在读 |
 |---|---|---|---|
 | `CALLSIGN` | 对象 | 6 键 | `Game`、`js/missions/` |
-| `AIRCRAFT` | 数组 | **17** 条（可驾驶 6） | `Ent` `makeAircraft`、`Game`、`js/ui/codex/`、`AI`、`js/render/planform/`、`HUD`、`unitview.js` |
-| `SHIPS` | 数组 | **16** 条 | `js/missions/` `spawnShip`、`js/ui/codex/` `inv3`、`unitview.js`、`Game` `preflight` |
+| `AIRCRAFT` | 数组 | **24** 条（可驾驶 9） | `Ent` `makeAircraft`、`Game`、`js/ui/codex/`、`AI`、`js/render/planform/`、`HUD`、`unitview.js` |
+| `SHIPS` | 数组 | **18** 条 | `js/missions/` `spawnShip`、`js/ui/codex/` `inv3`、`unitview.js`、`Game` `preflight` |
 | `PLATFORMS` | 数组 | 6 条（固定平台，`fixed: true`） | 与 `SHIPS` 同构（含 `mounts` / `launchers`），详情页 / 图鉴 / 关卡 |
-| `WEAPONS` | 对象 | **51** 键（`gun` 5） | `Ent`、`Game`、`AI`、`HUD`、`js/ui/codex/` |
+| `WEAPONS` | 对象 | **52** 键（`gun` 5） | `Ent`、`Game`、`AI`、`HUD`、`js/ui/codex/` |
 | `TURRET_GUNS` | 对象 | 13 键 | 炮塔 / 发射架（见 [turret.md](turret.md)） |
 | `TARGETS` | 对象 | 8 键（按模型名） | `Ent`（`isHard` / `gunResistK` / 目标标签） |
 | `CALLSIGN` | 对象 | 6 键 | `Game`、`js/missions/` |
@@ -83,7 +83,7 @@ var CALLSIGN = {
 
 ## AIRCRAFT 表
 
-数组，18 条。6 条可驾驶（`frigatebird sailfish booby petrel skua albatross`），12 条 NPC（带 `npcOnly: true`：`folded_wing gravel schist basalt sandstone boulder tideline spray datum pelican quartz lodestone`）。
+数组，24 条。9 条可驾驶（`frigatebird sailfish booby petrel skua albatross` + 批次 6 新增 `seahorse`（D-27 海马，垂直起降）/ `gannet`（F-12 塘鹅，国土防卫重型战斗机）/ `tern`（G-8 燕鸥，战斗轰炸机）），15 条 NPC（带 `npcOnly: true`：`folded_wing gravel schist basalt sandstone boulder tideline spray datum pelican quartz lodestone` + 批次 6 新增 `obsidian`（GAL-52 黑曜岩，下游战略制空支援机）/ `puffin`（J-4 海鹦，上游空中整备机）/ `manta`（J-6 蝠鲼，上游重型运输机））。
 
 **`model` 不必等于 `id`**：NPC 机型借用现成几何——`tideline` 用 `sailfish`，`datum` / `pelican` 用 `sower`，`quartz` / `lodestone` 用 `boulder`。
 
@@ -104,7 +104,9 @@ var CALLSIGN = {
 | `variableSweep` | bool | — | 只有 `frigatebird` 有；`Ent` 据此做变后掠翼插值 |
 | `tags` | string[] | — | 机制标签，注册时展开成 `{名: true}`，实体创建时带到 `a.tags`；`folded_wing`（上游 KA-7）与 `gravel`（下游 ROK-6「砾石」廉价无人机，默认挂一对 BIN-6）写了 `['unmanned']`（无人机，原来的 `isDrone`） |
 | `muzzle` | `[x, y, z]` | — | 炮管口的机体坐标（x 取绝对值，左右各一），写了就按它出膛（`Ent.gunMuzzle`，原来的 `GUN_MUZZLE` 表）；目前只有 `booby` 写了 |
-| `hitR` | number | — | 命中半径（米），缺省 7.5（`Combat.HIT_R_AIR`）；机炮弹丸判定（`scanShot`）、近炸弹 / 引信、爆炸衰减（`Combat.radiusOf`）都读 `a.hitR`。目前只有 `boulder`（ROK-40）写了 11.5：机体 58 × 54 m 再用 7.5 会显得"贴着机翼打不中"，hp 不动，靠更大的靶面自然变脆 |
+| `hitR` | number | — | 命中半径（米），缺省 7.5（`Combat.HIT_R_AIR`）；机炮弹丸判定（`scanShot`）、近炸弹 / 引信、爆炸衰减（`Combat.radiusOf`）都读 `a.hitR`。`boulder`（ROK-40）写了 11.5：机体 58 × 54 m 再用 7.5 会显得"贴着机翼打不中"，hp 不动，靠更大的靶面自然变脆；批次 6 的大机型也写了：`obsidian` 13、`puffin` 10、`manta` 14 |
+| `vtol` | 对象 | — | 垂直起降参数（批次 6，目前只有 `seahorse`，同时带标签 `vtol` 与 `noPSM`）：速度低于 `transSpeed` 时 `stepAircraft` 把整帧交给 `Ent.stepVtol`（`js/engine/entities/vtol.js`）。字段：`transSpeed`（进悬停分支的速度，回到 ×1.08 且机头对齐后交还主路径）/ `wingV`（翼升力从 0 到满的速度尺度）/ `liftG`（升力推力 / 重量）/ `vzUp` `vzDown`（辅助悬停的最大爬升 / 下降速度 m/s）/ `fwdAccel`（前向推力加速度）/ `drag`（悬停线性阻力）/ `align`（速度矢量被拉向机头的速率）/ `rcs`（`{ pitch, roll, yaw }` 姿态角速率 rad/s，不吃动压）。`phys.vStall` 要取得很小（海马 70），它只在主路径里起作用 |
+| `ewField` | 对象 | — | 机载大范围电子战场（批次 6.4，目前只有 `obsidian`：`{ wid: 'vsc', R: 18000 }`，带标签 `ewfield`）：`spawnEnemy` 把它转成 `ai.jam`（带 `R`），敌方进入 `R` 米自动开机（`jamAuto`），不改接战构型；其余可选键同 `spawnEnemy` 的 `jam`（`skill / trigK / dur / fadeTo / rekey / msg`） |
 | `gunResist` | number | — | 机炮抗性（小口径航炮伤害减免比例，`Ent.gunResistK`）；`boulder` 0.15、`pelican` / `lodestone` / `quartz` 0.05，其余缺省 = 0 |
 | `mounts` | 数组 | — | 机上炮塔 / 炮位（目前只有 `boulder`），写法同舰船的 `mounts` |
 | `stats` | 对象 | ✅ | 机库六维条；键见下，缺某个维度会算出 `NaN` 宽度 |
@@ -154,7 +156,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 - `pts` 是机体系俯视坐标，**同时是俯视识别图的引线锚点**（单一数据源，别再建一份）
 - `pts.length` 必须是**偶数**（成对挂载），`preflight` 会查
 - `playerOnly: true`（可选）：这一组只给玩家（机库）用，`Ent.mountPlan` / `buildNpcMounts` 对 NPC 一律跳过，所以 NPC 的槽数、弹药池、重量不受它影响。2.4 给每架战斗机多加的一对挂点就是这样标的；下游四型的新组在 3.1.15 起去掉了这个标记（敌机开始使用）
-- `npcLoadouts`（可选，目前 schist / basalt / sandstone / tideline 有）：敌机挂载预设，`{ 预设名: { 组id: 武器id } }`，可以留空组、可以同弹多组；关卡 `spawnEnemy` 的 `loadout` 写预设名即可，查不到 / 组 id 写错会抛错
+- `npcLoadouts`（可选，目前 schist / basalt / sandstone / tideline 有；批次 6 起 `obsidian` 有 `support` 预设：三个机腹弹舱 + 翼下两组都是 `tephra`、翼尖自卫 `dl4`，关卡要 `loadout: 'support'` 并写 `special: null`，否则退回 `dl6`）：敌机挂载预设，`{ 预设名: { 组id: 武器id } }`，可以留空组、可以同弹多组；关卡 `spawnEnemy` 的 `loadout` 写预设名即可，查不到 / 组 id 写错会抛错
 - `defaultLoadout` 的值是 `WEAPONS` 的键或 `null`；多数 NPC 机型写 `{}`（`folded_wing` 例外，见文末）
 - `hy`（可选）是**吊挂高度**（机体系 y，单位米）。不写就用
   `Ent.STORE_HY` 按 `kind` 给的默认值（tip −0.35 / light −1.15 /
@@ -169,7 +171,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 
 ## SHIPS 表
 
-数组，**16** 条，覆盖四方参战势力与三个未参战国家（见设定集 8.0.1）。
+数组，**18** 条（批次 6 新增上游 `narwhal` 独角鲸级航空巡洋舰：标签 `resupply`、有 `runways`、无弹射器与机库；下游 `hallucigenia` 怪诞虫级无人机航母：标签 `droneCarrier`、有 `hangar` 与三条 `runways`），覆盖四方参战势力与三个未参战国家（见设定集 8.0.1）。
 每条的设定散文在 `desc` 里，游戏内由 `js/ui/codex/` 的 `inv3` 图鉴与 `unitview.js` 的单位详情页展示。
 
 **这张表已经接进关卡**：`js/missions/` 的 `spawnShip(w, o)` 按 `o.model` 在 `SHIPS` 里查表
@@ -186,7 +188,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | 字段 | 类型 | 含义 | 谁在读 |
 |---|---|---|---|
 | `id` | string | 内部键，**同时是 `MODELS` 的键与预览图文件名** | `inv3`、`tools/render/render-ships.js` |
-| `model` | string | `MODELS` 的键（当前 16 条与 `id` 一一对应，但保留这个字段以便多艘复用同一模型）；**`spawnShip` 按它查表** | `spawnShip`、`inv3`、渲染 |
+| `model` | string | `MODELS` 的键（当前 18 条与 `id` 一一对应，但保留这个字段以便多艘复用同一模型）；**`spawnShip` 按它查表** | `spawnShip`、`inv3`、渲染 |
 | `hull` | string | 军舰的级名或船名（`虎鲸级` / `蓝鲸级` / `MV SOUTHERN CROSS`）；任务简报与台词里的舰船称呼必须取自这里。上下游军舰不挂字母数字编号 | `inv3` |
 | `name` / `cn` | string | 英文舰名 / 中文舰名 | `inv3` |
 | `cls` | string | 舰种（护航驱逐舰 / 导弹快艇 / 布缆船…） | `inv3` |
@@ -195,7 +197,8 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 | `disp` / `dim` / `speed` / `crew` | number / number[] | 满载吨位 t / 主尺度 `[长, 宽, 吃水]` m / 航速 **kn** / 编制人数 | `inv3`、`unitview` |
 | `hp` / `radius` / `value` | number | 交战数值：结构值 / 受击半径 / 任务价值分 | `spawnShip`（任务可用 `o.hp` 等覆盖） |
 | `gunResist` | number | 机炮抗性（小口径航炮伤害 ×(1 − gunResist)，小艇 0 → 航母 0.995）；`spawnShip` 传给 `makeTarget` | `Ent.gunResistK` |
-| `runways` | `[{ x, y, z, yaw }]` | 甲板跑道（可选）：本地坐标，x 右舷、z 舰首、y 甲板高，`z` 是起飞端，`yaw` 相对舰首的偏角（rad）。整备点 `reset: 'runway'` 用它决定补给后飞机放在哪（多条随机取一条）；目前只有 `humpback` | `Resupply.resetPose` |
+| `runways` | `[{ x, y, z, yaw }]` | 甲板跑道（可选）：本地坐标，x 右舷、z 舰首、y 甲板高，`z` 是起飞端，`yaw` 相对舰首的偏角（rad）。整备点 `reset: 'runway'` 用它决定补给后飞机放在哪（多条随机取一条）；目前有 `humpback`（左右两条）、`narwhal`（斜角甲板前端一条）、`hallucigenia`（三条并排弹射轨道）。**批次 6 起也是通用甲板起飞的跑道**：`spawnEnemy` / `spawnDrone` 的 `o.deck` 取其 `x/y/z/yaw` 作起飞位姿（`Ent.deckPose`，`js/engine/entities/deck.js`） | `Resupply.resetPose`、`Ent.deckSlot / deckPose` |
+| `hangar` | 对象 | 无人机机库（可选，标签 `droneCarrier`，目前只有 `hallucigenia`）：`capacity`（机库架数，也是开局数量）/ `launchCd`（每波间隔 s）/ `waveSize`（每波架数）/ `stagger`（波内每架间隔 s）/ `dockR`（回收圈半径，缺省 400 m，要大于无人机的盘旋半径余量）/ `recoverAlt`（回收高度上限，要高于 AI 离地保护 420 m）/ `droneType`（无人机机型 id，怪诞虫为 `gravel`）/ `skill`（可选）/ `cmd`（可选；AI 长机的无人机不读三档命令，对母舰放出的无人机已无实际作用）/ `leash`（无人机自选目标的范围 m，怪诞虫 25 000；`spawnShip` 的 `o.hangarLeash` 可覆盖）/ `firstCd`（首波延迟 s，缺省 6）。运行时状态在 `t.hangar`（`spawnShip` 创建，`o.hangarCount` / `o.hangar === false` 可调） | `tickHangar`（`js/missions/_lib.js`）、`spawnShip` |
 | `mounts` / `launchers` | 数组 | 炮位 / 导弹发射器（原来的 `SHIP_MOUNTS` / `SHIP_LAUNCHERS`），用 `data/_lib.js` 的 `_m()` / `_L()` 构造，`ARC_*` 是射界常量；**只有 11 艘 / 8 艘带**。`smoke.js` 断言 `mounts` 的炮数与 `arms` 文本一致，发射器不算炮。封存时拼出 `allMounts`（炮位 + 有实体模型的发射架）给预览缓存用 | `Turret`、`unitview`、渲染预览 |
 | `vials` | string[] | 要害列表（打哪里收益最大） | `inv3`（目前只展示，没有分区判定） |
 | `arms` | string[] | 舰载武备用**自然语言**描述（不给新编号，见下） | `inv3` |
@@ -248,7 +251,7 @@ defaultLoadout: { A: 'srm', B: 'v11', C: 'qsr', D: 'oep' }
 
 ## WEAPONS 表
 
-对象，51 键，由 `data/weapons/<id>.js` 一件一个文件注册（`Registry.weapon({ id, order, … })`），封存时汇成 `WEAPONS`。**`id`（= 文件名）是内部代号**（`v11` `cel3` `dl4`…），玩家看到的永远是 `name`。改 id 要动多个文件，别改（五门机炮是唯一一次改名：`k1 k2 k3 k7 k11` → `cel1 cel3v cel3 cel7 tca11`，与玩家看到的 CEL-n 对应）。
+对象，52 键，由 `data/weapons/<id>.js` 一件一个文件注册（`Registry.weapon({ id, order, … })`），封存时汇成 `WEAPONS`。批次 6 新增 `tephra`（DAR-12「火山灰」，下游远程主动雷达空空弹：`fits` 为空、玩家挂不上，`npcFits: ['heavy', 'belly']`，每点 2 发，`lockDist` 14 km；只给黑曜岩）。**`id`（= 文件名）是内部代号**（`v11` `cel3` `dl4`…），玩家看到的永远是 `name`。改 id 要动多个文件，别改（五门机炮是唯一一次改名：`k1 k2 k3 k7 k11` → `cel1 cel3v cel3 cel7 tca11`，与玩家看到的 CEL-n 对应）。
 
 `kind` 取值（当前分布）：
 
@@ -542,7 +545,7 @@ if (!ac) ac = AIRCRAFT[0];        // ← 静默回退
 | 无人机身份 | 机型文件的 `tags: ['unmanned']` |
 | 下游呼号池 | `CS_DOWNSTREAM`（77 条，`callsigns/air.js`，越界回绕） |
 | 无线电台词 | `VOICES[任务id][事件名]`（`js/data/voices.js`） |
-| **舰船的吨位 / 尺寸 / 舰种 / 要害 / 交战数值** | **`SHIPS`（16 条，`spawnShip` 按 `model` 查表）** |
+| **舰船的吨位 / 尺寸 / 舰种 / 要害 / 交战数值** | **`SHIPS`（18 条，`spawnShip` 按 `model` 查表）** |
 | 某关里某条船的位置 / 航路 / 阵营 / 武器 | `js/missions/` 里那次 `spawnShip` 调用（`route.speed` 是 m/s） |
 | **舰船外形** | 不在本表 —— 见 `js/models/` 的 `hull()` 与 [models.md](models.md#船体-hullsecs-colside-coldeck-colbottom) |
 | 加一个单位 | 新建 `js/data/<类别>/<id>.js` + 对应文本 JSON，再跑 `node tools/build/gen-pages.js`（见 [DESIGN.md §3](../DESIGN.md)） |

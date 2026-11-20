@@ -10,7 +10,7 @@
 | 文件 | 内容 |
 |---|---|
 | `_state.js` | 建空壳 `var PLANFORM = { $: {} }`；`$` 是私有状态，**只许本命名空间的文件读写**，跨命名空间走公开函数（smoke 有静态检查） |
-| `planes.js` | 各机型的俯视数据 `$.P`（即 `PLANFORM.planes`，6 个机型） |
+| `planes.js` | 各机型的俯视数据 `$.P`（即 `PLANFORM.planes`，9 个机型） |
 | `stores.js` | 挂载外形：`$.STORE_LEN`、`isPod`、`storeHalfW` / `storeLen`、`drawStore`（按武器 `look` 画）、`drawRound`、`drawStoreKind`（按 `kind` 的老画法，给没有 `look` 的吊舱用） |
 | `paint.js` | `groupsOf` / `groupStore`、`paint`（主绘制）、`draw`（机库大图）、`paintStore`（单件挂载的放大图） |
 | `zz-api.js` | 把 `$` 上的东西挂成公开 API：`PLANFORM.planes` / `draw` / `paint` / `paintStore` |
@@ -23,7 +23,7 @@
 
 机库里原本只有文字和统计条，玩家看不出几架飞机"长得"有什么不一样。
 右上角一张俯视识别图之后，外形差异一眼可辨。
-`$.P` 里现有 **6 个机型**，键名与 `AIRCRAFT[].model` 一一对应：
+`$.P` 里现有 **9 个机型**，键名与 `AIRCRAFT[].model` 一一对应：
 
 | 键 | 机型 | 翼展 / 机长（m） | 俯视特征 |
 |---|---|---|---|
@@ -33,10 +33,13 @@
 | `petrel` | F-9 海燕 | 13.2 / 22.9 | **三角翼** —— 机身最细长，双尾喷口 |
 | `skua` | D-21 贼鸥 | 13.8 / 21.4 | **无尾菱形翼** —— 后缘前掠，扁平尾缘 |
 | `albatross` | D-33 信天翁 | 16.4 / 19.6 | **前掠翼** —— 翼尖在翼根之前 |
+| `tern` | G-8 燕鸥 | 16.0 / 24.2 | 批次 6.2c：低空突防战斗轰炸机，固定大翼套 + 后掠外翼、长机头 |
+| `seahorse` | D-27 海马 | 8.6 / 16.0 | 批次 6.2：轻型垂直起降机，座舱盖外另有升力风扇舱盖的填充 |
+| `gannet` | F-12 塘鹅 | 15.6 / 24.0 | 批次 6.2b：鸭翼 + 切角大三角翼的重型战斗机 |
 
-表是按 `model` 查的，不是按 `id`：`AIRCRAFT` 17 条（`js/data/aircraft/<id>.js`）里，NPC 机型 `tideline`（XAMSI「潮线」）
-的 `model` 是 `'sailfish'`，所以它也能取到旗鱼这份数据 —— **实际有俯视图的是 7 型**
-（6 架可驾驶 + `tideline`）。其余 10 型 NPC 没有数据，单位详情页对它们不显示这一节
+表是按 `model` 查的，不是按 `id`：`AIRCRAFT` 23 条（`js/data/aircraft/<id>.js`）里，NPC 机型 `tideline`（XAMSI「潮线」）
+的 `model` 是 `'sailfish'`，所以它也能取到旗鱼这份数据 —— **实际有俯视图的是 10 型**
+（9 架可驾驶 + `tideline`）。其余 13 型 NPC（含 `obsidian` / `puffin` / `manta`，它们只在关卡里出现，批次 6 没给它们做俯视图） 没有数据，单位详情页对它们不显示这一节
 （见 [unitview.md](unitview.md)）。借用意味着 `tideline` 的识别图就是 D-14 的外形，
 这与它在三维里用 `sailfish` 模型是同一个取舍。
 
@@ -120,7 +123,7 @@ PLANFORM.planes.frigatebird = {
 单一数据源"。**不要在 `js/render/planform/` 里再抄一份坐标。**
 
 `frigatebird` 额外带 `sweepAlt` / `sweepPivot` / `sweepLabel` 三个字段
-（详见"可变后掠翼"）；其余五个机型只有 `cannon`，没有挂点字段。
+（详见"可变后掠翼"）；其余八个机型只有 `cannon`，没有挂点字段。
 
 `zz-api.js` 对外只导出四个东西：
 
