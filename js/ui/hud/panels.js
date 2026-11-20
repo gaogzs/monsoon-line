@@ -146,7 +146,7 @@
         list.push({ id: 'resupply', txt: T('ui.hud.panels.drawAlerts.resupply_empty'), col: 'rgba(255,176,58,0.62)', font: F2, on: true, h: $.U(30) });
       }
     }
-    if (Ent.agl(p) < 200 && p.fwd.y < 0) list.push({ id: 'terrain', txt: T('ui.hud.panels.drawAlerts.txt_2'), col: $.RED, font: F1, on: bl, h: $.U(30) });
+    if (Ent.agl(p) < 200 && (p.vtolOn ? p.vel.y < -3 : p.fwd.y < 0)) list.push({ id: 'terrain', txt: T('ui.hud.panels.drawAlerts.txt_2'), col: $.RED, font: F1, on: bl, h: $.U(30) });
     /* 过载：纯提示，没有惩罚。琥珀常亮 → 红色快闪（HudFx.gAlert 给 0 / 1 / 2） */
     var gl = typeof HudFx !== 'undefined' && HudFx.gAlert ? HudFx.gAlert() : 0;
     if (gl > 0) list.push({ id: 'gload', txt: T(HudFx.gNegative() ? 'ui.hud.panels.drawAlerts.gload_neg' : 'ui.hud.panels.drawAlerts.gload_pos'), col: gl > 1 ? $.RED : $.AMBER, font: F2, on: gl > 1 ? blFast : true, h: $.U(30) });

@@ -99,6 +99,7 @@
     $.drawCompass(ctx, W, H, p, world, S, cam);
     $.drawPitchLadder(ctx, W, H, cam, p, S);
     $.drawBoresight(ctx, W, H, p);
+    $.drawHover(ctx, W, H, cam, p);         // 垂直起降机型的悬停分支：速度矢量 / 垂直速度 / 模式（hover.js）
     $.drawTapes(ctx, W, H, p, S);
     $.drawRadar(ctx, W, H, p, world);
     $.drawEnginePanel(ctx, W, H, p);

@@ -43,7 +43,10 @@
   /* 主路径每帧调用：速度掉到 transSpeed 以下就进悬停分支。进入时 vel = fwd × speed，天然连续。 */
   function vtolWatch(a) {
     var vt = a.ac && a.ac.vtol;
-    if (vt && !a.vtolOn && a.speed < vt.transSpeed) a.vtolOn = true;
+    if (vt && !a.vtolOn && a.speed < vt.transSpeed) {
+      a.vtolOn = true;
+      if (a.isPlayer) a.throttle = 0.5;           // 进悬停分支时油门回到"定高"（原来的油门位置在这里是爬升 / 推力指令）
+    }
   }
 
   function stepVtol(a, dt, world) {

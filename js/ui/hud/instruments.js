@@ -178,16 +178,18 @@
     tape(ctx, x, top, hgt, p.speed, 50, 200, 1, 'M/S', $.CY, 0.85);
     /* 失速速度刻度：失速的是动压，所以这个速度随高度实时变（海平面 vStall，11 km 约 1.8 倍，20 km 约 3.7 倍）。
        琥珀短横标在带子右侧；超出带宽时贴边，并画成三角提示它在带外。 */
-    var vSt = Ent.vStallAt(p);
-    var sy = cy + (p.speed - vSt) * 0.85;
-    var syc = M3.clamp(sy, top + 3, top + hgt - 3);
-    ctx.fillStyle = (p.speed < vSt) ? $.RED : $.AMBER;
-    if (sy === syc) ctx.fillRect(x + 1, syc - 1, 22, 3);
-    else {
-      ctx.beginPath();
-      if (sy > syc) { ctx.moveTo(x + 12, syc + 3); ctx.lineTo(x + 6, syc - 3); ctx.lineTo(x + 18, syc - 3); }
-      else { ctx.moveTo(x + 12, syc - 3); ctx.lineTo(x + 6, syc + 3); ctx.lineTo(x + 18, syc + 3); }
-      ctx.closePath(); ctx.fill();
+    if (!p.vtolOn) {                // 垂直起降机型的悬停分支没有失速（vtol.js），不画失速刻度
+      var vSt = Ent.vStallAt(p);
+      var sy = cy + (p.speed - vSt) * 0.85;
+      var syc = M3.clamp(sy, top + 3, top + hgt - 3);
+      ctx.fillStyle = (p.speed < vSt) ? $.RED : $.AMBER;
+      if (sy === syc) ctx.fillRect(x + 1, syc - 1, 22, 3);
+      else {
+        ctx.beginPath();
+        if (sy > syc) { ctx.moveTo(x + 12, syc + 3); ctx.lineTo(x + 6, syc - 3); ctx.lineTo(x + 18, syc - 3); }
+        else { ctx.moveTo(x + 12, syc - 3); ctx.lineTo(x + 6, syc + 3); ctx.lineTo(x + 18, syc + 3); }
+        ctx.closePath(); ctx.fill();
+      }
     }
     /* 大数字和刻度同一单位（m/s）。以前大数字是没标单位的 km/h，和刻度对不上，
        看着像速度读数和指针不一致 */
@@ -214,11 +216,11 @@
     var gx = W - L.margin - 58;
     var qx = gx - 122;
     var q = p.q;
-    var qCol = q < 12 ? $.RED : (q < 20 ? $.AMBER : $.GREEN);
+    var qCol = p.vtolOn ? $.DIM : (q < 12 ? $.RED : (q < 20 ? $.AMBER : $.GREEN));     // 悬停时动压低是常态，不报红
     ctx.strokeStyle = $.DIM; ctx.lineWidth = 1;
     ctx.strokeRect(qx - 58, qy - 26, 116, 48);
     // 动压不足时标题闪成"舵面失效"—— 不另占一行
-    var bl = (q < 12) && (Math.sin(performance.now() * 0.012) > 0);
+    var bl = (q < 12) && !p.vtolOn && (Math.sin(performance.now() * 0.012) > 0);
     $.text(ctx, bl ? T('ui.hud.instruments.drawTapes.s1') : T('ui.hud.instruments.drawTapes.s2'), qx - 50, qy - 9, bl ? $.RED : $.DIM, $.FS, 'left');
     $.text(ctx, q.toFixed(1) + ' kPa', qx + 50, qy + 11, qCol, $.FB, 'right');
 

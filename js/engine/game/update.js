@@ -207,7 +207,7 @@
     else SFX.engine(0, false, false);
 
     // 撞击告警
-    if ($.player.alive && $.player.pos.y < 260 && $.player.fwd.y < -0.1) SFX.terrain();
+    if ($.player.alive && $.player.pos.y < 260 && ($.player.vtolOn ? $.player.vel.y < -5 : $.player.fwd.y < -0.1)) SFX.terrain();
     if ($.player.stall) SFX.stall();
 
     // 任务逻辑

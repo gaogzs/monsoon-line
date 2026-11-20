@@ -135,6 +135,10 @@
        回落比推进慢一些，免得一松手就"咔"地弹回来。 */
     if (thrIn) {
       $.player.throttle += thrIn * dt * 0.62;
+    } else if ($.player.vtolOn && $.player.throttle > 0.85) {
+      /* 垂直起降机型的悬停分支（vtol.js）：0.5 定高、0.5–0.85 爬升、0.85 以上是前向推力 ——
+         松手回落到 0.85（爬升封顶），而不是 1.0：1.0 以上的"加力区"在这里是推力，不是爬升指令 */
+      $.player.throttle = Math.max(0.85, $.player.throttle - dt * 1.6);
     } else if ($.player.throttle > 1.0) {
       $.player.throttle = Math.max(1.0, $.player.throttle - dt * 1.6);
     } else if ($.player.throttle < $.THR_IDLE) {
@@ -149,7 +153,7 @@
        速度掉到 1.3 倍失速以下就自动退出。 */
     var demand = Math.abs(c.pitch) + Math.abs(c.roll);
     var canG = $.player.speed > Ent.vStallAt($.player) * 1.30;
-    var wantG = !!$.keys.KeyG && demand > 0.55 && canG && !psmOn;
+    var wantG = !!$.keys.KeyG && demand > 0.55 && canG && !psmOn && !$.player.vtolOn;     // 悬停分支用固定角速率，没有高 G
 
     if (wantG) {
       $.player.gLoad = M3.smooth($.player.gLoad || 1, $.HIG_MAX, 9, dt);

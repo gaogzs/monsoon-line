@@ -127,5 +127,19 @@ for (const [thr, want, name] of [[0.75, VT.vzUp * 0.25 / 0.35, '爬升'], [0.25,
   chk('F 无 ac.vtol 的机型：vtolOn 恒为 falsy', !a.vtolOn);
 }
 
+/* G HUD：悬停分支下整帧 HUD 能画出来（速度矢量 / 垂直速度 / 模式字，hud/hover.js），不抛错；普通状态不画悬停元素 */
+{
+  const { sb, w } = make(7);
+  const p = sb.Game.__player();
+  sb.Renderer.setCamera(p.pos, p.fwd, p.up, 58);
+  p.ac = Object.assign({}, p.ac, { vtol: VT });
+  let err = null;
+  for (const [on, speed, vel] of [[true, 20, [5, 2, 18]], [true, 0, [0, 0, 0]], [true, 85, [0, 1, 85]], [false, 300, [0, 0, 300]]]) {
+    p.vtolOn = on; p.speed = speed; p.vel = sb.M3.V(vel[0], vel[1], vel[2]); p.vtolWk = Math.min(1, (speed / VT.wingV) ** 2); p.vtolVz = 10;
+    try { sb.HUD.draw(w, p, DT, {}); } catch (e) { err = e; }
+  }
+  chk('G 悬停 / 过渡 / 普通状态下整帧 HUD 都能画出来', !err, err ? err.message : '');
+}
+
 console.log(ok ? '\n全部通过' : '\n有失败');
 process.exit(ok ? 0 : 1);
