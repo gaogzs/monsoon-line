@@ -23,7 +23,7 @@ Registry.ship({
   /* 机库：capacity 架砾石；每 launchCd 秒一波、一波 waveSize 架、波内每隔 stagger 秒放一架；
      无人机弹药打空 / 血量低时飞回舰尾槽位（舰后 240 m），进入 dockR 且低于 recoverAlt 后收回（不计击毁、不计损失）。
      recoverAlt 要高于 AI 的离地保护（420 m），dockR 要大于无人机的盘旋半径余量 */
-  hangar: { capacity: 12, launchCd: 25, waveSize: 3, stagger: 2.5, dockR: 400, recoverAlt: 600, droneType: 'gravel', cmd: 'sortie' },
+  hangar: { capacity: 12, launchCd: 25, waveSize: 3, stagger: 2.5, dockR: 400, recoverAlt: 600, droneType: 'gravel', leash: 25000 },
   /* 三条并排的弹射轨道：(x, y, z) 是起飞端，起点往后退 80 m；与 js/models/ships/hallucigenia.js 的轨道对上 */
   runways: [
     { x: -8, y: 9.2, z: 78, yaw: 0 },

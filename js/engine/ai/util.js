@@ -130,26 +130,24 @@
     return null;
   }
 
-  /* 无人机的三种用法（同一型砾石，用命令区分，不用另做机型）：
-       伴飞（focus / cover / spread，原有）：守在长机编队槽位，目标来自长机授权，不追出去
-       防御（guard）：守在长机（母舰）周围，只打进入 GUARD_R 的敌机；目标一出圈就放弃、回槽位
-       出击（sortie）：从长机出发主动找 SORTIE_R 内的目标（先空中、没有再找带得动的面目标），追击不设圈；
-                      弹打空 / 重伤由 tickHangar 改 recall 收回
-     两者都沿用"长机没了就盘旋、被压制就只规避"的无人机设定。目标在手时 maneuver 放行到通用 pursue 分支。 */
-  $.GUARD_R = 8000;
-  $.SORTIE_R = 30000;
-  $.guardTarget = function (a, s, lead, world) {
-    if (!lead || !lead.alive) return null;
-    var t = s.target, R = $.GUARD_R;
-    // 滞回：已在追的放宽到 1.4 R，免得在圈边来回切换
-    if (t && t.alive && t.kind !== 'target' && Ent.hostile(t, a) && M3.dist(t.pos, lead.pos) < R * 1.4) return t;
-    var th = leadThreat(a, world);
-    return (th && M3.dist(th.pos, lead.pos) < R * 1.4) ? th : nearestEnemyTo(lead.pos, a, world, R);
+  /* 长机是 AI 时的无人机：没有 focus / cover / spread 三档命令（那是玩家给僚机下的令）。
+     AI 长机没有复杂的指挥逻辑，僚机只做两件事：
+       巡航：守在长机的编队槽位
+       战斗：在长机周围 leash 范围内自己选目标、自由追击；目标跑出范围（×1.4 滞回）就放弃、飞回槽位
+     leash 缺省 LEASH_R；同一型无人机从母舰放出时，防御与出击的区别只是 leash 大小（机库数据 / 关卡选项）。
+     被压制 / 回收中 / 长机阵亡仍走原来的"只规避 / 飞回 / 盘旋"，不进这里。 */
+  $.LEASH_R = 8000;
+  $.aiLed = function (s, world) {
+    var l = $.leaderOf(s, world);
+    return !!(l && l.alive && !l.isPlayer);
   };
-  $.sortieTarget = function (a, s, lead, world) {
-    if (!lead || !lead.alive) return null;
-    var t = s.target;
-    if (t && t.alive && Ent.hostile(t, a) && M3.dist(t.pos, a.pos) < $.SORTIE_R * 1.3) return t;
-    return nearestEnemy(a, world, $.SORTIE_R) || $.surfaceTargetFor(a, world);
+  $.leashTarget = function (a, s, lead, world) {
+    var R = s.leash || $.LEASH_R, t = s.target;
+    // 滞回：已在追的放宽到 1.4 R，免得在圈边来回切换
+    if (t && t.alive && Ent.hostile(t, a) && M3.dist(t.pos, lead.pos) < R * 1.4) return t;
+    var e = nearestEnemyTo(lead.pos, a, world, R);
+    if (e) return e;
+    var g = $.surfaceTargetFor(a, world);                // 带得动对面弹才找面目标，同样不出圈
+    return (g && M3.dist(g.pos, lead.pos) < R) ? g : null;
   };
 })(AI);

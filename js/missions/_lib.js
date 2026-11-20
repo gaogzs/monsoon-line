@@ -257,7 +257,7 @@ function spawnDrone(w, leader, o) {
   if (o.callsign) { a.name = o.callsign; a.label = o.callsign; }
   AI.attach(a, {
     role: 'drone', skill: o.skill !== undefined ? o.skill : 0.62,
-    leader: leader, cmd: o.cmd || 'focus',
+    leader: leader, cmd: o.cmd || 'focus', leash: o.leash || 0,
     formation: { dx: sl.dx, dy: sl.dy, dz: sl.dz }
   });
   w.actors.push(a);
@@ -302,7 +302,7 @@ function tickHangar(t, w, dt) {
     if (h.sg <= 0) {
       var k = h.launched;
       var dr = spawnDrone(w, t, {
-        type: d.droneType, deck: t, skill: d.skill, cmd: h.cmd || d.cmd,
+        type: d.droneType, deck: t, skill: d.skill, cmd: d.cmd, leash: h.leash || d.leash,
         dx: ((k % 5) - 2) * 70, dz: -190 - (k % 3) * 40
       });
       if (dr) { h.count--; h.pending--; h.launched++; h.sg = d.stagger; }
@@ -529,7 +529,7 @@ function spawnShip(w, o) {
   if (s.hangar && o.hangar !== false) {
     t.hangar = { count: o.hangarCount !== undefined ? o.hangarCount : s.hangar.capacity,
       cd: s.hangar.firstCd !== undefined ? s.hangar.firstCd : 6, pending: 0, sg: 0, launched: 0, recovered: 0, hold: false,
-      cmd: o.hangarCmd || null };     // 关卡可用 hangarCmd 覆盖舰船数据的放飞命令：'sortie' 出击 / 'guard' 防御 / 伴飞档
+      leash: o.hangarLeash || 0 };    // 关卡可用 hangarLeash 覆盖舰船数据的自选目标范围：小 = 防御母舰，大 = 出击
   }
   if (o.ref) (w.refs || (w.refs = {}))[o.ref] = t;     // 关卡按 ref 引用本单位（mission.resupply）
   w.targets.push(t);
