@@ -476,6 +476,10 @@
         s.target = null;                       // 自主防御：只规避，不开火
       } else if (s.cmd === 'recall') {
         s.target = null;                       // 回收：只飞回舰尾，不接战（机库见 missions/_lib.js 的 tickHangar）
+      } else if (s.cmd === 'guard') {
+        s.target = $.guardTarget(a, s, dLead, world);        // 防御：守在长机 / 母舰周围，只打进圈的
+      } else if (s.cmd === 'sortie') {
+        s.target = $.sortieTarget(a, s, dLead, world);       // 出击：主动找目标，追击不设圈
       } else if (s.cmd === 'spread') {
         s.target = $.nearestEnemy(a, world, 9000);
       } else if (s.cmd === 'cover') {
@@ -632,8 +636,9 @@
          有 a.route 的（预警机）不进这里：它们走 updateRoute */
       var sup = $.supportDir(a, s, world, dt);
       desired = sup.dir; throttle = sup.throttle; ab = sup.ab;
-    } else if (s.role === 'drone') {
-      /* 无人僚机永远待在编队里，不追出去。
+    } else if (s.role === 'drone' && !((s.cmd === 'guard' || s.cmd === 'sortie') && s.target && s.target.alive)) {
+      /* guard / sortie 手上有目标时不进这里：放行到下面通用的 pursue 分支去追（无目标 / 目标丢了就回到本分支守槽位）。
+         无人僚机永远待在编队里，不追出去。
 
          它的价值在于替长机挡导弹、探路、把导弹挂架打空 ——
          一旦追出去，这三件事就都做不成了。

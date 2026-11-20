@@ -302,7 +302,7 @@ function tickHangar(t, w, dt) {
     if (h.sg <= 0) {
       var k = h.launched;
       var dr = spawnDrone(w, t, {
-        type: d.droneType, deck: t, skill: d.skill, cmd: d.cmd,
+        type: d.droneType, deck: t, skill: d.skill, cmd: h.cmd || d.cmd,
         dx: ((k % 5) - 2) * 70, dz: -190 - (k % 3) * 40
       });
       if (dr) { h.count--; h.pending--; h.launched++; h.sg = d.stagger; }
@@ -528,7 +528,8 @@ function spawnShip(w, o) {
   /* 机库（SHIPS[].hangar）：count = 机库里还有几架；o.hangarCount 改开局数量，o.hangar === false 关掉自动放飞 */
   if (s.hangar && o.hangar !== false) {
     t.hangar = { count: o.hangarCount !== undefined ? o.hangarCount : s.hangar.capacity,
-      cd: s.hangar.firstCd !== undefined ? s.hangar.firstCd : 6, pending: 0, sg: 0, launched: 0, recovered: 0, hold: false };
+      cd: s.hangar.firstCd !== undefined ? s.hangar.firstCd : 6, pending: 0, sg: 0, launched: 0, recovered: 0, hold: false,
+      cmd: o.hangarCmd || null };     // 关卡可用 hangarCmd 覆盖舰船数据的放飞命令：'sortie' 出击 / 'guard' 防御 / 伴飞档
   }
   if (o.ref) (w.refs || (w.refs = {}))[o.ref] = t;     // 关卡按 ref 引用本单位（mission.resupply）
   w.targets.push(t);

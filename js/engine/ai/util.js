@@ -129,4 +129,27 @@
     }
     return null;
   }
+
+  /* 无人机的三种用法（同一型砾石，用命令区分，不用另做机型）：
+       伴飞（focus / cover / spread，原有）：守在长机编队槽位，目标来自长机授权，不追出去
+       防御（guard）：守在长机（母舰）周围，只打进入 GUARD_R 的敌机；目标一出圈就放弃、回槽位
+       出击（sortie）：从长机出发主动找 SORTIE_R 内的目标（先空中、没有再找带得动的面目标），追击不设圈；
+                      弹打空 / 重伤由 tickHangar 改 recall 收回
+     两者都沿用"长机没了就盘旋、被压制就只规避"的无人机设定。目标在手时 maneuver 放行到通用 pursue 分支。 */
+  $.GUARD_R = 8000;
+  $.SORTIE_R = 30000;
+  $.guardTarget = function (a, s, lead, world) {
+    if (!lead || !lead.alive) return null;
+    var t = s.target, R = $.GUARD_R;
+    // 滞回：已在追的放宽到 1.4 R，免得在圈边来回切换
+    if (t && t.alive && t.kind !== 'target' && Ent.hostile(t, a) && M3.dist(t.pos, lead.pos) < R * 1.4) return t;
+    var th = leadThreat(a, world);
+    return (th && M3.dist(th.pos, lead.pos) < R * 1.4) ? th : nearestEnemyTo(lead.pos, a, world, R);
+  };
+  $.sortieTarget = function (a, s, lead, world) {
+    if (!lead || !lead.alive) return null;
+    var t = s.target;
+    if (t && t.alive && Ent.hostile(t, a) && M3.dist(t.pos, a.pos) < $.SORTIE_R * 1.3) return t;
+    return nearestEnemy(a, world, $.SORTIE_R) || $.surfaceTargetFor(a, world);
+  };
 })(AI);
