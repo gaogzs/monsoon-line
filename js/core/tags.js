@@ -36,9 +36,11 @@ Tags.declare('resupply', { owner: 'game',     doc: T('core.tags.doc_19') });
 Tags.declare('droneCarrier', { owner: 'game', doc: T('core.tags.doc_22') });
 // 大范围电子战场：机型数据的 ewField 由 spawnEnemy 转成 ai.jam（js/engine/ai/brain.js 的 jamAuto），半径取 ewField.R
 Tags.declare('ewfield', { owner: 'ai', doc: T('core.tags.doc_23') });
-// reserved：本批没有机型使用，VTOL（批次 6）带上它；读的地方是 psm.js 的 psmGate
+// 垂直起降：机型数据的 vtol 字段（参数）由 stepAircraft 读，速度低于 transSpeed 转入 entities/vtol.js 的悬停分支（海马用）
+Tags.declare('vtol',      { owner: 'entities', doc: T('core.tags.doc_24') });
+// 读的地方是 psm.js 的 psmGate；VTOL 带上它（悬停分支里没有过失速机动）
 // 半主动雷达制导（Fox 1）：导弹只在发射机对该目标持有有效锁定时受引导，丢锁沿航向飞、宽限内重锁恢复（entities/missile.js）
 Tags.declare('sarh',      { owner: 'entities', doc: T('core.tags.doc_21') });
 // reserved：目前没有机型使用。带上它的 AI 飞机永不撤离（js/engine/ai/retreat.js 的 canRetreat 读它）
 Tags.declare('noRetreat', { owner: 'ai', reserved: true, doc: T('core.tags.doc_20') });
-Tags.declare('noPSM',    { owner: 'entities', reserved: true, doc: T('core.tags.doc_18') });
+Tags.declare('noPSM',    { owner: 'entities', doc: T('core.tags.doc_18') });

@@ -4523,7 +4523,7 @@ if (Ent && M3 && me && world) {
   }
 
   /* ---- 过失速机动（PSM）：门限、收敛、出口 ----
-     详细场景在 tools/test/probes/probe-psm.js；这里只守住接线：noPSM 已声明（reserved）、
+     详细场景在 tools/test/probes/probe-psm.js；这里只守住接线：noPSM 已声明、
      各条门限各给各的原因、一把完整的 PSM 能收敛、出口速度连续、松开即结束且无冷却。 */
   {
     const G = sandbox.Game, Ent = sandbox.Ent, AI = sandbox.AI, M3d = sandbox.M3;
@@ -4532,7 +4532,7 @@ if (Ent && M3 && me && world) {
     const w = G.__world(), pl = G.__player();
     pump(2);
     const decl = sandbox.Tags.declared().noPSM;
-    if (!decl || !decl.reserved) bad.push('noPSM 没有声明为 reserved');
+    if (!decl) bad.push('noPSM 没有声明');       // 海马（垂直起降）已经在用它，不再是 reserved；"声明了必须被用到"的断言覆盖它
 
     const put = (alt, spd, aim) => {
       pl.pos = M3d.V(0, alt, 0); pl.fwd = M3d.V(0, 0, 1); pl.up = M3d.V(0, 1, 0); pl.right = M3d.V(1, 0, 0);
