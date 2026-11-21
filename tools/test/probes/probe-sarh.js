@@ -93,8 +93,11 @@ function fly(weapon, script, opts) {
   w.actors = w.actors.filter(a => a === p); w.targets.length = 0;
   p.pos.x += 80000; p.hp = p.maxHp = 1e9;           // 玩家挪远，别参与
   w.arenaDef = null;
-  const mk = (team, x, z, fz) => { const a = E.makeAircraft({ type: 'albatross', team, x, y: 4000, z, fwd: M.V(0, 0, fz), speed: 250, special: 'tether' }); a.hp = a.maxHp = 1e9; return a; };
-  const sh = mk(1, 0, 0, 1), tg1 = mk(0, 0, 9000, -1), tg2 = mk(0, 1500, 8000, -1);
+  /* 射手带半主动弹；两个目标只是被照射的靶，不带武器（special: null）：否则它们会还击，谁先开火 / 导弹何时到射手
+     决定射手是否被迫进躲避（躲避模式不开火），测的就成了对射的混沌而不是 AI 的照射逻辑（导弹去掉 +70 之后这个场景
+     就因此变了：射手 15 s 就进躲避、一直没机会开火） */
+  const mk = (team, x, z, fz, sp) => { const a = E.makeAircraft({ type: 'albatross', team, x, y: 4000, z, fwd: M.V(0, 0, fz), speed: 250, special: sp }); a.hp = a.maxHp = 1e9; return a; };
+  const sh = mk(1, 0, 0, 1, 'tether'), tg1 = mk(0, 0, 9000, -1, null), tg2 = mk(0, 1500, 8000, -1, null);
   AI.attach(sh, { role: 'enemy', skill: 0.9, rank: 'ace' });
   AI.attach(tg1, { role: 'ally', skill: 0.3, rank: 'rookie' }); AI.attach(tg2, { role: 'ally', skill: 0.3, rank: 'rookie' });
   tg1.ai.cmd = 'hold'; tg2.ai.cmd = 'hold';

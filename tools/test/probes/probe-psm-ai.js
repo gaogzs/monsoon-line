@@ -46,7 +46,9 @@ function scene(seed, o) {
 
 /* ---------- A / E ---------- */
 {
-  const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  /* 触发是概率性的（v3.7.0 上 24/30 ≈ 80%，v3.7.1 去掉导弹 +70 后 28/30 ≈ 93%：攻击机的导弹到达时间变了，
+     威胁判定随之变化）。12 个种子对 ~90% 的触发率太少，「全中」的概率不低、断言会随机贴边，所以取 30 个。 */
+  const SEEDS = Array.from({ length: 30 }, (_, i) => i + 1);
   let trig = 0, nan = 0, crashed = 0, unfinished = 0, againEarly = 0;
   for (const seed of SEEDS) {
     const W = scene(seed);
