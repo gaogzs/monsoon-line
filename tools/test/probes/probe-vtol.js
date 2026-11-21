@@ -7,10 +7,12 @@
    直接调 Ent.stepAircraft（不经输入层），给 a.ctrl / a.throttle / a.ab / a.brake，量物理，用真正的 seahorse 数据：
    A. 推力 0%：从 120 m/s 前飞减速到 < 0.5 m/s、高度漂移 < 3 m；放平后完全静止
    B. 推力 25% / 50%：收敛到 vS/2、vS（±3 m/s），高度保持
-   C. 喷口角：悬停 ≈ 90°、加速起步 40–70°、v ≥ vStall ≈ 0°、随速度单调不增
+   C. 喷口角：悬停 ≈ 90°、加速起步 25–70°、v ≥ vStall ≈ 0°、随速度单调不增
    D. 减速板：悬停下降率 ≈ vzDown（±2）、水平静止；接近 vStall 的速度上竖直指令很小（gate = 1 − wk）
    E. 仰头上升：推力 0% 仰 30° 爬升 ≈ vzUp·sin30°（±2）；低头 30° 不下降
    M. 喷口出力随高度衰减：3000 m 悬停负荷 ≈ g/(accel·η)、越高越高；8500 m 满指令托不住被迫下降，降到够用的高度停住
+   O. 失速警告：喷口托得住时 a.stall 恒 false；托不住、正在下沉时为真，下沉散掉后解除
+   P. 悬停推到 100% 转入平飞用时：3000 m ≤ 9 s、6000 m ≤ 13 s
    N. 高海拔小幅垂直补偿：6000 m 推力 0–50% 各挡低速不失速不下沉且速度越高负荷越低；9000 m 从主路径进悬停低速平飞保持高度；
       升限处推力 50% 能加速离开
    L. 直升机式平移：悬停时倾斜机身，升力喷口的水平分量推着飞机往倾斜方向走（低头前 / 仰头后 / 右滚右 / 左滚左），
@@ -102,7 +104,7 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
     prev = d; n++;
     if (a.speed >= vS()) { atVs = d; break; }
   }
-  chk('C 起步加速（推力指令不变）：喷口偏下 40–70°（含主路径的推力渐入系数）', first > 40 && first < 70, 'noz0=' + first.toFixed(1) + '°');
+  chk('C 起步加速（推力指令不变）：喷口偏下 25–70°（含低速过渡加力）', first > 25 && first < 70, 'noz0=' + first.toFixed(1) + '°');
   chk('C 速度升高喷口角单调不增、到 vStall 回到 ≈ 0°', mono && atVs !== null && atVs < 1, 'at vStall=' + (atVs === null ? 'n/a' : atVs.toFixed(2)) + '° steps=' + n);
 }
 
@@ -232,16 +234,36 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
     'v=' + ce.a.speed.toFixed(1) + ' jet=' + (ce.a.vtolJet * 100).toFixed(0) + '% dy=' + (ce.a.pos.y - yc).toFixed(1));
 }
 
-/* O 垂直起降机型没有失速：任何高度、任何速度（含主路径里掉到 vStall 以下的那一帧），a.stall 恒为 false */
+/* O 失速警告的语义：喷口托得住时 a.stall 恒为 false（任何高度 / 速度，含主路径里掉到 vStall 以下的交接帧）；
+      喷口满指令仍托不住、正在下沉时 a.stall 为真（HUD 报失速，虽然不是常规失速），降到托得住的高度后解除 */
 {
   let bad = null;
-  for (const [alt, v0, pct] of [[3000, 40, 0], [8500, 60, 0], [10500, 80, 30], [10500, 150, 0]]) {
+  for (const [alt, v0, pct] of [[3000, 40, 0], [6000, 50, 0], [9000, 150, 30], [10500, 200, 60]]) {
     const m = make(15, 'seahorse', alt);
     m.a.vtolOn = false; m.a.speed = v0; m.a.vel = m.sb.M3.V(0, 0, v0);       // 从主路径起步，覆盖进入悬停分支的交接帧
     m.thr(pct);
-    m.run(60, 0, () => { if (m.a.stall && !bad) bad = alt + ' m v0=' + v0 + ' stall'; });
+    m.run(60, 0, () => { if (m.a.stall && !m.a.vtolSink && !(m.a.vtolJet >= 1) && !bad) bad = alt + ' m v0=' + v0; });
   }
-  chk('O 垂直起降机型任何高度 / 速度 a.stall 恒为 false（含主路径的交接帧）', !bad, bad || '');
+  chk('O 喷口托得住时 a.stall 恒为 false（任何高度 / 速度，含主路径的交接帧）', !bad, bad || '');
+  const hi = make(15, 'seahorse', 8500); hi.thr(0);
+  let stallDuringSink = false, sinkFrames = 0;
+  hi.run(20, 0, () => { if (hi.a.vtolSink > 1) { sinkFrames++; if (hi.a.stall) stallDuringSink++; } });
+  chk('O 8500 m 喷口托不住、正在下沉：a.stall 为真（HUD 报失速）', sinkFrames > 60 && stallDuringSink === sinkFrames, 'sinkFrames=' + sinkFrames + ' stall=' + stallDuringSink);
+  hi.run(240, 0);
+  chk('O 降到托得住的高度、下沉散掉后：a.stall 解除', !hi.a.stall && !hi.a.vtolSink, 'stall=' + hi.a.stall + ' y=' + hi.a.pos.y.toFixed(0));
+}
+
+/* P 悬停推到 100% 转入平飞不拖沓：3000 m ≤ 9 s、6000 m（接近悬停升限）≤ 13 s 交接给主路径 */
+{
+  const rows = [];
+  for (const [alt, limit] of [[3000, 9], [6000, 13]]) {
+    const m = make(16, 'seahorse', alt);
+    m.thr(100);
+    let t = -1;
+    for (let i = 0; i < 40 * 60 && t < 0; i++) { m.hold(0); m.sb.Ent.stepAircraft(m.a, DT, m.w); if (!m.a.vtolOn) t = i / 60; }
+    rows.push({ alt, limit, t });
+  }
+  chk('P 悬停推 100%：交接给主路径用时 3000 m ≤ 9 s、6000 m ≤ 13 s', rows.every(r => r.t > 0 && r.t <= r.limit), rows.map(r => r.alt + ' m: ' + r.t.toFixed(1) + ' s').join('，'));
 }
 
 /* L 直升机式平移：悬停时倾斜机身，升力喷口的水平分量把飞机推向倾斜的方向（低头向前、仰头向后、右滚向右），松开后收住 */
@@ -280,12 +302,11 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
     try { sb.HUD.draw(w, p, DT, {}); } catch (e) { err = e; }
   }
   chk('I 悬停 / 过渡 / 普通状态下整帧 HUD 都能画出来', !err, err ? err.message : '');
-  /* 托不住（喷口负荷 ≥ 100%）时的警告栈：单独一条 LIFT LIMIT，不是失速（STALL） */
-  const ctxStub = new Proxy({}, { get(t, k) { if (k in t) return t[k]; if (k === 'canvas') return { width: 1280, height: 720 }; if (k === 'measureText') return () => ({ width: 8 }); return () => {}; }, set(t, k, v) { t[k] = v; return true; } });
-  const alertIds = (jet, stall) => { p.vtolOn = true; p.vtolJet = jet; p.stall = stall; p.pos = sb.M3.V(0, 8500, 0); return sb.HUD.drawAlerts(ctxStub, 1280, 720, p, { missiles: [], actors: [], detected: true }).map(a => a.id); };
-  const idsSink = alertIds(1.2, false), idsOk = alertIds(0.8, false);
-  chk('I 喷口托不住：警告栈出 LIFT LIMIT、不出 STALL；托得住时两者都没有', idsSink.indexOf('liftlimit') >= 0 && idsSink.indexOf('stall') < 0 && idsOk.indexOf('liftlimit') < 0 && idsOk.indexOf('stall') < 0, JSON.stringify(idsSink) + ' / ' + JSON.stringify(idsOk));
-  p.vtolOn = false; p.vtolJet = 0; p.stall = false;
+  /* 悬停面板与屏外标记的安全矩形不重叠：矩形左边界在面板右缘之外（普通状态下不变） */
+  const rect0 = sb.HUD.offscreenRect(1280, 720, { vtolOn: false });
+  const rect1 = sb.HUD.offscreenRect(1280, 720, { vtolOn: true });
+  const tapeX = Math.min(132, 1280 * 0.15), panelRight = tapeX + 60 + 196;
+  chk('I 悬停时屏外标记安全矩形让出面板（左边界 > 面板右缘），普通状态不变', rect1.x0 > panelRight && rect0.x0 < rect1.x0 && rect0.x0 === 318, 'normal=' + rect0.x0 + ' vtol=' + rect1.x0.toFixed(0) + ' panelRight=' + panelRight);
   const t1 = sb.T('ui.hud.hover.hs', { v: '3.5' }), t2 = sb.T('ui.hud.hover.noz', { a: '42' });
   chk('I 悬停 HUD 文案的占位符被填进数字（项目用 {{x}} 双花括号）', t1.indexOf('3.5') >= 0 && t2.indexOf('42') >= 0 && t1.indexOf('{') < 0 && t2.indexOf('{') < 0, t1 + ' | ' + t2);
 }

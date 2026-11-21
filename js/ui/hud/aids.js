@@ -215,6 +215,8 @@
 
     // 左：空速带 + 引擎出力带（后者在空速带右边 U(104)，读数再往外）
     var left = m + $.U(168) + CLR;
+    // 垂直起降机型的悬停面板（hover.js）贴在速度带右边，比引擎带更靠右：悬停时再让出它的宽度
+    if (p && p.vtolOn && $.HOVER_PANEL) left = Math.max(left, m + $.U($.HOVER_PANEL.off + $.HOVER_PANEL.w) + CLR);
     // 右：高度带 + 动压表（动压表以 x = W - m 为中心、半宽 62）
     var right = m + $.U(62) + CLR;
     // 上：指南针（含航向读数） + 两行任务目标
