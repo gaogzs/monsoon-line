@@ -11,6 +11,8 @@
    D. 减速板：悬停下降率 ≈ vzDown（±2）、水平静止；接近 vStall 的速度上竖直指令很小（gate = 1 − wk）
    E. 仰头上升：推力 0% 仰 30° 爬升 ≈ vzUp·sin30°（±2）；低头 30° 不下降
    M. 喷口出力随高度衰减：3000 m 悬停负荷 ≈ g/(accel·η)、越高越高；8500 m 满指令托不住被迫下降，降到够用的高度停住
+   N. 高海拔小幅垂直补偿：6000 m 推力 0–50% 各挡低速不失速不下沉且速度越高负荷越低；9000 m 从主路径进悬停低速平飞保持高度；
+      升限处推力 50% 能加速离开
    L. 直升机式平移：悬停时倾斜机身，升力喷口的水平分量推着飞机往倾斜方向走（低头前 / 仰头后 / 右滚右 / 左滚左），
       高度保持，放平后阻力收住；放平的悬停纹丝不动
    F. 0 → 100% 加速过 vStall：交接帧加速度 < 20 m/s²、速度方向变化 < 3°、全程不失速、不 NaN
@@ -197,6 +199,37 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
   hi.run(240, 0);
   chk('M 下降到喷口托得住的高度后停住（活着、没有继续下沉、速度 ≈ 0），悬停升限低于 8500 m', hi.a.alive && hi.a.pos.y < 8500 - 300 && hi.a.pos.y > 5000 && !hi.a.vtolSink && hi.a.speed < 0.5 && hi.a.vtolJet <= 1.0001,
     'y=' + hi.a.pos.y.toFixed(0) + ' jet=' + (hi.a.vtolJet * 100).toFixed(1) + '% sink=' + (hi.a.vtolSink || 0).toFixed(2));
+}
+
+/* N 高海拔下小幅度垂直补偿依然有效：有效 vStall 随高度升高，翼升力系数 wk 变小，缺口由喷口按比例补上，不失速、不下沉 */
+{
+  const rows = [];
+  for (const pct of [0, 10, 20, 30, 40, 50]) {
+    const m = make(14, 'seahorse', 6000);
+    m.thr(pct);
+    let stall = false, minVy = 0;
+    m.run(60, 0, () => { if (m.a.stall) stall = true; minVy = Math.min(minVy, m.a.vel.y); });
+    rows.push({ pct, stall, minVy, jet: m.a.vtolJet, sink: m.a.vtolSink || 0, speed: m.a.speed });
+  }
+  chk('N 6000 m 推力 0–50% 各挡低速：全程不失速、不下沉（负荷 < 100%）', rows.every(r => !r.stall && r.minVy > -0.3 && r.sink === 0 && r.jet < 1), rows.map(r => r.pct + '%:' + (r.jet * 100).toFixed(0) + '%').join(' '));
+  let mono = true;
+  for (let i = 1; i < rows.length; i++) if (!(rows[i].jet < rows[i - 1].jet && rows[i].speed > rows[i - 1].speed)) mono = false;
+  chk('N 速度越高喷口负荷越低（翼托得越多，补偿越小）', mono && rows[rows.length - 1].jet < 0.02);
+  const m9 = make(14, 'seahorse', 9000);
+  m9.a.vtolOn = false; m9.a.speed = 160; m9.a.vel = m9.sb.M3.V(0, 0, 160);
+  m9.thr(30);
+  let stall9 = false;
+  m9.run(40, 0, () => { if (m9.a.stall) stall9 = true; });
+  const y9 = m9.a.pos.y; m9.run(20, 0);
+  chk('N 9000 m 从主路径减速进悬停分支、推力 30%：低速平飞保持高度（负荷 < 100%、不失速、不下沉）',
+    m9.a.vtolOn && !stall9 && !m9.a.vtolSink && m9.a.vtolJet < 1 && Math.abs(m9.a.pos.y - y9) < 5, 'v=' + m9.a.speed.toFixed(1) + ' jet=' + (m9.a.vtolJet * 100).toFixed(0) + '% wk=' + m9.a.vtolWk.toFixed(2) + ' dy=' + (m9.a.pos.y - y9).toFixed(1));
+  const m0 = make(14, 'seahorse', 9000); m0.thr(0); m0.run(8, 0);
+  chk('N 同一高度静止悬浮托不住（对照）：负荷 ≥ 100%、在下沉', m0.a.vtolJet >= 1 && m0.a.vel.y < -1, 'jet=' + (m0.a.vtolJet * 100).toFixed(0) + '% vy=' + m0.a.vel.y.toFixed(1));
+  const ce = make(14, 'seahorse', 8500); ce.thr(0); ce.run(120, 0);        // 沉到悬停升限附近停住
+  const yc = ce.a.pos.y; let stallc = false;
+  ce.thr(50); ce.run(40, 0, () => { if (ce.a.stall) stallc = true; });
+  chk('N 悬停升限处推力 50% 能加速离开（翼接手、负荷降下来），不会困在升限、不失速', ce.a.speed > 0.8 * ce.vS() && ce.a.vtolJet < 0.6 && !stallc && Math.abs(ce.a.pos.y - yc) < 30,
+    'v=' + ce.a.speed.toFixed(1) + ' jet=' + (ce.a.vtolJet * 100).toFixed(0) + '% dy=' + (ce.a.pos.y - yc).toFixed(1));
 }
 
 /* L 直升机式平移：悬停时倾斜机身，升力喷口的水平分量把飞机推向倾斜的方向（低头向前、仰头向后、右滚向右），松开后收住 */
