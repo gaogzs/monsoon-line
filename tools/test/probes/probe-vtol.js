@@ -232,6 +232,18 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
     'v=' + ce.a.speed.toFixed(1) + ' jet=' + (ce.a.vtolJet * 100).toFixed(0) + '% dy=' + (ce.a.pos.y - yc).toFixed(1));
 }
 
+/* O 垂直起降机型没有失速：任何高度、任何速度（含主路径里掉到 vStall 以下的那一帧），a.stall 恒为 false */
+{
+  let bad = null;
+  for (const [alt, v0, pct] of [[3000, 40, 0], [8500, 60, 0], [10500, 80, 30], [10500, 150, 0]]) {
+    const m = make(15, 'seahorse', alt);
+    m.a.vtolOn = false; m.a.speed = v0; m.a.vel = m.sb.M3.V(0, 0, v0);       // 从主路径起步，覆盖进入悬停分支的交接帧
+    m.thr(pct);
+    m.run(60, 0, () => { if (m.a.stall && !bad) bad = alt + ' m v0=' + v0 + ' stall'; });
+  }
+  chk('O 垂直起降机型任何高度 / 速度 a.stall 恒为 false（含主路径的交接帧）', !bad, bad || '');
+}
+
 /* L 直升机式平移：悬停时倾斜机身，升力喷口的水平分量把飞机推向倾斜的方向（低头向前、仰头向后、右滚向右），松开后收住 */
 {
   const fwdOf = (a, sb) => sb.M3.norm(sb.M3.V(a.fwd.x, 0, a.fwd.z));
@@ -268,6 +280,12 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
     try { sb.HUD.draw(w, p, DT, {}); } catch (e) { err = e; }
   }
   chk('I 悬停 / 过渡 / 普通状态下整帧 HUD 都能画出来', !err, err ? err.message : '');
+  /* 托不住（喷口负荷 ≥ 100%）时的警告栈：单独一条 LIFT LIMIT，不是失速（STALL） */
+  const ctxStub = new Proxy({}, { get(t, k) { if (k in t) return t[k]; if (k === 'canvas') return { width: 1280, height: 720 }; if (k === 'measureText') return () => ({ width: 8 }); return () => {}; }, set(t, k, v) { t[k] = v; return true; } });
+  const alertIds = (jet, stall) => { p.vtolOn = true; p.vtolJet = jet; p.stall = stall; p.pos = sb.M3.V(0, 8500, 0); return sb.HUD.drawAlerts(ctxStub, 1280, 720, p, { missiles: [], actors: [], detected: true }).map(a => a.id); };
+  const idsSink = alertIds(1.2, false), idsOk = alertIds(0.8, false);
+  chk('I 喷口托不住：警告栈出 LIFT LIMIT、不出 STALL；托得住时两者都没有', idsSink.indexOf('liftlimit') >= 0 && idsSink.indexOf('stall') < 0 && idsOk.indexOf('liftlimit') < 0 && idsOk.indexOf('stall') < 0, JSON.stringify(idsSink) + ' / ' + JSON.stringify(idsOk));
+  p.vtolOn = false; p.vtolJet = 0; p.stall = false;
   const t1 = sb.T('ui.hud.hover.hs', { v: '3.5' }), t2 = sb.T('ui.hud.hover.noz', { a: '42' });
   chk('I 悬停 HUD 文案的占位符被填进数字（项目用 {{x}} 双花括号）', t1.indexOf('3.5') >= 0 && t2.indexOf('42') >= 0 && t1.indexOf('{') < 0 && t2.indexOf('{') < 0, t1 + ' | ' + t2);
 }

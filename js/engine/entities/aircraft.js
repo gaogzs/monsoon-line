@@ -213,7 +213,8 @@
     a.q = q / 1000;                        // kPa，供 HUD 显示
 
     var ctrl = $.ctrlFactor(a.pos.y, a.speed, a.ac);
-    a.stall = a.speed < p.vStall;
+    /* 垂直起降机型没有失速：速度掉到 vStall × transK 以下就由 vtol.js 接管（喷口补升力），主路径里不置失速标志 */
+    a.stall = a.speed < p.vStall && !(a.ac && a.ac.vtol);
     if (a.stall) ctrl *= 0.34;
     /* 过失速机动刚结束：舵效从 0.34 倍（与失速同量级）在 PSM_RECOVER_S 内爬回满，
        免得出口突然满舵。没做过 PSM 的飞机这个字段不存在，零开销。 */

@@ -8,7 +8,6 @@
         "hs": "HS  水平 {{v}} m/s",
         "noz": "NOZ  喷口 {{a}}°",
         "jet": "JET  喷口负荷 {{a}}%",
-        "jet_limit": "LIFT LIMIT  喷口已满 {{a}}%，托不住，被迫下降",
         "vs": "VS  m/s"
       }
     }

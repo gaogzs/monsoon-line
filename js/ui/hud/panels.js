@@ -86,7 +86,7 @@
      ============================================================ */
   /* 优先级（上 → 下）：雷达 / 导弹 > 低高度 > 失速 > 动压 > 其它状态。
      低高度排在失速前面：它意味着下一秒就是海面。 */
-  $.ALERT_ORDER = ['guided', 'missile', 'lit', 'arena', 'resupply', 'damage', 'terrain', 'stall', 'gload', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
+  $.ALERT_ORDER = ['guided', 'missile', 'lit', 'arena', 'resupply', 'damage', 'terrain', 'liftlimit', 'stall', 'gload', 'lowq', 'psm', 'jammed', 'winchester', 'emcon'];
 
   $.alertsBottom = 0;
 
@@ -150,6 +150,8 @@
     /* 过载：纯提示，没有惩罚。琥珀常亮 → 红色快闪（HudFx.gAlert 给 0 / 1 / 2） */
     var gl = typeof HudFx !== 'undefined' && HudFx.gAlert ? HudFx.gAlert() : 0;
     if (gl > 0) list.push({ id: 'gload', txt: T(HudFx.gNegative() ? 'ui.hud.panels.drawAlerts.gload_neg' : 'ui.hud.panels.drawAlerts.gload_pos'), col: gl > 1 ? $.RED : $.AMBER, font: F2, on: gl > 1 ? blFast : true, h: $.U(30) });
+    /* 垂直起降机型喷口满指令仍托不住、被迫下降（vtol.js 的 vtolJet ≥ 1）：这不是失速，单独一条，不借用 STALL */
+    if (p.vtolOn && (p.vtolJet || 0) >= 1) list.push({ id: 'liftlimit', txt: T('ui.hud.panels.drawAlerts.liftlimit'), col: $.RED, font: F1, on: bl, h: $.U(30) });
     if (p.stall) list.push({ id: 'stall', txt: T('ui.hud.panels.drawAlerts.txt_3'), col: $.RED, font: F1, on: bl, h: $.U(30) });
     if (p.pos.y > 18000 && p.q < 12) list.push({ id: 'lowq', txt: T('ui.hud.panels.drawAlerts.txt_4'), col: $.AMBER, font: F2, on: bl, h: $.U(30) });
     /* 过失速机动：进行中琥珀闪烁，冷却中青色常亮（不闪，不抢眼）。 */
