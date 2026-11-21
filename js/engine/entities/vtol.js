@@ -27,7 +27,7 @@
      本批不做着舰：触地和主路径一样直接坠毁。
      ============================================================ */
   var D = Math.PI / 180;
-  var EXIT_K = 1.08;                      // 退出悬停分支的速度 = 进入速度 × EXIT_K（和进入点之间留滞回）
+  var EXIT_K = 1.04;                      // 退出悬停分支的速度 = 进入速度 × EXIT_K（和进入点之间留一点滞回，别抖）
   var EXIT_ANGLE = 12 * D;                // 退出时速度矢量与机头的最大夹角
   var SINK_MAX = 140;                     // 托不住时的下沉速度上限（与主路径失速下沉同一个量级）
   var PITCH_DOWN_K = 0.6;                 // 推杆（机头向下）比拉杆弱一点，沿用主路径"向上强于向下"的方向
@@ -66,7 +66,7 @@
     var wk = vtolWingK(p.vStall, v);
     a.vtolWk = wk;
     a.q = $.qOf(a.pos.y, v) / 1000;
-    a.stall = false; a.sink = 0; a.ctrlAuth = 1;
+    a.stall = false; a.sink = 0; a.ctrlAuth = 1;      // a.stall 下面按喷口是否托得住重写
 
     // ---- 姿态：固定角速率，按挂载打折（与主路径同一份 effectivePhys 比值）----
     var rc = vt.rcs;
@@ -101,11 +101,16 @@
     var Ld = G * (1 - wk);
     var eta = Math.pow($.airDensity(a.pos.y) / $.RHO0, vt.jetExp === undefined ? 0.8 : vt.jetExp);
     var A = vt.jetT * G * (p.accel / ph.accel) * eta;
-    var Af = Math.sqrt(Math.max(0, A * A - Ld * Ld));
+    /* 剩给前向的推力：喷口预算扣掉升力后剩的 √(A² − Ld²)，但不低于主发动机推力的 fwdMin 倍（海马 0.7）——
+       升力由升力喷口承担，主发动机的前向推力不会因为"要托住重量"而被吃光。否则越接近悬停升限越加速不动
+       （满指令负荷 ≈ 100% 时前向预算趋近 0，推到 100% 要 20 多秒才能转入平飞）。 */
+    var Af = Math.max(Math.sqrt(Math.max(0, A * A - Ld * Ld)), (vt.fwdMin === undefined ? 0.7 : vt.fwdMin) * p.accel);
     var acc, used = 0;
     if (v < vT) {
       var r2 = (v * v) / Math.max(1, vT * vT);
-      acc = Af * Math.min(1, $.THRUST_TAPER * (1 - r2));
+      /* 过渡加力：喷口向后转的低速段，前向加速度乘 (1 + transBoost·(1 − wk))，wk → 1 时回到 1，
+         所以 vStall 以上与主路径公式仍然完全一致（交接连续）；没有它，从悬停推到 100% 要十几秒才转入平飞 */
+      acc = Af * (1 + (vt.transBoost === undefined ? 0.6 : vt.transBoost) * (1 - wk)) * Math.min(1, $.THRUST_TAPER * (1 - r2));
       used = acc;
     } else {
       /* 与主路径 −decel·min(1,(r²−1)·4) 同形；期望速度很小 / 为 0 时分母取 8 m/s，
@@ -133,6 +138,9 @@
     var def = Math.max(0, Ld - tl * a.up.y);
     if (def > 0) a.vtolSink = Math.min(SINK_MAX, (a.vtolSink || 0) + def * dt);
     else if (a.vtolSink) { a.vtolSink *= Math.exp(-dt / 0.9); if (a.vtolSink < 0.05) a.vtolSink = 0; }
+    /* 喷口托不住、正在下沉：HUD 照常报「失速」（不是常规失速——没有舵效损失和失速下沉——只借用同一条警告和提示音，
+       让玩家知道"现在掉高度是因为升力不够"）；差额消失、下沉散掉之后自动解除 */
+    a.stall = def > 0 || (a.vtolSink || 0) > 1;
     var vh = a.vtolVh || (a.vtolVh = { x: 0, z: 0 });
     var kd = vt.drag + 3 * wk;
     vh.x += (a.up.x * tl - kd * vh.x) * dt;

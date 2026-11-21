@@ -33,10 +33,13 @@ Registry.aircraft({
        jetT        喷口总推重比（海平面、空载，乘 G 得加速度）；实际满指令推力 = jetT·G × 挂载折扣 × (ρ/ρ₀)^jetExp
        jetExp      喷口出力随空气密度衰减的指数。高处托住同样的重量要推更高的指令，满指令仍不够就被迫下降
                    （默认挂载悬停升限约 6.3 km、空载约 9–10 km，挂得越重越低）
+       fwdMin      前向推力下限 = 主发动机 accel × fwdMin（升力由升力喷口承担，前向加速不会被「托住重量」吃光），默认 0.7
+       transBoost  过渡加力：低速段（翼升力系数 wk 小）前向加速度乘 (1 + transBoost·(1 − wk))，wk → 1 时回到 1；
+                   让从悬停推到 100% 的转平飞不拖沓（交接点仍与主路径连续）
        drag        悬停漂移的阻力系数（1/s）：机身倾斜 θ 时水平推力 ≈ g·tanθ，漂移速度收敛到 g·tanθ / drag
                    （俯仰 10° ≈ 5 m/s、20° ≈ 10 m/s），松开姿态后按它指数收住
        rcs         姿态角速率（rad/s），不吃动压 */
-  vtol: { transK: 1.2, vzUp: 24, vzDown: 18, vAccel: 9, drag: 0.35, jetT: 2.3, jetExp: 0.8, rcs: { pitch: 0.9, roll: 1.6, yaw: 0.9 } },
+  vtol: { transK: 1.2, vzUp: 24, vzDown: 18, vAccel: 9, drag: 0.35, jetT: 2.3, jetExp: 0.8, fwdMin: 0.7, transBoost: 0.6, rcs: { pitch: 0.9, roll: 1.6, yaw: 0.9 } },
   gun: 'cel3',
   maxLoad: 3200,
   hardpointGroups: [
