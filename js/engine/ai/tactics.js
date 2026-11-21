@@ -291,7 +291,14 @@
       var inner = M3.mul(t.right, -(t.right.y > 0 ? 1 : -1) * Math.min(250, dT * 0.2));
       lead = M3.add(lead, inner);
     }
-    if (k >= 0.7 && plan !== 'lag') lead = M3.add(lead, M3.V(0, Math.min(120, dT * 0.06), 0));
+    /* high：近距略高于目标飞（+6% 距离，≤ 120 m），冲过头时有垂直余量。
+       但它改的是**机头指向**，机炮又是沿机头打的：开火窗口里（机炮有效射程内、有弹）抬高瞄准点，
+       机头会比视线高约 0.05 rad（570 m 处 27 m），炮弹从目标头上掠过，而开火锥角是 ±0.1 rad，
+       所以照打不误、一直打空 —— 高技能 AI 的瞄准优势（偏移 5 mrad）被它自己的战术偏置吃掉，
+       伤害和低技能持平（probe-aim 暴露的问题）。窗口里不抬，只在机炮够不着的距离上用。 */
+    var gw = WEAPONS[a.gun];
+    var gunWin = !!(gw && a.gunAmmo > 0 && dT < (a.pos.y > 18000 ? gw.highRange : gw.range) * 0.9);
+    if (k >= 0.7 && plan !== 'lag' && !gunWin) lead = M3.add(lead, M3.V(0, Math.min(120, dT * 0.06), 0));
     s.holdPlan = plan;
     var aimDir = M3.norm(M3.sub(lead, a.pos));
     var m = k * T.HOLD_MIX;
