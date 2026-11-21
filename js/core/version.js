@@ -3,8 +3,8 @@
    标题页右上角显示它的时间与版本号，用来确认当前部署的是哪一版。 */
 var BUILD_STAMP = {
   version: "v3.7.1",
-  time: '2026-11-21 16:29',
-  iso: '2026-11-21T16:29:20+09:00',
-  hash: '9c487ea',
-  subject: "fix: 无动力炸弹投放时不再有向前的 70 m/s 助推（碎玉 / PEJ-22 / PEJ-4 / PEJ-14 / PEJ-30）"
+  time: '2026-11-21 17:32',
+  iso: '2026-11-21T17:32:14+09:00',
+  hash: '80671b9',
+  subject: "test: 修四个早就失败的探针——probe-tactics 夹具与 A 组、probe-npc-loadouts 的 sk1、probe-turret 的随机源"
 };
