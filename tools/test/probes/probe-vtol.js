@@ -10,6 +10,7 @@
    C. 喷口角：悬停 ≈ 90°、加速起步 40–70°、v ≥ vStall ≈ 0°、随速度单调不增
    D. 减速板：悬停下降率 ≈ vzDown（±2）、水平静止；接近 vStall 的速度上竖直指令很小（gate = 1 − wk）
    E. 仰头上升：推力 0% 仰 30° 爬升 ≈ vzUp·sin30°（±2）；低头 30° 不下降
+   M. 喷口出力随高度衰减：3000 m 悬停负荷 ≈ g/(accel·η)、越高越高；8500 m 满指令托不住被迫下降，降到够用的高度停住
    L. 直升机式平移：悬停时倾斜机身，升力喷口的水平分量推着飞机往倾斜方向走（低头前 / 仰头后 / 右滚右 / 左滚左），
       高度保持，放平后阻力收住；放平的悬停纹丝不动
    F. 0 → 100% 加速过 vStall：交接帧加速度 < 20 m/s²、速度方向变化 < 3°、全程不失速、不 NaN
@@ -17,7 +18,7 @@
    H. 低速机动：90° 偏航，速度只由推力目标决定（±4 m/s）
    I. HUD：悬停 / 过渡 / 普通状态下整帧都能画出来
    J. 没有 ac.vtol 的机型不进悬停分支
-   K. VTOL_THR_IDLE 与 Game.THR_IDLE 一致；海马 phys.accel ≥ 1.2 G（喷口悬停的推力预算）
+   K. VTOL_THR_IDLE 与 Game.THR_IDLE 一致；海马喷口推重比 jetT ≥ 1.5
    用法：node tools/test/probes/probe-vtol.js
    ============================================================ */
 'use strict';
@@ -31,11 +32,11 @@ function chk(name, cond, detail) {
 const DT = 1 / 60, G = 9.80665, IDLE = 0.04;
 const R = Math.PI / 180;
 
-function make(seed, type) {
+function make(seed, type, y0) {
   const S = Sim.load({ seed });
   S.start(0);
   const sb = S.sandbox, w = sb.Game.__world();
-  const a = sb.Ent.makeAircraft({ type: type || 'seahorse', team: 0, x: 0, y: 3000, z: 0, fwd: sb.M3.V(0, 0, 1), speed: 0 });
+  const a = sb.Ent.makeAircraft({ type: type || 'seahorse', team: 0, x: 0, y: y0 || 3000, z: 0, fwd: sb.M3.V(0, 0, 1), speed: 0 });
   a.vel = sb.M3.V(0, 0, 0); a.speed = 0;
   a.hp = a.maxHp = 1e9;
   if (a.ac.vtol) a.vtolOn = true;
@@ -177,6 +178,27 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
   chk('H 低速偏航 ≈ 100° 后速度仍收敛到推力目标（±4 m/s）', Math.abs(a.speed - want) < 4 && a.vtolOn, 'v=' + a.speed.toFixed(1) + ' want=' + want.toFixed(1));
 }
 
+/* M 喷口出力上限随高度衰减：高处同样悬停要推更高的指令，满指令仍不够就被迫下降，降到密度够了才停 */
+{
+  const m3 = make(13, 'seahorse', 3000);
+  m3.thr(0); m3.run(10, 0);
+  const rho = (sb, y) => sb.Ent.$.airDensity(y) / sb.Ent.$.RHO0;
+  const eta = (m, y) => Math.pow(rho(m.sb, y), m.vt.jetExp);
+  const ratio = m3.a._pe.accel / m3.a.phys.accel;                    // 挂载折扣
+  const want3 = G / (m3.vt.jetT * G * ratio * eta(m3, 3000));
+  chk('M 3000 m 悬停：喷口负荷 ≈ g /（jetT·G × 挂载折扣 × η）= ' + (want3 * 100).toFixed(0) + '%（±3%），托得住、不下沉', Math.abs(m3.a.vtolJet - want3) < 0.03 && !m3.a.vtolSink && Math.abs(m3.a.vel.y) < 0.2, 'jet=' + (m3.a.vtolJet * 100).toFixed(1) + '% sink=' + (m3.a.vtolSink || 0));
+  const lo = make(13, 'seahorse', 1500); lo.thr(0); lo.run(10, 0);
+  chk('M 越高喷口负荷越高（1500 m < 3000 m）', lo.a.vtolJet < m3.a.vtolJet, (lo.a.vtolJet * 100).toFixed(1) + '% < ' + (m3.a.vtolJet * 100).toFixed(1) + '%');
+  const hi = make(13, 'seahorse', 8500); hi.thr(0);
+  let minVy = 0, maxJet = 0;
+  hi.run(25, 0, () => { minVy = Math.min(minVy, hi.a.vel.y); maxJet = Math.max(maxJet, hi.a.vtolJet); });
+  chk('M 8500 m 悬停：喷口满指令仍托不住，被迫下降（负荷 ≥ 100%、下沉 > 3 m/s）', maxJet >= 1 && minVy < -3, 'maxJet=' + (maxJet * 100).toFixed(0) + '% minVy=' + minVy.toFixed(1));
+  const y0 = hi.a.pos.y;
+  hi.run(240, 0);
+  chk('M 下降到喷口托得住的高度后停住（活着、没有继续下沉、速度 ≈ 0），悬停升限低于 8500 m', hi.a.alive && hi.a.pos.y < 8500 - 300 && hi.a.pos.y > 5000 && !hi.a.vtolSink && hi.a.speed < 0.5 && hi.a.vtolJet <= 1.0001,
+    'y=' + hi.a.pos.y.toFixed(0) + ' jet=' + (hi.a.vtolJet * 100).toFixed(1) + '% sink=' + (hi.a.vtolSink || 0).toFixed(2));
+}
+
 /* L 直升机式平移：悬停时倾斜机身，升力喷口的水平分量把飞机推向倾斜的方向（低头向前、仰头向后、右滚向右），松开后收住 */
 {
   const fwdOf = (a, sb) => sb.M3.norm(sb.M3.V(a.fwd.x, 0, a.fwd.z));
@@ -229,7 +251,7 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
 {
   const { sb, a } = make(11);
   chk('K VTOL_THR_IDLE 与 Game.THR_IDLE 一致', sb.Ent.$.VTOL_THR_IDLE === sb.Game.$.THR_IDLE, sb.Ent.$.VTOL_THR_IDLE + ' vs ' + sb.Game.$.THR_IDLE);
-  chk('K 海马 phys.accel ≥ 1.2 G（喷口悬停的推力预算）', a.phys.accel >= 1.2 * G, 'accel=' + a.phys.accel);
+  chk('K 海马空载喷口推重比 jetT ≥ 1.5（海平面悬停有余量）', a.ac.vtol.jetT >= 1.5, 'jetT=' + a.ac.vtol.jetT);
 }
 
 console.log(ok ? '\n全部通过' : '\n有失败');

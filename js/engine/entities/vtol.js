@@ -18,8 +18,10 @@
      推力 / 阻力 / 重力沿航迹 / 转弯掉速——只多三件事：
        ① 期望速度曲线 vtolSpeedTarget（主路径对 VTOL 机型也用它，两个分支的油门含义连续）
        ② 升力缺口 Ld = G·(1 − wk)，wk = min(1,(v/vStall)²)（与主路径失速下沉同一个比值）由喷口垂直分量补上，
-          总推力预算 A = phys.accel，剩给前向的 Af = √(A² − Ld²)：速度越低、缺口越大、能用于加速的越少，喷口越朝下
+          喷口总推力预算 A = jetT·G × 挂载折扣 × η(高度)，剩给前向的 Af = √(A² − Ld²)：速度越低、缺口越大、能用于加速的越少，喷口越朝下
        ③ 只在低速生效的悬停能力（gate = 1 − wk）：减速板下降、仰头上升（a.vtolVy 以 vAccel 趋近目标，加到 vel.y）
+     喷口出力上限：随空气密度衰减（η = (ρ/ρ₀)^jetExp），高处要推更高的指令才托得住，满指令仍不够就被迫下降（vtolSink），
+     所以悬停有一个随挂载变化的升限（海马默认挂载约 6.3 km、空载约 9–10 km），不是想悬在哪就悬在哪。
      vStall 以上 wk = 1：Ld = 0、gate = 0、公式与主路径完全一致，所以交接连续。
      姿态：RCS 式固定角速率（ac.vtol.rcs），不吃动压；a.ctrlAuth 写 1（steerTo / HUD 读它）。
      本批不做着舰：触地和主路径一样直接坠毁。
@@ -27,6 +29,7 @@
   var D = Math.PI / 180;
   var EXIT_K = 1.08;                      // 退出悬停分支的速度 = 进入速度 × EXIT_K（和进入点之间留滞回）
   var EXIT_ANGLE = 12 * D;                // 退出时速度矢量与机头的最大夹角
+  var SINK_MAX = 140;                     // 托不住时的下沉速度上限（与主路径失速下沉同一个量级）
   var PITCH_DOWN_K = 0.6;                 // 推杆（机头向下）比拉杆弱一点，沿用主路径"向上强于向下"的方向
   /* 与 Game.THR_IDLE 同值（Ent 读不到 Game 的变量）：油门轴的"慢车"点，HUD 推力 0%，其下是减速板；
      tools/test/probes/probe-vtol.js 会比较两者，改一边忘了另一边会报错 */
@@ -53,7 +56,7 @@
   /* 主路径每帧调用：速度掉到 vStall × transK 以下就进悬停分支。进入时 vel = fwd × speed，天然连续。 */
   function vtolWatch(a, p) {
     var vt = a.ac && a.ac.vtol;
-    if (vt && !a.vtolOn && a.speed < p.vStall * vt.transK) { a.vtolOn = true; a.vtolVy = 0; a.vtolVh = { x: 0, z: 0 }; }
+    if (vt && !a.vtolOn && a.speed < p.vStall * vt.transK) { a.vtolOn = true; a.vtolVy = 0; a.vtolSink = 0; a.vtolVh = { x: 0, z: 0 }; }
   }
 
   function stepVtol(a, dt, world) {
@@ -91,10 +94,13 @@
     // ---- 速度：主路径同形的标量速度，沿机头 ----
     var brake = !!a.brake || (a.throttle !== undefined && a.throttle < $.VTOL_THR_IDLE);
     var vT = brake ? 0 : vtolSpeedTarget(a, p, a.throttle);
-    /* 升力缺口由喷口垂直分量补上；总推力预算 A（不能低于 G，否则悬停不了），剩下给前向。
-       期望速度不变，缺口越大 Af 越小：加速变慢、喷口偏下；速度上去缺口缩小，喷口转回后方。 */
+    /* 升力缺口由喷口垂直分量补上。喷口的出力随空气密度衰减：满指令的实际推力预算
+       A = jetT·G × 挂载折扣（effectivePhys.accel / phys.accel）× η(高度)，η = (ρ/ρ₀)^jetExp。高处要托住同样的重量得推更高的指令（jetLoad = 需要的推力 / A），
+       到满指令仍不够就托不住（见下面的 vtolSink：被迫下降，降到密度够了才停）。
+       剩下的预算给前向：期望速度不变，缺口越大 Af 越小，加速变慢、喷口偏下；速度上去缺口缩小，喷口转回后方。 */
     var Ld = G * (1 - wk);
-    var A = Math.max(p.accel, Ld * 1.01);
+    var eta = Math.pow($.airDensity(a.pos.y) / $.RHO0, vt.jetExp === undefined ? 0.8 : vt.jetExp);
+    var A = vt.jetT * G * (p.accel / ph.accel) * eta;
     var Af = Math.sqrt(Math.max(0, A * A - Ld * Ld));
     var acc, used = 0;
     if (v < vT) {
@@ -119,7 +125,14 @@
     /* 直升机式平移：升力喷口沿机体 up 推，倾斜时多推一点保住竖直分量（Tl = Ld / cosθ），
        多出来的就是水平分量 —— 机头低头向前、仰头向后、右滚向右、左滚向左（Ld 随翼升力系数消失，高速时没有）。
        水平漂移速度 vh 单独积分、有阻力，松开姿态后慢慢收住；速度上来后阻力随 wk 加大，在交接点前自然并入前飞。 */
-    var tl = Math.min(Ld / Math.max(0.35, a.up.y), A);
+    var need = Ld / Math.max(0.35, a.up.y);                 // 要托住竖直分量需要的实际推力
+    var tl = Math.min(need, A);                             // 实际给出的（封顶当前高度的预算）
+    a.vtolJet = A > 0 ? need / A : 9;                       // 喷口负荷：1 = 满指令（HUD 显示；≥ 1 就托不住了）
+    /* 满指令仍不够：差额变成往下的加速度累积成下沉速度（和主路径的失速下沉同形：差额不在时 0.9 s 内散掉），
+       降到密度够了（η 回升、差额消失）才停 —— 悬停升限由喷口出力决定，随挂载（phys.accel 打折）变化 */
+    var def = Math.max(0, Ld - tl * a.up.y);
+    if (def > 0) a.vtolSink = Math.min(SINK_MAX, (a.vtolSink || 0) + def * dt);
+    else if (a.vtolSink) { a.vtolSink *= Math.exp(-dt / 0.9); if (a.vtolSink < 0.05) a.vtolSink = 0; }
     var vh = a.vtolVh || (a.vtolVh = { x: 0, z: 0 });
     var kd = vt.drag + 3 * wk;
     vh.x += (a.up.x * tl - kd * vh.x) * dt;
@@ -133,7 +146,7 @@
     a.vtolVy = vy + M3.clamp(tgt - vy, -vt.vAccel * dt, vt.vAccel * dt);
 
     a.vel = M3.mul(a.fwd, a.speed);
-    a.vel.x += vh.x; a.vel.y += a.vtolVy; a.vel.z += vh.z;
+    a.vel.x += vh.x; a.vel.y += a.vtolVy - (a.vtolSink || 0); a.vel.z += vh.z;
 
     // 载荷因数（G 表）：同 PSM —— 速度的实际变化量加 1G 投到机体 up 轴
     if (dt > 1e-4) {
@@ -154,7 +167,7 @@
 
     // ---- 退出：速度够了、竖直辅助速度已经散掉，交还主路径（vel = fwd × speed，连续）----
     if (a.speed > p.vStall * vt.transK * EXIT_K && Math.abs(a.vtolVy) < 1.5 && Math.hypot(vh.x, vh.z) < 1.5 &&
-        M3.dot(M3.norm(a.vel), a.fwd) > Math.cos(EXIT_ANGLE)) { a.vtolOn = false; a.vtolVy = 0; vh.x = vh.z = 0; }
+        M3.dot(M3.norm(a.vel), a.fwd) > Math.cos(EXIT_ANGLE)) { a.vtolOn = false; a.vtolVy = 0; a.vtolSink = 0; vh.x = vh.z = 0; }
 
     $.stepAircraftTail(a, dt, world);
   }

@@ -34,10 +34,13 @@
     var wk = p.vtolWk || 0;
     var mode = (p.speed < 6 && Math.abs(vel.y) < 1.5) ? 'hover' : (wk > 0.35 ? 'trans' : 'vtol');
     var col = mode === 'trans' ? $.AMBER : $.GREEN;
-    $.text(ctx, T('ui.hud.hover.mode_' + mode), cx, cy - $.U(86), col, $.FB, 'center');
-    $.text(ctx, T('ui.hud.hover.hs', { v: hs.toFixed(1) }), cx, cy - $.U(68), $.DIM, $.FS, 'center');
+    $.text(ctx, T('ui.hud.hover.mode_' + mode), cx, cy - $.U(104), col, $.FB, 'center');
+    $.text(ctx, T('ui.hud.hover.hs', { v: hs.toFixed(1) }), cx, cy - $.U(86), $.DIM, $.FS, 'center');
     // 喷口角：0° 朝后（翼托着）… 90° 朝下（纯喷流托举），由实际速度决定，与推力挡位无关
-    $.text(ctx, T('ui.hud.hover.noz', { a: ((p.vtolNoz || 0) * 180 / Math.PI).toFixed(0) }), cx, cy - $.U(52), $.DIM, $.FS, 'center');
+    $.text(ctx, T('ui.hud.hover.noz', { a: ((p.vtolNoz || 0) * 180 / Math.PI).toFixed(0) }), cx, cy - $.U(70), $.DIM, $.FS, 'center');
+    /* 喷口负荷：托住重量需要的推力 / 当前高度的满指令推力（空气越稀越高）；≥ 100% 就托不住，被迫下降 */
+    var jet = p.vtolJet || 0, jcol = jet >= 1 ? $.RED : (jet >= 0.85 ? $.AMBER : $.DIM);
+    $.text(ctx, T(jet >= 1 ? 'ui.hud.hover.jet_limit' : 'ui.hud.hover.jet', { a: Math.round(jet * 100) }), cx, cy - $.U(54), jcol, $.FS, 'center');
 
     // 垂直速度尺
     var g = $.U(120), x = cx + $.U(150), k = (g / 2) / VS_RANGE;
