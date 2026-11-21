@@ -25,22 +25,46 @@ const mkAc = (skill, team) => {
   AI.attach(a, { role: 'enemy', skill, rank: skill >= 0.72 ? 'elite' : 'pawn' });
   return a;
 };
-const msl = (wid, z, owner) => ({ pos: M3.V(0, 4000, z), w: WEAPONS[wid], owner: owner || null, alive: true });
+/* 手造的导弹要带上 fwd / vel / speed（朝飞机 (0, 4000, 0) 飞）：v3.6.4 的多策略躲避（evade.js）读它们算相对速度和接近率，
+   真实导弹一定有这些字段；以前这里只有 pos / w / owner / alive，evadeStrat 在 M3.mul(undefined) 上直接崩溃 */
+const msl = (wid, z, owner) => {
+  const pos = M3.V(0, 4000, z), fwd = M3.norm(M3.sub(M3.V(0, 4000, 0), pos));
+  return { pos, w: WEAPONS[wid], owner: owner || null, alive: true, fwd, speed: 800, vel: M3.mul(fwd, 800) };
+};
 
 /* ---------- A ---------- */
+/* v3.6.4 起 skill ≥ 0.4 的躲避是多策略：每枚来袭弹按（导引头类型 × 距离 × 态势 × 技能）加权随机选一种（私有 LCG）。
+   所以不再断言"红外弹必然爬升"，而是逐个种子看"选到什么就得做到什么"（选择的分布在 probe-evade.js 里测）。
+   低技能（< MIN_SKILL 0.4）仍回退到旧基线：3/9 线 + 俯冲。 */
 {
-  const hi = mkAc(0.8), lo = mkAc(0.4);
-  const ir = $.evade(hi, msl('srm', -2000), null);
-  chk('A 红外弹（skill ≥ 0.6）：爬升且不开加力', ir.dir.y > 0.3 && ir.ab === false, 'y=' + ir.dir.y.toFixed(2) + ' ab=' + ir.ab);
-  const radar = $.evade(hi, msl('mrm', -2000), null);
-  chk('A 主动雷达弹：照旧（俯冲 + 加力）', radar.dir.y < 0 && radar.ab === true, 'y=' + radar.dir.y.toFixed(2));
   const owner = { alive: true, pos: M3.V(6000, 4000, 0) };       // 发射机在正右方 6 km
-  const sarh = $.evade(hi, msl('tether', -2000, owner), null);
-  const toO = M3.norm(M3.sub(owner.pos, hi.pos));
-  const dirH = M3.norm(M3.V(sarh.dir.x, 0, sarh.dir.z));
-  chk('A 半主动弹：机头垂直于"自己 → 发射机"的视线（3/9 线）', Math.abs(M3.dot(dirH, M3.norm(M3.V(toO.x, 0, toO.z)))) < 0.45, 'cos=' + M3.dot(dirH, M3.norm(M3.V(toO.x, 0, toO.z))).toFixed(2));
+  const N = 40, irPlans = {}, sarhPlans = {};
+  let climbOk = true, climbN = 0, beamOwnerOk = true, beamOwnerN = 0, finite = true;
+  for (let i = 0; i < N; i++) {
+    const rs = (Math.imul(i + 1, 2654435761) >>> 0) || 1;
+    const hi = mkAc(0.8); hi.ai.rs = rs;
+    const ir = $.evade(hi, msl('srm', -2000), null);
+    const pl = hi.ai.evPlan; irPlans[pl] = (irPlans[pl] || 0) + 1;
+    if (pl === 'climb') { climbN++; if (!(ir.dir.y > 0.3 && ir.ab === false)) climbOk = false; }
+    const hs = mkAc(0.8); hs.ai.rs = rs;
+    const sarh = $.evade(hs, msl('tether', -2000, owner), null);
+    const pl2 = hs.ai.evPlan; sarhPlans[pl2] = (sarhPlans[pl2] || 0) + 1;
+    if (pl2 === 'beamOwner') {
+      beamOwnerN++;
+      const toO = M3.norm(M3.sub(owner.pos, hs.pos));
+      const dirH = M3.norm(M3.V(sarh.dir.x, 0, sarh.dir.z));
+      if (!(Math.abs(M3.dot(dirH, M3.norm(M3.V(toO.x, 0, toO.z)))) < 0.45)) beamOwnerOk = false;
+    }
+    const hm = mkAc(0.8); hm.ai.rs = rs;
+    const radar = $.evade(hm, msl('mrm', -2000), null);
+    if (![radar.dir.x, radar.dir.y, radar.dir.z, radar.throttle].every(Number.isFinite)) finite = false;
+  }
+  chk('A 红外弹（skill 0.8）：选到 climb 时必须爬升且不开加力（出现 ≥ 1 次，且不止一种策略）', climbOk && climbN >= 1 && Object.keys(irPlans).length > 1, 'climb×' + climbN + ' 分布=' + JSON.stringify(irPlans));
+  chk('A 半主动弹：选到 beamOwner 时机头垂直于"自己 → 发射机"的视线（3/9 线），且出现 ≥ 1 次', beamOwnerOk && beamOwnerN >= 1, 'beamOwner×' + beamOwnerN + ' 分布=' + JSON.stringify(sarhPlans));
+  chk('A 主动雷达弹：每种策略都给出有限的方向与油门', finite);
+  const lo = mkAc(0.3);                                            // < MIN_SKILL：回退旧基线
   const irLo = $.evade(lo, msl('srm', -2000), null);
-  chk('A 低技能：红外弹也是统一的 3/9 + 俯冲（不爬升）', irLo.dir.y < 0, 'y=' + irLo.dir.y.toFixed(2));
+  chk('A 低技能（< 0.4）：红外弹也是统一的 3/9 + 俯冲（不爬升、不走多策略）', irLo.dir.y < 0 && !lo.ai.evPlan, 'y=' + irLo.dir.y.toFixed(2) + ' plan=' + lo.ai.evPlan);
 }
 
 /* ---------- B ---------- */

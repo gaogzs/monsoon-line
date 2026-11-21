@@ -44,7 +44,16 @@ function hitSeg(M3, p0, p1, c, r) {
   return M3.dist(M3.add(p0, M3.mul(d, s)), c) <= r;
 }
 
+/* 脚本自己用的带种子随机数（mulberry32）。以前这里直接用宿主的 Math.random()：被测引擎里的 Math.random 是沙箱里
+   按种子固定的，但"急机动"的方向 / 时机是这个脚本自己抽的，每次运行都不一样，于是同一个种子每次结果乱跳
+   （v3.7.0 基线上连跑 5 次「轻微机动 2g」平均掉血 0.6–58.6，上限 60）。 */
+function mkRng(seed) {
+  let a = (Math.imul(seed | 0, 2654435761) >>> 0) || 1;
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
 function run(mode, seed) {
+  const rnd = mkRng(seed * 101 + (mode === 'jink' ? 7 : 3));
   const S = Sim.load({ seed: seed, init: false });
   const { G, ship, tgt, world } = setup(S);
   const M3 = G.M3, R = G.Combat.HIT_R_AIR;
@@ -68,9 +77,9 @@ function run(mode, seed) {
     } else if (mode === 'jink') {
       jinkT -= DT;
       if (jinkT <= 0) {
-        jinkT = 0.4 + Math.random() * 0.6;
-        const g = 9.81 * (3 + Math.random() * 4);
-        const ang = Math.random() * Math.PI * 2;
+        jinkT = 0.4 + rnd() * 0.6;
+        const g = 9.81 * (3 + rnd() * 4);
+        const ang = rnd() * Math.PI * 2;
         jinkA = M3.V(0, Math.sin(ang) * g, Math.cos(ang) * g);   // 垂直于横穿方向的过载
       }
       const sp = M3.len(tgt.vel);
@@ -124,6 +133,7 @@ function slewCheck() {
    weave = [过载 g, 平均换向间隔 s]：每次换一个垂直于航向的随机过载方向。
    目标：平直通场必死（≥ 120 hp），一机动就大大降低（2 g ≤ 60、6 g ≤ 40） */
 function passRun(weave, seed) {
+  const rnd = mkRng(seed * 131 + (weave ? Math.round(weave[0] * 10) : 1));
   const S = Sim.load({ seed: seed, init: false });
   const G = S.sandbox, M3 = G.M3;
   const dk = G.SHIPS.find(s => s.id === 'dunkleosteus');
@@ -140,8 +150,8 @@ function passRun(weave, seed) {
     if (weave) {   // 变向机动：每 weave[1] 秒换一个垂直于航向的过载方向，大小 weave[0] g
       jT -= DT;
       if (jT <= 0) {
-        jT = weave[1] * (0.7 + 0.6 * Math.random());
-        const ang = Math.random() * Math.PI * 2;
+        jT = weave[1] * (0.7 + 0.6 * rnd());
+        const ang = rnd() * Math.PI * 2;
         jA = M3.V(Math.cos(ang) * weave[0] * 9.81, Math.sin(ang) * weave[0] * 9.81, 0);
       }
       a.vel = M3.mul(M3.norm(M3.add(a.vel, M3.mul(jA, DT))), 250);

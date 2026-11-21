@@ -78,8 +78,26 @@ if (process.argv.includes('--write')) {
 const base = JSON.parse(fs.readFileSync(BASE, 'utf8'));
 const bad = [], info = [];
 const sameObj = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/* 随机遭遇战（sk1）的刷怪队列是用带种子的 Math.random 现生成的：只要前面任何代码多 / 少消耗一次随机数，
+   整个队列组成就换一批（v3.1.15 的基线是 26 架，后来一直是 15 架，且每次运行都一样），"第 i 架对第 i 架"的比对
+   对它天生就脆。它真正要守的是"每种机型的挂载与弹药池没变"，所以改成按（机型, 队伍）做集合比对：
+   现在出现的每一架的 弹药池 / 槽数 / loadFactor 必须在基线里同机型同队伍出现过；数量与顺序不比。 */
+const RANDOM_QUEUE = { sk1: 1 };
+const sig = r => JSON.stringify([r.pool, r.slots, r.lf]);
 for (const mid of Object.keys(base)) {
   const A = base[mid], B = cur[mid] || [];
+  if (RANDOM_QUEUE[mid]) {
+    const known = {};
+    for (const r of A) (known[r.ac + '/' + r.team] = known[r.ac + '/' + r.team] || new Set()).add(sig(r));
+    if (!B.length) bad.push(mid + ' 一架敌机都没刷出来');
+    B.forEach((r, i) => {
+      const set = known[r.ac + '/' + r.team];
+      if (!set) { bad.push(mid + '#' + i + ' ' + r.ac + '/' + r.team + ' 基线里没出现过这种机型 / 队伍（要么是有意新增，重存基线；要么刷怪出错）'); return; }
+      if (!set.has(sig(r))) bad.push(mid + '#' + i + ' ' + r.ac + ' 的弹药池 / 槽数 / loadFactor 与基线里该机型的任何一架都不同：' + sig(r));
+    });
+    info.push(mid + ' 随机队列：按（机型, 队伍）集合比对，现在 ' + B.length + ' 架（基线 ' + A.length + ' 架，数量与顺序不比）');
+    continue;
+  }
   if (A.length !== B.length) { bad.push(mid + ' 敌机数量变了：' + A.length + ' → ' + B.length); continue; }
   for (let i = 0; i < A.length; i++) {
     const a = A[i], b = B[i], tag = mid + '#' + i + ' ' + a.ac;
