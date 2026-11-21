@@ -16,7 +16,7 @@
 | `physics.js` | 大气密度 / 动压 / 控制因子 / 转弯因子 / 阻力系数、地形钩子（`terrainY` `groundY` `agl` `setTerrain`） |
 | `aircraft.js` | `makeAircraft` / `stepAircraft` / `curLoadFactor` / `nozzlesOf`；`stepAircraft` 开头按 `a.deck` → `a.psm` → `a.vtolOn` 的顺序把整帧交给独立分支 |
 | `deck.js` | 甲板起飞（批次 6.1b）：`stepDeck` / `deckSlot` / `deckPose` / `putOnDeck`，见 §9 |
-| `vtol.js` | 垂直起降低速区飞行分支（批次 6.2）：`stepVtol` / `vtolWatch` / `vtolWingK`，见 §9 |
+| `vtol.js` | 垂直起降低速区飞行分支（批次 6.2）：`stepVtol` / `vtolWatch` / `vtolWingK` / `vtolSpeedTarget`，见 §9 |
 | `mounts.js` | 挂点适配（`fitsKind`）、NPC 挂载分配（`buildNpcMounts`）、选弹（`chooseWeapon` / `setWeapon` / `weaponMatchesTarget`）、挂载物位置（`storePos` 等） |
 | `missile.js` | `makeMissile` / `stepMissile`、红外重捕获、诱饵二次欺骗 |
 | `range.js` | 有效射程、发射包线、`aiReach` / `lockOff` |
@@ -54,7 +54,7 @@
 | `makeAircraft` | `makeAircraft(o) → a` | 造飞机。`o = {type, team, x/y/z, fwd, speed, throttle, special, loadout, pods, isPlayer, flares, radio, group}`（无人机不再靠 `o.isDrone`，而是机型 `tags.unmanned`，造机时 `a.tags = ac.tags`）。非玩家会顺手建 `ammoPool` / `slotCd`（§ 3.1） |
 | `stepAircraft` | `stepAircraft(a, dt, world)` | 飞机每帧：挂载惩罚→动压→失速→姿态→速度→位置→冷却→拖烟。`a.deck` 非空整帧交给 `stepDeck`、`a.psm` 交给 `stepPSM`、`a.vtolOn` 交给 `stepVtol`（后两者在尾部回到共用的 `stepAircraftTail`） |
 | `stepDeck` / `deckSlot` / `deckPose` / `putOnDeck` / `DECK` | `stepDeck(a, dt, world)` / `deckSlot(host, want, now) → 跑道下标\|-1` / `deckPose(host, ri) → {pos, fwd}` / `putOnDeck(a, host, ri) → a` / 常量表 | 通用甲板起飞，见 §9。`stepDeck` 一般由 `stepAircraft` 派发，导出是给探针用 |
-| `stepVtol` | `stepVtol(a, dt, world)` | 垂直起降悬停分支，由 `stepAircraft` 在 `a.vtolOn` 时派发，见 §9。`vtolWatch` / `vtolWingK` 只在 `Ent.$` 内部，不导出 |
+| `stepVtol` | `stepVtol(a, dt, world)` | 垂直起降悬停分支，由 `stepAircraft` 在 `a.vtolOn` 时派发，见 §9。`vtolWatch` / `vtolWingK` / `vtolSpeedTarget` 只在 `Ent.$` 内部，不导出 |
 | `fitsKind` | `fitsKind(w, kind, playerStyle) → bool` | 这件武器挂得住这种挂点吗。玩家读 `fits`，NPC 读 `npcFits`（缺省退回 `fits`） |
 | `mountPlan` | `mountPlan(a) → [弹种或 null]` | 逐组挂载分配（逐组配置 → 吊舱 → 制式弹），下标对齐 `ac.hardpointGroups` |
 | `storePos` | `storePos(a, g, pt) → 世界坐标` | 一个挂点的挂载物该画在哪。`pt` 只有 (横向, 前后)，高度取 `g.hy` 或按类型给的默认值（`STORE_HY`） |
@@ -155,7 +155,7 @@
 | `planAlpha` / `rollLock` / `prevDesired` / `aimRate` | `AI.steerTo`（`ai/steer.js`） | 飞控跨帧状态 |
 | `ctrlAuth` | `stepAircraft` | 当前舵效（动压 × 失速），steerTo 与 FCS 表读取；悬停分支恒写 1 |
 | `deck` | `putOnDeck`（`stepDeck` 每帧更新，离舰 / 宿主被打掉时置 null） | 甲板起飞状态 `{ host, ri, len, s, v, acc, x0, z0, dx, dz, y }`；非空期间位置由 `stepDeck` 写、`AI.update` 不跑（`engine/game/update.js`）。宿主侧另有 `host.deckUse[ri]`（占用的飞机）/ `host.deckFreeAt[ri]`（这条跑道下次可用的世界时刻） |
-| `vtolOn` / `vtolWk` / `vtolVz` | `vtolWatch` / `stepVtol` | 悬停分支开关（仅带 `ac.vtol` 的机型）/ 机翼升力系数 0..1 / 油门对应的指令竖直速度（m/s）。`vtolOn` 被控制层、看门狗、HUD 读，见 [game.md](game.md)、[hud.md](hud.md) |
+| `vtolOn` / `vtolWk` / `vtolVz` / `vtolVy` / `vtolNoz` | `vtolWatch` / `stepVtol` | 悬停分支开关（仅带 `ac.vtol` 的机型）/ 机翼升力系数 0..1 / 低速悬停能力的指令竖直速度（m/s，减速板下降、仰头上升）/ 竖直辅助速度（m/s，趋近指令）/ 喷口转角（rad，0 朝后 … π/2 朝下，HUD 的 NOZ）。`vtolOn` 被控制层、看门狗、HUD 读，见 [game.md](game.md)、[hud.md](hud.md) |
 
 ### 3.2 导弹 / 炸弹 `m`（`kind: 'missile'`）
 
@@ -457,31 +457,33 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 - 使用方：无人机航母的机库（`missions/_lib.js` 的 `tickHangar`，见 [ai.md](ai.md)）。探针 `probe-deck`、`probe-carrier`。
 
 ### 9.2 垂直起降（`vtol.js`，机型数据带 `ac.vtol`）
+### 9.2 垂直起降（`vtol.js`，机型数据带 `ac.vtol`；v3.7.1 重设计）
 
-主路径是运动学模型（`vel = fwd × speed`，速度钳在 `[0.42 vStall, 1.12 vMax]`，没有侧滑与竖直速度），装不下悬停。带 `ac.vtol` 的机型（目前只有 D-27 海马，标签 `vtol` `noPSM`）在低速区走独立分支：
+主路径是运动学模型（`vel = fwd × speed`，速度钳在 `[0.42 vStall, 1.12 vMax]`，没有侧滑与竖直速度），装不下悬停。带 `ac.vtol` 的机型（目前只有 D-27 海马，标签 `vtol` `noPSM`）在低速区走独立分支。核心语义：**推力只代表玩家期望的前进速度**（沿机体自己的前向，不是世界水平），不直接产生升力；**不下坠只由实际速度决定**，喷口转向补上机翼托不住的那部分。
 
-- **进入**：`stepAircraft` 末尾对带 `ac.vtol` 的机型调 `vtolWatch`，`speed < transSpeed` 就置 `a.vtolOn`，下一帧起整帧交给 `stepVtol`。进入时 `vel = fwd × speed`，天然连续；玩家进入时油门被拉回 0.5（"定高"）。
-- **退出**：`speed > transSpeed × 1.08`（`EXIT_K`，与进入点之间留滞回）**且**速度矢量与机头夹角 ≤ 12°（`EXIT_ANGLE`）时清 `a.vtolOn`，主路径接着飞；角度没对齐就留在本分支里继续对齐。
-- **速度是自由矢量 `a.vel`**（与机头解耦），每帧写回 `a.speed = |vel|`，武器 / 相机 / HUD 读的仍是 `a.speed`、`a.vel`。每帧 `a.stall = false`、`a.sink = 0`、`a.ctrlAuth = 1`。
-- **受力**（加速度）：重力；机翼升力随速度混入，抵消垂直于速度方向的那部分重力（系数 `wk = min(1, (v / wingV)²)`）；升力推力沿机体 `up`，由"辅助悬停"按竖直速度追踪油门指令（增益 `VZ_GAIN` 1.6，竖直加速度上下限 9 / 6 m/s²，上限 `liftG × G`），并按 `1/cosθ` 补偿倾斜——倾斜后推力的水平分量就是横向漂移，不另外加；前向推力沿机头，油门 > 0.85 才开；线性阻力 `−drag × vel`，翼升力起来后减弱；`wk > 0.01` 时速度矢量以时间常数 `align × wk` 被拉向机头。
-- **姿态**：RCS 式固定角速率 `ac.vtol.rcs`，不吃动压与 `ctrlFactor`，按挂载打折（与主路径同一份 `effectivePhys` 比值）；推杆比拉杆弱（`PITCH_DOWN_K` 0.6）。
-- **油门轴语义**（仅玩家，控制层特例见 [game.md](game.md)）：0.50 定高悬停；0.50 → 0.85 爬升（到 `vzUp`）；0.50 → 0.04 下降（到 `vzDown`）；0.85 → 1.25 前向推力渐开（`fwdAccel`）。
-- **其他**：载荷因数 `gNow` 按速度实际变化算；触地（离地 ≤ 2 m）与主路径一样直接坠毁（`kill`，不做着舰）；尾部回到 `stepAircraftTail`（冷却 / 拖烟 / 电子战结算照常）。
-- **只为玩家设计**：`vtolWatch` 本身不分玩家 / AI（带 `ac.vtol` 的机体速度低了都会进分支），但 AI 没有任何悬停逻辑（`ai/` 里不读 `vtolOn`），油门轴语义与进入时的油门回 0.5 都只对玩家生效；海马目前只作为可玩机型。`noPSM` 标签让 PSM 对它不可用。
+- **推力 → 期望速度**（`vtolSpeedTarget(a, p, th)`，主路径对带 `ac.vtol` 的机型也用它，所以两条路径的推力含义连续）：HUD 推力 0%（慢车 `$.VTOL_THR_IDLE`）→ 0；0 → 50% 从 0 升到有效 `vStall`；50% → 100% 从 `vStall` 升到 `vMil`（乘 `thrustK`）；加力 = `vMax`；减速板（推力在慢车以下）→ 0。`$.VTOL_THR_IDLE` 与 `Game.THR_IDLE` 同值（`Ent` 读不到 `Game` 的变量），`probe-vtol` 比较两者是否相等。
+- **进入**：`stepAircraft` 末尾对带 `ac.vtol` 的机型调 `vtolWatch(a, p)`，`speed < 有效 vStall × transK`（`effectivePhys` 的 `vStall`，随高度 / 挂载）就置 `a.vtolOn`，下一帧起整帧交给 `stepVtol`。进入时 `vel = fwd × speed`，天然连续；**不再动玩家的推力**。
+- **退出**：`speed > 有效 vStall × transK × 1.08`（`EXIT_K`，与进入点之间留滞回）**且**竖直辅助速度 `|a.vtolVy| < 1.5` **且**速度矢量与机头夹角 ≤ 12°（`EXIT_ANGLE`）时清 `a.vtolOn`，主路径接着飞（`vel = fwd × speed`，连续）。
+- **标量速度沿机头**（与主路径同形，不再是自由矢量）：`a.vel = fwd × speed`，再加竖直辅助速度 `a.vtolVy`。推力 / 阻力 / 重力沿航迹 / 转弯掉速都和主路径同一套，只多三件事：
+  1. **期望速度曲线**（上面）。
+  2. **升力缺口由喷口垂直分量补上**：翼升力系数 `wk = min(1, (v / vStall)²)`（与主路径失速下沉同一个比值，`vtolWingK`）；缺口 `Ld = G × (1 − wk)`；总推力预算 `A = phys.accel`（必须大于 `G`，代码里下限 `1.01 × Ld`）；剩给前向的 `Af = √(A² − Ld²)`，用它做加速（取代主路径的 `accel`）。速度越低缺口越大、能用于加速的越少。喷口角 `a.vtolNoz = atan2(Ld, 实际使用的前向推力)`：0° 朝后 … 90° 朝下，HUD 显示为 `NOZ`。喷口角只由实际速度与加速状态决定，与推力挡位、机头俯仰无关。
+  3. **只在低速生效的悬停能力**（`gate = 1 − wk`）：减速板（`a.brake` 或推力 < 慢车）按 `vzDown` 悬浮下降；仰头按仰角给爬升率 `vzUp × sin(pitch)`；低头**不**下降。目标竖直速度 `a.vtolVz`（给 HUD）= `((brake ? −vzDown : 0) + vzUp × max(0, fwd.y)) × gate`，`a.vtolVy` 以 `vAccel` 趋近它。
+- **重力与转弯掉速**乘 `wk`（低速时由喷口托着，不掉速；`vStall` 以上 `wk = 1`）。`vStall` 以上 `Ld = 0`、`gate = 0`，两条路径公式完全一致，所以交接连续。
+- **没有漂移**：机体倾斜不再产生横向漂移（速度沿机头，喷口角只调竖直分量）。
+- **姿态**：RCS 式固定角速率 `ac.vtol.rcs`，不吃动压与 `ctrlFactor`，按挂载打折（与主路径同一份 `effectivePhys` 比值）；推杆比拉杆弱（`PITCH_DOWN_K` 0.6）。每帧 `a.stall = false`、`a.sink = 0`、`a.ctrlAuth = 1`。
+- **其他**：载荷因数 `gNow` 按速度实际变化算；触地（离地 ≤ 2 m）与主路径一样直接坠毁（`kill`，不做着舰）；尾部回到 `stepAircraftTail`（冷却 / 拖烟 / 电子战结算照常）。控制层不再对悬停分支做推力特例，高 G 在悬停时仍关闭（见 [game.md](game.md)）。
+- **只为玩家设计**：`vtolWatch` 本身不分玩家 / AI（带 `ac.vtol` 的机体速度低了都会进分支），但 AI 没有任何悬停逻辑（`ai/` 里不读 `vtolOn`），海马目前只作为可玩机型。`noPSM` 标签让 PSM 对它不可用。
 - **`ac.vtol` 参数表**（海马取值，注释在 `js/data/aircraft/seahorse.js`）：
 
 | 字段 | 海马 | 含义 |
 |---|---|---|
-| `transSpeed` | 95 | 低于它进悬停分支；回到 ×1.08 且机头对齐后交还主路径 |
-| `wingV` | 80 | 翼升力从 0 到满的速度尺度 |
-| `liftG` | 1.6 | 升力推力 / 重量（要大于 1 + 阻力才能以 `vzUp` 爬升） |
-| `vzUp` / `vzDown` | 28 / 18 | 辅助悬停的最大爬升 / 下降速度（m/s），对应油门 0.85 / 0.04 |
-| `fwdAccel` | 14 | 前向推力加速度（m/s²），油门 0.85 → 1.25 渐开 |
-| `drag` | 0.18 | 悬停时的线性阻力系数（1/s） |
-| `align` | 2.5 | 速度矢量被拉向机头的速率（1/s，× `wk`） |
+| `transK` | 1.2 | 速度低于「有效 `vStall` × `transK`」进悬停分支；回到 ×1.08 且对齐后交还主路径 |
+| `vzUp` | 24 | 低速时仰头上升的最大爬升率（m/s，按仰角 `sin` 折算）；低头不下降 |
+| `vzDown` | 18 | 减速板悬浮下降的速度（m/s） |
+| `vAccel` | 9 | 竖直辅助速度 `a.vtolVy` 的变化率（m/s²） |
 | `rcs` | `{ pitch 0.9, roll 1.6, yaw 0.9 }` | 姿态角速率（rad/s） |
 
-探针 `probe-vtol`。
+升力推力预算不在 `ac.vtol` 里，取自 `phys.accel`（海马 16 m/s²，大于 `G`）；翼升力尺度取 `phys.vStall`（海马 70）。探针 `probe-vtol`（23 项）。
 
 ---
 

@@ -569,11 +569,11 @@ cd[wid] = [0..1]   // 就绪度：0 = 刚打完，1 = 装填完毕
 
 ## 垂直起降悬停 HUD（`hover.js`，批次 6.2）
 
-`$.drawHover(ctx, W, H, cam, p)`，在 `draw()` 里排在 `drawBoresight` 之后、`drawTapes` 之前；**只在 `p.vtolOn && p.alive` 时画**，其他机型 / 常规飞行一帧不画，也没有设置开关。物理见 [flight-model.md](flight-model.md) 的「垂直起降悬停分支」。画三样东西：
+`$.drawHover(ctx, W, H, cam, p)`，在 `draw()` 里排在 `drawBoresight` 之后、`drawTapes` 之前；**只在 `p.vtolOn && p.alive` 时画**，其他机型 / 常规飞行一帧不画，也没有设置开关。物理见 [flight-model.md](flight-model.md) 的「垂直起降悬停分支」。画下面几样东西：
 
-- **速度矢量菱形**（绿，边长约 8 px）：投影点 = `p.pos + norm(p.vel) × 1400`；速度 ≤ 1.5 m/s 时方向没有意义，不画。它与 `drawBoresight` 的机头标记（小圆）之间的偏离就是**横向漂移**。
-- **模式字 + 水平速度**（准星上方）：`HOVER`（`speed < 6` 且 `|vel.y| < 1.5`，几乎不动）/ `VTOL`（喷流托举）/ `TRANS`（过渡：翼升力系数 `p.vtolWk > 0.35`，琥珀色，其余绿色），下一行小字是水平速度（m/s）。文字走 `T('ui.hud.hover.mode_<hover|vtol|trans>')`、`ui.hud.hover.hs`、`ui.hud.hover.vs`。
-- **垂直速度尺**（准星右侧一条竖尺，量程 ±30 m/s、刻度每 10 m/s）：白三角 = 当前竖直速度 `vel.y`，青色短横 = 油门指令的目标竖直速度 `p.vtolVz`（油门 0.5 在零线上，向上爬升、向下下降）；尺顶是标签（`ui.hud.hover.vs`），尺底是带符号的当前值。
+- **速度矢量菱形**（绿，边长约 8 px）：投影点 = `p.pos + norm(p.vel) × 1400`；速度 ≤ 1.5 m/s 时方向没有意义，不画。它与 `drawBoresight` 的机头标记（小圆）之间的偏离就是竖直辅助速度（悬停下降 / 仰头上升）带来的航迹偏移；速度沿机头，没有横向漂移。
+- **模式字 + 水平速度**（准星上方）：按翼升力系数 `p.vtolWk` 分档——`HOVER`（`speed < 6` 且 `|vel.y| < 1.5`，几乎不动）/ `TRANS`（过渡：`p.vtolWk > 0.35`，琥珀色）/ `VTOL`（其余，喷流托举），`HOVER` 优先，`HOVER` 与 `VTOL` 绿色。下一行小字是水平速度（m/s），再下一行小字是 **`NOZ`**：喷口转角 `p.vtolNoz`（度，0° 朝后 … 90° 朝下，由实际速度决定，与推力挡位无关）。文字走 `T('ui.hud.hover.mode_<hover|vtol|trans>')`、`ui.hud.hover.hs`、`ui.hud.hover.noz`、`ui.hud.hover.vs`。
+- **垂直速度尺**（准星右侧一条竖尺，量程 ±30 m/s、刻度每 10 m/s）：白三角 = 当前竖直速度 `vel.y`，青色短横 = 低速悬停能力的指令竖直速度 `p.vtolVz`（减速板下降为负、仰头上升为正，高于失速速度时为 0）；尺顶是标签（`ui.hud.hover.vs`），尺底是带符号的当前值。
 
 悬停分支对其他 HUD 元素的特例：空速带不画失速刻度、动压表不报红不闪、`TERRAIN` 告警按竖直速度——分别见「速度带」「动压表」「告警栈」。
 

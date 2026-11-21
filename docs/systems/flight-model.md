@@ -441,44 +441,50 @@ HUD：告警栈 `psm`（进行中琥珀闪烁），G 表上方的攻角仪表（
 
 ---
 
-## 垂直起降悬停分支（VTOL，批次 6.2，`entities/vtol.js`）
+## 垂直起降悬停分支（VTOL，批次 6.2，v3.7.1 重设计，`entities/vtol.js`）
 
-主路径是运动学模型：`vel = fwd × speed`，速度钳在 `[0.42 vStall, 1.12 vMax]`，没有侧滑和竖直速度，**装不下悬停**。和 PSM 一样，VTOL 是**速度矢量与机头解耦**的独立分支：带 `ac.vtol` 的机型（D-27 海马，标签 `vtol` `noPSM`）速度掉到 `transSpeed`（95 m/s）以下，`stepAircraft` 末尾的 `vtolWatch` 置 `a.vtolOn`，之后每帧整个交给 `$.stepVtol`（派发在 `stepAircraft` 开头，顺序 `a.deck` → `a.psm` → `a.vtolOn`）。不带 `ac.vtol` 的机型逐帧不变。
+主路径是运动学模型：`vel = fwd × speed`，速度钳在 `[0.42 vStall, 1.12 vMax]`，没有侧滑和竖直速度，**装不下悬停**。和 PSM 一样，VTOL 是独立分支：带 `ac.vtol` 的机型（D-27 海马，标签 `vtol` `noPSM`）速度掉到「有效 `vStall` × `transK`」（`transK` 1.2）以下，`stepAircraft` 末尾的 `vtolWatch` 置 `a.vtolOn`，之后每帧整个交给 `$.stepVtol`（派发在 `stepAircraft` 开头，顺序 `a.deck` → `a.psm` → `a.vtolOn`）。
+
+**设计语义**：推力只代表玩家**期望的前进速度**（沿机体前向），不直接产生升力；不下坠**只由实际速度决定**，喷口转向补足。所以推力高低在机动时只影响速度，只有低速平飞时才通过喷口角影响垂直 / 平飞的过渡。
 
 ### 模型
 
-速度是自由矢量 `a.vel`，每帧写回 `a.speed = |vel|`。以加速度（m/s²）叠加：
+分支里的算法与主路径同形：标量速度 `a.speed` 沿机头，`a.vel = fwd × speed` 再加竖直辅助速度 `a.vtolVy`；推力 / 阻力 / 重力沿航迹 / 转弯掉速都和主路径一样。只多三件事：
 
 ```js
-wk  = min(1, (v / wingV)²)                       // 翼升力系数：0 = 纯喷流托举，1 = 机翼托住全部重量
-acc = g − gPerp × wk                              // 机翼抵消垂直于速度的那部分重力
-acc += fwd × fwdAccel × clamp((thr − 0.85)/0.4)   // 前向推力：油门 > 0.85 才开
-acc −= vel × drag × (1 − 0.7 wk)                  // 线性阻力，翼升力起来后减弱
-// 升力推力：沿机体 up，辅助悬停按竖直速度追踪油门指令
-azDes = clamp((vzCmd − vel.y) × 1.6, −6, +9)
-acc  += up × clamp((azDes − acc.y) / ((1 − wk) × max(0.35, up.y)), 0, liftG × g) × (1 − wk)
+// ① 期望速度（主路径对 ac.vtol 机型也用这条曲线，见 vtolSpeedTarget）
+//   HUD 推力 0%（慢车 VTOL_THR_IDLE）→ 0；0 → 50%：0 → vStall；50 → 100%：vStall → vMil；加力 → vMax；减速板 → 0
+// ② 升力缺口由喷口垂直分量补上
+wk  = min(1, (v / vStall)²)          // 翼升力系数，与主路径失速下沉同一个比值；vStall 取有效值（随高度 / 挂载）
+Ld  = G × (1 − wk)                   // 升力缺口
+A   = max(phys.accel, 1.01 × Ld)     // 总推力预算（phys.accel 必须大于 G）
+Af  = √(A² − Ld²)                    // 剩给前向的推力，取代主路径的 accel
+vtolNoz = atan2(Ld, 实际用的前向推力)  // 喷口转角：0° 朝后 … 90° 朝下
+// ③ 只在低速生效的悬停能力：gate = 1 − wk
+vz  = ((减速板 ? −vzDown : 0) + vzUp × max(0, fwd.y)) × gate
 ```
 
-- 升力推力按 `1/cosθ` 补偿机体倾斜：倾斜后推力的水平分量就是**横向漂移**，不另外加。`wk` 趋近 1 时（速度 ≳ `wingV`）升力推力随 `(1 − wk)` 归零，全靠机翼。
-- **气流跟着机体走**：`wk > 0.01` 时，速度矢量以 `1 − exp(−align × wk × dt)` 的比例被拉向机头（大小不变）。
+- **期望速度**：推力 0% = 0（完全静止悬浮）；0 → 50% 期望速度 0 → `vStall`（越低越接近悬浮）；50% → 100% 为 `vStall` → `vMil`；加力 = `vMax`；减速板（推力在慢车 `$.VTOL_THR_IDLE` 以下，与 `Game.THR_IDLE` 同值，探针核对）= 0。期望速度低于实际速度时按主路径同形的减速（分母下限 8 m/s，避免 0 附近抖动）。
+- **缺口与喷口**：速度越低 `wk` 越小、缺口越大、能用于前向加速的推力越少、喷口越朝下；速度上去缺口缩小，喷口转回后方。喷口角只由实际速度与加速状态决定，与推力挡位、机头俯仰无关，推力挡位只改变期望速度。重力沿航迹与转弯掉速都乘 `wk`（低速时喷口托着）。
+- **悬停能力**：减速板才悬浮下降（`vzDown`）；仰头按仰角 `sin` 给爬升率（`vzUp`）；低头不下降。`a.vtolVy` 以 `vAccel` 趋近目标 `a.vtolVz`，加到 `vel.y`。
+- **vStall 以上** `wk = 1`：`Ld = 0`、`gate = 0`，两条路径公式完全一致，交接连续。
+- **没有漂移**：机体倾斜不产生横向漂移（旧版"自由矢量 + 升力推力沿机体 up"的模型已删）。
 - **姿态**：RCS 式固定角速率 `ac.vtol.rcs`（海马 俯仰 0.9 / 滚转 1.6 / 偏航 0.9 rad/s），**不吃动压与 `ctrlFactor`**，按挂载打折（同一份 `effectivePhys` 比值）；滚转有 0.14 s 的一阶平滑；推杆（机头向下）× 0.6。`a.ctrlAuth` 恒写 1，`a.stall = false`、`a.sink = 0`（这一段没有失速）。
-- **油门轴**（玩家，控制层特例见 [game.md](game.md)）：`0.50` 定高悬停；`0.50 → 0.85` 竖直速度指令 0 → `vzUp`（28 m/s 爬升）；`0.50 → 0.04` 指令 0 → `−vzDown`（18 m/s 下降）；`0.85 → 1.25` 前向推力渐开。指令竖直速度写在 `a.vtolVz` 给 HUD。
 - G 表：同 PSM，用速度的实际变化量加 1 G 投到机体 `up` 轴，一阶平滑 0.15 s。
 - 参数表见 [entities.md](entities.md) 的 §9.2。
 
 ### 交接与连续
 
-- **进入**：`vel = fwd × speed` 本来就是主路径的速度，所以交接点天然连续；玩家进入时 `throttle` 被设为 0.5（主路径里的油门位置在这里会变成爬升 / 推力指令）。
-- **退出**：`speed > transSpeed × 1.08`（`EXIT_K`，与进入点之间留滞回）**且**速度与机头夹角 ≤ 12°（`EXIT_ANGLE`）才清 `a.vtolOn`；退出时 `vel ≈ fwd × speed`，与主路径连续。没对齐就留在本分支里靠 `align` 继续拉。
+- **进入**：`speed < 有效 vStall × transK`；`vel = fwd × speed` 本来就是主路径的速度，交接点天然连续。推力不被改写（控制层没有特例）。
+- **退出**：`speed > 有效 vStall × transK × 1.08`（`EXIT_K`，与进入点之间留滞回）**且** `|a.vtolVy| < 1.5` **且**速度与机头夹角 ≤ 12°（`EXIT_ANGLE`）才清 `a.vtolOn`；退出时 `vel ≈ fwd × speed`，与主路径连续。
 - 尾部走共用的 `stepAircraftTail`（冷却 / 装填 / 电子战 / 拖烟照常）。控制层的高 G 在悬停分支里关掉，看门狗对 `vtolOn` 免检（悬停本来就几乎不动），地形警告改按竖直速度——见 [game.md](game.md)、[hud.md](hud.md)。
 
 ### 它不做什么
 
 - **没有着舰 / 着陆**：离地 ≤ 2 m 与主路径一样直接 `kill` 坠毁（本批刻意不做）。
-- **玩家专用**：油门语义与进入时的油门回 0.5 只对玩家；`vtolWatch` 不区分玩家 / AI，但 AI 没有任何悬停逻辑。
-- 没有高 G、没有 PSM（`noPSM`）、没有失速与失速下沉、不受 `ctrlFactor` 影响；不改主路径的任何公式。
-- 速度回到 `transSpeed × 1.08` 以上就按主路径飞（失速速度、可用升限等照旧）。
-
+- **玩家专用**：`vtolWatch` 不区分玩家 / AI，但 AI 没有任何悬停逻辑。
+- 没有高 G、没有 PSM（`noPSM`）、没有失速与失速下沉、不受 `ctrlFactor` 影响。
+- 主路径只有一处因它改动：带 `ac.vtol` 的机型，主路径的期望速度改用同一条 `vtolSpeedTarget` 曲线，其余机型逐帧不变。
 ---
 
 ## 高度上限与地形

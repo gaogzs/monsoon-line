@@ -65,7 +65,7 @@ tools/
 | 战略制空支援机黑曜岩（守在友机后方 / 定时多目标齐射 / 敌机逼近脱离 / 压制 / ewField 干扰场） | `probe-support.js` |
 | 空中整备机海鹦（盘旋航线 / `Resupply.validate` 认飞机的标签 / 移动整备点驻留与出圈清零） | `probe-tanker.js` |
 | 重型运输机蝠鲼（不武装 / 大靶面与血量 / 沿航线飞） | `probe-transport.js` |
-| 垂直起降 `stepVtol`（悬停 / 前倾平移 / 爬升下降率 / 过渡到翼飞时速度连续） | `probe-vtol.js` |
+| 垂直起降 `stepVtol`（推力 → 期望速度曲线 / 喷口补升力缺口 / 减速板下降与仰头爬升 / 过渡到翼飞时速度连续，23 项） | `probe-vtol.js` |
 | `render-gl.js` / `render.js` / `shading.js` | `probe-render.js`（要 Chrome） |
 | 模型、挂载、俯视图、详情页 | 对应的 `render/` 预览器（肉眼看） |
 | 要发一个版本 | `release.js vX.Y.Z`，见[版本戳与发版](#版本戳与发版) |

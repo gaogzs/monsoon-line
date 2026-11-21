@@ -46,7 +46,7 @@
 | `noPSM` | entities | 该机型不能做过失速机动（PSM）。缺省所有机型可用；VTOL 带上它 | 机型 `seahorse` | `entities/psm.js`（`psmGate` 返回 `reason: 'noPSM'`）、`ai/psm.js`、`ui/hud/instruments.js`（不画 PSM 指示） |
 | `droneCarrier` | game | 无人机航母：带机库（`SHIPS[].hangar`），按波次从跑道放飞无人机、回收耗尽的无人机 | 舰船 `hallucigenia` | 目前只是文档性标签：机制由 `missions/_lib.js` 的 `tickHangar` 按 `t.hangar`（`spawnTarget` 读 `SHIPS[].hangar` 建立）驱动，不读这个标签 |
 | `ewfield` | ai | 大范围电子战场：机型数据的 `ewField`（`R` 等）由 `spawnEnemy` 转成 `ai.jam`，干扰半径取 `ewField.R`（黑曜岩 18 km） | 机型 `obsidian` | `missions/_lib.js`（`spawnEnemy` 读 `ac.ewField`）、`ai/brain.js`（`jamAuto`，`J.R` 覆盖半径）、`game/lock.js`（读 `a.ewFieldR / ewFieldK`） |
-| `vtol` | entities | 垂直起降：机型数据的 `vtol` 字段（参数）决定悬停分支，速度低于 `transSpeed` 转入 `entities/vtol.js` | 机型 `seahorse` | `entities/aircraft.js`（`stepAircraft` 末尾读 `ac.vtol` 调 `vtolWatch`）、`entities/vtol.js`（`stepVtol`）、`ui/hud/hover.js`；标签本身为文档性，运行时读的是 `ac.vtol` 参数 |
+| `vtol` | entities | 垂直起降：机型数据的 `vtol` 字段（参数）决定悬停分支，速度低于「有效 `vStall` × `transK`」转入 `entities/vtol.js` | 机型 `seahorse` | `entities/aircraft.js`（`stepAircraft` 末尾读 `ac.vtol` 调 `vtolWatch`）、`entities/vtol.js`（`stepVtol`）、`ui/hud/hover.js`；标签本身为文档性，运行时读的是 `ac.vtol` 参数 |
 
 ## 加一个标签
 
