@@ -291,7 +291,9 @@
     var th = M3.clamp(a.throttle, 0, 1);
     /* 高空包线：军推 / 加力的目标速度乘 thrustK(y)，到有效升限处刚好是 1.1·vStall(y)，
        见 physics.js「失速速度随动压变化」。怠速目标仍锚在当前高度的失速速度上。 */
-    var vTarget = M3.lerp(p.vStall * 0.74, (a.ab ? p.vMax : p.vMil) * $.thrustK(a, a.pos.y), th);
+    var vTarget = (a.ac && a.ac.vtol)
+      ? $.vtolSpeedTarget(a, p, a.throttle)       // 垂直起降机型：推力 = 期望前进速度，0% 静止悬浮、50% = vStall（见 vtol.js）
+      : M3.lerp(p.vStall * 0.74, (a.ab ? p.vMax : p.vMil) * $.thrustK(a, a.pos.y), th);
 
     // 可变后掠翼：低速展开（改善低速盘旋），高速后掠（减小波阻）
     if (a.ac && a.ac.variableSweep) {
@@ -366,7 +368,7 @@
       return;
     }
 
-    if (a.ac && a.ac.vtol) $.vtolWatch(a);       // 垂直起降机型：速度掉到 transSpeed 以下，下一帧起转入 vtol.js
+    if (a.ac && a.ac.vtol) $.vtolWatch(a, p);    // 垂直起降机型：速度掉到 vStall × transK 以下，下一帧起转入 vtol.js
     stepAircraftTail(a, dt, world);
   }
 

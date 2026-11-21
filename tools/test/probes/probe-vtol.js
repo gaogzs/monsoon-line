@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 /* ============================================================
-   垂直起降探针（docs/POST2-0IMPL.md 批次 6.2，js/engine/entities/vtol.js 的 stepVtol）
+   垂直起降探针（docs/POST2-0IMPL.md 批次 6.2，js/engine/entities/vtol.js，v3.7.1 重设计后的语义）
 
-   直接调 Ent.stepAircraft（不经输入层），给 a.ctrl / a.throttle，量物理：
-   A. 油门 0.5 悬停 30 s：速度 < 0.5 m/s、高度漂移 < 3 m
-   B. 机头前倾 15°：水平速度随阻力收敛到解析值附近（3 s 时 ±40%，含机头到位时间），高度保持（辅助悬停补偿倾斜）
-   C. 油门 0.75 / 0.25：爬升 / 下降率落在 vzUp·(0.25/0.35) / vzDown·(0.25/0.46) ±2 m/s
-   D. 从悬停前倾 + 推满油门加速过 transSpeed：全程不失速、不 NaN、|vel| 每帧加速度 < 15 m/s²、
-      交接给主路径（vtolOn 清掉）后速度继续连续、不再掉回悬停
-   E. 从前飞速度抬头减速回到悬停（速度 < 3 m/s）
-   F. 没有 ac.vtol 的机型：不进悬停分支（vtolWatch 不置位）
+   推力只代表期望的前进速度：0% 静止悬浮、50% = 有效 vStall、100% = 军推；不下坠由实际速度决定
+   （速度 < vStall 喷口转向补升力缺口）；减速板才悬浮下降；低速时仰头上升。
+   直接调 Ent.stepAircraft（不经输入层），给 a.ctrl / a.throttle / a.ab / a.brake，量物理，用真正的 seahorse 数据：
+   A. 推力 0%：从 120 m/s 前飞减速到 < 0.5 m/s、高度漂移 < 3 m；机头俯仰 ±20° 仍纹丝不动
+   B. 推力 25% / 50%：收敛到 vS/2、vS（±3 m/s），高度保持
+   C. 喷口角：悬停 ≈ 90°、加速起步 40–70°、v ≥ vStall ≈ 0°、随速度单调不增
+   D. 减速板：悬停下降率 ≈ vzDown（±2）、水平静止；接近 vStall 的速度上竖直指令很小（gate = 1 − wk）
+   E. 仰头上升：推力 0% 仰 30° 爬升 ≈ vzUp·sin30°（±2）、水平静止；低头 30° 不下降
+   F. 0 → 100% 加速过 vStall：交接帧加速度 < 20 m/s²、速度方向变化 < 3°、全程不失速、不 NaN
+   G. 高速（200 m/s，主路径）改推力只改速度，vtolOn 不置位
+   H. 低速机动：90° 偏航，速度只由推力目标决定（±4 m/s）
+   I. HUD：悬停 / 过渡 / 普通状态下整帧都能画出来
+   J. 没有 ac.vtol 的机型不进悬停分支
+   K. VTOL_THR_IDLE 与 Game.THR_IDLE 一致；海马 phys.accel ≥ 1.2 G（喷口悬停的推力预算）
    用法：node tools/test/probes/probe-vtol.js
    ============================================================ */
 'use strict';
@@ -20,125 +26,186 @@ function chk(name, cond, detail) {
   if (!cond) ok = false;
 }
 
-const VT = { transSpeed: 95, wingV: 80, liftG: 1.6, vzUp: 28, vzDown: 18, fwdAccel: 14, drag: 0.18, align: 2.5,
-  rcs: { pitch: 0.9, roll: 1.6, yaw: 0.9 } };
-const DT = 1 / 60;
+const DT = 1 / 60, G = 9.80665, IDLE = 0.04;
+const R = Math.PI / 180;
 
-function make(seed, vtol) {
+function make(seed, type) {
   const S = Sim.load({ seed });
   S.start(0);
   const sb = S.sandbox, w = sb.Game.__world();
-  const a = sb.Ent.makeAircraft({ type: 'albatross', team: 0, x: 0, y: 3000, z: 0, fwd: sb.M3.V(0, 0, 1), speed: 0 });
-  if (vtol !== false) {
-    a.ac = Object.assign({}, a.ac, { vtol: VT });
-    a.phys = Object.assign({}, a.phys, { vStall: 70 });
-    a.vtolOn = true;
-  }
+  const a = sb.Ent.makeAircraft({ type: type || 'seahorse', team: 0, x: 0, y: 3000, z: 0, fwd: sb.M3.V(0, 0, 1), speed: 0 });
   a.vel = sb.M3.V(0, 0, 0); a.speed = 0;
   a.hp = a.maxHp = 1e9;
+  if (a.ac.vtol) a.vtolOn = true;
+  const vt = a.ac.vtol;
+  const vS = () => sb.Ent.vStallAt(a);                       // 有效 vStall（随高度）
+  /* 推力百分比（HUD：慢车 0%、军推 100%、> 100% 加力；< 0 减速板）→ 油门轴，同时写 ab / brake（输入层的约定） */
+  const thr = pct => {
+    if (pct < 0) { a.throttle = IDLE * 0.5; a.ab = false; a.brake = true; return; }
+    a.brake = false;
+    if (pct > 100) { a.throttle = 1.25; a.ab = true; return; }
+    a.ab = false; a.throttle = IDLE + pct / 100 * (1 - IDLE);
+  };
   const pitchNow = () => Math.asin(Math.max(-1, Math.min(1, a.fwd.y)));
-  /* 俯仰保持：目标俯仰角（rad，抬头为正）。ctrl 与输入层同一约定：pitch > 0 抬头 */
   const hold = tgt => { a.ctrl.pitch = Math.max(-1, Math.min(1, (tgt - pitchNow()) * 4)); a.ctrl.roll = 0; a.ctrl.yaw = 0; };
-  return { S, sb, w, a, hold, pitchNow };
+  const run = (secs, pitch, each) => { for (let i = 0; i < secs * 60; i++) { hold(pitch === undefined ? 0 : pitch); sb.Ent.stepAircraft(a, DT, w); if (each) each(i); } };
+  return { S, sb, w, a, vt, vS, thr, hold, run, pitchNow };
 }
 const fin = a => [a.pos.x, a.pos.y, a.pos.z, a.vel.x, a.vel.y, a.vel.z, a.speed, a.fwd.x, a.fwd.y, a.fwd.z].every(Number.isFinite);
 const hv = a => Math.hypot(a.vel.x, a.vel.z);
 
-/* A 悬停 */
+/* A 推力 0%：静止悬浮 */
 {
-  const { sb, w, a, hold } = make(1);
-  a.throttle = 0.5;
-  let y0 = a.pos.y, ymax = 0, vmax = 0;
-  for (let i = 0; i < 60 * 30; i++) {
-    hold(0); sb.Ent.stepAircraft(a, DT, w);
-    if (i > 60 * 5) { ymax = Math.max(ymax, Math.abs(a.pos.y - y0)); vmax = Math.max(vmax, a.speed); }
-  }
-  chk('A 油门 0.5 悬停：速度 < 0.5 m/s、高度漂移 < 3 m', vmax < 0.5 && ymax < 3 && fin(a), 'vmax=' + vmax.toFixed(3) + ' dy=' + ymax.toFixed(2));
-  chk('A 悬停期间不失速、仍在悬停分支', a.stall === false && a.vtolOn === true);
+  const { sb, a, thr, run } = make(1);
+  a.speed = 120; a.vel = sb.M3.V(0, 0, 120);                 // 主路径速度起步，要先减速再进悬停分支
+  thr(0);
+  run(15, 0);
+  const y0 = a.pos.y;
+  let vmax = 0, dy = 0;
+  const watch = () => { vmax = Math.max(vmax, a.speed); dy = Math.max(dy, Math.abs(a.pos.y - y0)); };
+  run(10, 0, watch);
+  chk('A 推力 0%：从 120 m/s 减速到静止、高度保持', vmax < 0.5 && dy < 3 && a.vtolOn && fin(a), 'v=' + vmax.toFixed(3) + ' dy=' + dy.toFixed(2));
+  vmax = 0; dy = 0;
+  run(5, -20 * R, watch);
+  chk('A 推力 0%：机头低头 20° 飞机仍纹丝不动（姿态不推走飞机，低头也不下降）', vmax < 0.5 && dy < 3, 'v=' + vmax.toFixed(3) + ' dy=' + dy.toFixed(2));
+  vmax = 0;
+  run(5, 20 * R, watch);                                     // 仰头会按仰角爬升（见 E），但水平方向仍然纹丝不动
+  chk('A 推力 0%：机头仰起 20° 水平速度仍为 0（只有竖直爬升）', Math.hypot(a.vel.x, a.vel.z) < 0.5 && a.vel.y > 0, 'hv=' + Math.hypot(a.vel.x, a.vel.z).toFixed(3) + ' vy=' + a.vel.y.toFixed(2));
+  chk('A 悬停：不失速、无 NaN', a.stall === false && fin(a));
 }
 
-/* B 前倾 → 横向漂移 */
-{
-  const { sb, w, a, hold } = make(2);
-  a.throttle = 0.5;
-  const th = -15 * Math.PI / 180, y0 = a.pos.y;
+/* B 推力 25% / 50%：期望速度 = vS·(x/0.5) */
+for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
+  const { a, thr, run, vS } = make(2);
+  thr(pct);
+  run(25, 0);
+  const want = vS() * k, y0 = a.pos.y;
   let dy = 0;
-  for (let i = 0; i < 60 * 3; i++) { hold(th); sb.Ent.stepAircraft(a, DT, w); dy = Math.max(dy, Math.abs(a.pos.y - y0)); }
-  const v3 = hv(a);
-  /* 机头前倾约 1 s 才到位，解析值按"到位后 2 s"算：(g·tanθ/drag)(1 − e^(−drag·t)) */
-  const g = 9.80665, k = VT.drag, expect = (g * Math.tan(-th) / k) * (1 - Math.exp(-k * 2));
-  chk('B 前倾 15° 3 s：水平速度在解析值 ±40%', Math.abs(v3 - expect) < 0.4 * expect, 'v=' + v3.toFixed(2) + ' expect≈' + expect.toFixed(2));
-  chk('B 倾斜期间高度保持（辅助悬停补偿 1/cosθ）', dy < 6, 'dy=' + dy.toFixed(2));
-  chk('B 漂移方向沿机头水平朝向（前倾向前）', a.vel.z > 0.5 && Math.abs(a.vel.x) < 0.2 * a.vel.z);
+  run(15, 0, () => { dy = Math.max(dy, Math.abs(a.pos.y - y0)); });
+  chk('B 推力 ' + pct + '%：收敛到 ' + want.toFixed(1) + ' m/s（±3）且高度保持', Math.abs(a.speed - want) < 3 && dy < 3, 'v=' + a.speed.toFixed(1) + ' dy=' + dy.toFixed(2));
 }
 
-/* C 升降 */
-for (const [thr, want, name] of [[0.75, VT.vzUp * 0.25 / 0.35, '爬升'], [0.25, -VT.vzDown * 0.25 / 0.46, '下降']]) {
-  const { sb, w, a, hold } = make(3);
-  a.throttle = thr;
-  for (let i = 0; i < 60 * 8; i++) { hold(0); sb.Ent.stepAircraft(a, DT, w); }
-  chk('C 油门 ' + thr + ' ' + name + '率 ≈ ' + want.toFixed(1) + ' m/s（±2）', Math.abs(a.vel.y - want) < 2, 'vy=' + a.vel.y.toFixed(2));
-}
-
-/* D 加速过渡 */
+/* C 喷口角随实际速度变化，与推力指令无关 */
 {
-  const { sb, w, a, hold } = make(4);
-  a.throttle = 1.25; a.ab = true;
-  let stallSeen = false, maxAcc = 0, exitT = -1, nan = false, vPrev = a.vel;
-  let vAtExit = 0, jumpAtExit = 0, angAtExit = 0;
+  const { a, thr, run, vS, sb, w } = make(3);
+  thr(0); run(3, 0);
+  chk('C 悬停喷口朝下 ≈ 90°', a.vtolNoz / R > 89, 'noz=' + (a.vtolNoz / R).toFixed(1) + '°');
+  thr(100);
+  let first = null, prev = null, mono = true, atVs = null, n = 0;
+  for (let i = 0; i < 60 * 30 && a.vtolOn; i++) {
+    a.ctrl.pitch = 0; a.ctrl.roll = 0; a.ctrl.yaw = 0;
+    sb.Ent.stepAircraft(a, DT, w);
+    const d = a.vtolNoz / R;
+    if (first === null) first = d;
+    if (prev !== null && d > prev + 0.5) mono = false;
+    prev = d; n++;
+    if (a.speed >= vS()) { atVs = d; break; }
+  }
+  chk('C 起步加速（推力指令不变）：喷口偏下 40–70°（含主路径的推力渐入系数）', first > 40 && first < 70, 'noz0=' + first.toFixed(1) + '°');
+  chk('C 速度升高喷口角单调不增、到 vStall 回到 ≈ 0°', mono && atVs !== null && atVs < 1, 'at vStall=' + (atVs === null ? 'n/a' : atVs.toFixed(2)) + '° steps=' + n);
+}
+
+/* D 减速板 */
+{
+  const { a, thr, run, vt } = make(4);
+  thr(0); run(4, 0);
+  const x0 = a.pos.x, z0 = a.pos.z;
+  thr(-1);
+  run(6, 0);
+  chk('D 减速板：悬停下降率 ≈ vzDown（±2）、水平静止', Math.abs(a.vel.y + vt.vzDown) < 2 && hv(a) < 0.5 && Math.hypot(a.pos.x - x0, a.pos.z - z0) < 1,
+    'vy=' + a.vel.y.toFixed(2) + ' hv=' + hv(a).toFixed(3));
+  const m = make(4);
+  m.a.speed = 0.95 * m.vS(); m.a.vel = m.sb.M3.V(0, 0, m.a.speed);
+  m.thr(-1); m.run(1 / 60, 0);
+  chk('D 接近 vStall 的速度上拉减速板：竖直指令很小（翼托着，gate 小），不是悬停下降率', Math.abs(m.a.vtolVz) < 0.3 * m.vt.vzDown, 'vz指令=' + m.a.vtolVz.toFixed(2));
+}
+
+/* E 仰头上升 */
+{
+  const up = make(5), dn = make(5);
+  up.thr(0); dn.thr(0);
+  up.run(10, 30 * R); dn.run(10, -30 * R);
+  const want = up.vt.vzUp * Math.sin(30 * R);
+  chk('E 推力 0% 仰 30°：爬升 ≈ vzUp·sin30° = ' + want.toFixed(1) + ' m/s（±2）、水平静止', Math.abs(up.a.vel.y - want) < 2 && hv(up.a) < 0.5, 'vy=' + up.a.vel.y.toFixed(2) + ' hv=' + hv(up.a).toFixed(3));
+  chk('E 推力 0% 低头 30°：不下降（下降只认减速板）', Math.abs(dn.a.vel.y) < 0.5 && hv(dn.a) < 0.5, 'vy=' + dn.a.vel.y.toFixed(2));
+}
+
+/* F 加速过渡 */
+{
+  const { sb, a, thr, hold, vS, w } = make(6);
+  thr(120);
+  let stallSeen = false, maxAcc = 0, exitT = -1, nan = false, vPrev = a.vel, angAtExit = 0, vAtExit = 0;
   for (let i = 0; i < 60 * 40; i++) {
-    hold(a.vtolOn ? -20 * Math.PI / 180 : 0);
+    hold(0);
     const was = a.vtolOn;
     sb.Ent.stepAircraft(a, DT, w);
     if (a.stall) stallSeen = true;
     if (!fin(a)) nan = true;
     const dv = sb.M3.len(sb.M3.sub(a.vel, vPrev)) / DT;
-    if (was && dv > maxAcc) maxAcc = dv;                    // 只量悬停分支内（含交接帧）：交接后主路径自己的推力加速度不算跳变
+    if (was && dv > maxAcc) maxAcc = dv;
     if (was && !a.vtolOn && exitT < 0) {
-      exitT = i / 60; vAtExit = a.speed; jumpAtExit = dv;
-      const n0 = sb.M3.norm(vPrev), n1 = sb.M3.norm(a.vel);
-      angAtExit = Math.acos(Math.max(-1, Math.min(1, sb.M3.dot(n0, n1)))) * 180 / Math.PI;
+      exitT = i / 60; vAtExit = a.speed;
+      angAtExit = Math.acos(Math.max(-1, Math.min(1, sb.M3.dot(sb.M3.norm(vPrev), sb.M3.norm(a.vel))))) / R;
     }
     vPrev = a.vel;
   }
-  chk('D 加速过 transSpeed 后交接给主路径（vtolOn 清掉）', exitT > 0 && !a.vtolOn, 'exit at ' + exitT.toFixed(1) + ' s, v=' + vAtExit.toFixed(1));
-  chk('D 全程不失速、不 NaN', !stallSeen && !nan);
-  chk('D 悬停分支内每帧加速度 < 20 m/s²（前向推力 14 + 倾斜分量的合理上限，没有速度跳变）', maxAcc < 20, 'max=' + maxAcc.toFixed(2) + ' atExit=' + jumpAtExit.toFixed(2));
-  chk('D 交接帧速度方向变化 < 3°', angAtExit < 3, 'ang=' + angAtExit.toFixed(2));
-  chk('D 交接后主路径稳定（速度 > transSpeed，不再掉回悬停）', a.speed > VT.transSpeed * 1.2 && !a.vtolOn, 'v=' + a.speed.toFixed(1));
+  chk('F 加速过 vStall 后交接给主路径（vtolOn 清掉）', exitT > 0 && !a.vtolOn, 'exit at ' + exitT.toFixed(1) + ' s, v=' + vAtExit.toFixed(1));
+  chk('F 全程不失速、不 NaN', !stallSeen && !nan);
+  chk('F 悬停分支内每帧加速度 < 20 m/s²、交接帧速度方向变化 < 3°', maxAcc < 20 && angAtExit < 3, 'max=' + maxAcc.toFixed(2) + ' ang=' + angAtExit.toFixed(2));
+  chk('F 交接后主路径稳定（速度高于进入速度，不再掉回悬停）', a.speed > vS() * 1.5 && !a.vtolOn, 'v=' + a.speed.toFixed(1));
 }
 
-/* E 减速回悬停 */
+/* G 高速：推力只改速度 */
 {
-  const { sb, w, a, hold } = make(5);
-  a.speed = 70; a.vel = sb.M3.V(0, 0, 70); a.throttle = 0.5;
-  /* 抬头 25° 减速：阻力与倾斜推力的水平分量一起把速度收下去，最后放平 */
-  for (let i = 0; i < 60 * 12; i++) { hold(25 * Math.PI / 180); sb.Ent.stepAircraft(a, DT, w); }
-  for (let i = 0; i < 60 * 25; i++) { hold(0); sb.Ent.stepAircraft(a, DT, w); }
-  chk('E 抬头减速后放平：回到悬停（速度 < 3 m/s）', a.speed < 3 && a.vtolOn, 'v=' + a.speed.toFixed(2));
-  chk('E 过程无 NaN', fin(a));
+  const { sb, a, thr, hold, w } = make(7);
+  a.vtolOn = false; a.speed = 200; a.vel = sb.M3.V(0, 0, 200);
+  thr(80);
+  let on = false;
+  for (let i = 0; i < 60 * 10; i++) { hold(0); sb.Ent.stepAircraft(a, DT, w); if (a.vtolOn) on = true; }
+  const v80 = a.speed;
+  thr(100);
+  for (let i = 0; i < 60 * 10; i++) { hold(0); sb.Ent.stepAircraft(a, DT, w); if (a.vtolOn) on = true; }
+  chk('G 200 m/s 主路径：推力 80% → 100% 只改速度（速度升高），不进悬停分支', !on && a.speed > v80 + 5 && a.speed < 400, 'v80=' + v80.toFixed(1) + ' v100=' + a.speed.toFixed(1));
 }
 
-/* F 非 VTOL 机型不进悬停分支 */
+/* H 低速机动：转向不改变推力目标 */
 {
-  const { sb, w, a } = make(6, false);
-  a.speed = 80; a.vel = sb.M3.V(0, 0, 80); a.throttle = 0.04;       // 低速也不该触发（没有 ac.vtol）
-  for (let i = 0; i < 60 * 5; i++) { a.ctrl.pitch = 0; a.ctrl.roll = 0; a.ctrl.yaw = 0; sb.Ent.stepAircraft(a, DT, w); }
-  chk('F 无 ac.vtol 的机型：vtolOn 恒为 falsy', !a.vtolOn);
+  const { a, thr, run, vS, sb, w } = make(8);
+  thr(25);
+  run(25, 0);
+  const want = vS() * 0.5;
+  for (let i = 0; i < 120; i++) { a.ctrl.pitch = 0; a.ctrl.roll = 0; a.ctrl.yaw = 1; sb.Ent.stepAircraft(a, DT, w); }
+  run(5, 0);
+  chk('H 低速偏航 ≈ 100° 后速度仍收敛到推力目标（±4 m/s）', Math.abs(a.speed - want) < 4 && a.vtolOn, 'v=' + a.speed.toFixed(1) + ' want=' + want.toFixed(1));
 }
 
-/* G HUD：悬停分支下整帧 HUD 能画出来（速度矢量 / 垂直速度 / 模式字，hud/hover.js），不抛错；普通状态不画悬停元素 */
+/* I HUD */
 {
-  const { sb, w } = make(7);
+  const { sb, w, a } = make(9);
   const p = sb.Game.__player();
   sb.Renderer.setCamera(p.pos, p.fwd, p.up, 58);
-  p.ac = Object.assign({}, p.ac, { vtol: VT });
+  p.ac = Object.assign({}, p.ac, { vtol: a.ac.vtol });
   let err = null;
-  for (const [on, speed, vel] of [[true, 20, [5, 2, 18]], [true, 0, [0, 0, 0]], [true, 85, [0, 1, 85]], [false, 300, [0, 0, 300]]]) {
-    p.vtolOn = on; p.speed = speed; p.vel = sb.M3.V(vel[0], vel[1], vel[2]); p.vtolWk = Math.min(1, (speed / VT.wingV) ** 2); p.vtolVz = 10;
+  for (const [on, speed, vel, noz] of [[true, 20, [5, 2, 18], 0.6], [true, 0, [0, 0, 0], 1.5], [true, 70, [0, 1, 70], 0.1], [false, 300, [0, 0, 300], 0]]) {
+    p.vtolOn = on; p.speed = speed; p.vel = sb.M3.V(vel[0], vel[1], vel[2]); p.vtolWk = Math.min(1, (speed / 79) ** 2); p.vtolVz = 10; p.vtolNoz = noz;
     try { sb.HUD.draw(w, p, DT, {}); } catch (e) { err = e; }
   }
-  chk('G 悬停 / 过渡 / 普通状态下整帧 HUD 都能画出来', !err, err ? err.message : '');
+  chk('I 悬停 / 过渡 / 普通状态下整帧 HUD 都能画出来', !err, err ? err.message : '');
+}
+
+/* J 非 VTOL 机型 */
+{
+  const { sb, a, w } = make(10, 'albatross');
+  a.speed = 80; a.vel = sb.M3.V(0, 0, 80); a.throttle = 0.04;
+  for (let i = 0; i < 60 * 5; i++) { a.ctrl.pitch = 0; a.ctrl.roll = 0; a.ctrl.yaw = 0; sb.Ent.stepAircraft(a, DT, w); }
+  chk('J 无 ac.vtol 的机型：vtolOn 恒为 falsy', !a.vtolOn);
+}
+
+/* K 常量与预算 */
+{
+  const { sb, a } = make(11);
+  chk('K VTOL_THR_IDLE 与 Game.THR_IDLE 一致', sb.Ent.$.VTOL_THR_IDLE === sb.Game.$.THR_IDLE, sb.Ent.$.VTOL_THR_IDLE + ' vs ' + sb.Game.$.THR_IDLE);
+  chk('K 海马 phys.accel ≥ 1.2 G（喷口悬停的推力预算）', a.phys.accel >= 1.2 * G, 'accel=' + a.phys.accel);
 }
 
 console.log(ok ? '\n全部通过' : '\n有失败');

@@ -1,60 +1,66 @@
 (function (Ent) {
   'use strict';
   var $ = Ent.$;
-  $.stepVtol = stepVtol; $.vtolWatch = vtolWatch; $.vtolWingK = vtolWingK;
+  $.stepVtol = stepVtol; $.vtolWatch = vtolWatch; $.vtolWingK = vtolWingK; $.vtolSpeedTarget = vtolSpeedTarget;
 
   /* ============================================================
-     垂直起降（批次 6.2）：低速区的独立飞行分支
+     垂直起降（批次 6.2，v3.7.1 重设计）：低速区的独立分支
 
-     主路径（stepAircraft）是运动学模型：vel = fwd × speed，速度钳在 [0.42 vStall, 1.12 vMax]，
-     没有侧滑和竖直速度，装不下悬停。带 ac.vtol 的机型在速度掉到 transSpeed 以下时
-     由 stepAircraft 末尾的 vtolWatch 置 a.vtolOn，之后每帧整个交给本文件；
-     速度回到 transSpeed × EXIT_K 以上且机头与速度基本对齐时，a.vtolOn 清掉，主路径接着飞。
+     设计语义（玩家看到的）：
+       推力  只代表玩家**期望的前进速度**（沿机体自己的前向，不是世界水平），不直接产生升力。
+             喷口向后时（速度够高）它就是普通飞机的引擎推力 —— 主路径本来就是"推力 → 期望速度"，这里同一套算法。
+       悬浮  推力 0% = 期望速度 0 = 完全静止悬浮；0 → 50% 期望速度从 0 升到 vStall（固定翼刚能平飞的速度），越低越接近悬浮。
+       不下坠  只由**实际速度**决定：速度低于 vStall 时机翼托不住，喷口转向补上升力缺口；
+               推力对应的期望速度不变，与油门挡位、机头俯仰都无关。
+       下降  只有减速板（推力在慢车以下）才会悬浮下降；仰头在低速时按仰角给爬升率，低头不下降。
 
-     速度是自由矢量 a.vel（与机头解耦），每帧写回 a.speed = |vel|，武器 / 相机 / HUD 读的还是 a.speed、a.vel。
-     受力（加速度，m/s²）：
-       重力        (0, −G, 0)，机翼升力随速度混入，抵消**垂直于速度方向**的那一部分（wingK）
-       升力推力    沿机体 up（推力矢量朝下），大小由"辅助悬停"给：按竖直速度追踪油门指令，
-                   并按 1/cosθ 补偿倾斜 —— 倾斜后推力的水平分量就是**横向漂移**，不另外加
-       前向推力    沿机头 fwd，油门推到 0.85 以上才开（发动机喷口转向后方）
-       阻力        −drag × vel，翼升力起来后减弱
-     速度大于 wingV 之后机翼托住全部重量，升力推力随 (1 − wingK) 归零；
-     速度矢量以 align 的时间常数被拉向机头（气流跟着机体走），与主路径的 vel = fwd × speed 在交接点连续。
-
-     油门轴语义（控制层 control.js 对 vtolOn 的特例）：
-       0.50   定高悬停；0.50 → 0.85 爬升（到 vzUp），0.50 → 0.04 下降（到 vzDown）
-       0.85 → 1.25  前向推力渐开（松手回落到 0.85）
-     姿态：RCS 式固定角速率（ac.vtol.rcs），不吃动压与 ctrlFactor；a.ctrlAuth 写 1（steerTo / HUD 读它）。
+     实现：vtolOn 时整帧交给这里（stepAircraft 末尾的 vtolWatch 置位）。算法和主路径同形——标量速度沿机头、
+     推力 / 阻力 / 重力沿航迹 / 转弯掉速——只多三件事：
+       ① 期望速度曲线 vtolSpeedTarget（主路径对 VTOL 机型也用它，两个分支的油门含义连续）
+       ② 升力缺口 Ld = G·(1 − wk)，wk = min(1,(v/vStall)²)（与主路径失速下沉同一个比值）由喷口垂直分量补上，
+          总推力预算 A = phys.accel，剩给前向的 Af = √(A² − Ld²)：速度越低、缺口越大、能用于加速的越少，喷口越朝下
+       ③ 只在低速生效的悬停能力（gate = 1 − wk）：减速板下降、仰头上升（a.vtolVy 以 vAccel 趋近目标，加到 vel.y）
+     vStall 以上 wk = 1：Ld = 0、gate = 0、公式与主路径完全一致，所以交接连续。
+     姿态：RCS 式固定角速率（ac.vtol.rcs），不吃动压；a.ctrlAuth 写 1（steerTo / HUD 读它）。
      本批不做着舰：触地和主路径一样直接坠毁。
      ============================================================ */
   var D = Math.PI / 180;
-  var EXIT_K = 1.08;                      // 退出悬停分支的速度 = transSpeed × EXIT_K（和进入点之间留滞回）
-  var EXIT_ANGLE = 12 * D;                // 退出时速度矢量与机头的最大夹角（再大就继续留在本分支里对齐）
-  var VZ_GAIN = 1.6;                      // 竖直速度误差 → 竖直加速度（1/s）
-  var AZ_UP = 9, AZ_DOWN = 6;             // 辅助悬停给出的竖直加速度上下限（m/s²）
+  var EXIT_K = 1.08;                      // 退出悬停分支的速度 = 进入速度 × EXIT_K（和进入点之间留滞回）
+  var EXIT_ANGLE = 12 * D;                // 退出时速度矢量与机头的最大夹角
   var PITCH_DOWN_K = 0.6;                 // 推杆（机头向下）比拉杆弱一点，沿用主路径"向上强于向下"的方向
+  /* 与 Game.THR_IDLE 同值（Ent 读不到 Game 的变量）：油门轴的"慢车"点，HUD 推力 0%，其下是减速板；
+     tools/test/probes/probe-vtol.js 会比较两者，改一边忘了另一边会报错 */
+  $.VTOL_THR_IDLE = 0.04;
 
-  /* 机翼升力系数：0 = 纯喷流托举（悬停），1 = 机翼托住全部重量 */
-  function vtolWingK(vt, v) {
-    var r = v / Math.max(1, vt.wingV);
+  /* 翼升力系数：0 = 纯喷流托举（悬停），1 = 机翼托住全部重量。vStall 取有效值（随高度） */
+  function vtolWingK(vStall, v) {
+    var r = v / Math.max(1, vStall);
     return Math.min(1, r * r);
   }
 
-  /* 主路径每帧调用：速度掉到 transSpeed 以下就进悬停分支。进入时 vel = fwd × speed，天然连续。 */
-  function vtolWatch(a) {
+  /* 油门 → 期望速度（推力 0% 慢车 → 0；0 → 50% 从 0 升到 vStall；50% → 100% 升到军推；加力 = 极速）。
+     p = effectivePhys(a)。慢车以下（减速板）也是 0。 */
+  function vtolSpeedTarget(a, p, th) {
+    var tk = $.thrustK(a, a.pos.y);
+    if (a.ab) return p.vMax * tk;
+    th = M3.clamp(th === undefined ? 1 : th, 0, 1);
+    if (th <= $.VTOL_THR_IDLE) return 0;
+    var x = (th - $.VTOL_THR_IDLE) / (1 - $.VTOL_THR_IDLE);
+    if (x < 0.5) return p.vStall * (x / 0.5);
+    return M3.lerp(p.vStall, p.vMil * tk, (x - 0.5) / 0.5);
+  }
+
+  /* 主路径每帧调用：速度掉到 vStall × transK 以下就进悬停分支。进入时 vel = fwd × speed，天然连续。 */
+  function vtolWatch(a, p) {
     var vt = a.ac && a.ac.vtol;
-    if (vt && !a.vtolOn && a.speed < vt.transSpeed) {
-      a.vtolOn = true;
-      if (a.isPlayer) a.throttle = 0.5;           // 进悬停分支时油门回到"定高"（原来的油门位置在这里是爬升 / 推力指令）
-    }
+    if (vt && !a.vtolOn && a.speed < p.vStall * vt.transK) { a.vtolOn = true; a.vtolVy = 0; }
   }
 
   function stepVtol(a, dt, world) {
     var vt = a.ac.vtol, ph = a.phys, p = $.effectivePhys(a), G = $.G;
-    var vel = a.vel || M3.mul(a.fwd, a.speed);
-    var vPrev = vel;
-    var v = M3.len(vel);
-    var wk = vtolWingK(vt, v);
+    var vPrev = a.vel || M3.mul(a.fwd, a.speed);
+    var v = a.speed;
+    var wk = vtolWingK(p.vStall, v);
     a.vtolWk = wk;
     a.q = $.qOf(a.pos.y, v) / 1000;
     a.stall = false; a.sink = 0; a.ctrlAuth = 1;
@@ -82,44 +88,47 @@
     var B = M3.orthonormalize(a.fwd, a.up);
     a.fwd = B.fwd; a.up = B.up; a.right = B.right;
 
-    // ---- 受力 ----
-    var vh = v > 1e-3 ? M3.mul(vel, 1 / v) : a.fwd;
-    var gVec = M3.V(0, -G, 0);
-    var gPerp = M3.sub(gVec, M3.mul(vh, M3.dot(gVec, vh)));
-    var acc = M3.sub(gVec, M3.mul(gPerp, wk));                 // 机翼升力抵消垂直于速度的那部分重力
-    var th = M3.clamp(a.throttle === undefined ? 0.5 : a.throttle, 0, 1.25);
-    var vzFrac = th >= 0.5 ? M3.clamp((th - 0.5) / 0.35, 0, 1) : -M3.clamp((0.5 - th) / 0.46, 0, 1);
-    var vzCmd = vzFrac >= 0 ? vzFrac * vt.vzUp : vzFrac * vt.vzDown;
-    a.vtolVz = vzCmd;                                          // HUD：指令竖直速度
-    var tf = vt.fwdAccel * M3.clamp((th - 0.85) / 0.4, 0, 1);
-    if (tf) acc = M3.add(acc, M3.mul(a.fwd, tf));
-    acc = M3.sub(acc, M3.mul(vel, vt.drag * (1 - 0.7 * wk)));
-    var lk = 1 - wk;
-    if (lk > 0.02 && a.up.y > 0.1) {
-      var azDes = M3.clamp((vzCmd - vel.y) * VZ_GAIN, -AZ_DOWN, AZ_UP);
-      var tl = M3.clamp((azDes - acc.y) / (lk * Math.max(0.35, a.up.y)), 0, vt.liftG * G);
-      acc = M3.add(acc, M3.mul(a.up, tl * lk));
+    // ---- 速度：主路径同形的标量速度，沿机头 ----
+    var brake = !!a.brake || (a.throttle !== undefined && a.throttle < $.VTOL_THR_IDLE);
+    var vT = brake ? 0 : vtolSpeedTarget(a, p, a.throttle);
+    /* 升力缺口由喷口垂直分量补上；总推力预算 A（不能低于 G，否则悬停不了），剩下给前向。
+       期望速度不变，缺口越大 Af 越小：加速变慢、喷口偏下；速度上去缺口缩小，喷口转回后方。 */
+    var Ld = G * (1 - wk);
+    var A = Math.max(p.accel, Ld * 1.01);
+    var Af = Math.sqrt(Math.max(0, A * A - Ld * Ld));
+    var acc, used = 0;
+    if (v < vT) {
+      var r2 = (v * v) / Math.max(1, vT * vT);
+      acc = Af * Math.min(1, $.THRUST_TAPER * (1 - r2));
+      used = acc;
+    } else {
+      /* 与主路径 −decel·min(1,(r²−1)·4) 同形；期望速度很小 / 为 0 时分母取 8 m/s，
+         免得 0 附近出现反向加速的抖动（vT ≥ 8 时与主路径完全一致） */
+      var dn = Math.max(vT, 8);
+      acc = -p.decel * Math.min(1, Math.max(0, v * v - vT * vT) / (dn * dn) * 4);
+      if (brake) acc *= 1.8;
     }
-    vel = M3.add(vel, M3.mul(acc, dt));
+    // 重力沿航迹：喷口托着时不掉速，随翼升力系数混入（vStall 以上与主路径一致）
+    acc -= G * a.fwd.y * wk;
+    // 转弯掉速：同主路径，乘 wk（低速时舵效来自喷口，不再额外掉速）
+    var wTurn = Math.abs(pIn) * pitchR + Math.abs(yIn) * yawR;
+    acc -= $.TURN_BLEED * wTurn * v * wk;
+    a.speed = M3.clamp(v + acc * dt, 0, p.vMax * 1.12);
+    a.vtolNoz = Math.atan2(Ld, Math.max(0, used));        // 喷口转角：0 朝后 … 90° 朝下（HUD / 以后的模型动画读）
 
-    // ---- 气流跟着机体走：速度矢量被拉向机头（大小不变），翼升力越足越快 ----
-    if (wk > 0.01) {
-      var v2 = M3.len(vel);
-      if (v2 > 1) {
-        var vn = M3.mul(vel, 1 / v2);
-        var cosA = M3.clamp(M3.dot(vn, a.fwd), -1, 1), ang1 = Math.acos(cosA);
-        if (ang1 > 1e-4) {
-          var ax = M3.cross(vn, a.fwd), axl = M3.len(ax);
-          if (axl > 1e-9) vel = M3.rotAxis(vel, M3.mul(ax, 1 / axl), ang1 * (1 - Math.exp(-vt.align * wk * dt)));
-        }
-      }
-    }
-    a.vel = vel;
-    a.speed = M3.len(vel);
+    // ---- 只在低速生效的悬停能力：减速板下降、仰头上升（gate = 1 − wk，高速时为 0）----
+    var gate = 1 - wk;
+    var tgt = ((brake ? -vt.vzDown : 0) + vt.vzUp * Math.max(0, a.fwd.y)) * gate;
+    a.vtolVz = tgt;                                        // HUD：指令竖直速度
+    var vy = a.vtolVy || 0;
+    a.vtolVy = vy + M3.clamp(tgt - vy, -vt.vAccel * dt, vt.vAccel * dt);
+
+    a.vel = M3.mul(a.fwd, a.speed);
+    a.vel.y += a.vtolVy;
 
     // 载荷因数（G 表）：同 PSM —— 速度的实际变化量加 1G 投到机体 up 轴
     if (dt > 1e-4) {
-      var aAct = M3.mul(M3.sub(vel, vPrev), 1 / dt);
+      var aAct = M3.mul(M3.sub(a.vel, vPrev), 1 / dt);
       var nRaw = (M3.dot(aAct, a.up) + G * a.up.y) / G;
       if (a.gNow === undefined) a.gNow = 1;
       a.gNow += (nRaw - a.gNow) * Math.min(1, dt / 0.15);
@@ -134,8 +143,9 @@
       return;
     }
 
-    // ---- 退出：速度够了、速度矢量与机头基本对齐，交还主路径（vel = fwd × speed，此时夹角 ≤ EXIT_ANGLE，连续）----
-    if (a.speed > vt.transSpeed * EXIT_K && M3.dot(M3.norm(a.vel), a.fwd) > Math.cos(EXIT_ANGLE)) a.vtolOn = false;
+    // ---- 退出：速度够了、竖直辅助速度已经散掉，交还主路径（vel = fwd × speed，连续）----
+    if (a.speed > p.vStall * vt.transK * EXIT_K && Math.abs(a.vtolVy) < 1.5 &&
+        M3.dot(M3.norm(a.vel), a.fwd) > Math.cos(EXIT_ANGLE)) { a.vtolOn = false; a.vtolVy = 0; }
 
     $.stepAircraftTail(a, dt, world);
   }

@@ -6,6 +6,7 @@
         "mode_vtol": "VTOL  喷流托举",
         "mode_trans": "TRANS  过渡",
         "hs": "HS  水平 {v} m/s",
+        "noz": "NOZ  喷口 {a}°",
         "vs": "VS  m/s"
       }
     }

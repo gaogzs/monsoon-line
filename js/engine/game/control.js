@@ -135,10 +135,6 @@
        回落比推进慢一些，免得一松手就"咔"地弹回来。 */
     if (thrIn) {
       $.player.throttle += thrIn * dt * 0.62;
-    } else if ($.player.vtolOn && $.player.throttle > 0.85) {
-      /* 垂直起降机型的悬停分支（vtol.js）：0.5 定高、0.5–0.85 爬升、0.85 以上是前向推力 ——
-         松手回落到 0.85（爬升封顶），而不是 1.0：1.0 以上的"加力区"在这里是推力，不是爬升指令 */
-      $.player.throttle = Math.max(0.85, $.player.throttle - dt * 1.6);
     } else if ($.player.throttle > 1.0) {
       $.player.throttle = Math.max(1.0, $.player.throttle - dt * 1.6);
     } else if ($.player.throttle < $.THR_IDLE) {

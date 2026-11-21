@@ -22,17 +22,14 @@ Registry.aircraft({
   stats: { spd: 0.46, mob: 0.52, stl: 0.30, fire: 0.46, dur: 0.30, rng: 0.30, ecm: 0.20 },
   /* vStall 取得很小（70）：它只在主路径（速度 ≥ vtol.transSpeed）里起作用，那里本来就不该失速 */
   phys: { vMax: 360, vMil: 300, vStall: 70, accel: 16, decel: 28, pitch: 0.9, roll: 2.2, yaw: 0.6, hp: 105 },
-  /* 悬停分支参数（vtol.js）：
-       transSpeed  低于它进悬停分支；速度回到 ×1.08 且机头对齐后交还主路径
-       wingV       翼升力从 0 到满的速度尺度（wingK = min(1, (v/wingV)²)）
-       liftG       升力推力 / 重量（要大于 1 + 阻力才能以 vzUp 爬升）
-       vzUp vzDown 辅助悬停的最大爬升 / 下降速度（m/s），油门 0.85 / 0.04 对应
-       fwdAccel    前向推力加速度（m/s²），油门 0.85 → 1.25 渐开
-       drag        悬停时的线性阻力系数（1/s）
-       align       速度矢量被拉向机头的速率（1/s，×wingK）
+  /* 悬停分支参数（vtol.js）。推力只代表期望的前进速度（0% 静止悬浮、50% = vStall、100% = 军推），
+     不下坠由实际速度决定：速度低于 vStall 时喷口转向补上机翼托不住的那部分（推力预算 = phys.accel，必须大于 G）。
+       transK      速度低于「有效 vStall × transK」进悬停分支；回到 ×1.08 且对齐后交还主路径
+       vzUp        低速时仰头上升的最大爬升率（m/s，按仰角 sin 折算）；低头不下降
+       vzDown      减速板（推力在慢车以下）悬浮下降的速度（m/s）
+       vAccel      竖直辅助速度的变化率（m/s²）
        rcs         姿态角速率（rad/s），不吃动压 */
-  vtol: { transSpeed: 95, wingV: 80, liftG: 1.6, vzUp: 28, vzDown: 18, fwdAccel: 14, drag: 0.18, align: 2.5,
-    rcs: { pitch: 0.9, roll: 1.6, yaw: 0.9 } },
+  vtol: { transK: 1.2, vzUp: 24, vzDown: 18, vAccel: 9, rcs: { pitch: 0.9, roll: 1.6, yaw: 0.9 } },
   gun: 'cel3',
   maxLoad: 3200,
   hardpointGroups: [

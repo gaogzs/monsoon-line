@@ -36,6 +36,8 @@
     var col = mode === 'trans' ? $.AMBER : $.GREEN;
     $.text(ctx, T('ui.hud.hover.mode_' + mode), cx, cy - $.U(86), col, $.FB, 'center');
     $.text(ctx, T('ui.hud.hover.hs', { v: hs.toFixed(1) }), cx, cy - $.U(68), $.DIM, $.FS, 'center');
+    // 喷口角：0° 朝后（翼托着）… 90° 朝下（纯喷流托举），由实际速度决定，与推力挡位无关
+    $.text(ctx, T('ui.hud.hover.noz', { a: ((p.vtolNoz || 0) * 180 / Math.PI).toFixed(0) }), cx, cy - $.U(52), $.DIM, $.FS, 'center');
 
     // 垂直速度尺
     var g = $.U(120), x = cx + $.U(150), k = (g / 2) / VS_RANGE;
