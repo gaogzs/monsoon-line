@@ -2,12 +2,14 @@
 /* ============================================================
    无动力炸弹的投放初速探针（js/engine/entities/missile.js 的 launchSpeed / launchVel，js/engine/game/launch.js）
 
-   以前所有挂载一律「载机速度 + 70 m/s、沿机头」出架：导弹的弹射助推被炸弹照单全收，炸弹被向前"推"出去 70 m/s，
-   悬停的垂直起降机甚至会把炸弹打出去 70 m/s。现在无动力弹（ballistic 且没有 burn：碎玉 clb、PEJ-22 hbh、PEJ-4 hbl、
-   PEJ-14 pgb、PEJ-30 v30）的初速 = 载机此刻的速度矢量 + 沿机腹向下 EJECT_BOMB（3 m/s）；有动力的弹（导弹 / 火箭）仍是 +70。
+   以前所有挂载一律「载机速度 + 70 m/s、沿机头」出架：导弹的弹射助推被炸弹和火箭照单全收，被向前"推"出去 70 m/s，
+   悬停的垂直起降机甚至会把炸弹打出去 70 m/s。现在抛物线弹族（isDropped：ballistic 或带 burn）没有任何向前的助推：
+   炸弹 / 滑翔炸弹（碎玉 clb、PEJ-22 hbh、PEJ-4 hbl、PEJ-14 pgb、PEJ-30 v30、GUT-9 asl）初速 = 载机此刻的速度矢量 +
+   沿机腹向下 EJECT_BOMB（3 m/s）；火箭（PEJ-6 rkt）初速 = 载机速度矢量，向前的加速完全靠发动机 burn 段；导弹仍是 +70。
    A. 平飞 300 m/s 投碎玉：初速矢量 ≈ 载机速度 + 向下 3 m/s，沿机头没有额外分量
    B. 悬停（速度 0）投弹：只有向下 3 m/s，水平速度为 0
-   C. 五种无动力弹各投一枚：都满足 A；带漂移 / 竖直速度的载机（vel 与 fwd × speed 不同）继承的是真实 vel
+   C. 六种炸弹各投一枚：都满足 A；带漂移 / 竖直速度的载机（vel 与 fwd × speed 不同）继承的是真实 vel
+   G. 火箭（PEJ-6）：初速 = 载机速度矢量（没有 +70、没有抛放），发动机烧完（burn 0.7 s）后速度 ≈ 载机速度 + boost × burn
    D. 导弹（srm）初速仍是载机速度 + 70（沿用旧行为）
    E. HUD 落点预测（naturalPoint）与真实投下的炸弹落点一致（同一个初速矢量）
    F. launchSpeed：无动力弹 +3、导弹 +70（HUD 预测 / AI 包线 / 真实发射共用）
@@ -64,14 +66,14 @@ const EJ = sb.Ent.$.EJECT_BOMB;
 /* C 五种无动力弹 + 带漂移 / 竖直速度的载机 */
 {
   const bad = [];
-  for (const wid of ['clb', 'hbh', 'hbl', 'pgb', 'v30']) {
+  for (const wid of ['clb', 'hbh', 'hbl', 'pgb', 'v30', 'asl']) {
     if (!sb.WEAPONS[wid]) { bad.push(wid + ' 不存在'); continue; }
     const r = drop(wid, { speed: 250 });
     if (!r.fired) { bad.push(wid + ' 没打出去'); continue; }
     const d = sub(r.m.vel, p.vel);
     if (!(Math.abs(d.z) < 0.01 && Math.abs(d.y + EJ) < 0.01)) bad.push(wid + ' dvel=' + JSON.stringify(d));
   }
-  chk('C hbh / hbl / pgb / v30 / clb 五种无动力弹：初速都是载机速度 + 向下 ' + EJ + ' m/s', bad.length === 0, bad.join('；'));
+  chk('C clb / hbh / hbl / pgb / v30 / asl（GUT-9）六种炸弹：初速都是载机速度 + 向下 ' + EJ + ' m/s', bad.length === 0, bad.join('；'));
   const drift = drop('clb', { speed: 40, vel: sb.M3.V(12, -6, 40) });                 // vel ≠ fwd × speed（带漂移 / 下沉）
   const d = sub(drift.m.vel, sb.M3.V(12, -6, 40));
   chk('C 载机带漂移 / 竖直速度时，炸弹继承真实速度矢量（不是机头方向 × 速度）', Math.abs(d.x) < 0.01 && Math.abs(d.z) < 0.01 && Math.abs(d.y + EJ) < 0.01, 'dvel=(' + d.x.toFixed(2) + ',' + d.y.toFixed(2) + ',' + d.z.toFixed(2) + ')');
@@ -82,6 +84,20 @@ const EJ = sb.Ent.$.EJECT_BOMB;
   const r = drop('srm', { speed: 300 });
   chk('D 导弹（srm）初速仍是载机速度 + 70 m/s（有动力的弹保持旧行为）', r.fired && Math.abs(r.m.speed - 370) < 0.01, 'speed=' + (r.m && r.m.speed));
   chk('F launchSpeed：无动力弹 +' + EJ + '、导弹 +70', sb.Ent.launchSpeed(sb.WEAPONS.clb, 300) === 300 + EJ && sb.Ent.launchSpeed(sb.WEAPONS.srm, 300) === 370 && sb.Ent.isUnpowered(sb.WEAPONS.clb) && !sb.Ent.isUnpowered(sb.WEAPONS.srm));
+}
+
+/* G 火箭：没有向前的初速助推，加速靠发动机 */
+{
+  const r = drop('rkt', { speed: 300 });
+  const wr = sb.WEAPONS.rkt;
+  const d = sub(r.m.vel, p.vel);
+  chk('G 火箭（PEJ-6）出巢：初速 = 载机速度矢量（没有 +70、没有抛放）', r.fired && len(d) < 0.01, 'dvel=' + len(d).toFixed(3) + ' |vel|=' + len(r.m.vel).toFixed(1));
+  const world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
+  const m = r.m; let t = 0;
+  while (t < wr.burn - 1e-6) { sb.Ent.stepMissile(m, 1 / 60, world); world.particles.length = 0; t += 1 / 60; }
+  const gain = len(m.vel) - 300;
+  chk('G 发动机烧完后速度增益 ≈ boost × burn（扣掉重力 / 阻力，±15%）= ' + (wr.boost * wr.burn).toFixed(0) + ' m/s', Math.abs(gain - wr.boost * wr.burn) < 0.15 * wr.boost * wr.burn, 'gain=' + gain.toFixed(0));
+  chk('F launchSpeed：火箭 +0（抛物线弹族，不吃弹射助推）', sb.Ent.launchSpeed(wr, 300) === 300 && sb.Ent.isDropped(wr) && !sb.Ent.isUnpowered(wr));
 }
 
 /* E 落点预测与真实投下的炸弹一致 */

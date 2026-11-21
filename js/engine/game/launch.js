@@ -207,8 +207,8 @@
         target: (irSalvo && q > 0) ? null : (target || null),
         owner: actor
       };
-      /* 无动力弹（炸弹）：初速 = 载机此刻的速度矢量 + 沿机腹向下的一点抛放速度，没有向前的助推 */
-      if (Ent.isUnpowered(wp)) spec.vel = Ent.launchVel(wp, actor);
+      /* 抛物线弹族（炸弹 / GUT-9 / 火箭）：初速 = 载机此刻的速度矢量（炸弹再加一点向下的抛放速度），没有向前的助推 */
+      if (Ent.isDropped(wp)) spec.vel = Ent.launchVel(wp, actor);
       if (gap > 0 && q > 0) {
         w.shotQueue.push({ t: q * gap, spec: spec, salvo: irSalvo });
         continue;

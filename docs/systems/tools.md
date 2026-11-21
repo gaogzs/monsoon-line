@@ -65,7 +65,7 @@ tools/
 | 战略制空支援机黑曜岩（守在友机后方 / 定时多目标齐射 / 敌机逼近脱离 / 压制 / ewField 干扰场） | `probe-support.js` |
 | 空中整备机海鹦（盘旋航线 / `Resupply.validate` 认飞机的标签 / 移动整备点驻留与出圈清零） | `probe-tanker.js` |
 | 重型运输机蝠鲼（不武装 / 大靶面与血量 / 沿航线飞） | `probe-transport.js` |
-| 无动力炸弹的投放初速（碎玉 / PEJ-22 / PEJ-4 / PEJ-14 / PEJ-30 无向前助推、悬停只下落、继承载机真实速度矢量；导弹仍 +70；HUD 落点预测与真实落点一致） | `probe-bomb-release.js` |
+| 抛物线弹的投放初速（碎玉 / PEJ-22 / PEJ-4 / PEJ-14 / PEJ-30 / GUT-9 无向前助推、悬停只下落、继承载机真实速度矢量；火箭初速 = 载机速度、靠发动机加速；导弹仍 +70；HUD 落点预测与真实落点一致） | `probe-bomb-release.js` |
 | 垂直起降 `stepVtol`（推力 → 期望速度曲线 / 喷口补升力缺口 / 减速板下降与仰头爬升 / 过渡到翼飞时速度连续，23 项） | `probe-vtol.js` |
 | `render-gl.js` / `render.js` / `shading.js` | `probe-render.js`（要 Chrome） |
 | 模型、挂载、俯视图、详情页 | 对应的 `render/` 预览器（肉眼看） |

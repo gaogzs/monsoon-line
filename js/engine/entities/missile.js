@@ -1,22 +1,25 @@
 (function (Ent) {
   'use strict';
   var $ = Ent.$;
-  $.makeMissile = makeMissile; $.stepMissile = stepMissile; $.launchSpeed = launchSpeed; $.launchVel = launchVel; $.isUnpowered = isUnpowered;
+  $.makeMissile = makeMissile; $.stepMissile = stepMissile; $.launchSpeed = launchSpeed; $.launchVel = launchVel; $.isUnpowered = isUnpowered; $.isDropped = isDropped;
 
   /* 发射初速（相对载机多出来的那一份）：
-       导弹 / 火箭 / 滑翔动力弹  载机速度 + 70 m/s —— 弹射助推 / 点火前的出架速度，沿机头。
-       无动力弹（炸弹、滑翔炸弹：ballistic 且没有 burn）  载机速度 + 一点点抛放速度（EJECT_BOMB，沿机腹向下），
-         不能有向前的助推：它们出架之后只有重力和阻力，初速就是载机此刻的速度。
-         以前所有挂载一律 +70 沿机头，炸弹被"推"出去 70 m/s（悬停的垂直起降机甚至会把炸弹打出去 70 m/s）。
-     HUD 的落点 / 包线预测、AI 的投放包线都用这个函数，和真实发射保持同一个初速。 */
+       导弹（有导引头 / 自带速度模型的）  载机速度 + 70 m/s —— 弹射助推，沿机头。
+       抛物线弹族（isDropped：ballistic 或带 burn —— 炸弹、滑翔炸弹 GUT-9、火箭 PEJ-6）  没有任何向前的助推：
+         初速矢量 = 载机此刻的速度矢量；炸弹再加一点点向下的抛放速度（EJECT_BOMB，沿机腹），
+         火箭从巢里出来没有抛放（0），向前的加速完全靠发动机的 burn 段（boost × burn）。
+         以前所有挂载一律 +70 沿机头：炸弹和火箭被"推"出去 70 m/s（悬停的垂直起降机甚至会把炸弹打出去 70 m/s）。
+     HUD 的落点 / 包线预测、AI 的投放包线都用这两个函数，和真实发射保持同一个初速。 */
   var EJECT_BOMB = 3;
+  function isDropped(w) { return !!(w && w.tags && (w.tags.ballistic || w.burn)); }
   function isUnpowered(w) { return !!(w && w.tags && w.tags.ballistic && !w.burn); }
-  function launchSpeed(w, carrierSpeed) { return (carrierSpeed || 0) + (isUnpowered(w) ? EJECT_BOMB : 70); }
-  /* 无动力弹的初速矢量 = 载机此刻的速度矢量 + 沿机腹向下的抛放速度；有动力的弹返回 undefined（走 launchSpeed 沿机头）。
+  function ejectSpeed(w) { return isUnpowered(w) ? EJECT_BOMB : 0; }
+  function launchSpeed(w, carrierSpeed) { return (carrierSpeed || 0) + (isDropped(w) ? ejectSpeed(w) : 70); }
+  /* 抛物线弹的初速矢量 = 载机此刻的速度矢量 + 沿机腹向下的抛放速度；导弹返回 undefined（走 launchSpeed 沿机头）。
      载机 c 取 { vel?, fwd, speed, up? }：HUD 预测 / AI 包线 / 真实发射共用 */
   function launchVel(w, c) {
-    if (!isUnpowered(w)) return undefined;
-    return M3.add(c.vel || M3.mul(c.fwd, c.speed || 0), M3.mul(c.up || M3.V(0, 1, 0), -EJECT_BOMB));
+    if (!isDropped(w)) return undefined;
+    return M3.add(c.vel || M3.mul(c.fwd, c.speed || 0), M3.mul(c.up || M3.V(0, 1, 0), -ejectSpeed(w)));
   }
   $.EJECT_BOMB = EJECT_BOMB;
   $.SARH_GRACE = 2.5;       // 半主动弹丢照射后的宽限（s）：宽限内发射机重锁同一目标就恢复引导，超时永久失去引导
@@ -43,9 +46,9 @@
          有发动机的弹每帧都会用 vel = fwd × speed 重算速度，所以初始
          零向量无所谓。无动力弹的速度却完全靠 vel 自己累积 ——
          初值给 0 的话它是"从空中静止开始往下掉"，扔出去的动能全丢了。 */
-      /* o.vel：调用方直接给初速矢量（无动力弹用：载机的真实速度矢量 + 抛放速度，所以悬停 / 带漂移 / 带下沉的载机
+      /* o.vel：调用方直接给初速矢量（抛物线弹族用：载机的真实速度矢量 + 抛放速度，所以悬停 / 带漂移 / 带下沉的载机
          放出去的炸弹继承的是它真实的运动，不是"机头方向 × 速度"）；没给就沿用机头方向 × speed */
-      vel: (o.vel && isUnpowered(w)) ? M3.clone(o.vel)
+      vel: (o.vel && isDropped(w)) ? M3.clone(o.vel)
         : (w.tags.ballistic || w.burn)
         ? M3.mul(M3.norm(o.fwd), o.speed || 120)
         : M3.V(0, 0, 0),

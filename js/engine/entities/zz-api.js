@@ -55,7 +55,7 @@
   Ent.mountIssues = $.mountIssues;
   Ent.clearMountIssues = $.clearMountIssues;
   Ent.makeMissile = $.makeMissile;
-  Ent.launchSpeed = $.launchSpeed; Ent.launchVel = $.launchVel; Ent.isUnpowered = $.isUnpowered;
+  Ent.isDropped = $.isDropped; Ent.launchSpeed = $.launchSpeed; Ent.launchVel = $.launchVel; Ent.isUnpowered = $.isUnpowered;
   Ent.stepMissile = $.stepMissile;
   Ent.effectiveLife = $.effectiveLife;
   Ent.breakLock = $.breakLock;

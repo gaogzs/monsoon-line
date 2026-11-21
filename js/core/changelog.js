@@ -2,9 +2,53 @@
    由 tools/build/release.js 从 CHANGELOG.md 写出，每次发版后重新生成。
    主菜单的「更新记录」页读它。规则见 docs/VERSIONING.md。 */
 var CHANGELOG = {
-  "current": "v3.7.0",
-  "generated": "2026-11-20T17:55:07+09:00",
+  "current": "v3.7.1",
+  "generated": "2026-11-21T16:29:20+09:00",
   "releases": [
+    {
+      "version": "v3.7.1",
+      "date": "2026-11-21",
+      "title": "待润色",
+      "tag": "小版本",
+      "commit": "9c487ea",
+      "lead": "",
+      "sections": [
+        {
+          "h": "新增",
+          "items": [
+            "feat: 悬停面板移到左侧速度带右边（扩展信息），不再占画面中央",
+            "feat: VTOL 喷口出力随高度衰减，满指令托不住就被迫下降（悬停升限）",
+            "docs: VTOL 推力语义重做（v3.7.1）——各系统文档、tags 说明、海马数据注释同步新语义"
+          ]
+        },
+        {
+          "h": "调整",
+          "items": [
+            "test: probe-vtol 加 N 组——高海拔小幅垂直补偿依然有效（不失速、不下沉、速度越高负荷越低、升限处能加速离开）",
+            "test: 重存 data 基线（海马 vtol.jetT / jetExp 与注释）",
+            "refactor: VTOL 推力改为期望前进速度，不下坠由实际速度决定、喷口转向补足"
+          ]
+        },
+        {
+          "h": "修复",
+          "items": [
+            "fix: 无动力炸弹投放时不再有向前的 70 m/s 助推（碎玉 / PEJ-22 / PEJ-4 / PEJ-14 / PEJ-30）",
+            "fix: VTOL 托不住被迫下降时不再借用失速警告——VTOL 机型 a.stall 恒为 false，警告栈单独出 LIFT LIMIT",
+            "fix: VTOL 悬停时倾斜机身产生直升机式平移；HUD 文案占位符改为 {{x}}"
+          ]
+        },
+        {
+          "h": "文档",
+          "items": [
+            "test: 重存 data 基线（海马 vtol.fwdMin / transBoost 与说明文字）",
+            "fix: 海马说明的 \\n 显示成字面量、「照射中断」占位符 {s}；VTOL 托不住时恢复失速警告、悬停转平飞提速",
+            "test: 重存 data 基线（海马 vtol.drag 与说明）",
+            "test: 重存 data 基线（海马 vtol 参数与说明按新推力语义改动）",
+            "docs: 发布 v3.7.0（新单位：垂直起降、无人机航母与重型战机）"
+          ]
+        }
+      ]
+    },
     {
       "version": "v3.7.0",
       "date": "2026-11-21",
