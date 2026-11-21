@@ -29,6 +29,7 @@
   var D = Math.PI / 180;
   var EXIT_K = 1.04;                      // 退出悬停分支的速度 = 进入速度 × EXIT_K（和进入点之间留一点滞回，别抖）
   var EXIT_ANGLE = 12 * D;                // 退出时速度矢量与机头的最大夹角
+  var CEIL_FADE = 800;                    // 有效升限以上，喷口出力衰减到 0 的高度跨度（m）
   var SINK_MAX = 140;                     // 托不住时的下沉速度上限（与主路径失速下沉同一个量级）
   var PITCH_DOWN_K = 0.6;                 // 推杆（机头向下）比拉杆弱一点，沿用主路径"向上强于向下"的方向
   /* 与 Game.THR_IDLE 同值（Ent 读不到 Game 的变量）：油门轴的"慢车"点，HUD 推力 0%，其下是减速板；
@@ -100,7 +101,11 @@
        剩下的预算给前向：期望速度不变，缺口越大 Af 越小，加速变慢、喷口偏下；速度上去缺口缩小，喷口转回后方。 */
     var Ld = G * (1 - wk);
     var eta = Math.pow($.airDensity(a.pos.y) / $.RHO0, vt.jetExp === undefined ? 0.8 : vt.jetExp);
-    var A = vt.jetT * G * (p.accel / ph.accel) * eta;
+    /* 有效升限（Ent.ceilingEff，min(数据升限, 失速升限)）以上，喷口出力在 CEIL_FADE 米内衰减到 0：
+       喷口只按空气密度衰减的话，空载的 VTOL 能飞到明显高于自己升限的地方（13.5 km、速度远低于 vStall 也有升力），
+       绕过全机型统一的"升限"设定（probe-stall-alt：升限以上 2500 m 必须撑不住）。升限以下 fade = 1，不受影响。 */
+    var fade = M3.clamp(1 - (a.pos.y - $.ceilingEff(a)) / CEIL_FADE, 0, 1);
+    var A = vt.jetT * G * (p.accel / ph.accel) * eta * fade;
     /* 剩给前向的推力：喷口预算扣掉升力后剩的 √(A² − Ld²)，但不低于主发动机推力的 fwdMin 倍（海马 0.7）——
        升力由升力喷口承担，主发动机的前向推力不会因为"要托住重量"而被吃光。否则越接近悬停升限越加速不动
        （满指令负荷 ≈ 100% 时前向预算趋近 0，推到 100% 要 20 多秒才能转入平飞）。 */
