@@ -5,11 +5,13 @@
    推力只代表期望的前进速度：0% 静止悬浮、50% = 有效 vStall、100% = 军推；不下坠由实际速度决定
    （速度 < vStall 喷口转向补升力缺口）；减速板才悬浮下降；低速时仰头上升。
    直接调 Ent.stepAircraft（不经输入层），给 a.ctrl / a.throttle / a.ab / a.brake，量物理，用真正的 seahorse 数据：
-   A. 推力 0%：从 120 m/s 前飞减速到 < 0.5 m/s、高度漂移 < 3 m；机头俯仰 ±20° 仍纹丝不动
+   A. 推力 0%：从 120 m/s 前飞减速到 < 0.5 m/s、高度漂移 < 3 m；放平后完全静止
    B. 推力 25% / 50%：收敛到 vS/2、vS（±3 m/s），高度保持
    C. 喷口角：悬停 ≈ 90°、加速起步 40–70°、v ≥ vStall ≈ 0°、随速度单调不增
    D. 减速板：悬停下降率 ≈ vzDown（±2）、水平静止；接近 vStall 的速度上竖直指令很小（gate = 1 − wk）
-   E. 仰头上升：推力 0% 仰 30° 爬升 ≈ vzUp·sin30°（±2）、水平静止；低头 30° 不下降
+   E. 仰头上升：推力 0% 仰 30° 爬升 ≈ vzUp·sin30°（±2）；低头 30° 不下降
+   L. 直升机式平移：悬停时倾斜机身，升力喷口的水平分量推着飞机往倾斜方向走（低头前 / 仰头后 / 右滚右 / 左滚左），
+      高度保持，放平后阻力收住；放平的悬停纹丝不动
    F. 0 → 100% 加速过 vStall：交接帧加速度 < 20 m/s²、速度方向变化 < 3°、全程不失速、不 NaN
    G. 高速（200 m/s，主路径）改推力只改速度，vtolOn 不置位
    H. 低速机动：90° 偏航，速度只由推力目标决定（±4 m/s）
@@ -47,8 +49,9 @@ function make(seed, type) {
     a.ab = false; a.throttle = IDLE + pct / 100 * (1 - IDLE);
   };
   const pitchNow = () => Math.asin(Math.max(-1, Math.min(1, a.fwd.y)));
-  const hold = tgt => { a.ctrl.pitch = Math.max(-1, Math.min(1, (tgt - pitchNow()) * 4)); a.ctrl.roll = 0; a.ctrl.yaw = 0; };
-  const run = (secs, pitch, each) => { for (let i = 0; i < secs * 60; i++) { hold(pitch === undefined ? 0 : pitch); sb.Ent.stepAircraft(a, DT, w); if (each) each(i); } };
+  const rollNow = () => Math.asin(Math.max(-1, Math.min(1, -a.right.y)));          // 右滚（右翼向下）为正
+  const hold = (tgt, roll) => { a.ctrl.pitch = Math.max(-1, Math.min(1, (tgt - pitchNow()) * 4)); a.ctrl.roll = Math.max(-1, Math.min(1, ((roll || 0) - rollNow()) * 4)); a.ctrl.yaw = 0; };
+  const run = (secs, pitch, each, roll) => { for (let i = 0; i < secs * 60; i++) { hold(pitch === undefined ? 0 : pitch, roll); sb.Ent.stepAircraft(a, DT, w); if (each) each(i); } };
   return { S, sb, w, a, vt, vS, thr, hold, run, pitchNow };
 }
 const fin = a => [a.pos.x, a.pos.y, a.pos.z, a.vel.x, a.vel.y, a.vel.z, a.speed, a.fwd.x, a.fwd.y, a.fwd.z].every(Number.isFinite);
@@ -65,12 +68,7 @@ const hv = a => Math.hypot(a.vel.x, a.vel.z);
   const watch = () => { vmax = Math.max(vmax, a.speed); dy = Math.max(dy, Math.abs(a.pos.y - y0)); };
   run(10, 0, watch);
   chk('A 推力 0%：从 120 m/s 减速到静止、高度保持', vmax < 0.5 && dy < 3 && a.vtolOn && fin(a), 'v=' + vmax.toFixed(3) + ' dy=' + dy.toFixed(2));
-  vmax = 0; dy = 0;
-  run(5, -20 * R, watch);
-  chk('A 推力 0%：机头低头 20° 飞机仍纹丝不动（姿态不推走飞机，低头也不下降）', vmax < 0.5 && dy < 3, 'v=' + vmax.toFixed(3) + ' dy=' + dy.toFixed(2));
-  vmax = 0;
-  run(5, 20 * R, watch);                                     // 仰头会按仰角爬升（见 E），但水平方向仍然纹丝不动
-  chk('A 推力 0%：机头仰起 20° 水平速度仍为 0（只有竖直爬升）', Math.hypot(a.vel.x, a.vel.z) < 0.5 && a.vel.y > 0, 'hv=' + Math.hypot(a.vel.x, a.vel.z).toFixed(3) + ' vy=' + a.vel.y.toFixed(2));
+  chk('A 推力 0%、机身放平：完全静止（不倾斜就不平移）', a.vtolVh && Math.hypot(a.vtolVh.x, a.vtolVh.z) < 0.01, 'vh=' + Math.hypot(a.vtolVh.x, a.vtolVh.z).toFixed(4));
   chk('A 悬停：不失速、无 NaN', a.stall === false && fin(a));
 }
 
@@ -126,8 +124,8 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
   up.thr(0); dn.thr(0);
   up.run(10, 30 * R); dn.run(10, -30 * R);
   const want = up.vt.vzUp * Math.sin(30 * R);
-  chk('E 推力 0% 仰 30°：爬升 ≈ vzUp·sin30° = ' + want.toFixed(1) + ' m/s（±2）、水平静止', Math.abs(up.a.vel.y - want) < 2 && hv(up.a) < 0.5, 'vy=' + up.a.vel.y.toFixed(2) + ' hv=' + hv(up.a).toFixed(3));
-  chk('E 推力 0% 低头 30°：不下降（下降只认减速板）', Math.abs(dn.a.vel.y) < 0.5 && hv(dn.a) < 0.5, 'vy=' + dn.a.vel.y.toFixed(2));
+  chk('E 推力 0% 仰 30°：爬升 ≈ vzUp·sin30° = ' + want.toFixed(1) + ' m/s（±2）', Math.abs(up.a.vel.y - want) < 2, 'vy=' + up.a.vel.y.toFixed(2));
+  chk('E 推力 0% 低头 30°：不下降（下降只认减速板）', Math.abs(dn.a.vel.y) < 0.5, 'vy=' + dn.a.vel.y.toFixed(2));
 }
 
 /* F 加速过渡 */
@@ -179,6 +177,30 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
   chk('H 低速偏航 ≈ 100° 后速度仍收敛到推力目标（±4 m/s）', Math.abs(a.speed - want) < 4 && a.vtolOn, 'v=' + a.speed.toFixed(1) + ' want=' + want.toFixed(1));
 }
 
+/* L 直升机式平移：悬停时倾斜机身，升力喷口的水平分量把飞机推向倾斜的方向（低头向前、仰头向后、右滚向右），松开后收住 */
+{
+  const fwdOf = (a, sb) => sb.M3.norm(sb.M3.V(a.fwd.x, 0, a.fwd.z));
+  const along = (a, d) => a.vel.x * d.x + a.vel.z * d.z;
+  const mk = (pitchDeg, rollDeg) => {
+    const m = make(12);
+    m.thr(0); m.run(3, 0);
+    const d = fwdOf(m.a, m.sb), r = m.sb.M3.norm(m.sb.M3.V(m.a.right.x, 0, m.a.right.z)), y0 = m.a.pos.y;
+    m.run(8, pitchDeg * R, null, rollDeg * R);
+    return { m, d, r, y0 };
+  };
+  const dn = mk(-20, 0);
+  const want = G * Math.tan(20 * R) / dn.m.vt.drag * (1 - Math.exp(-dn.m.vt.drag * 7));         // 倾斜到位后约 7 s 的解析值
+  chk('L 低头 20° 悬停 8 s：向机头方向平移，速度 ≈ g·tanθ/drag 的收敛值（±35%）', Math.abs(along(dn.m.a, dn.d) - want) < 0.35 * want, 'v=' + along(dn.m.a, dn.d).toFixed(2) + ' expect≈' + want.toFixed(2));
+  chk('L 平移的同时高度保持（垂直喷口加量补偿竖直分量）', Math.abs(dn.m.a.pos.y - dn.y0) < 3, 'dy=' + (dn.m.a.pos.y - dn.y0).toFixed(2));
+  const up = mk(20, 0);
+  chk('L 仰头 20° 悬停：向机尾方向平移', along(up.m.a, up.d) < -3, 'v=' + along(up.m.a, up.d).toFixed(2));
+  const rr = mk(0, 15), rl = mk(0, -15);
+  const sr = rr.m.a.vel.x * rr.r.x + rr.m.a.vel.z * rr.r.z, sl = rl.m.a.vel.x * rl.r.x + rl.m.a.vel.z * rl.r.z;
+  chk('L 右滚 15° 向右平移、左滚 15° 向左平移（对称）', sr > 2 && sl < -2 && Math.abs(sr + sl) < 0.2 * Math.abs(sr), 'right=' + sr.toFixed(2) + ' left=' + sl.toFixed(2));
+  dn.m.run(25, 0);
+  chk('L 机身放平后平移被阻力收住（< 0.5 m/s）', hv(dn.m.a) < 0.5, 'hv=' + hv(dn.m.a).toFixed(3));
+}
+
 /* I HUD */
 {
   const { sb, w, a } = make(9);
@@ -191,6 +213,8 @@ for (const [pct, k] of [[25, 0.5], [50, 1.0]]) {
     try { sb.HUD.draw(w, p, DT, {}); } catch (e) { err = e; }
   }
   chk('I 悬停 / 过渡 / 普通状态下整帧 HUD 都能画出来', !err, err ? err.message : '');
+  const t1 = sb.T('ui.hud.hover.hs', { v: '3.5' }), t2 = sb.T('ui.hud.hover.noz', { a: '42' });
+  chk('I 悬停 HUD 文案的占位符被填进数字（项目用 {{x}} 双花括号）', t1.indexOf('3.5') >= 0 && t2.indexOf('42') >= 0 && t1.indexOf('{') < 0 && t2.indexOf('{') < 0, t1 + ' | ' + t2);
 }
 
 /* J 非 VTOL 机型 */

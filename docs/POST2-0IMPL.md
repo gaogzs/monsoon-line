@@ -1427,7 +1427,7 @@ droneCarrier: {
 | VTOL | 计划见 6.2 | 与计划一致的部分：独立 `stepVtol`、只给玩家用、`noPSM`；出入：① **推力 = 期望前进速度**（v3.7.1 重做，取代首版的"辅助悬停"：油门 0.5 定高、倾斜就漂移）——推力 0% 静止悬浮、0→50% 期望速度 0→`vStall`、50→100% 到 `vMil`、加力极速、减速板为 0；不下坠只由实际速度决定，翼升力系数 `wk = min(1, (v/vStall)²)`，升力缺口 `G(1−wk)` 由喷口垂直分量补上（总推力预算 `phys.accel`，须大于 G），喷口角 `a.vtolNoz` 在 HUD 显示为 NOZ；只有减速板才悬浮下降、仰头按仰角爬升、低头不下降；没有横向漂移，也不再改写玩家推力；② **不做舰面起降**（没有着舰 / 升降机逻辑）；③ `noPSM` 的 `reserved` **去掉**（海马使用它，smoke 断言同步）；④ 机型名定为 **海马 D-27**；⑤ 速度低于「有效 `vStall` × `vtol.transK`」（1.2）进悬停分支，回到 ×1.08 且对齐后交还主路径，`vStall` 以上两条路径公式一致；⑥ 看门狗对 `a.vtolOn` 豁免（悬停位置本来就不动） |
 | 机库命令 | 计划写机库 `cmd` | 数据里仍有 `hangar.cmd` 字段并传给 `spawnDrone`，但 AI 长机的无人机不读三档命令，该字段对母舰放出的无人机已无实际作用 |
 
-**v3.7.1：推力语义重做（期望速度 + 喷口按实际速度补升力缺口）**：`ac.vtol` 字段改为 `{ transK, vzUp, vzDown, vAccel, rcs }`（旧的 `transSpeed / wingV / liftG / fwdAccel / drag / align` 删除）；主路径对带 `ac.vtol` 的机型改用同一条期望速度曲线 `vtolSpeedTarget`；控制层的 0.85 推力回落特例删除；新增常量 `$.VTOL_THR_IDLE`（与 `Game.THR_IDLE` 同值，探针核对）；`probe-vtol` 重写（23 项）。上文 6.2 的"实现"段保留首版计划原文（自由矢量、横向漂移），以本节为准。
+**v3.7.1：推力语义重做（期望速度 + 喷口按实际速度补升力缺口）**：`ac.vtol` 字段改为 `{ transK, vzUp, vzDown, vAccel, rcs }`（旧的 `transSpeed / wingV / liftG / fwdAccel / align` 删除；`drag` 保留，含义改为悬停漂移阻力）；主路径对带 `ac.vtol` 的机型改用同一条期望速度曲线 `vtolSpeedTarget`；控制层的 0.85 推力回落特例删除；新增常量 `$.VTOL_THR_IDLE`（与 `Game.THR_IDLE` 同值，探针核对）；`probe-vtol` 重写（23 项）。上文 6.2 的"实现"段保留首版计划原文（自由矢量、横向漂移），以本节为准。
 
 **回归基线**：`data` 基线随每个新单位重存；`golden`（场景回放）仅 `m2@1` 有意改变——6.6 让高原 `relay` 带武装并在生成时抽 `fireCd`，m2 回放从第 6 秒起分歧，关掉武装后无分歧；其余 12 关与 `golden-render` 不变。
 

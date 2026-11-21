@@ -463,13 +463,13 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 
 - **推力 → 期望速度**（`vtolSpeedTarget(a, p, th)`，主路径对带 `ac.vtol` 的机型也用它，所以两条路径的推力含义连续）：HUD 推力 0%（慢车 `$.VTOL_THR_IDLE`）→ 0；0 → 50% 从 0 升到有效 `vStall`；50% → 100% 从 `vStall` 升到 `vMil`（乘 `thrustK`）；加力 = `vMax`；减速板（推力在慢车以下）→ 0。`$.VTOL_THR_IDLE` 与 `Game.THR_IDLE` 同值（`Ent` 读不到 `Game` 的变量），`probe-vtol` 比较两者是否相等。
 - **进入**：`stepAircraft` 末尾对带 `ac.vtol` 的机型调 `vtolWatch(a, p)`，`speed < 有效 vStall × transK`（`effectivePhys` 的 `vStall`，随高度 / 挂载）就置 `a.vtolOn`，下一帧起整帧交给 `stepVtol`。进入时 `vel = fwd × speed`，天然连续；**不再动玩家的推力**。
-- **退出**：`speed > 有效 vStall × transK × 1.08`（`EXIT_K`，与进入点之间留滞回）**且**竖直辅助速度 `|a.vtolVy| < 1.5` **且**速度矢量与机头夹角 ≤ 12°（`EXIT_ANGLE`）时清 `a.vtolOn`，主路径接着飞（`vel = fwd × speed`，连续）。
+- **退出**：`speed > 有效 vStall × transK × 1.08`（`EXIT_K`，与进入点之间留滞回）**且**竖直辅助速度 `|a.vtolVy| < 1.5` **且**水平漂移 `|a.vtolVh| < 1.5` **且**速度矢量与机头夹角 ≤ 12°（`EXIT_ANGLE`）时清 `a.vtolOn`，主路径接着飞（`vel = fwd × speed`，连续）。
 - **标量速度沿机头**（与主路径同形，不再是自由矢量）：`a.vel = fwd × speed`，再加竖直辅助速度 `a.vtolVy`。推力 / 阻力 / 重力沿航迹 / 转弯掉速都和主路径同一套，只多三件事：
   1. **期望速度曲线**（上面）。
   2. **升力缺口由喷口垂直分量补上**：翼升力系数 `wk = min(1, (v / vStall)²)`（与主路径失速下沉同一个比值，`vtolWingK`）；缺口 `Ld = G × (1 − wk)`；总推力预算 `A = phys.accel`（必须大于 `G`，代码里下限 `1.01 × Ld`）；剩给前向的 `Af = √(A² − Ld²)`，用它做加速（取代主路径的 `accel`）。速度越低缺口越大、能用于加速的越少。喷口角 `a.vtolNoz = atan2(Ld, 实际使用的前向推力)`：0° 朝后 … 90° 朝下，HUD 显示为 `NOZ`。喷口角只由实际速度与加速状态决定，与推力挡位、机头俯仰无关。
   3. **只在低速生效的悬停能力**（`gate = 1 − wk`）：减速板（`a.brake` 或推力 < 慢车）按 `vzDown` 悬浮下降；仰头按仰角给爬升率 `vzUp × sin(pitch)`；低头**不**下降。目标竖直速度 `a.vtolVz`（给 HUD）= `((brake ? −vzDown : 0) + vzUp × max(0, fwd.y)) × gate`，`a.vtolVy` 以 `vAccel` 趋近它。
 - **重力与转弯掉速**乘 `wk`（低速时由喷口托着，不掉速；`vStall` 以上 `wk = 1`）。`vStall` 以上 `Ld = 0`、`gate = 0`，两条路径公式完全一致，所以交接连续。
-- **没有漂移**：机体倾斜不再产生横向漂移（速度沿机头，喷口角只调竖直分量）。
+- **直升机式平移**：升力喷口沿机体 `up` 推，倾斜时多推一点保住竖直分量（`Tl = min(Ld / max(0.35, up.y), A)`），多出来的 `up` 水平投影 × `Tl` 就是水平加速度：低头向前、仰头向后、右滚向右、左滚向左；水平漂移速度 `a.vtolVh` 单独积分，阻力 `drag + 3·wk`（松开姿态后慢慢收住，速度上来后随 `wk` 加大，在交接点前并入前飞），`a.vel` 再加上它。放平的悬停纹丝不动；倾斜 θ 时稳态漂移 ≈ `g·tanθ / drag`。`Ld` 随 `wk` 消失，高速时没有这项。
 - **姿态**：RCS 式固定角速率 `ac.vtol.rcs`，不吃动压与 `ctrlFactor`，按挂载打折（与主路径同一份 `effectivePhys` 比值）；推杆比拉杆弱（`PITCH_DOWN_K` 0.6）。每帧 `a.stall = false`、`a.sink = 0`、`a.ctrlAuth = 1`。
 - **其他**：载荷因数 `gNow` 按速度实际变化算；触地（离地 ≤ 2 m）与主路径一样直接坠毁（`kill`，不做着舰）；尾部回到 `stepAircraftTail`（冷却 / 拖烟 / 电子战结算照常）。控制层不再对悬停分支做推力特例，高 G 在悬停时仍关闭（见 [game.md](game.md)）。
 - **只为玩家设计**：`vtolWatch` 本身不分玩家 / AI（带 `ac.vtol` 的机体速度低了都会进分支），但 AI 没有任何悬停逻辑（`ai/` 里不读 `vtolOn`），海马目前只作为可玩机型。`noPSM` 标签让 PSM 对它不可用。
@@ -481,9 +481,10 @@ IR 弹那边则靠 `m.spoofed` 无条件 `continue`，同样是永久免疫。
 | `vzUp` | 24 | 低速时仰头上升的最大爬升率（m/s，按仰角 `sin` 折算）；低头不下降 |
 | `vzDown` | 18 | 减速板悬浮下降的速度（m/s） |
 | `vAccel` | 9 | 竖直辅助速度 `a.vtolVy` 的变化率（m/s²） |
+| `drag` | 0.35 | 悬停漂移的阻力系数（1/s）：倾斜 θ 时漂移速度收敛到 `g·tanθ / drag`（10° ≈ 5 m/s、20° ≈ 10 m/s），松开姿态后按它指数收住 |
 | `rcs` | `{ pitch 0.9, roll 1.6, yaw 0.9 }` | 姿态角速率（rad/s） |
 
-升力推力预算不在 `ac.vtol` 里，取自 `phys.accel`（海马 16 m/s²，大于 `G`）；翼升力尺度取 `phys.vStall`（海马 70）。探针 `probe-vtol`（23 项）。
+升力推力预算不在 `ac.vtol` 里，取自 `phys.accel`（海马 16 m/s²，大于 `G`）；翼升力尺度取 `phys.vStall`（海马 70）。探针 `probe-vtol`（含倾斜平移、HUD 文案占位符检查）。
 
 ---
 

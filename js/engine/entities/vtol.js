@@ -9,7 +9,7 @@
      设计语义（玩家看到的）：
        推力  只代表玩家**期望的前进速度**（沿机体自己的前向，不是世界水平），不直接产生升力。
              喷口向后时（速度够高）它就是普通飞机的引擎推力 —— 主路径本来就是"推力 → 期望速度"，这里同一套算法。
-       悬浮  推力 0% = 期望速度 0 = 完全静止悬浮；0 → 50% 期望速度从 0 升到 vStall（固定翼刚能平飞的速度），越低越接近悬浮。
+       悬浮  推力 0% = 期望速度 0 = 静止悬浮（机身放平时；倾斜会像直升机一样平移，见下）；0 → 50% 期望速度从 0 升到 vStall（固定翼刚能平飞的速度），越低越接近悬浮。
        不下坠  只由**实际速度**决定：速度低于 vStall 时机翼托不住，喷口转向补上升力缺口；
                推力对应的期望速度不变，与油门挡位、机头俯仰都无关。
        下降  只有减速板（推力在慢车以下）才会悬浮下降；仰头在低速时按仰角给爬升率，低头不下降。
@@ -53,7 +53,7 @@
   /* 主路径每帧调用：速度掉到 vStall × transK 以下就进悬停分支。进入时 vel = fwd × speed，天然连续。 */
   function vtolWatch(a, p) {
     var vt = a.ac && a.ac.vtol;
-    if (vt && !a.vtolOn && a.speed < p.vStall * vt.transK) { a.vtolOn = true; a.vtolVy = 0; }
+    if (vt && !a.vtolOn && a.speed < p.vStall * vt.transK) { a.vtolOn = true; a.vtolVy = 0; a.vtolVh = { x: 0, z: 0 }; }
   }
 
   function stepVtol(a, dt, world) {
@@ -116,6 +116,15 @@
     a.speed = M3.clamp(v + acc * dt, 0, p.vMax * 1.12);
     a.vtolNoz = Math.atan2(Ld, Math.max(0, used));        // 喷口转角：0 朝后 … 90° 朝下（HUD / 以后的模型动画读）
 
+    /* 直升机式平移：升力喷口沿机体 up 推，倾斜时多推一点保住竖直分量（Tl = Ld / cosθ），
+       多出来的就是水平分量 —— 机头低头向前、仰头向后、右滚向右、左滚向左（Ld 随翼升力系数消失，高速时没有）。
+       水平漂移速度 vh 单独积分、有阻力，松开姿态后慢慢收住；速度上来后阻力随 wk 加大，在交接点前自然并入前飞。 */
+    var tl = Math.min(Ld / Math.max(0.35, a.up.y), A);
+    var vh = a.vtolVh || (a.vtolVh = { x: 0, z: 0 });
+    var kd = vt.drag + 3 * wk;
+    vh.x += (a.up.x * tl - kd * vh.x) * dt;
+    vh.z += (a.up.z * tl - kd * vh.z) * dt;
+
     // ---- 只在低速生效的悬停能力：减速板下降、仰头上升（gate = 1 − wk，高速时为 0）----
     var gate = 1 - wk;
     var tgt = ((brake ? -vt.vzDown : 0) + vt.vzUp * Math.max(0, a.fwd.y)) * gate;
@@ -124,7 +133,7 @@
     a.vtolVy = vy + M3.clamp(tgt - vy, -vt.vAccel * dt, vt.vAccel * dt);
 
     a.vel = M3.mul(a.fwd, a.speed);
-    a.vel.y += a.vtolVy;
+    a.vel.x += vh.x; a.vel.y += a.vtolVy; a.vel.z += vh.z;
 
     // 载荷因数（G 表）：同 PSM —— 速度的实际变化量加 1G 投到机体 up 轴
     if (dt > 1e-4) {
@@ -144,8 +153,8 @@
     }
 
     // ---- 退出：速度够了、竖直辅助速度已经散掉，交还主路径（vel = fwd × speed，连续）----
-    if (a.speed > p.vStall * vt.transK * EXIT_K && Math.abs(a.vtolVy) < 1.5 &&
-        M3.dot(M3.norm(a.vel), a.fwd) > Math.cos(EXIT_ANGLE)) { a.vtolOn = false; a.vtolVy = 0; }
+    if (a.speed > p.vStall * vt.transK * EXIT_K && Math.abs(a.vtolVy) < 1.5 && Math.hypot(vh.x, vh.z) < 1.5 &&
+        M3.dot(M3.norm(a.vel), a.fwd) > Math.cos(EXIT_ANGLE)) { a.vtolOn = false; a.vtolVy = 0; vh.x = vh.z = 0; }
 
     $.stepAircraftTail(a, dt, world);
   }

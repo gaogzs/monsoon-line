@@ -30,8 +30,10 @@ Registry.aircraft({
        vzUp        低速时仰头上升的最大爬升率（m/s，按仰角 sin 折算）；低头不下降
        vzDown      减速板（推力在慢车以下）悬浮下降的速度（m/s）
        vAccel      竖直辅助速度的变化率（m/s²）
+       drag        悬停漂移的阻力系数（1/s）：机身倾斜 θ 时水平推力 ≈ g·tanθ，漂移速度收敛到 g·tanθ / drag
+                   （俯仰 10° ≈ 5 m/s、20° ≈ 10 m/s），松开姿态后按它指数收住
        rcs         姿态角速率（rad/s），不吃动压 */
-  vtol: { transK: 1.2, vzUp: 24, vzDown: 18, vAccel: 9, rcs: { pitch: 0.9, roll: 1.6, yaw: 0.9 } },
+  vtol: { transK: 1.2, vzUp: 24, vzDown: 18, vAccel: 9, drag: 0.35, rcs: { pitch: 0.9, roll: 1.6, yaw: 0.9 } },
   gun: 'cel3',
   maxLoad: 3200,
   hardpointGroups: [
