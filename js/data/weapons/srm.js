@@ -5,7 +5,7 @@ Registry.weapon({
   order: 60,
   id: 'srm', name: 'TOR-2', cn: T('weapons.srm.cn'), kind: 'aam',
   model: 'missile',
-  speed: 760, boost: 180, life: 4.5, vsLife: 12.0,
+  speed: 760, boost: 180, life: 4.7, vsLife: 12.0,
   turn: 1.75, seeker: 'ir', lockCone: 28 * Math.PI / 180, lockDist: 4200,
   dmg: 30,salvo: 1, flare: 0.38, fuze: 12, blast: 18, blastCore: 2,
   target: 'air',    desc: T('weapons.srm.desc'),

@@ -2,7 +2,7 @@ Registry.weapon({
   order: 140,
   id: 'qsr', name: 'GIR-5', cn: T('weapons.qsr.cn'), kind: 'aam',
   model: 'missile',
-  speed: 740, boost: 190, life: 4.2, vsLife: 11.0,
+  speed: 740, boost: 190, life: 4.4, vsLife: 11.0,
   turn: 1.70, seeker: 'ir', lockCone: 30 * Math.PI / 180, lockDist: 4000,
   dmg: 24,salvo: 3, flare: 0.40, fuze: 10, blast: 16, blastCore: 2,
   target: 'air',

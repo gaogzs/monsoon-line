@@ -2,7 +2,7 @@ Registry.weapon({
   order: 320,
   id: 'v22', name: 'SPO-22', cn: T('weapons.v22.cn'), kind: 'asm',
   model: 'missile',
-  speed: 920, boost: 130, life: 12.0, vsLife: 45.0,
+  speed: 920, boost: 130, life: 12.4, vsLife: 45.0,
   turn: 0.55, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 8600,
   dmg: 260,salvo: 1, flare: 0.85, blast: 20, blastCore: 6,
   target: 'ship',

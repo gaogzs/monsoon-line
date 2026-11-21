@@ -3,7 +3,7 @@ Registry.weapon({
   order: 420,
   id: 'vgt', name: 'TUM-7', cn: T('weapons.vgt.cn'), kind: 'agm',
   model: 'missile',
-  speed: 430, boost: 120, life: 9.0, vsLife: 20.0,
+  speed: 430, boost: 120, life: 9.2, vsLife: 20.0,
   turn: 0.62, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 7000,
   dmg: 190, cd: 11, salvo: 1, flare: 0.62, blast: 30, blastCore: 8,
   target: 'ground',

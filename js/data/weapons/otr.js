@@ -3,7 +3,7 @@ Registry.weapon({
   order: 450,
   id: 'otr', name: 'TOR-1', cn: T('weapons.otr.cn'), kind: 'aam',
   model: 'missile',
-  speed: 620, boost: 200, life: 3.0, vsLife: 7.0,
+  speed: 620, boost: 200, life: 3.1, vsLife: 7.0,
   turn: 1.35, seeker: 'ir', lockCone: 24 * Math.PI / 180, lockDist: 3000,
   dmg: 32, cd: 6, salvo: 1, flare: 0.86, fuze: 18, blast: 28, blastCore: 8,
   target: 'air',

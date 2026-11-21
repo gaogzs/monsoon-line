@@ -4,7 +4,7 @@ Registry.weapon({
      过载取两者之间，其余保持原型。 */
   id: 'v17', name: 'CLA-17', cn: T('weapons.v17.cn'), kind: 'aam',
   model: 'missile',
-  speed: 1150, boost: 160, life: 10.0, vsLife: 30.0,
+  speed: 1150, boost: 160, life: 10.45, vsLife: 30.0,
   turn: 1.00, seeker: 'radar', lockCone: 24 * Math.PI / 180, lockDist: 12500,
   dmg: 62,salvo: 1, flare: 0.72, fuze: 21, blast: 33, blastCore: 4,
   target: 'air', nezer: true, scramjet: true,

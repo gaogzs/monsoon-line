@@ -3,7 +3,7 @@ Registry.weapon({
   order: 430,
   id: 'vsr', name: 'BOX-14', cn: T('weapons.vsr.cn'), kind: 'asm',
   model: 'missile',
-  speed: 560, boost: 150, life: 11.0, vsLife: 24.0,
+  speed: 560, boost: 150, life: 11.3, vsLife: 24.0,
   turn: 0.55, seeker: 'radar', lockCone: 32 * Math.PI / 180, lockDist: 9000,
   dmg: 260, cd: 15.6, salvo: 1, flare: 0.72, blast: 20, blastCore: 6,
   target: 'ship',

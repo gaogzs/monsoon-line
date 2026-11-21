@@ -3,7 +3,7 @@ Registry.weapon({
   tags: ['antiRadar'],
   id: 'arm', name: 'SPO-8', cn: T('weapons.arm.cn'), kind: 'aam',
   model: 'missile',
-  speed: 880, boost: 190, life: 7.5, vsLife: 18.0,
+  speed: 880, boost: 190, life: 7.8, vsLife: 18.0,
   turn: 1.35, seeker: 'radar', lockCone: 26 * Math.PI / 180, lockDist: 9500,
   dmg: 52,salvo: 1, flare: 0.35, fuze: 22, blast: 44, blastCore: 7,
   target: 'air',

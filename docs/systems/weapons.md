@@ -442,7 +442,7 @@ hp = actor.pos + actor.fwd*4 + actor.right * side * (2.4 + rank*1.9)
 （±25% 的 `SALVO_FAN`）是为了不出现"每次齐射都是同一张对称图"。
 单发（`n ≤ 1`）不做任何偏移。
 
-打出的弹初速由 `Ent.launchSpeed(w, actor.speed)` 给：有导引头的导弹是载机速度 + 70 m/s（弹射助推，沿机头）；**抛物线弹族**（`Ent.isDropped`：`ballistic` 或带 `burn`——五种炸弹 `clb` `hbh` `hbl` `pgb` `v30`、滑翔制导炸弹 GUT-9 `asl`、火箭 PEJ-6 `rkt`）没有向前的助推：初速矢量 = 载机此刻的速度矢量（`Ent.launchVel`），炸弹再加沿机腹向下 3 m/s（`Ent.EJECT_BOMB`），火箭从巢里出来没有抛放，向前的加速完全靠发动机 `boost × burn`。所以悬停时炸弹只会往下掉，带漂移 / 下沉的载机放出的弹继承它真实的运动。旧版所有挂载一律 +70 沿机头（平飞投弹落点比现在远 1.2–1.9 km，火箭出巢速度快约 70 m/s）。发射后该槽进入 `wp.cd` 冷却，
+打出的弹初速由 `Ent.launchSpeed(w, actor.speed)` 给：**导弹不加**——初速 = 载机速度（沿机头），之后全靠自己的发动机 `boost` 加速（旧版 +70 m/s 是重复计算：现实里导弹离轨时的 30–50 m/s 本来就是发动机在导轨上加速出来的，而这里发动机从 t = 0 就在算；v3.7.1 去掉，同时各弹动力段 `life` 补了 0.1–0.45 s，实际飞行射程不变，`probe-missile-reach` 守着参考表）。**抛物线弹族**（`Ent.isDropped`：`ballistic` 或带 `burn`——五种炸弹 `clb` `hbh` `hbl` `pgb` `v30`、滑翔制导炸弹 GUT-9 `asl`、火箭 PEJ-6 `rkt`）同样没有向前的助推：初速矢量 = 载机此刻的速度矢量（`Ent.launchVel`），炸弹再加沿机腹向下 3 m/s（`Ent.EJECT_BOMB`），火箭从巢里出来没有抛放，向前的加速完全靠发动机 `boost × burn`。所以悬停时炸弹只会往下掉，带漂移 / 下沉的载机放出的弹继承它真实的运动。旧版所有挂载一律 +70 沿机头（平飞投弹落点比现在远 1.2–1.9 km，火箭出巢速度快约 70 m/s）。舰载 / 车载导弹（`ss6` `dl9` `ssm` 等没有飞机挂点的）不走这套发射，`life` 没动。发射后该槽进入 `wp.cd` 冷却，
 `spCd` 更新为"最快就绪的那个槽"的剩余时间。
 
 玩家发射时 `fireSpecial()`（`js/ui/input.js`，经 `launchCall(w)`）还会按类型播无线电呼号：

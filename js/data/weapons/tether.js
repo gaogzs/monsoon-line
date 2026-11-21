@@ -6,7 +6,7 @@ Registry.weapon({
   id: 'tether', name: 'CLA-6', cn: T('weapons.tether.cn'), kind: 'aam',
   model: 'missile',
   // 相对 CLA-4：射程远约 20%、速度同级、战斗部 +10%、携弹 +50%、冷却更短 —— 便宜好用，代价是发射机必须一直盯着
-  speed: 900, boost: 200, life: 9.0, vsLife: 20.0,
+  speed: 900, boost: 200, life: 9.3, vsLife: 20.0,
   turn: 1.45, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 10300,
   dmg: 44, salvo: 1, flare: 0.38, fuze: 18, blast: 30, blastCore: 4,
   target: 'air',

@@ -3,7 +3,7 @@ Registry.weapon({
   tags: ['hobs'],
   id: 'v9', name: 'GIR-9', cn: T('weapons.v9.cn'), kind: 'aam',
   model: 'missile',
-  speed: 830, boost: 200, life: 4.0, vsLife: 9.0,
+  speed: 830, boost: 200, life: 4.2, vsLife: 9.0,
   turn: 1.90, seeker: 'ir', lockCone: 75 * Math.PI / 180, lockDist: 3800,
   dmg: 44,salvo: 2, flare: 0.50, fuze: 13, blast: 19, blastCore: 2,
   target: 'air',

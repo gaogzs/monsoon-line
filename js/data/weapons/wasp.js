@@ -3,7 +3,7 @@ Registry.weapon({
   tags: ['reAcquire'],
   id: 'wasp', name: 'SUT-7', cn: T('weapons.wasp.cn'), kind: 'aam',
   model: 'missile',
-  speed: 860, boost: 260, life: 4.8, vsLife: 12.0,
+  speed: 860, boost: 260, life: 5, vsLife: 12.0,
   turn: 2.15, seeker: 'ir', lockCone: 36 * Math.PI / 180, lockDist: 5200,
   dmg: 38,salvo: 1, flare: 0.36, fuze: 13, blast: 19, blastCore: 2,
   target: 'air',

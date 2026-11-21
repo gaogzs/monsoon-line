@@ -3,7 +3,7 @@ Registry.weapon({
   tags: ['highAltImmune'],
   id: 'hva', name: 'SPO-9', cn: T('weapons.hva.cn'), kind: 'aam',
   model: 'missile',
-  speed: 980, boost: 240, life: 8.0, vsLife: 18.0,
+  speed: 980, boost: 240, life: 8.3, vsLife: 18.0,
   turn: 1.30, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 11000,
   dmg: 62,salvo: 1, flare: 0.70, fuze: 26, blast: 48, blastCore: 7,
   target: 'air', desc: T('weapons.hva.desc'),

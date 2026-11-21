@@ -2,7 +2,7 @@ Registry.weapon({
   order: 330,
   id: 'v25', name: 'GUT-25', cn: T('weapons.v25.cn'), kind: 'agm',
   model: 'missile',
-  speed: 730, boost: 120, life: 14.0, vsLife: 50.0,
+  speed: 730, boost: 120, life: 14.4, vsLife: 50.0,
   turn: 0.62, seeker: 'radar', lockCone: 45 * Math.PI / 180, lockDist: 8000,
   dmg: 175,salvo: 1, flare: 0.80, blast: 30, blastCore: 8,
   target: 'ground',

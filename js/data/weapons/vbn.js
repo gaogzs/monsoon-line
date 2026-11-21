@@ -4,7 +4,7 @@ Registry.weapon({
   tags: ['twinSeeker'],
   id: 'vbn', name: 'BIN-9', cn: T('weapons.vbn.cn'), kind: 'aam',
   model: 'missile',
-  speed: 780, boost: 300, life: 4.0, vsLife: 10.0,
+  speed: 780, boost: 300, life: 4.1, vsLife: 10.0,
   turn: 2.10, seeker: 'ir', lockCone: 40 * Math.PI / 180, lockDist: 4200,
   dmg: 42, cd: 8, salvo: 1, flare: 0.58, fuze: 12, blast: 18, blastCore: 2,
   target: 'air',

@@ -7,7 +7,7 @@
 Registry.weapon({
   order: 495,
   id: 'tephra', name: 'DAR-12', cn: T('weapons.tephra.cn'), kind: 'aam', model: 'missile',
-  speed: 1000, boost: 170, life: 11.0, vsLife: 26.0,
+  speed: 1000, boost: 170, life: 11.4, vsLife: 26.0,
   turn: 0.85, seeker: 'radar', lockCone: 20 * Math.PI / 180, lockDist: 14000,
   dmg: 56, salvo: 1, flare: 0.60, fuze: 24, blast: 40, blastCore: 5,
   target: 'air',

@@ -6,7 +6,7 @@ Registry.weapon({
   order: 90,
   id: 'kkv', name: 'TOR-8', cn: T('weapons.kkv.cn'), kind: 'aam',
   model: 'missile',
-  speed: 760, boost: 220, life: 4.5, vsLife: 12.0,
+  speed: 760, boost: 220, life: 4.6, vsLife: 12.0,
   turn: 2.73, seeker: 'ir', lockCone: 34 * Math.PI / 180, lockDist: 3800,
   dmg: 48,salvo: 1, flare: 0.40, fuze: 0, blast: 0, blastCore: 0,
   target: 'air',

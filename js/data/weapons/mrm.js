@@ -3,7 +3,7 @@ Registry.weapon({
   tags: ['decoyMemory', 'reAcquire'],
   id: 'mrm', name: 'CLA-4', cn: T('weapons.mrm.cn'), kind: 'aam',
   model: 'missile',
-  speed: 900, boost: 200, life: 8.0, vsLife: 20.0,
+  speed: 900, boost: 200, life: 8.3, vsLife: 20.0,
   turn: 1.45, seeker: 'radar', lockCone: 40 * Math.PI / 180, lockDist: 8600,
   dmg: 40,salvo: 1, flare: 0.30, fuze: 18, blast: 30, blastCore: 4,
   target: 'air',

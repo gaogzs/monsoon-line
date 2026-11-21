@@ -3,7 +3,7 @@ Registry.weapon({
   tags: ['hobs'],
   id: 'hos', name: 'TOR-6', cn: T('weapons.hos.cn'), kind: 'aam',
   model: 'missile',
-  speed: 700, boost: 240, life: 4.0, vsLife: 11.0,
+  speed: 700, boost: 240, life: 4.1, vsLife: 11.0,
   turn: 2.60, seeker: 'ir', lockCone: 88 * Math.PI / 180, lockDist: 3200,
   dmg: 28,salvo: 1, flare: 0.42, fuze: 11, blast: 17, blastCore: 2,
   target: 'air',

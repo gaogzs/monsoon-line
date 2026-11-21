@@ -4,8 +4,12 @@
   $.makeMissile = makeMissile; $.stepMissile = stepMissile; $.launchSpeed = launchSpeed; $.launchVel = launchVel; $.isUnpowered = isUnpowered; $.isDropped = isDropped;
 
   /* 发射初速（相对载机多出来的那一份）：
-       导弹（有导引头 / 自带速度模型的）  载机速度 + 70 m/s —— 弹射助推，沿机头。
-       抛物线弹族（isDropped：ballistic 或带 burn —— 炸弹、滑翔炸弹 GUT-9、火箭 PEJ-6）  没有任何向前的助推：
+       导弹（有导引头 / 自带速度模型的）  不加：初速 = 载机速度（沿机头），之后全靠自己的发动机（boost）加速。
+         以前这里 +70 m/s——现实里导弹从导轨离开时确实已经有 30–50 m/s 的相对速度（导轨 2–3 m、起步 20–40 g，
+         v = √(2aL)），但那是发动机在导轨上加速出来的；这里发动机从 t = 0 就在算 boost，0.2 s 内自己就到了，
+         再加 70 等于让导弹抢跑 0.35 s 的助推（重复计算）。去掉之后各弹的动力段 life 补了 0.1–0.45 s（v3.7.1，
+         按"载机 350 m/s、6000 m 平飞"的实际飞行射程标定，旧射程不变，probe-missile-reach 守着）。
+       抛物线弹族（isDropped：ballistic 或带 burn —— 炸弹、滑翔炸弹 GUT-9、火箭 PEJ-6）  同样没有向前的助推：
          初速矢量 = 载机此刻的速度矢量；炸弹再加一点点向下的抛放速度（EJECT_BOMB，沿机腹），
          火箭从巢里出来没有抛放（0），向前的加速完全靠发动机的 burn 段（boost × burn）。
          以前所有挂载一律 +70 沿机头：炸弹和火箭被"推"出去 70 m/s（悬停的垂直起降机甚至会把炸弹打出去 70 m/s）。
@@ -14,7 +18,7 @@
   function isDropped(w) { return !!(w && w.tags && (w.tags.ballistic || w.burn)); }
   function isUnpowered(w) { return !!(w && w.tags && w.tags.ballistic && !w.burn); }
   function ejectSpeed(w) { return isUnpowered(w) ? EJECT_BOMB : 0; }
-  function launchSpeed(w, carrierSpeed) { return (carrierSpeed || 0) + (isDropped(w) ? ejectSpeed(w) : 70); }
+  function launchSpeed(w, carrierSpeed) { return (carrierSpeed || 0) + ejectSpeed(w); }
   /* 抛物线弹的初速矢量 = 载机此刻的速度矢量 + 沿机腹向下的抛放速度；导弹返回 undefined（走 launchSpeed 沿机头）。
      载机 c 取 { vel?, fwd, speed, up? }：HUD 预测 / AI 包线 / 真实发射共用 */
   function launchVel(w, c) {

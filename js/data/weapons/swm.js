@@ -3,7 +3,7 @@ Registry.weapon({
   order: 260,
   id: 'swm', name: 'GIR-12', cn: T('weapons.swm.cn'), kind: 'aam',
   model: 'missile',
-  speed: 720, boost: 300, life: 3.5, vsLife: 9.0,
+  speed: 720, boost: 300, life: 3.6, vsLife: 9.0,
   turn: 2.55, seeker: 'ir', lockCone: 32 * Math.PI / 180, lockDist: 3400,
   dmg: 16,salvo: 4, flare: 0.44, fuze: 8, blast: 14, blastCore: 2,
   target: 'air',    desc: T('weapons.swm.desc'),

@@ -25,7 +25,7 @@ Registry.weapon({
   order: 130,
   id: 'vlar', name: 'CLA-12', cn: T('weapons.vlar.cn'), kind: 'aam',
   model: 'missile',
-  speed: 980, boost: 150, life: 12.0, vsLife: 30.0,
+  speed: 980, boost: 150, life: 12.4, vsLife: 30.0,
   turn: 0.78, seeker: 'radar', lockCone: 18 * Math.PI / 180, lockDist: 16000,
   dmg: 66,salvo: 1, flare: 0.66, fuze: 27, blast: 49, blastCore: 7,
   target: 'air',

@@ -5,14 +5,16 @@
    以前所有挂载一律「载机速度 + 70 m/s、沿机头」出架：导弹的弹射助推被炸弹和火箭照单全收，被向前"推"出去 70 m/s，
    悬停的垂直起降机甚至会把炸弹打出去 70 m/s。现在抛物线弹族（isDropped：ballistic 或带 burn）没有任何向前的助推：
    炸弹 / 滑翔炸弹（碎玉 clb、PEJ-22 hbh、PEJ-4 hbl、PEJ-14 pgb、PEJ-30 v30、GUT-9 asl）初速 = 载机此刻的速度矢量 +
-   沿机腹向下 EJECT_BOMB（3 m/s）；火箭（PEJ-6 rkt）初速 = 载机速度矢量，向前的加速完全靠发动机 burn 段；导弹仍是 +70。
+   沿机腹向下 EJECT_BOMB（3 m/s）；火箭（PEJ-6 rkt）初速 = 载机速度矢量，向前的加速完全靠发动机 burn 段；
+   导弹同样不再 +70（v3.7.1：现实里离轨速度是发动机在导轨上加速出来的，这里发动机从 t=0 就算，再加是重复计算；
+   各弹 life 补了 0.1–0.45 s 让射程不变，见 probe-missile-reach）。
    A. 平飞 300 m/s 投碎玉：初速矢量 ≈ 载机速度 + 向下 3 m/s，沿机头没有额外分量
    B. 悬停（速度 0）投弹：只有向下 3 m/s，水平速度为 0
    C. 六种炸弹各投一枚：都满足 A；带漂移 / 竖直速度的载机（vel 与 fwd × speed 不同）继承的是真实 vel
    G. 火箭（PEJ-6）：初速 = 载机速度矢量（没有 +70、没有抛放），发动机烧完（burn 0.7 s）后速度 ≈ 载机速度 + boost × burn
-   D. 导弹（srm）初速仍是载机速度 + 70（沿用旧行为）
+   D. 导弹（srm）初速 = 载机速度（不再 +70）
    E. HUD 落点预测（naturalPoint）与真实投下的炸弹落点一致（同一个初速矢量）
-   F. launchSpeed：无动力弹 +3、导弹 +70（HUD 预测 / AI 包线 / 真实发射共用）
+   F. launchSpeed：炸弹 +3、导弹 +0、火箭 +0（HUD 预测 / AI 包线 / 真实发射共用）
    用法：node tools/test/probes/probe-bomb-release.js
    ============================================================ */
 'use strict';
@@ -82,8 +84,8 @@ const EJ = sb.Ent.$.EJECT_BOMB;
 /* D 导弹仍是 +70；F launchSpeed */
 {
   const r = drop('srm', { speed: 300 });
-  chk('D 导弹（srm）初速仍是载机速度 + 70 m/s（有动力的弹保持旧行为）', r.fired && Math.abs(r.m.speed - 370) < 0.01, 'speed=' + (r.m && r.m.speed));
-  chk('F launchSpeed：无动力弹 +' + EJ + '、导弹 +70', sb.Ent.launchSpeed(sb.WEAPONS.clb, 300) === 300 + EJ && sb.Ent.launchSpeed(sb.WEAPONS.srm, 300) === 370 && sb.Ent.isUnpowered(sb.WEAPONS.clb) && !sb.Ent.isUnpowered(sb.WEAPONS.srm));
+  chk('D 导弹（srm）初速 = 载机速度（v3.7.1 起不再 +70，加速靠自己的发动机；参考射程见 probe-missile-reach）', r.fired && Math.abs(r.m.speed - 300) < 0.01, 'speed=' + (r.m && r.m.speed));
+  chk('F launchSpeed：炸弹 +' + EJ + '、导弹 +0', sb.Ent.launchSpeed(sb.WEAPONS.clb, 300) === 300 + EJ && sb.Ent.launchSpeed(sb.WEAPONS.srm, 300) === 300 && sb.Ent.isUnpowered(sb.WEAPONS.clb) && !sb.Ent.isUnpowered(sb.WEAPONS.srm));
 }
 
 /* G 火箭：没有向前的初速助推，加速靠发动机 */

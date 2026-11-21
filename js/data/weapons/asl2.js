@@ -3,7 +3,7 @@ Registry.weapon({
   tags: ['penetrator'],
   id: 'asl2', name: 'GUT-12', cn: T('weapons.asl2.cn'), kind: 'agm',
   model: 'missile',
-  speed: 480, boost: 140, life: 10.0, vsLife: 22.0,
+  speed: 480, boost: 140, life: 10.2, vsLife: 22.0,
   turn: 0.90, seeker: 'radar', lockCone: 34 * Math.PI / 180, lockDist: 9000,
   dmg: 340,salvo: 1, flare: 0.75, blast: 45, blastCore: 10,
   target: 'ground',

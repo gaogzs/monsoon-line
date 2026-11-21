@@ -337,7 +337,7 @@ AI（友军、敌军一样）用同一套门槛：被压制时只能对 `clearR`
 
 ```js
 // computeEnvelope：rmax / nez 用真实弹道动态算（Ent.envelopeRange）
-var e = Ent.envelopeRange(w, { pos, fwd, speed: Ent.launchSpeed(w, p.speed), vel: Ent.launchVel(w, p) }, t);   // 抛物线弹族（炸弹 / GUT-9 / 火箭）没有向前助推并带载机速度矢量，导弹 +70（与真实发射同一个初速）
+var e = Ent.envelopeRange(w, { pos, fwd, speed: Ent.launchSpeed(w, p.speed), vel: Ent.launchVel(w, p) }, t);   // 抛物线弹族（炸弹 / GUT-9 / 火箭）没有向前助推并带载机速度矢量，导弹也不加（与真实发射同一个初速）
 rmax = min(w.lockDist, e.rmax);
 nez  = min(w.lockDist, min(e.nez, e.rmax));
 ```

@@ -4,7 +4,7 @@ Registry.weapon({
   tags: ['reAcquire'],
   id: 'v11', name: 'SUT-11', cn: T('weapons.v11.cn'), kind: 'aam',
   model: 'missile',
-  speed: 790, boost: 280, life: 5.0, vsLife: 11.0,
+  speed: 790, boost: 280, life: 5.2, vsLife: 11.0,
   turn: 2.45, seeker: 'ir', lockCone: 35 * Math.PI / 180, lockDist: 4600,
   dmg: 56,salvo: 1, flare: 0.35, fuze: 16, blast: 22, blastCore: 2,
   target: 'air',

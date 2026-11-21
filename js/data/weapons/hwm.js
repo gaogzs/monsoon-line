@@ -4,7 +4,7 @@ Registry.weapon({
   order: 100,
   id: 'hwm', name: 'CLA-8', cn: T('weapons.hwm.cn'), kind: 'aam',
   model: 'missile',
-  speed: 810, boost: 180, life: 8.0, vsLife: 20.0,
+  speed: 810, boost: 180, life: 8.3, vsLife: 20.0,
   turn: 1.16, seeker: 'radar', lockCone: 36 * Math.PI / 180, lockDist: 8000,
   dmg: 46,salvo: 1, flare: 0.34, fuze: 22, blast: 60, blastCore: 10,
   target: 'air',
