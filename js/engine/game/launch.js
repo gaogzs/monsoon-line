@@ -203,10 +203,12 @@
         team: actor.team,
         pos: M3.add(hp, shots[q].off),
         fwd: shots[q].fwd,
-        speed: actor.speed + 70,
+        speed: Ent.launchSpeed(wp, actor.speed),
         target: (irSalvo && q > 0) ? null : (target || null),
         owner: actor
       };
+      /* 无动力弹（炸弹）：初速 = 载机此刻的速度矢量 + 沿机腹向下的一点抛放速度，没有向前的助推 */
+      if (Ent.isUnpowered(wp)) spec.vel = Ent.launchVel(wp, actor);
       if (gap > 0 && q > 0) {
         w.shotQueue.push({ t: q * gap, spec: spec, salvo: irSalvo });
         continue;

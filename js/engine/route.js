@@ -95,7 +95,7 @@ var Route = (function () {
     /* 动态射程（与 AI 同一套）：制导弹还要在真实弹道的 rmax 余量之内才放，
        静态 aiReach 只是上界。缓存挂在航线状态 r 上，0.2 s 刷新。 */
     if (w.seeker && w.seeker !== 'none' && !w.tags.unguided) {
-      var env = Ent.envelopeCached(r, world.time || 0, { pos: a.pos, fwd: a.fwd, speed: a.speed + 70 }, w, L.weapon, t, 0.2);
+      var env = Ent.envelopeCached(r, world.time || 0, { pos: a.pos, fwd: a.fwd, speed: Ent.launchSpeed(w, a.speed), vel: Ent.launchVel(w, a) }, w, L.weapon, t, 0.2);
       if (d > Math.min(w.lockDist || Infinity, env.rmax) * (t.kind === "target" ? 0.8 : 0.9)) return;   // 余量：对空 0.9、对地 0.8
     }
     Ent.setWeapon(a, L.weapon);

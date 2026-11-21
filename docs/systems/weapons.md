@@ -442,7 +442,7 @@ hp = actor.pos + actor.fwd*4 + actor.right * side * (2.4 + rank*1.9)
 （±25% 的 `SALVO_FAN`）是为了不出现"每次齐射都是同一张对称图"。
 单发（`n ≤ 1`）不做任何偏移。
 
-打出的弹初速是 `actor.speed + 70`。发射后该槽进入 `wp.cd` 冷却，
+打出的弹初速由 `Ent.launchSpeed(w, actor.speed)` 给：导弹 / 火箭 / 带 `burn` 的弹是载机速度 + 70 m/s（弹射助推，沿机头）；**无动力弹**（`ballistic` 且没有 `burn`：`clb` `hbh` `hbl` `pgb` `v30` 五种炸弹）没有向前的助推，初速矢量 = 载机此刻的速度矢量 + 沿机腹向下 3 m/s（`Ent.launchVel`、`Ent.EJECT_BOMB`），所以悬停时炸弹只会往下掉，带漂移 / 下沉的载机放出的炸弹继承它真实的运动。旧版所有挂载一律 +70 沿机头，炸弹被「推」出去 70 m/s（平飞投弹落点比现在远 1.2–1.9 km）。发射后该槽进入 `wp.cd` 冷却，
 `spCd` 更新为"最快就绪的那个槽"的剩余时间。
 
 玩家发射时 `fireSpecial()`（`js/ui/input.js`，经 `launchCall(w)`）还会按类型播无线电呼号：

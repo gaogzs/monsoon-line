@@ -70,7 +70,7 @@
     var dummy = { kind: 'target', alive: true, team: 98, radius: 10,
       pos: M3.V(pos.x + hx * far, targetY, pos.z + hz * far), vel: M3.V(0, 0, 0) };
     var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
-    var m = $.makeMissile({ weapon: w.id, team: 98, pos: pos, fwd: fwd, speed: la.speed, target: dummy });
+    var m = $.makeMissile({ weapon: w.id, team: 98, pos: pos, fwd: fwd, speed: la.speed, vel: la.vel, target: dummy });
     m.owner = null;
     var last = M3.clone(m.pos);
     for (var f = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
@@ -115,7 +115,7 @@
     var t = { kind: tg.kind, alive: true, team: 98, radius: tg.radius || 10,
       pos: M3.clone(tg.pos), vel: tg.vel ? M3.clone(tg.vel) : M3.V(0, 0, 0) };
     if (tg.fwd) t.fwd = M3.clone(tg.fwd);
-    var m = $.makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, target: t, owner: null });
+    var m = $.makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, vel: la.vel, target: t, owner: null });
     var vMax = targetMaxSpeed(tg);
     var isAir = $.targetClass(w, tg) === 'air';
     var dt = 1 / 10, simT = 0;      // 包线 / 瞄准圈估算步长（见 estDt；近炸按线段最近点，不漏判）
@@ -271,7 +271,7 @@
   /* 自然落点：弹翼不修（无目标），纯抛物线落地。 */
   function naturalPoint(w, la, planeY) {
     var world = { time: 0, actors: [], targets: [], missiles: [], particles: [], bullets: [], silent: true };
-    var m = $.makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, owner: null });
+    var m = $.makeMissile({ weapon: w.id, team: 98, pos: M3.clone(la.pos), fwd: M3.clone(la.fwd), speed: la.speed, vel: la.vel, owner: null });
     for (var f = 0, tt = 0; f < EFF_MAX_FRAMES / 2 && m.alive; f++) {
       var edt = estDt(w, tt); tt += edt;
       $.stepMissile(m, edt, world);

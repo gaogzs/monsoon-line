@@ -22,7 +22,7 @@
     var c = p.__ccip;
     if (!c || c.w !== w.id || c.plane !== plane || now - c.at > 100) {
       c = p.__ccip = { w: w.id, at: now, plane: plane,
-        pt: Ent.naturalPoint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }, plane) };
+        pt: Ent.naturalPoint(w, { pos: p.pos, fwd: p.fwd, speed: Ent.launchSpeed(w, p.speed), vel: Ent.launchVel(w, p) }, plane) };
     }
     var pt = c.pt;
     var R = w.cluster || w.blast || 0;
@@ -107,7 +107,7 @@
     var c = p.__fp;
     if (!c || c.w !== w.id || c.ty !== ft || now - c.at > 300) {
       c = p.__fp = { w: w.id, ty: ft, at: now, spd: p.speed || 0, y: p.pos.y,
-        fp: Ent.finFootprint(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }, undefined, ft) };
+        fp: Ent.finFootprint(w, { pos: p.pos, fwd: p.fwd, speed: Ent.launchSpeed(w, p.speed), vel: Ent.launchVel(w, p) }, undefined, ft) };
     }
     var fp = c.fp;
     if (!fp) return;
@@ -177,7 +177,7 @@
     if (!c || c.w !== w.id || now - c.at > 300 ||
         Math.abs(d - c.d) > 150 || Math.abs((p.speed || 0) - c.spd) > 50 ||
         Math.abs(p.pos.y - c.y) > 500) {
-      var e = Ent.envelopeRange(w, { pos: p.pos, fwd: p.fwd, speed: (p.speed || 0) + 70 }, t);
+      var e = Ent.envelopeRange(w, { pos: p.pos, fwd: p.fwd, speed: Ent.launchSpeed(w, p.speed), vel: Ent.launchVel(w, p) }, t);
       var lock = w.lockDist || Infinity;
       var rmax = Math.min(lock, e.rmax);
       var nez = Math.min(lock, Math.min(e.nez, e.rmax));

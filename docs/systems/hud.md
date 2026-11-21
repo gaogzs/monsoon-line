@@ -337,7 +337,7 @@ AI（友军、敌军一样）用同一套门槛：被压制时只能对 `clearR`
 
 ```js
 // computeEnvelope：rmax / nez 用真实弹道动态算（Ent.envelopeRange）
-var e = Ent.envelopeRange(w, { pos, fwd, speed: p.speed + 70 }, t);
+var e = Ent.envelopeRange(w, { pos, fwd, speed: Ent.launchSpeed(w, p.speed), vel: Ent.launchVel(w, p) }, t);   // 无动力弹 +3 并带载机速度矢量，其余 +70（与真实发射同一个初速）
 rmax = min(w.lockDist, e.rmax);
 nez  = min(w.lockDist, min(e.nez, e.rmax));
 ```

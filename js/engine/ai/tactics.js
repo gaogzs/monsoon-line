@@ -15,7 +15,7 @@
   var AI_ENV_T = 0.1;
 
   function aiEnvelope(a, s, w, wid, t) {
-    return Ent.envelopeCached(s, s.envClock, { pos: a.pos, fwd: a.fwd, speed: a.speed + 70 }, w, wid, t, AI_ENV_T);
+    return Ent.envelopeCached(s, s.envClock, { pos: a.pos, fwd: a.fwd, speed: Ent.launchSpeed(w, a.speed), vel: Ent.launchVel(w, a) }, w, wid, t, AI_ENV_T);
   }
 
   function leadTo(a, t) {
