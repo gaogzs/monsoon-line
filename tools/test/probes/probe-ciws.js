@@ -46,7 +46,10 @@ function run(seed, opt) {
   const saved = { speed: w.speed };
   if (opt.speed) w.speed = opt.speed;
   // 从 8 km 外、扇面散开的方位来（齐射时各弹错开一点方位）
-  const base = Math.random() * Math.PI * 2;
+  /* 来袭方位由种子确定（黄金比例序列，均匀铺满 0..2π）。
+     以前这里写的是宿主的 Math.random()：它不是沙箱里带种子的那个，于是同一份代码每次运行方位都不同，
+     探针结果跑两次不一样（HEAD 上也是），"各档同一批种子"对方位也不成立。 */
+  const base = ((seed * 0.6180339887498949) % 1) * Math.PI * 2;
   const R0 = opt.dist || 8000;
   for (let i = 0; i < opt.n; i++) {
     const a = base + (i - (opt.n - 1) / 2) * 0.12;

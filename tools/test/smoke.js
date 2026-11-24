@@ -4671,6 +4671,10 @@ if (Ent && M3 && me && world) {
     /* 管理局勤务机「水准」：沿编组巡视 —— 飞 150 s，看它守不守得住巡视高度、
        有没有真的往下一个编组走。（datum 推力弱，高空守不住高度时这里会报。） */
     {
+      /* 这一项开始前把随机源重置到初始种子、结束后恢复：它的结果只该取决于勤务机自己的飞行，
+         不该取决于前面几十项测试一共消耗了多少随机数（加力羽流不再消耗随机数之后，到这里的位置变了，
+         这一项就挂过一次 —— 同一份代码，换 12 个种子它全部通过，而且 HEAD 上种子 4、6 还各有一次约 30 s 的失速）。 */
+      const __savedSeed = __seed; __seed = 0x2f6e2b1;
       const m5 = sandbox.MISSIONS.findIndex(m => m.id === 'm5');
       G.startMission(m5);
       const w5 = G.__world(), p5 = G.__player();
@@ -4693,6 +4697,7 @@ if (Ent && M3 && me && world) {
         if (seenIdx < 1) bad.push('勤务机 150 s 内没有到达第一个编组');
         counts.push('水准到第' + seenIdx + '航点');
       }
+      __seed = __savedSeed;          // 恢复：这一项之后的测试看到的随机流，等于这一项没消耗过随机数
     }
 
     // 资料库 s4 的 3D 预览：条目带 mount，调用不抛异常
