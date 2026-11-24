@@ -100,14 +100,27 @@
     var w = WEAPONS[p.special];
     if (!w || !w.fin || !w.tags.ballistic) return;
 
-    /* 可达区域每 0.3 s 重算一次（一次要跑上百份弹道）：像机载火控解算那样定时刷新，
-       两次之间圈钉在世界坐标上不动，换武器 / 换目标高度才立刻重算。 */
+    /* 可达区域定时刷新（一次要跑几十份弹道）：像机载火控解算那样，两次之间圈钉在
+       世界坐标上不动。重算是分步任务（Ent.finFootprintJob）：每帧最多花 FP_BUDGET_MS
+       推几条射线，摊到几帧里算完再换新圈，不在单帧里卡一下。
+       目标高度变化超过 FP_TY_DEAD 米才重算（死区），避免目标起伏时每帧重启。 */
+    var FP_BUDGET_MS = 4, FP_TY_DEAD = 30;
+    var FP_REFRESH_MS = 200;      // 上一轮算完后隔多久开始下一轮（转弯时圈会滞后，所以比旧的 300 短）
     var now = performance.now();
     var ft = p.target && p.target.alive && p.target.kind === 'target' ? p.target.pos.y : 0;
     var c = p.__fp;
-    if (!c || c.w !== w.id || c.ty !== ft || now - c.at > 300) {
-      c = p.__fp = { w: w.id, ty: ft, at: now, spd: p.speed || 0, y: p.pos.y,
-        fp: Ent.finFootprint(w, { pos: p.pos, fwd: p.fwd, speed: Ent.launchSpeed(w, p.speed), vel: Ent.launchVel(w, p) }, undefined, ft) };
+    if (!c || c.w !== w.id) c = p.__fp = { w: w.id, ty: ft, at: -Infinity, fp: null, job: null };
+    else if (c.job && Math.abs(ft - c.ty) > FP_TY_DEAD) c.job = null;       // 目标高度变了：放弃旧任务
+    if (!c.job && (now - c.at > FP_REFRESH_MS || Math.abs(ft - c.ty) > FP_TY_DEAD)) {
+      /* 快照：任务跨好几帧，飞机的 pos / fwd 每帧都在变，不能传引用。 */
+      c.ty = ft;
+      c.job = Ent.finFootprintJob(w, { pos: M3.clone(p.pos), fwd: M3.clone(p.fwd),
+        speed: Ent.launchSpeed(w, p.speed), vel: Ent.launchVel(w, p) }, undefined, ft, { fast: true, dtFix: 1 / 5 });
+    }
+    if (c.job) {
+      var done = false, t0 = performance.now();
+      do { done = c.job.step(); } while (!done && performance.now() - t0 < FP_BUDGET_MS);
+      if (done) { c.fp = c.job.result(); c.job = null; c.at = performance.now(); }
     }
     var fp = c.fp;
     if (!fp) return;

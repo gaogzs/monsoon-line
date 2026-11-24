@@ -1,7 +1,7 @@
 (function (Ent) {
   'use strict';
   var $ = Ent.$;
-  $.effRange = effRange; $.maxReach = maxReach; $.glideReach = glideReach; $.flyTo = flyTo; $.envelopeRange = envelopeRange; $.envelopeCached = envelopeCached; $.displayRange = displayRange; $.naturalPoint = naturalPoint; $.finFootprint = finFootprint; $.lockOff = lockOff; $.aiReach = aiReach; $.effectiveLife = effectiveLife;
+  $.effRange = effRange; $.maxReach = maxReach; $.glideReach = glideReach; $.flyTo = flyTo; $.envelopeRange = envelopeRange; $.envelopeCached = envelopeCached; $.displayRange = displayRange; $.naturalPoint = naturalPoint; $.finFootprint = finFootprint; $.finFootprintJob = finFootprintJob; $.lockOff = lockOff; $.aiReach = aiReach; $.effectiveLife = effectiveLife;
 
   /* ============================================================
      有效射程：这件弹从 alt 高度平飞发射，**真的能飞到多远**
@@ -285,32 +285,87 @@
   /* 沿水平角 φ（0 = 前方，±90° = 左右），二分求"能命中"（flyTo）的最远地面目标
      水平距离。用真实命中判定，而不是弹翼满偏落点 —— 满偏上修会把抛物线掰成平飞
      （等于偷偷滑翔），那不是精确制导炸弹的"修正范围"。 */
-  function reachAtAngle(w, la, phi, hi, ty) {
+  function reachAtAngle(w, la, phi, hi, ty, dtFix, guess) {
     var hx = Math.sin(phi), hz = Math.cos(phi);
     function at(D) {
       return { kind: 'target', radius: 20,
         pos: M3.V(la.pos.x + hx * D, ty || 0, la.pos.z + hz * D), vel: M3.V(0, 0, 0), speed: 0 };
     }
-    return bisectFar(function (D) { return flyTo(w, la, at(D), false); }, 400, hi || maxReach(w, la, ty || 0));
+    function pred(D) { return flyTo(w, la, at(D), false, dtFix); }
+    hi = hi || maxReach(w, la, ty || 0);
+    /* 暖启动：相邻射线的射程变化平滑，先用邻居的结果夹一个窄括号
+       （guess×0.85 命中、guess×1.15 失手），再在括号里二分，省掉全程采样。
+       括号不成立（射程突变）就退回全程的 bisectFar。 */
+    if (guess > 400) {
+      var l = Math.max(400, guess * 0.85), r = Math.min(hi, guess * 1.15);
+      if (r < hi && pred(l) && !pred(r)) {
+        for (var j = 0; j < 3; j++) {
+          var mid = (l + r) / 2;
+          if (pred(mid)) l = mid; else r = mid;
+        }
+        return l;
+      }
+    }
+    return bisectFar(pred, 400, hi);
   }
 
   /* 可达区域：{ natural, points }。natural = 自然落点（弹翼不修）；
      points = 沿各水平角 flyTo 二分出的"能命中"最远地面目标 —— 用真实命中判定
      （flyTo / stepMissile 同一套），所以目标套进圈内就真的打得中。返回 null 表示
      这枚弹没有弹翼修正（不画圈）。 */
-  function finFootprint(w, la, n, ty) {
+  /* 扇区以机头水平朝向为轴（yaw = 0 即世界 +z，与旧行为一致）。
+     opt.fast：HUD 用的省算模式 ——
+       · 左右对称（无风、导引对称）只算机头一侧的射线再镜像；发射速度带侧滑分量时不镜像；
+       · 相邻射线暖启动（见 reachAtAngle）。
+     不传 opt 时逐条独立二分，结果与以前一致（探针 / 基线用）。 */
+  /* 分步任务版：每次 step() 只算一条射线（第一步额外算 maxReach + 自然落点），
+     返回 true 表示算完，result() 取结果。HUD 每帧推一步，把上百份弹道摊到几帧里，
+     避免单帧卡顿。la 在建任务时就被读走（pos / fwd 的引用要保持不变，调用方传快照）。 */
+  function finFootprintJob(w, la, n, ty, opt) {
     if (!w || !w.fin) return null;
     n = n || 12;
-    var pts = [], hi = maxReach(w, la, ty || 0);
-    for (var i = 0; i <= n; i++) {
-      var phi = (i / n - 0.5) * (90 * Math.PI / 180);   // -45°..45°（前方扇区）
-      var D = reachAtAngle(w, la, phi, hi, ty);
-      /* 该方向"能命中"距离 < 最小射程（弹翼横修不到那么侧）：跳过，不画进圈。 */
-      if (D <= 400) continue;
-      var hx = Math.sin(phi), hz = Math.cos(phi);
-      pts.push({ x: la.pos.x + hx * D, z: la.pos.z + hz * D });
-    }
-    return { natural: naturalPoint(w, la, ty), points: pts };
+    opt = opt || {};
+    var hl = Math.sqrt(la.fwd.x * la.fwd.x + la.fwd.z * la.fwd.z);
+    var yaw = hl > 1e-3 ? Math.atan2(la.fwd.x, la.fwd.z) : 0;
+    var half = (n % 2 === 0) ? n / 2 : -1;      // 机头正前方那条射线的下标（n 为奇数时没有）
+    var vel = la.vel || la.fwd;
+    var lat = hl > 1e-3 ? (vel.x * la.fwd.z - vel.z * la.fwd.x) / hl : 0;   // 发射速度的侧向分量
+    var mirror = !!opt.fast && half >= 0 && Math.abs(lat) < 2;
+    var D = new Array(n + 1), i = mirror ? half : 0, prev = 0, hi = 0, natural = null, started = false;
+    function phiOf(k) { return yaw + (k / n - 0.5) * (90 * Math.PI / 180); }   // 机头 ±45°（前方扇区）
+    return {
+      step: function () {
+        if (!started) {
+          started = true;
+          hi = maxReach(w, la, ty || 0);
+          natural = naturalPoint(w, la, ty);
+          return false;
+        }
+        if (i > n) return true;
+        D[i] = reachAtAngle(w, la, phiOf(i), hi, ty, opt.dtFix, opt.fast ? prev : 0);
+        prev = D[i];
+        i++;
+        return i > n;
+      },
+      result: function () {
+        var k, pts = [];
+        if (mirror) for (k = 0; k < half; k++) D[k] = D[n - k];
+        for (k = 0; k <= n; k++) {
+          /* 该方向"能命中"距离 < 最小射程（弹翼横修不到那么侧）：跳过，不画进圈。 */
+          if (!(D[k] > 400)) continue;
+          var ph = phiOf(k);
+          pts.push({ x: la.pos.x + Math.sin(ph) * D[k], z: la.pos.z + Math.cos(ph) * D[k] });
+        }
+        return { natural: natural, points: pts };
+      }
+    };
+  }
+
+  function finFootprint(w, la, n, ty, opt) {
+    var job = finFootprintJob(w, la, n, ty, opt);
+    if (!job) return null;
+    while (!job.step());
+    return job.result();
   }
 
   function hitsAt(w, y0, D) {

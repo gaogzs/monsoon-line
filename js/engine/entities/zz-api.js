@@ -99,6 +99,7 @@
   Ent.SEA_Y = $.SEA_Y;
   Ent.setTerrain = $.setTerrain;
   Ent.finFootprint = $.finFootprint;
+  Ent.finFootprintJob = $.finFootprintJob;
   Ent.aiReach = $.aiReach;
   Ent.AI_RANGE_K = $.AI_RANGE_K;
   Ent.lockOff = $.lockOff;
