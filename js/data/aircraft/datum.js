@@ -17,7 +17,8 @@ Registry.aircraft({
   model: 'sower',
   desc: T('aircraft.datum.desc'),
   stats: { spd: 0.29, mob: 0.22, stl: 0.20, fire: 0.10, dur: 0.72, rng: 0.86, ecm: 0.42 },
-  phys: { vMax: 295, vMil: 250, vStall: 72, accel: 11, decel: 34, pitch: 0.34, roll: 1.56, yaw: 0.26, hp: 180 },
+  // 没有加力：vMax = vMil（约定见 _schema.js；Ent.hasAfterburner 以此判断）
+  phys: { vMax: 250, vMil: 250, vStall: 72, accel: 11, decel: 34, pitch: 0.34, roll: 1.56, yaw: 0.26, hp: 180 },
   gun: 'cel3v',
   maxLoad: 900,
   hardpointGroups: [

@@ -25,7 +25,8 @@ Registry.aircraft({
   model: 'sower',
   desc: T('aircraft.pelican.desc'),
   stats: { spd: 0.24, mob: 0.18, stl: 0.10, fire: 0.05, dur: 0.84, rng: 0.94, ecm: 0.26 },
-  phys: { vMax: 300, vMil: 255, vStall: 80, accel: 11, decel: 33, pitch: 0.32, roll: 1.48, yaw: 0.25, hp: 200 },
+  // 没有加力：vMax = vMil（约定见 _schema.js；Ent.hasAfterburner 以此判断）
+  phys: { vMax: 255, vMil: 255, vStall: 80, accel: 11, decel: 33, pitch: 0.32, roll: 1.48, yaw: 0.25, hp: 200 },
   /* 无武装。上面那段描述写了好几个版本，数值这里一直挂着 cel3 ——
      所谓"没有任何武器"在数据里其实是有武器。现在对齐。 */
   gun: null,

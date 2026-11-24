@@ -24,7 +24,8 @@ Registry.aircraft({
   desc: T('aircraft.gravel.desc'),
   stats: { spd: 0.52, mob: 0.58, stl: 0.18, fire: 0.40, dur: 0.14, rng: 0.30, ecm: 0.10 },
   /* 极速不求压过有人机（它跟的是下游长机，下游长机本来就慢）；hp 很低——一发近炸就没了 */
-  phys: { vMax: 470, vMil: 390, vStall: 84, accel: 22, decel: 36, pitch: 0.70, roll: 2.30, yaw: 0.34, hp: 36 },
+  // 没有加力：vMax = vMil（约定见 _schema.js；Ent.hasAfterburner 以此判断）
+  phys: { vMax: 390, vMil: 390, vStall: 84, accel: 22, decel: 36, pitch: 0.70, roll: 2.30, yaw: 0.34, hp: 36 },
   gun: null,
   maxLoad: 800,
   hardpointGroups: [

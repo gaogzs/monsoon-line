@@ -28,8 +28,9 @@ Registry.aircraft({
   model: 'boulder',
   desc: T('aircraft.boulder.desc'),
   stats: { spd: 0.15, mob: 0.05, stl: 0.06, fire: 0.18, dur: 0.95, rng: 0.74, ecm: 0.34 },
+  // 没有加力：vMax = vMil（约定见 _schema.js；Ent.hasAfterburner 以此判断）
   phys: {
-    vMax: 305, vMil: 260, vStall: 110,
+    vMax: 260, vMil: 260, vStall: 110,
     accel: 8, decel: 16, pitch: 0.15, roll: 0.66, yaw: 0.10, hp: 420
   },
   /* 无武装。理由与做法见上面那段注释 —— 这不是漏写。 */

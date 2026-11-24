@@ -19,7 +19,8 @@ Registry.aircraft({
   model: 'manta',
   desc: T('aircraft.manta.desc'),
   stats: { spd: 0.20, mob: 0.06, stl: 0.04, fire: 0.0, dur: 0.95, rng: 0.55, ecm: 0.15 },
-  phys: { vMax: 300, vMil: 250, vStall: 80, accel: 8, decel: 22, pitch: 0.20, roll: 0.70, yaw: 0.14, hp: 700 },
+  // 没有加力：vMax = vMil（约定见 _schema.js；Ent.hasAfterburner 以此判断）
+  phys: { vMax: 250, vMil: 250, vStall: 80, accel: 8, decel: 22, pitch: 0.20, roll: 0.70, yaw: 0.14, hp: 700 },
   hitR: 14,                     // 很大的靶面（缺省 7.5，boulder 11.5）
   gun: null,
   maxLoad: 0,

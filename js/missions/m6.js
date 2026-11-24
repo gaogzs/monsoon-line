@@ -50,7 +50,7 @@ Registry.mission({
     p.fwd = M3.V(0, 0, 1);
     p.speed = 500;
     p.throttle = 0.95;
-    p.ab = true;
+    p.ab = Ent.hasAfterburner(p);
 
     spawnWingman(w, 2, -220, 30, -320);
     spawnWingman(w, 3, 220, 30, -320);

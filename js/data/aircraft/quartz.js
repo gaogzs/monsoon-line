@@ -15,7 +15,8 @@ Registry.aircraft({
   model: 'boulder',
   desc: T('aircraft.quartz.desc'),
   stats: { spd: 0.21, mob: 0.14, stl: 0.08, fire: 0.04, dur: 0.80, rng: 0.90, ecm: 0.32 },
-  phys: { vMax: 285, vMil: 240, vStall: 78, accel: 10, decel: 32, pitch: 0.30, roll: 1.4, yaw: 0.24, hp: 190 },
+  // 没有加力：vMax = vMil（约定见 _schema.js；Ent.hasAfterburner 以此判断）
+  phys: { vMax: 240, vMil: 240, vStall: 78, accel: 10, decel: 32, pitch: 0.30, roll: 1.4, yaw: 0.24, hp: 190 },
   /* 无武装，同 J-2 —— 预警机是眼睛，不是枪手。 */
   gun: null,
   maxLoad: 0,

@@ -89,7 +89,7 @@
       x0: rw.x - Math.sin(rw.yaw || 0) * len, z0: rw.z - Math.cos(rw.yaw || 0) * len,
       dx: Math.sin(rw.yaw || 0), dz: Math.cos(rw.yaw || 0), y: rw.y + DECK_K.GEAR_H
     };
-    a.throttle = 1; a.ab = true;
+    a.throttle = 1; a.ab = $.hasAfterburner(a);       // 没有加力的机型弹射起飞也只推军推
     (host.deckUse || (host.deckUse = []))[ri] = a;
     stepDeck(a, 0, null);        // 立刻摆好位置与姿态：生成的这一帧就在起点上
     return a;

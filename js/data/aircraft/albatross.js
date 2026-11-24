@@ -15,6 +15,7 @@ Registry.aircraft({
   model: 'albatross',
   desc: T('aircraft.albatross.desc'),
   stats: { spd: 0.46, mob: 0.93, stl: 0.24, fire: 0.60, dur: 0.62, rng: 0.80, ecm: 0.30 },
+  exhaust: { color: 'amber' },
   phys: { vMax: 470, vMil: 380, vStall: 96, accel: 24, decel: 42, pitch: 0.80, roll: 2.81, yaw: 0.36, hp: 118 },
   gun: 'cel3',
   maxLoad: 5000,

@@ -15,6 +15,7 @@ Registry.aircraft({
   caps: ['intercept'],
   maker: T('aircraft.sailfish.maker'),
   stats: { spd: 0.96, mob: 0.84, stl: 0.86, fire: 0.54, dur: 0.32, rng: 0.48, ecm: 0.30 },
+  exhaust: { color: 'violet' },
   phys: { vMax: 566, vMil: 448, vStall: 122, accel: 33, decel: 36, pitch: 0.80, roll: 2.65, yaw: 0.28, hp: 92 },
   gun: 'cel3',
   maxLoad: 4800,

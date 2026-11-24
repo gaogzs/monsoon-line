@@ -17,6 +17,7 @@ Registry.aircraft({
   model: 'petrel',
   desc: T('aircraft.petrel.desc'),
   stats: { spd: 0.98, mob: 0.40, stl: 0.30, fire: 0.74, dur: 0.58, rng: 0.62, ecm: 0.28 },
+  exhaust: { color: 'blue' },
   phys: { vMax: 640, vMil: 500, vStall: 138, accel: 34, decel: 32, pitch: 0.48, roll: 1.72, yaw: 0.24, hp: 110 },
   gun: 'cel3',
   maxLoad: 5200,

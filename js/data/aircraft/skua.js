@@ -15,6 +15,7 @@ Registry.aircraft({
   model: 'skua',
   desc: T('aircraft.skua.desc'),
   stats: { spd: 0.72, mob: 0.66, stl: 0.96, fire: 0.56, dur: 0.50, rng: 0.70, ecm: 0.72 },
+  exhaust: { color: 'violet' },
   phys: { vMax: 540, vMil: 430, vStall: 118, accel: 26, decel: 36, pitch: 0.66, roll: 2.42, yaw: 0.26, hp: 96 },
   gun: 'cel3',
   maxLoad: 4200,

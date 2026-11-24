@@ -3,9 +3,23 @@
    phys 与 entities.js 的飞行模型一一对应：
      vMax/vMil/vStall  m/s      accel/decel  m/s²
      pitch/roll/yaw    rad/s    hp  结构完整度
+   vMax 是加力上限、vMil 是军推。**vMax == vMil 表示这架飞机没有加力**（运输机、预警机、巡逻机、廉价无人机……）：
+     Ent.hasAfterburner 以此判断，玩家油门推不进加力区、AI 不会加力、弹射起飞也不开加力、HUD 油门条不画加力区、
+     不出羽流。只有这一个事实来源，不另设标志；图鉴 / 机库显示的最高速也就是真实能飞到的最高速。
 
    stats.stl（匿踪）—— 缩短敌方对这架机的锁定距离（见 stealthValue / lockCutOf）。
    stats.ecm（电子对抗）—— 削弱瞄准它的导弹的提前量预测。两者各管一件事，不重叠。
+
+   exhaust.size —— 加力羽流的大小系数（可选）。不写 = 每个喷口都是 1；写数字 = 全部喷口统一；
+     写数组 = 按喷口顺序逐个设置（顺序 = 模型里喷口件 C.nozzle 的书写顺序，缺的补 1）。
+     系数同时乘羽流的粗细、长度和激波间距，0 = 该喷口不喷火。基础尺寸取自模型里量出的喷口出口半径。
+     羽流每帧现画（Ent.exhaustPlumes），所有喷口同时存在，不是离散的火球。
+     查某型的喷口顺序与出口半径：node -e "const S=require('./tools/lib/sim').load({seed:1});console.log(S.sandbox.Ent.nozzlesOf('<model>'))"
+   exhaust.color —— 羽流配色（可选，只对有加力的机型有意义），整架机统一。写预设名：'amber'（默认，有烟的橙色）/
+     'smoky'（烟更多，更红更暗，给设定里"更旧一代"的发动机）/ 'blue'（燃烧干净的蓝）/ 'violet'（蓝紫）；
+     或写对象只改想改的项：{ base: 'blue', core, hot, mid, warm, cool, halo, diamond }，
+     值必须是 #rrggbb。现实里蓝色是自由基化学发光（很淡），橙色是炽热碳烟（亮得多、有烟就盖过蓝色），
+     烟的多少取决于发动机 / 燃烧室设计，不取决于国籍。
 
    hardpointGroups[].expose —— 该组挂载对匿踪的影响系数，默认 1；
      0 = 完全内埋（弹舱），挂什么都不影响匿踪；0.5 = 半埋，只算一半。

@@ -16,6 +16,7 @@ Registry.aircraft({
   muzzle: [0.28, -0.78, 10.2],
   maker: T('aircraft.booby.maker'),
   stats: { spd: 0.3, mob: 0.44, stl: 0.30, fire: 0.98, dur: 0.98, rng: 0.60, ecm: 0.24 },
+  exhaust: { color: 'amber' },
   phys: { vMax: 340, vMil: 295, vStall: 88, accel: 18, decel: 44, pitch: 0.62, roll: 1.72, yaw: 0.34, hp: 250 },
   gun: 'cel7',
   maxLoad: 7200,

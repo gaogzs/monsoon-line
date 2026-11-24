@@ -21,7 +21,8 @@ Registry.aircraft({
   model: 'puffin',
   desc: T('aircraft.puffin.desc'),
   stats: { spd: 0.30, mob: 0.12, stl: 0.05, fire: 0.0, dur: 0.70, rng: 0.60, ecm: 0.20 },
-  phys: { vMax: 340, vMil: 280, vStall: 85, accel: 9, decel: 24, pitch: 0.28, roll: 1.0, yaw: 0.20, hp: 260 },
+  // 没有加力：vMax = vMil（约定见 _schema.js；Ent.hasAfterburner 以此判断）
+  phys: { vMax: 280, vMil: 280, vStall: 85, accel: 9, decel: 24, pitch: 0.28, roll: 1.0, yaw: 0.20, hp: 260 },
   hitR: 10,                     // 大型机：靶面比战斗机大（缺省 7.5）
   gun: null,
   maxLoad: 0,

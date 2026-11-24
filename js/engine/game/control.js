@@ -158,7 +158,8 @@
     }
     $.player.hiG = wantG;
 
-    $.player.throttle = M3.clamp($.player.throttle, 0, $.THR_MAX);
+    /* 没有加力的机型（Ent.hasAfterburner）油门最多推到军推 100%，不进加力区 */
+    $.player.throttle = M3.clamp($.player.throttle, 0, Ent.hasAfterburner($.player) ? $.THR_MAX : 1.0);
     $.player.ab = $.player.throttle > 1.0;
     $.player.brake = $.player.throttle < $.THR_IDLE;
 

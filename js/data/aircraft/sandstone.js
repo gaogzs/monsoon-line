@@ -19,6 +19,8 @@ Registry.aircraft({
   model: 'sandstone',
   desc: T('aircraft.sandstone.desc'),
   stats: { spd: 0.36, mob: 0.50, stl: 0.12, fire: 0.62, dur: 0.60, rng: 0.44, ecm: 0.20 },
+  // 设定里"便宜到可以损失"：最糙的一台，烟最多，尾端最暗
+  exhaust: { color: { base: 'smoky', hot: '#ffb858', cool: '#9e3416' } },
   phys: { vMax: 395, vMil: 330, vStall: 92, accel: 20, decel: 42, pitch: 0.60, roll: 1.95, yaw: 0.32, hp: 130 },
   gun: 'tca11',
   maxLoad: 3400,

@@ -20,7 +20,8 @@ Registry.aircraft({
   model: 'spray',
   desc: T('aircraft.spray.desc'),
   stats: { spd: 0.26, mob: 0.30, stl: 0.10, fire: 0.26, dur: 0.52, rng: 0.92, ecm: 0.30 },
-  phys: { vMax: 320, vMil: 275, vStall: 82, accel: 14, decel: 36, pitch: 0.38, roll: 1.64, yaw: 0.30, hp: 110 },
+  // 没有加力：vMax = vMil（约定见 _schema.js；Ent.hasAfterburner 以此判断）
+  phys: { vMax: 275, vMil: 275, vStall: 82, accel: 14, decel: 36, pitch: 0.38, roll: 1.64, yaw: 0.30, hp: 110 },
   gun: 'cel1',
   maxLoad: 1400,
   hardpointGroups: [

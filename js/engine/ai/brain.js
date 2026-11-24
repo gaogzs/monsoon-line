@@ -793,6 +793,9 @@
     }
 
     if ($.illumHolds(s)) ab = false;            // 照射期间不主动加力，免得把目标甩出锥而丢锁
+    /* 没有加力的机型（Ent.hasAfterburner）：油门最多军推、不进加力。卡在最后一道赋值上，
+       因为上面各分支（含"撞地前强行拉起"）都可能写 ab = true / throttle > 1，不能指望它们各自记得判断 */
+    if (!Ent.hasAfterburner(a)) { ab = false; if (throttle > 1) throttle = 1; }
     a.throttle = throttle;
     a.ab = ab;
 

@@ -40,6 +40,10 @@ Registry.aircraft({
                    （俯仰 10° ≈ 5 m/s、20° ≈ 10 m/s），松开姿态后按它指数收住
        rcs         姿态角速率（rad/s），不吃动压 */
   vtol: { transK: 1.2, vzUp: 24, vzDown: 18, vAccel: 9, drag: 0.35, jetT: 2.3, jetExp: 0.8, fwdMin: 0.7, transBoost: 0.6, rcs: { pitch: 0.9, roll: 1.6, yaw: 0.9 } },
+  /* 加力尾焰的大小，按喷口：[0] 右前 (x=+1.30)、[1] 左前 (-1.30)、[2] 右后 (+0.45)、[3] 左后 (-0.45)。
+     单发的垂直起降机，四个喷口共用一台发动机，各喷一整团火视觉推力太大；前一对是升力 / 矢量喷口，
+     略大于后一对。想调哪个喷口改数组里对应的数；0 = 该喷口不喷火。 */
+  exhaust: { size: [0.55, 0.55, 0.45, 0.45], color: 'blue' },
   gun: 'cel3',
   maxLoad: 3200,
   hardpointGroups: [

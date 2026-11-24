@@ -99,6 +99,7 @@
     }
     Renderer.drawParticles($.world.particles);
     Renderer.drawParticles(Ent.flashRings($.world));
+    Renderer.drawParticles(Ent.exhaustPlumes($.world, pcam && pcam.pos));    // 加力羽流：每帧现生成，不进 world.particles
     /* 曳光弹：WebGL 粒子开着时变成拖尾粒子，与模型 / 海面做深度测试（山后、机身后的子弹被挡掉）；
        否则退回 2D 画布（没有深度，画在整幅画面之上）。2-0IMPL 2.2d */
     var tracerGL = Renderer.glParticles();

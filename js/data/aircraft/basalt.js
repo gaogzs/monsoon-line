@@ -20,6 +20,8 @@ Registry.aircraft({
   model: 'basalt',
   desc: T('aircraft.basalt.desc'),
   stats: { spd: 0.83, mob: 0.32, stl: 0.16, fire: 0.78, dur: 0.68, rng: 0.58, ecm: 0.24 },
+  // 旧一代发动机（smoky），但推力大：靠喷口的一层更亮
+  exhaust: { color: { base: 'smoky', hot: '#ffd078' } },
   phys: { vMax: 610, vMil: 490, vStall: 142, accel: 30, decel: 30, pitch: 0.44, roll: 1.56, yaw: 0.22, hp: 150 },
   gun: 'tca11',
   maxLoad: 6200,

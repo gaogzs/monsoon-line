@@ -18,6 +18,8 @@ Registry.aircraft({
   model: 'sailfish',
   desc: T('aircraft.tideline.desc'),
   stats: { spd: 0.47, mob: 0.62, stl: 0.14, fire: 0.40, dur: 0.44, rng: 0.48, ecm: 0.18 },
+  // 发动机"来自北边、是上一代的东西"：北岸标准色，尾端偏暗红
+  exhaust: { color: { base: 'amber', cool: '#d4501a' } },
   phys: { vMax: 460, vMil: 370, vStall: 102, accel: 21, decel: 40, pitch: 0.62, roll: 2.26, yaw: 0.32, hp: 100 },
   gun: 'cel1',
   maxLoad: 2600,

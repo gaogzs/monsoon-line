@@ -14,6 +14,7 @@ Registry.aircraft({
   caps: ['strike', 'ew'],
   maker: T('aircraft.frigatebird.maker'),
   stats: { spd: 0.72, mob: 0.72, stl: 0.55, fire: 0.70, dur: 0.62, rng: 0.76, ecm: 0.40 },
+  exhaust: { color: 'amber' },
   phys: { vMax: 510, vMil: 372, vStall: 105, accel: 26, decel: 40, pitch: 0.76, roll: 2.34, yaw: 0.30, hp: 130 },
   gun: 'cel3',
   variableSweep: true,

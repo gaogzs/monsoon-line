@@ -38,6 +38,8 @@
   Ent.storePos = $.storePos;
   Ent.storeHy = $.storeHy;
   Ent.nozzlesOf = $.nozzlesOf;
+  Ent.exhaustPlumes = $.exhaustPlumes;
+  Ent.hasAfterburner = $.hasAfterburner;
   Ent.surfaceBelow = $.surfaceBelow;
   Ent.STORE_HY = $.STORE_HY;
   Ent.forEachStoreSlot = $.forEachStoreSlot;

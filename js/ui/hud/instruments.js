@@ -368,7 +368,7 @@
      为什么搬到这里：它原来贴在屏幕左下角，而那正是雷达圆心，
      雷达在 drawTapes 之后绘制，于是它一直被盖住、玩家根本看不到。
      注意它显示的是**油门杆位置**，不是速度，也不是推力 —— 三者都不同。 */
-  function thrTape(ctx, x, top, hgt, thr, ab, brake) {
+  function thrTape(ctx, x, top, hgt, thr, ab, brake, hasAB) {
     var y0 = top + hgt;
     var pct = thrPercent(thr);
     var span = THR_PCT_HI - THR_PCT_LO;
@@ -376,9 +376,11 @@
     var col = brake ? $.CY : (ab ? $.AMBER : $.GREEN);
     var yMil = yOf(100), yIdle = yOf(0);
 
-    // 加力区（100%–125%）、减速板区（−25%–0%）底色
-    ctx.fillStyle = 'rgba(255,176,58,0.10)';
-    ctx.fillRect(x - 5, top, 10, yMil - top);
+    // 加力区（100%–125%）、减速板区（−25%–0%）底色；没有加力的机型没有加力区（hasAB === false）
+    if (hasAB !== false) {
+      ctx.fillStyle = 'rgba(255,176,58,0.10)';
+      ctx.fillRect(x - 5, top, 10, yMil - top);
+    }
     ctx.fillStyle = 'rgba(69,214,255,0.10)';                 // = CY
     ctx.fillRect(x - 5, yIdle, 10, y0 - yIdle);
 
@@ -389,6 +391,7 @@
     for (var v = THR_PCT_LO; v <= THR_PCT_HI; v += 5) {
       var isMaj = (v % 25 === 0);
       if (!isMaj && v % 10 !== 0) continue;
+      if (hasAB === false && v > 100) continue;               // 没有加力：100% 以上不画刻度
       var y = yOf(v);
       ctx.beginPath();
       ctx.moveTo(x, y);
@@ -428,7 +431,7 @@
     var y1 = Math.min(rcy + R, H - $.gap(74, H, 0.11) - $.U(48));
     var hgt = Math.min(R * 1.9, $.U(190));
     var top = y1 - hgt;
-    thrTape(ctx, ex, top, hgt, p.throttle, p.ab, p.brake);
+    thrTape(ctx, ex, top, hgt, p.throttle, p.ab, p.brake, Ent.hasAfterburner(p));
     ctrlGauges(ctx, ex + $.U(62), top, hgt, p);
     // 高 G：正在拉过载时给个明确的提示，掉速才不至于莫名其妙
     if (p.hiG) {

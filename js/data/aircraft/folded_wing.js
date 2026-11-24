@@ -25,6 +25,7 @@ Registry.aircraft({
   desc: T('aircraft.folded_wing.desc'),
   stats: { spd: 0.96, mob: 0.76, stl: 0.32, fire: 0.62, dur: 0.28, rng: 0.62, ecm: 0.20 },
   /* 极速要压过最快的有人机（petrel 620）：跟不上长机的僚机替长机挡不了弹 */
+  exhaust: { color: 'violet' },
   phys: { vMax: 660, vMil: 540, vStall: 96, accel: 34, decel: 44, pitch: 0.78, roll: 2.65, yaw: 0.40, hp: 58 },
   /* 没有机炮：它是"发射架"，自己看不见东西，目标参数全靠长机喂 ——
      机炮要的是自己对准、自己判断开火时机，这两样它都没有。 */

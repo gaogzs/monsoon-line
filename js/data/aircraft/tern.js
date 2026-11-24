@@ -16,6 +16,7 @@ Registry.aircraft({
   model: 'tern',
   desc: T('aircraft.tern.desc'),
   stats: { spd: 0.62, mob: 0.58, stl: 0.34, fire: 0.76, dur: 0.52, rng: 0.62, ecm: 0.30 },
+  exhaust: { color: 'amber' },
   phys: { vMax: 450, vMil: 385, vStall: 105, accel: 24, decel: 36, pitch: 0.56, roll: 1.9, yaw: 0.30, hp: 130 },
   gun: 'cel3',
   maxLoad: 6000,

@@ -25,6 +25,7 @@ Registry.aircraft({
   ewField: { wid: 'vsc', R: 18000 },
   /* 极速比海燕还高，加速和机动都很差：快但转不动，靠速度脱身、靠射程和齐射输出 */
   stats: { spd: 0.92, mob: 0.06, stl: 0.08, fire: 0.95, dur: 0.88, rng: 0.99, ecm: 0.90 },
+  exhaust: { color: 'smoky' },
   phys: { vMax: 680, vMil: 560, vStall: 180, accel: 12, decel: 20, pitch: 0.18, roll: 0.50, yaw: 0.10, hp: 480 },
   hitR: 13,                     // 大靶面（缺省 7.5，boulder 11.5）
   gun: null,

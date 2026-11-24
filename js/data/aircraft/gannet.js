@@ -15,6 +15,7 @@ Registry.aircraft({
   model: 'gannet',
   desc: T('aircraft.gannet.desc'),
   stats: { spd: 0.55, mob: 0.36, stl: 0.22, fire: 0.92, dur: 0.88, rng: 0.80, ecm: 0.34 },
+  exhaust: { color: 'amber' },
   phys: { vMax: 520, vMil: 420, vStall: 120, accel: 20, decel: 34, pitch: 0.50, roll: 1.35, yaw: 0.28, hp: 190 },
   gun: 'cel3',
   maxLoad: 6800,
