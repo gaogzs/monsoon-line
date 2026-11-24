@@ -4,7 +4,12 @@
      gravity              炮弹重力倍率
      drag                 阻力系数（海平面，1/m）：a = −drag × ρ/ρ0 × |v|·v，见 ballistics.js；
                           没写就只有重力（航空机炮）
-     fuze / blast / blastCore  近炸引信与爆炸半径：写了才有空爆 / 近炸（Ent.fireGunFrom）
+     fuze / blast / blastCore  近炸引信与爆炸半径：写了才有空爆 / 近炸（Ent.fireGunFrom）。
+                          没有 ammo 的炮（近防炮等）直接按这三个字段走
+     ammo                 弹种表（≥ 50 mm 舰炮）：{ id: { fuze, blast, blastCore } }，各弹种覆盖上面三个字段：
+                            prox  近炸引信高爆：带 fuze，对空定时空爆加近炸
+                            he    高爆：fuze = 0，只在直接命中 / 落水时起爆，不会被路上的飞机引爆
+     shellAir / shellSurface  打飞机 / 打舰船与地面时每发炮弹选哪个弹种（炮塔开火时按瞄准目标选，见 turret.js）
      surface              也打海面 / 地面目标（目前只有 50 mm）
    伤害保持原计划（近防炮 4 / 50 mm 12 / 75 mm 30 / 120 mm 80），平衡靠散布、射速和迟钝的提前量：
    平直飞过去必死，稍微机动就大大降低。近防炮射速砍得最多（1800 → 700，高射速的东西少一截没人感觉得到），

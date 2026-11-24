@@ -520,14 +520,17 @@ var Turret = (function () {
     /* 对海面"试射—修正"：首轮散布 ×1.5，之后每轮收敛，第 4 轮起回到正常值 */
     if (!isAir(t)) { spr *= 1 + 0.5 * Math.max(0, 1 - (tu.salvo || 0) / 3); tu.salvo = (tu.salvo || 0) + 1; }
     var mz = tu.barrel ? M3.add(P0, M3.mul(dGun, tu.barrel)) : P0;
-    /* 带近炸的炮弹打飞机用"定时引信"：在预计到达目标的那一刻空爆；打舰船不定时，撞上才炸 */
-    var life = (g.fuze && isAir(t)) ? sol.tof : 0;
+    /* 弹种按这一发的瞄准目标选：打飞机 = 近炸引信高爆（prox），打舰船 / 地面 = 高爆（he，fuze = 0，
+       撞上 / 落水才炸，不会被路上的飞机引爆）。没有弹种表的炮（近防炮等）保持原样。
+       prox 弹用"定时引信"：在预计到达目标的那一刻空爆。 */
+    var sid = g.ammo ? (isAir(t) ? g.shellAir : g.shellSurface) : null;
+    var life = (sid ? sid === 'prox' : (g.fuze && isAir(t))) ? sol.tof : 0;
     while (tu.cd <= 0 && n < 8) {
       tu.cd += 1 / rps;
       n++;
       var dir = M3.norm(M3.add(dGun, M3.add(M3.mul(B.r, gauss() * spr), M3.mul(B.u, gauss() * spr))));
       var lf = life ? Math.max(0.05, life * (1 + gauss() * (tu.aim.fuzeErr || 0))) : 0;
-      var b = Ent.fireGunFrom(host, g, mz, dir, world, lf ? { life: lf } : null);
+      var b = Ent.fireGunFrom(host, g, mz, dir, world, (lf || sid) ? { life: lf || undefined, shell: sid || undefined } : null);
       b.turret = tu;
     }
     if (n) muzzleFlash(world, mz, dGun, host, g.cal || 20);

@@ -69,6 +69,7 @@
   Ent.ECM_LEAD_K = $.ECM_LEAD_K;
   Ent.fireGun = $.fireGun;
   Ent.fireGunFrom = $.fireGunFrom;
+  Ent.shellOf = $.shellOf;
   Ent.shellFuze = $.shellFuze;
   Ent.detonateShell = $.detonateShell;
   Ent.gunMuzzle = $.gunMuzzle;

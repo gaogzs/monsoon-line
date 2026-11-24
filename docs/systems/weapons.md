@@ -266,7 +266,8 @@ HUD 画**泪滴形动态瞄准圈**（目标套进圈内 = 必中）。`rkt` 与
 
 舰炮、近防炮、遥控炮、尾炮不在 `WEAPONS` 里，在 `TURRET_GUNS`（`js/data/turret-guns/<id>.js`，NPC 专用，不进挂载图鉴）。
 字段与机炮相同，另有 `gravity` / `fuze` / `blast` / `blastCore`（大口径近炸、定时空爆）、`airRange`、`surface`，
-以及 `kind: 'launcher'` 的导弹发射架。全表与瞄准逻辑见 [turret.md](turret.md)。
+以及 `kind: 'launcher'` 的导弹发射架。≥ 50 mm 舰炮另有 `ammo` 弹种表（`prox` 近炸引信高爆 / `he` 高爆），
+每发炮弹按瞄准目标选弹种：对空 `prox`，对舰船 `he`（`fuze` = 0，不被路上的飞机引爆）。全表与瞄准逻辑见 [turret.md](turret.md)。
 
 ## 机炮散布
 

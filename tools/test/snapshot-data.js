@@ -20,7 +20,8 @@ const OUT = path.join(__dirname, 'baseline', 'data.json');
    它们的内容现在只存在于 WEAPONS / SHIPS / PLATFORMS 里（基线 v3.0.0-a 起不再单列）。
    批次 1.8：HARD_MODELS / GUN_RESIST_MODELS 并入 TARGETS（js/data/targets/）；武器的布尔标志改成 tags，
    LEGACY_TAGS=1 时把标签还原成旧字段再比，用来核对"除迁移外一字不差"。
-   计划内字段改动：WEAPONS 里五门机炮多了 id 字段（注册表按 id 注册），并且从 k1 / k2 / k3 / k7 / k11 改名为 cel1 / cel2 / cel3 / cel7 / cel11（与玩家看到的 CEL-n 对应）。 */
+   计划内字段改动：WEAPONS 里五门机炮多了 id 字段（注册表按 id 注册），并且从 k1 / k2 / k3 / k7 / k11 改名为 cel1 / cel2 / cel3 / cel7 / cel11（与玩家看到的 CEL-n 对应）。
+   弹种系统：TURRET_GUNS 的 n50 / n75 / n120 把 fuze / blast / blastCore 搬进 ammo 表（prox 近炸引信高爆 / he 高爆），并新增 shellAir / shellSurface。 */
 const TABLES = ['CODEX', 'TARGETS', 'AIRCRAFT', 'SHIPS', 'PLATFORMS', 'WEAPONS', 'TURRET_GUNS',
   'VOICES', 'CALLSIGN', 'NAVAL_CS', 'NAVAL_NAMED',
   'NAVAL_CS_POOL', 'CS_DOWNSTREAM', 'CAMPAIGNS', 'SK_FITS'];

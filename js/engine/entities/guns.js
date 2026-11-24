@@ -1,7 +1,7 @@
 (function (Ent) {
   'use strict';
   var $ = Ent.$;
-  $.fireGunFrom = fireGunFrom; $.detonateShell = detonateShell; $.shellFuze = shellFuze; $.gunLead = gunLead; $.fireGun = fireGun; $.flashRings = flashRings; $.gunMuzzle = gunMuzzle; $.stepBullet = stepBullet;
+  $.fireGunFrom = fireGunFrom; $.shellOf = shellOf; $.detonateShell = detonateShell; $.shellFuze = shellFuze; $.gunLead = gunLead; $.fireGun = fireGun; $.flashRings = flashRings; $.gunMuzzle = gunMuzzle; $.stepBullet = stepBullet;
 
   /* ============================================================
      机炮
@@ -29,10 +29,13 @@
                 fuze / blast / blastCore  近炸引信与爆炸半径 —— 写了才会近炸 / 起爆，
                                           没写（航空机炮）就只有直接命中
      muzzle   炮口世界坐标；dir 单位方向（已含散布）
-     opt      { life }：缺省 range / speed
+     opt      { life, shell }：life 缺省 range / speed；shell = w.ammo 里的弹种 id（见 shellOf）
      炮弹的武器数据挂在 b.gw，不挂 b.w：b.w 会让 warheadK 把普通机炮也当成战斗部打折。
      起爆时 Combat.detonate 要读 shot.w，见 detonateShell。 */
   function fireGunFrom(shooter, w, muzzle, dir, world, opt) {
+    /* 弹种：opt.shell 指定时，这发弹的武器数据换成该弹种的版本（fuze / blast / blastCore 被覆盖） */
+    var shellId = (opt && opt.shell && w.ammo && w.ammo[opt.shell]) ? opt.shell : null;
+    if (shellId) w = shellOf(w, shellId);
     var life = (opt && opt.life) || Ballistics.life(w);
     var base = shooter.vel || M3.V(0, 0, 0);
     var b = {
@@ -43,8 +46,19 @@
       gw: w, grav: w.gravity === undefined ? 1 : w.gravity, drag: w.drag || 0,
       fuze: w.fuze || 0, blast: w.blast || 0
     };
+    if (shellId) b.shell = shellId;
     world.bullets.push(b);
     return b;
+  }
+
+  /* 弹种：炮的 ammo[id] 覆盖炮本身的 fuze / blast / blastCore，其余字段（速度、阻力、
+     Ballistics 缓存 __bal）靠原型继承原样共用。按炮缓存，不用每发弹新建一个对象。 */
+  function shellOf(g, id) {
+    var c = g.__shell || (g.__shell = {});
+    if (c[id] && Object.getPrototypeOf(c[id]) === g) return c[id];
+    var s = Object.create(g), a = g.ammo[id];
+    for (var k in a) if (Object.prototype.hasOwnProperty.call(a, k)) s[k] = a[k];
+    return (c[id] = s);
   }
 
   /* 带战斗部的炮弹起爆：直接命中 / 近炸 / 寿命到点空爆 / 落地，都走 Combat.detonate */
@@ -54,7 +68,7 @@
   }
 
   /* 近炸：本帧弹道线段离某架敌机的最近距离小于 fuze 就在最近点起爆。
-     只查飞机（炮弹对空才用近炸；打舰船靠直接命中）。 */
+     只查飞机，且只有带 fuze 的弹（prox 弹种）才会走到这里；he 弹 fuze = 0，靠直接命中 / 落水起爆。 */
   function shellFuze(b, world) {
     if (!b.alive || !(b.fuze > 0)) return false;
     var p0 = b.prev, d = M3.sub(b.pos, p0), dd = M3.dot(d, d);

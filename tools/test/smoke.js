@@ -6186,6 +6186,23 @@ try {
   const k1 = sandbox.WEAPONS.cel1;
   const b1 = EN.fireGunFrom({ team: 0, vel: V3.V(0, 0, 0) }, k1, V3.V(0, 1000, 0), V3.V(0, 0, 1), { bullets: [] });
   if (b1.blast || b1.fuze) bad.push('航空机炮的子弹带上了近炸 / 爆炸半径');
+  // 5b. 弹种：≥ 50 mm 舰炮每发按目标选弹种 —— 对空 prox（带近炸），对舰船 he（fuze = 0，不被路上的飞机引爆）
+  for (const id of ['n50', 'n75', 'n120']) {
+    const g = TG[id];
+    if (!g.ammo || !g.ammo.prox || !g.ammo.he || g.shellAir !== 'prox' || g.shellSurface !== 'he') { bad.push(id + ' 缺 prox / he 弹种表'); continue; }
+    const mk = (sh) => EN.fireGunFrom({ team: 0, vel: V3.V(0, 0, 0) }, g, V3.V(0, 100, 0), V3.V(0, 0, 1), { bullets: [] }, sh ? { shell: sh } : null);
+    const bp = mk('prox'), bh = mk('he');
+    if (bp.shell !== 'prox' || !(bp.fuze > 0) || !(bp.blast > 0)) bad.push(id + ' 的 prox 弹没带近炸引信 / 爆炸半径');
+    if (bh.shell !== 'he' || bh.fuze !== 0 || !(bh.blast > 0)) bad.push(id + ' 的 he 弹 fuze 应为 0 且带爆炸半径');
+    if (bp.blast !== bh.blast) bad.push(id + ' 两种弹的爆炸半径应一致（目前只差引信）');
+    // 敌机横穿弹道：prox 擦到就炸，he 不炸
+    for (const [b, want] of [[mk('prox'), true], [mk('he'), false]]) {
+      b.prev = V3.V(0, 100, 190); b.pos = V3.V(0, 100, 210);
+      const air = { kind: 'aircraft', team: 1, alive: true, hp: 1e9, maxHp: 1e9, pos: V3.V(0, 100, 200), vel: V3.V(0, 0, 0) };
+      const got = EN.shellFuze(b, { actors: [air], targets: [], bullets: [], particles: [], silent: true });
+      if (!!got !== want || b.alive === want) bad.push(id + ' 的 ' + b.shell + ' 弹遇到横穿的敌机：近炸=' + got + '，应为 ' + want);
+    }
+  }
   // 6. 预览网格带炮塔：面数 = 船体 + 各实体炮塔两件
   for (const s of SH) {
     if (!s.mounts) continue;
