@@ -30,8 +30,8 @@ Registry.model({
 
     b.quad(b.pt(0, 0.58, 6.4), b.pt(0.50, 0.68, 4.6), b.pt(0, 1.22, 3.2), b.pt(-0.50, 0.68, 4.6), C.canopy);
 
-    b.tube(V(0.42, 0, -10.6), V(0.42, 0, -11.3), 0.34, 0.32, 8, C.nozzle, C.darker);
-    b.tube(V(-0.42, 0, -10.6), V(-0.42, 0, -11.3), 0.34, 0.32, 8, C.nozzle, C.darker);
+    b.tube(V(0.34, 0, -10.6), V(0.34, 0, -11.3), 0.31, 0.29, 8, C.nozzle, C.darker);
+    b.tube(V(-0.34, 0, -10.6), V(-0.34, 0, -11.3), 0.31, 0.29, 8, C.nozzle, C.darker);
 
     return done(b, { span: 13.8, len: 22.9 });
   }
