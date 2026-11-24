@@ -71,6 +71,7 @@ var ModelLib = (function () {
   /** 轴向棱柱机身：secs = [{z, w, h, y?}] */
   MB.prototype.fuselage = function (secs, col, colCap) {
     var idx = [], i, s, z, w, h, y;
+    if (!this.hullSecs) this.hullSecs = secs;  // 第一条机身（主机身）的站位，flightDeck 按它贴顶面（不叫 hull：MB.hull 是船体方法）
     for (i = 0; i < secs.length; i++) {
       s = secs[i]; z = s.z; w = s.w; h = s.h; y = s.y || 0;
       idx.push([
@@ -91,6 +92,60 @@ var ModelLib = (function () {
     this.quad(F[0], F[3], F[2], F[1], colCap || col);
     this.quad(L[0], L[1], L[2], L[3], colCap || col);
     return idx;
+  };
+
+  /** 驾驶舱段（大型机用）：机身顶面上凸起一小段 —— 前风挡两块（中间一根立柱）、
+      两侧各一条长侧窗、平顶、后坡。战斗机那种"一片菱形盖子"放在运输机、轰炸机上像贴纸，
+      所以大型机改用这个。
+      位置按机身站位（b.fuselage 记下的 this.hullSecs，或 o.secs）自动贴着机身顶面，
+      调用的人只管给前后位置和大小。
+      玻璃面都和相邻面共用顶点，seatCanopies 不会把它们当战斗机舱盖压回机身；
+      整体是没有底的开口壳，orientClosed 不会给它标背面剔除（保持双面）。
+      o: z0   风挡下沿（最靠机头的 z）     dz  风挡水平长度     len 平顶长度     back 后坡长度
+         hw   顶部半宽                     hh  凸起高度
+         body 外壳色  glass 风挡色  glass2 侧窗色（缺省同 glass） */
+  MB.prototype.flightDeck = function (o) {
+    var secs = o.secs || this.hullSecs, self = this;
+    if (!secs) throw new Error('flightDeck: 先建机身（b.fuselage）');
+    var sec = function (z) {
+      for (var i = 0; i < secs.length - 1; i++) {
+        var a = secs[i], b = secs[i + 1];
+        if (z <= a.z && z >= b.z) {
+          var t = (a.z - z) / (a.z - b.z);
+          return { w: a.w + (b.w - a.w) * t, h: a.h + (b.h - a.h) * t, y: (a.y || 0) + ((b.y || 0) - (a.y || 0)) * t };
+        }
+      }
+      throw new Error('flightDeck: z 不在机身范围内 ' + z);
+    };
+    // 机身截面是菱形：离中线 x 处的顶面高度
+    var surf = function (x, z) { var s = sec(z); return s.y + s.h * (1 - Math.min(1, Math.abs(x) / s.w)); };
+    var mix = function (p, q, t) {
+      var a = self.v[p], b = self.v[q];
+      return self.pt(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t);
+    };
+    var z0 = o.z0, z1 = z0 - o.dz, z2 = z1 - o.len, z3 = z2 - o.back, hw = o.hw;
+    var wf = Math.min(hw * 0.55, sec(z0).w * 0.8);     // 风挡下沿半宽（机头在收窄，风挡包得窄一点）
+    var wb = Math.min(hw * 1.15, sec(z2).w * 0.8);     // 侧墙下沿后端半宽
+    var we = Math.min(hw * 0.70, sec(z3).w * 0.8);     // 后坡落到机身上的半宽
+    var yr = surf(0, z1) + o.hh;
+    var body = o.body, g1 = o.glass, g2 = o.glass2 || o.glass;
+    var AL = this.pt(-wf, surf(wf, z0), z0), AR = this.pt(wf, surf(wf, z0), z0), M = this.pt(0, surf(0, z0), z0);
+    var BL = this.pt(-hw, yr, z1), BR = this.pt(hw, yr, z1), T = this.pt(0, yr, z1);
+    var CL = this.pt(-hw, yr, z2), CR = this.pt(hw, yr, z2);
+    var DL = this.pt(-wb, surf(wb, z2) - 0.02, z2), DR = this.pt(wb, surf(wb, z2) - 0.02, z2);
+    var EL = this.pt(-we, surf(we, z3) - 0.02, z3), ER = this.pt(we, surf(we, z3) - 0.02, z3);
+    var A2L = mix(AL, BL, 0.4), A2R = mix(AR, BR, 0.4), D2L = mix(DL, CL, 0.4), D2R = mix(DR, CR, 0.4);
+    this.quad(AL, M, T, BL, g1);                      // 风挡：左右两块
+    this.quad(M, AR, BR, T, g1);
+    this.quad(A2L, BL, CL, D2L, g2);                  // 侧窗：墙上半截通长一条
+    this.quad(AL, A2L, D2L, DL, body);                // 墙下半截
+    this.quad(BR, A2R, D2R, CR, g2);
+    this.quad(AR, DR, D2R, A2R, body);
+    this.quad(BL, BR, CR, CL, body);                  // 平顶
+    this.quad(CL, CR, ER, EL, body);                  // 后坡
+    this.tri(CL, DL, EL, body);
+    this.tri(CR, ER, DR, body);
+    return this;
   };
 
   /** 长方体 */

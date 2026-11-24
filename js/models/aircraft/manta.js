@@ -47,9 +47,8 @@ Registry.model({
     // 背部货舱隆起
     b.box(0, 2.1, -3, 2.2, 1.0, 12, C.body3);
 
-    // 驾驶舱玻璃
-    b.quad(b.vt(V(0, 1.45, 8.6)), b.vt(V(1.1, 1.35, 6.2)),
-      b.vt(V(0, 1.55, 4.6)), b.vt(V(-1.1, 1.35, 6.2)), C.canopy);
+    // 驾驶舱：飞翼中央体上一个低矮的凸起，两块风挡 + 侧窗
+    b.flightDeck({ z0: 8.6, dz: 1.4, len: 2.0, back: 1.4, hw: 0.75, hh: 0.35, body: C.body, glass: C.canopy });
 
     return done(b, { span: 47, len: 41, sweepAlt: null });
   }

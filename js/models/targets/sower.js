@@ -27,7 +27,8 @@ Registry.model({
     b.tube(V(0.9, 0, -23.7), V(0.9, 0, -25.6), 0.58, 0.54, 10, C.nozzle, C.darker);
     b.tube(V(-0.9, 0, -23.7), V(-0.9, 0, -25.6), 0.58, 0.54, 10, C.nozzle, C.darker);
 
-    b.quad(b.pt(0, 2.15, 13.5), b.pt(1.1, 2.30, 10.0), b.pt(0, 3.10, 8.0), b.pt(-1.1, 2.30, 10.0), C.canopy);
+    // 驾驶舱：机头顶上凸起的一段（大型机不用战斗机的菱形盖子）
+    b.flightDeck({ z0: 13.2, dz: 1.6, len: 2.4, back: 1.6, hw: 0.85, hh: 0.55, body: C.navy, glass: C.canopy });
 
     return done(b, { span: 38.0, len: 42.5 });
   }

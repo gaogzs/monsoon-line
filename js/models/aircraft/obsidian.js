@@ -59,9 +59,8 @@ Registry.model({
     var bays = [10, 0, -10];
     for (var bi = 0; bi < bays.length; bi++) b.box(0, -1.40, bays[bi], 1.3, 0.06, 7.0, C.dark);
 
-    // 下垂鼻上的小舱盖
-    b.quad(b.vt(V(0, 0.35, 18.5)), b.vt(V(0.55, 0.55, 14.8)),
-      b.vt(V(0, 0.95, 12.8)), b.vt(V(-0.55, 0.55, 14.8)), C.canopy);
+    // 驾驶舱：下垂鼻后面一小段，低矮的两块风挡（协和的风挡很小，鼻子一放下来就是为了看路）
+    b.flightDeck({ z0: 17.0, dz: 1.2, len: 2.2, back: 1.2, hw: 0.5, hh: 0.28, body: C.body, glass: C.canopy });
 
     return done(b, { span: 19.2, len: 47, sweepAlt: null });
   }

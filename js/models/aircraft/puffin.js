@@ -38,9 +38,8 @@ Registry.model({
     b.box(0, -0.1, 13.0, 1.4, 1.2, 2.6, C.wing2);
     b.box(0, -2.5, -0.5, 3.0, 0.9, 12, C.body3);
 
-    // 座舱盖
-    b.quad(b.vt(V(0, 1.7, 11.4)), b.vt(V(0.9, 1.5, 9.6)),
-      b.vt(V(0, 1.3, 8.6)), b.vt(V(-0.9, 1.5, 9.6)), C.canopy);
+    // 驾驶舱：机头顶上凸起的一段（大型机不用战斗机的菱形盖子）
+    b.flightDeck({ z0: 12.4, dz: 1.5, len: 2.2, back: 1.4, hw: 0.8, hh: 0.5, body: C.body, glass: C.canopy });
 
     return done(b, { span: 30, len: 29.6, sweepAlt: null });
   }
