@@ -164,11 +164,27 @@
     // 中点插进去了，翼根前后两端还悬在收窄的机身外面。
     // 方向两个都试：沿翼面（翼尖 → 翼根）和直接朝机身轴线，取挪动更少的那个；
     // 翼根在收窄段外侧时，顺着翼展往下戳会擦边而过或戳得很深。
-    var push = function (P, T) {
-      if (insideBody(m, body, P[0], P[1], P[2])) return;
-      var a = pushAlong(P, dir(P, T)), c = pushAlong(P, dir([0, 0, P[2]], P));
-      var p = a && (!c || a.e <= c.e) ? a : c;
+    /* 优先沿翼面自己的方向推：翼面是一块平板，翼根被朝轴线斜着拽，整片尾翼的倾角就变了
+       （模型里写 0° 的垂尾显示成 4–6°，写 4° 的显示成 14°）。沿翼面推不进去、或要推得很深
+       （> ALONG_MAX，翼根擦着收窄的机身边）才退回朝轴线推。
+       **同一片翼面的两个翼根点必须同进同退**：一个沿翼面、一个朝轴线，翼面前后缘的倾角就不一样，
+       整片被扭歪（蝠鲼的后缘翼根在机身末端之后，只剩一根细尾刺）。有一个点沿翼面推不动，
+       两个点都用旧规则（取挪动更少的那个）。 */
+    var ALONG_MAX = 1.2;
+    var plan = function (P, T) {
+      if (insideBody(m, body, P[0], P[1], P[2])) return null;        // 已经在机身里：不动
+      return { a: pushAlong(P, dir(P, T)), c: pushAlong(P, dir([0, 0, P[2]], P)) };
+    };
+    var alongOk = function (pl) { return !pl || (pl.a && (!pl.c || pl.a.e <= Math.max(pl.c.e, ALONG_MAX))); };
+    var apply = function (P, pl, useAlong) {
+      if (!pl) return;
+      var p = useAlong ? pl.a : (pl.a && (!pl.c || pl.a.e <= pl.c.e) ? pl.a : pl.c);
       if (p) { P[0] = p.q[0]; P[1] = p.q[1]; P[2] = p.q[2]; }
+    };
+    var pushPair = function (P0, T0, P1, T1) {
+      var p0 = plan(P0, T0), p1 = plan(P1, T1), useAlong = alongOk(p0) && alongOk(p1);
+      apply(P0, p0, useAlong);
+      apply(P1, p1, useAlong);
     };
     for (var n = 0; n < fins.length; n++) {
       var ids = m.f[fins[n]].i;
@@ -180,17 +196,16 @@
       }
       var r0 = ids[best], r1 = ids[(best + 1) % 4];
       var t0 = ids[(best + 3) % 4], t1 = ids[(best + 2) % 4];   // 各自对应的翼尖点
-      push(m.v[r0], m.v[t0]);
-      push(m.v[r1], m.v[t1]);
+      pushPair(m.v[r0], m.v[t0], m.v[r1], m.v[t1]);
     }
     // foil 的翼根：前缘、后缘两点各推一次；上下最厚点跟着它们平移（按 0.6 : 0.4 取）。
     // 可变后掠翼的根由 morph 驱动，跳过。
     for (q = 0; q < foils.length; q++) {
       var R = foils[q].root, TP = foils[q].tip;
       if (morph[R[0]] || morph[R[2]]) continue;
+      if (foils[q].seat === false) continue;       // 装在别的翼面上的：翼根不归机身管
       var oL = m.v[R[0]].slice(), oT = m.v[R[2]].slice();
-      push(m.v[R[0]], m.v[TP[0]]);
-      push(m.v[R[2]], m.v[TP[2]]);
+      pushPair(m.v[R[0]], m.v[TP[0]], m.v[R[2]], m.v[TP[2]]);
       for (var kk = 1; kk < 4; kk += 2) {
         var mv = m.v[R[kk]];
         for (k = 0; k < 3; k++) {

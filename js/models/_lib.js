@@ -191,7 +191,10 @@ var ModelLib = (function () {
     }
     this.quad(id[0], id[1], id[2], id[3], col);
     this.quad(id[4], id[5], id[6], id[7], col);
-    (this.foils = this.foils || []).push({ f0: f0, f1: this.f.length, root: id.slice(0, 4), tip: id.slice(4) });
+    /* seat：翼根要不要被 rootFins 推进机身。装在别的翼面上的（A-10 式平尾端板垂尾）
+       传 opts.seat = false —— 它的翼根不在机身上，推进去只会把整片尾翼拽歪。 */
+    (this.foils = this.foils || []).push({ f0: f0, f1: this.f.length, root: id.slice(0, 4), tip: id.slice(4),
+      seat: !(opts && opts.seat === false) });
     return id;
   };
 
