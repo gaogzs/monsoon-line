@@ -9,7 +9,7 @@
    1. 公式性质：最高可持续高度满足 vT ≥ K·vStall 且恰好在边界上；可持续爬升梯度随高度下降、随速度下降、
       速度低于下限时为负、余量充足时不起作用（≥ 0.34，走原来的公式）；
    1b. 机头守卫：杆量对 fwd.y 的作用取决于机体朝向（俯仰杆 ∝ up.y，偏航杆 ∝ right.y），倒飞时方向反过来，
-      倒飞时方向反过来。曾经因为压杆方向写死，倒飞时把机头往上推；
+      大坡度时俯仰杆几乎没有垂直操纵权、要用偏航杆。曾经因为压杆方向写死，倒飞时把机头往上推；
    2. 任务数据与公式一致：石英 / 磁石在任务里的航线高度都在各自的最高可持续高度以下，
       而它们以前的高度（11 000 / 15 800 m）在以上（所以那时必然失速）；
    3. 水准 m5 × 12 个种子（HEAD 上种子 4、6 失速）：失速 = 0，速度始终 ≥ 1.05·失速速度；
@@ -98,6 +98,12 @@ console.log('\n== 1b. 机头守卫：杆的方向要看机体朝向 ==\n');
   check('倒飞、机头超限、杆是 +1（拉杆正在把机头压向世界下方）：不动 —— 这是以前的 bug：正负号写死，把它压成 −1', c.pitch === 1, 'pitch=' + c.pitch);
   c = guard(0.2, 1, 0, 1, 0, 0.3);
   check('没超限：不动', c.pitch === 1 && c.yaw === 0);
+  c = guard(0.42, 0.22, -0.97, 1, 0, 0.05);
+  check('右坡度 77°（up.y = 0.22，俯仰杆没有垂直操纵权）：偏航杆 +1 把机头放下来，同时压掉拉杆', c.yaw === 1 && c.pitch === -1, 'pitch=' + c.pitch + ' yaw=' + c.yaw);
+  c = guard(0.42, 0.22, 0.97, 1, 0, 0.05);
+  check('左坡度 77°：偏航杆 −1', c.yaw === -1 && c.pitch === -1, 'pitch=' + c.pitch + ' yaw=' + c.yaw);
+  c = guard(0.42, 0.95, -0.3, 1, 0.2, 0.05);
+  check('小坡度（|right.y| ≤ 0.5）：不碰偏航杆', c.yaw === 0.2, 'yaw=' + c.yaw);
 }
 
 console.log('\n== 2. 任务数据与公式一致 ==\n');
@@ -161,6 +167,12 @@ console.log('\n== 4. 全部关卡 × 150 s：所有走航线的 NPC 失速帧 = 
   check('观察到走航线的 NPC 条目 ≥ 15 个，且包含水准 / 巨砾 / 石英 / 磁石 / 鹈鹕（不是空通过）',
     keys.length >= 15 && ['datum', 'boulder', 'quartz', 'lodestone', 'pelican'].every(t => types.has(t)), keys.length + ' 个条目，机型：' + [...types].join(','));
   check('所有走航线的 NPC 失速帧合计 = 0', total === 0, withStall.length ? '有失速：' + withStall.map(k => k + ':' + rows[k].stall).join(' ') : '0 帧');
+  /* 高度捕获的超调：最高高度不超过要求 + OVER_MAX。以前巨砾 @m8 要求 6000 m 冲到 8.7 km（+2684 m）：大坡度转弯里机头被卡在 25° 仰角，
+     指令要它下降也不放。现在实测最大是巨砾的 +568 m（俯仰响应最慢，0.15 rad/s），其余都在 +270 m 以内。
+     上限 700 m 是照实测定的，不是理想值：巨砾仍然超调 568 m，要再收紧得让机头上限完全跟着垂直指令走（阶段 2 之后的事）。 */
+  const OVER_MAX = 700, over = keys.filter(k => rows[k].req > 0 && rows[k].ymax > rows[k].req + OVER_MAX);
+  check('航线飞机的最高高度不超过要求 + ' + OVER_MAX + ' m', over.length === 0,
+    over.length ? '超调：' + over.map(k => k + ' +' + Math.round(rows[k].ymax - rows[k].req)).join(' ') : '最大 ' + Math.max.apply(null, keys.filter(k => rows[k].req > 0).map(k => rows[k].ymax - rows[k].req)).toFixed(0) + ' m（' + keys.filter(k => rows[k].req > 0).sort((a, b) => (rows[b].ymax - rows[b].req) - (rows[a].ymax - rows[a].req))[0] + '）');
 }
 
 console.log('\n' + (bad.length

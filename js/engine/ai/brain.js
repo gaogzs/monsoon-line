@@ -165,7 +165,12 @@
     if (r.jam) jamAuto(a, r.jam, world, dt);
 
     $.steerTo(a, desired, ctrl, a);
-    $.routeNoseGuard(a, ctrl, $.routeNoseLimit(climbCap));      // 机头上限；压杆方向看 up.y（倒飞时反过来），见 ai/energy.js
+    /* 机头上限（见 ai/energy.js 的 routeNoseGuard：压杆方向看 up.y，大坡度时用偏航杆）。
+       比目标高 150 m 以上时上限收到 0.05：它在目标之上就不该往上扬 —— 上限要跟着垂直指令走，
+       不然机头会被钉在绝对上限（0.42）上、指令要它下降也不放（巨砾 @m8：要求 6000 m，直线爬到 8.7 km）。 */
+    var noseLim = $.routeNoseLimit(climbCap);
+    if (aglA > altEff + 150) noseLim = Math.min(noseLim, 0.05);
+    $.routeNoseGuard(a, ctrl, noseLim);
     a.throttle = 0.95;
     a.ab = false;
 

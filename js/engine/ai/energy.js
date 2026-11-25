@@ -99,14 +99,20 @@
   // 路线跟随时机头 fwd.y 的上限（超过就按超出量压杆）
   $.routeNoseLimit = function (climbCap) { return Math.min(RT_CLIMB + RT_NOSE_OVER, climbCap + 0.05); };
 
-  /* 机头超过上限时把杆压回去。杆量对 fwd.y 的作用正比于 up.y（正拉 = 机头朝机体上方转，倒飞时机体上方是
-     世界下方），所以压杆的方向要看 up.y 的符号；只在「这根杆正把机头往上推」（ctrl.pitch · up.y > 0）时压。
-     正飞时与「杆量 > 0 就压成负」逐位一致。
-     以前写成 ctrl.pitch > 0 就压负：steerTo 为了往下降翻成倒飞再拉杆时，这里反而把杆压成 −1，
-     倒飞的 −1 是把机头往世界上方推，水准在 K = 1.4 时就这样一路冲到 21.5 km 再失速。 */
+  /* 机头超过上限时把杆压回去。机头 fwd.y 对杆量的响应取决于机体朝向：
+       俯仰杆 ∝ up.y（正拉 = 机头朝机体上方转，倒飞时机体上方是世界下方）；
+       偏航杆 ∝ right.y（右偏航把机头转向 right 方向，其 y 分量就是 right.y）。
+     ① 俯仰：压杆的方向看 up.y 的符号，只在「这根杆正把机头往上推」（ctrl.pitch · up.y > 0）时压。
+        正飞时与「杆量 > 0 就压成负」逐位一致。以前写成 ctrl.pitch > 0 就压负：steerTo 为了往下降翻成倒飞再拉杆时，
+        这里反而把杆压成 −1，倒飞的 −1 是把机头往世界上方推，水准在 K = 1.4 时就这样一路冲到 21.5 km 再失速。
+     ② 偏航：大坡度（|right.y| > 0.5，约 30° 以上）时俯仰杆几乎没有垂直操纵权（坡度 77° 时 up.y 只有 0.22），
+        能放下机头的是偏航杆（|right.y| ≈ 0.97），右坡度（right.y < 0）要正偏航、左坡度要负偏航。
+        巨砾 @m8 在大坡度转弯里被卡在 25° 仰角、直线爬了 50 秒（冲到 8.7 km），就是因为只有俯仰这一个通道。 */
   $.routeNoseGuard = function (a, ctrl, noseLim) {
-    if (a.fwd.y > noseLim && ctrl.pitch * a.up.y > 0) {
-      ctrl.pitch = -(a.up.y > 0 ? 1 : -1) * Math.min(1, (a.fwd.y - noseLim) * 3);
+    if (a.fwd.y > noseLim) {
+      var ex = Math.min(1, (a.fwd.y - noseLim) * 3);
+      if (ctrl.pitch * a.up.y > 0) ctrl.pitch = -(a.up.y > 0 ? 1 : -1) * ex;
+      if (Math.abs(a.right.y) > 0.5) ctrl.yaw = (a.right.y < 0 ? 1 : -1) * ex;
     }
   };
 })(AI);
