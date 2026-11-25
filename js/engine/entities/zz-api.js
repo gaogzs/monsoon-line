@@ -11,6 +11,7 @@
   Ent.stallK = $.stallK;
   Ent.ceilingEff = $.ceilingEff;
   Ent.thrustK = $.thrustK;
+  Ent.vTargetAt = $.vTargetAt;       // 目标速度公式：stepAircraft 与 AI 的航线能量保护共用（ai/energy.js）
   Ent.vStallAt = function (a) { return $.effectivePhys(a).vStall; };
   Ent.makeAircraft = $.makeAircraft;
   Ent.stepAircraft = $.stepAircraft;

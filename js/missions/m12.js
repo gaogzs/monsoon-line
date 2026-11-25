@@ -90,7 +90,8 @@ Registry.mission({
     // 预警机
     spawnAewc(w, {
       ac: 'quartz', team: 1, label: T('missions.m12.spawn.label'),
-      x: 0, y: 11000, z: 34000,
+      // 10 000 m，不是 11 000（石英的有效升限）：理由见 m6.js 同一处
+      x: 0, y: 10000, z: 34000,
       a: M3.V(8000, 0, 34000), b: M3.V(-8000, 0, 37000)
     });
 

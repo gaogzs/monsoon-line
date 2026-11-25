@@ -146,15 +146,26 @@
     // 巡航高度保持 —— 航线给了高度，它只负责回到那上面
     // （航线高度 r.alt 按离地高度算：飞过高地时跟着抬起来）
     var aglA = Ent.agl(a);
-    if (aglA < r.alt - 150 && desired.y < 0.10) {
-      desired = M3.norm(M3.V(desired.x, 0.34, desired.z));
-    } else if (aglA > r.alt + 150 && desired.y > -0.10) {
+    /* 能量保护（ai/energy.js，按动压算）：航线要求的高度钳到这架飞机能持续飞的高度；
+       爬升梯度不超过当前高度上能持续的梯度；机头不得高过它。限制不起作用时一律走原来的公式。 */
+    var altEff = r.alt, yTopAbs = a.pos.y + (r.alt - aglA), yMaxAbs = $.routeAltMax(a);
+    if (yTopAbs > yMaxAbs) { altEff = r.alt - (yTopAbs - yMaxAbs); yTopAbs = yMaxAbs; }
+    var climbCap = $.routeClimbCap(a, yTopAbs);
+    if (aglA < altEff - 150 && desired.y < 0.10) {
+      if (climbCap >= $.RT_CLIMB) {
+        desired = M3.norm(M3.V(desired.x, 0.34, desired.z));
+      } else {
+        var sg = Math.min(0.32, Math.max(-0.28, climbCap));      // 梯度 → 方向：tanγ = sinγ / √(1 − sin²γ)
+        desired = M3.norm(M3.V(desired.x, sg / Math.sqrt(1 - sg * sg), desired.z));
+      }
+    } else if (aglA > altEff + 150 && desired.y > -0.10) {
       desired = M3.norm(M3.V(desired.x, -0.28, desired.z));
     }
 
     if (r.jam) jamAuto(a, r.jam, world, dt);
 
     $.steerTo(a, desired, ctrl, a);
+    $.routeNoseGuard(a, ctrl, $.routeNoseLimit(climbCap));      // 机头上限；压杆方向看 up.y（倒飞时反过来），见 ai/energy.js
     a.throttle = 0.95;
     a.ab = false;
 

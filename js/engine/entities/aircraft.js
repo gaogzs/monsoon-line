@@ -1,7 +1,7 @@
 (function (Ent) {
   'use strict';
   var $ = Ent.$;
-  $.makeAircraft = makeAircraft; $.curLoadFactor = curLoadFactor; $.stepAircraft = stepAircraft; $.effectivePhys = effectivePhys; $.stepAircraftTail = stepAircraftTail; $.nozzlesOf = nozzlesOf; $.exhaustPlumes = exhaustPlumes; $.hasAfterburner = hasAfterburner;
+  $.makeAircraft = makeAircraft; $.curLoadFactor = curLoadFactor; $.stepAircraft = stepAircraft; $.effectivePhys = effectivePhys; $.stepAircraftTail = stepAircraftTail; $.nozzlesOf = nozzlesOf; $.exhaustPlumes = exhaustPlumes; $.hasAfterburner = hasAfterburner; $.vTargetAt = vTargetAt;
 
   /* ============================================================
      飞机
@@ -297,7 +297,7 @@
        见 physics.js「失速速度随动压变化」。怠速目标仍锚在当前高度的失速速度上。 */
     var vTarget = (a.ac && a.ac.vtol)
       ? $.vtolSpeedTarget(a, p, a.throttle)       // 垂直起降机型：推力 = 期望前进速度，0% 静止悬浮、50% = vStall（见 vtol.js）
-      : M3.lerp(p.vStall * 0.74, (a.ab ? p.vMax : p.vMil) * $.thrustK(a, a.pos.y), th);
+      : vTargetAt(a, p, a.pos.y, th, a.ab);
 
     // 可变后掠翼：低速展开（改善低速盘旋），高速后掠（减小波阻）
     if (a.ac && a.ac.variableSweep) {
@@ -462,6 +462,13 @@
     var abT = (a.ab && hasAfterburner(a)) ? 1 : 0, abF = a.abFx || 0;
     a.abFx = abF + (abT - abF) * Math.min(1, dt * (abT ? 12 : 7));
     if (a.abFx < 0.004 && !abT) a.abFx = 0;
+  }
+
+  /* 高度 y、油门 th（0..1）下的目标速度（真空速）。stepAircraft 和 AI 的航线能量保护（ai/energy.js 的
+     routeAltMax / routeClimbCap）共用这一个公式：军推 / 加力的目标速度乘 thrustK(y)，怠速目标锚在 y 处的失速速度上。
+     p 是 effectivePhys(a)（要有 vStall0 / vMil / vMax）。 */
+  function vTargetAt(a, p, y, th, ab) {
+    return M3.lerp(p.vStall0 * $.stallK(y) * 0.74, (ab ? p.vMax : p.vMil) * $.thrustK(a, y), th);
   }
 
   /* 有没有加力：机型数据里 vMax（加力上限）高于 vMil（军推）。**vMax == vMil 就是没有加力** ——
