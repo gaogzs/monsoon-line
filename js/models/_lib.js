@@ -106,7 +106,7 @@ var ModelLib = (function () {
          body 外壳色  glass 风挡色  glass2 侧窗色（缺省同 glass） */
   MB.prototype.flightDeck = function (o) {
     var secs = o.secs || this.hullSecs, self = this;
-    if (!secs) throw new Error('flightDeck: 先建机身（b.fuselage）');
+    if (!secs) throw new Error('flightDeck: build the fuselage first (b.fuselage)');
     var sec = function (z) {
       for (var i = 0; i < secs.length - 1; i++) {
         var a = secs[i], b = secs[i + 1];
@@ -115,7 +115,7 @@ var ModelLib = (function () {
           return { w: a.w + (b.w - a.w) * t, h: a.h + (b.h - a.h) * t, y: (a.y || 0) + ((b.y || 0) - (a.y || 0)) * t };
         }
       }
-      throw new Error('flightDeck: z 不在机身范围内 ' + z);
+      throw new Error('flightDeck: z is outside the fuselage range: ' + z);
     };
     // 机身截面是菱形：离中线 x 处的顶面高度
     var surf = function (x, z) { var s = sec(z); return s.y + s.h * (1 - Math.min(1, Math.abs(x) / s.w)); };
